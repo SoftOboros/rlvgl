@@ -1,8 +1,8 @@
 # SCTD-04 — Ratatui ↔ rlvgl Two-Way Integration
 
-Status: **RATIFIED** (2026-07-12)
+Status: **RATIFIED AND IMPLEMENTED** (2026-07-12)
 Family: SCXML Tutorial Demo (SCTD). Builds on SCTD-00 through SCTD-03.
-Governs the proposed `ratatui-rlvgl` crate, the Ratatui submodule boundary,
+Governs the shipped `ratatui-rlvgl` crate, the Ratatui submodule boundary,
 the host demo, and the STM32H747I-DISCO bare-metal demonstration.
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT, MAY, and RECOMMENDED are
@@ -12,7 +12,7 @@ per RFC 2119 / 8174.
 
 - Ratatui's `Backend`, `Terminal`, `Buffer`, `Cell`, `Color`, `Modifier`,
   `Position`, `Size`, and `WindowSize` semantics are **as defined in
-  `SoftOboros/ratatui` at `de5168de6ba2f4b310565c287764f213f249a61f`;
+  `SoftOboros/ratatui` at `fc7c6a70794eebeaad5a1b732b9d5446dc9a4cb0`;
   used without modification**. At this baseline, `ratatui-core` and
   `ratatui` are `#![no_std]`, and `Backend::Error` is bounded by
   `core::error::Error` rather than `std::io::Error`.
@@ -29,7 +29,9 @@ per RFC 2119 / 8174.
   board/display/touch/DMA2D authority. SCTD-04 MUST reuse it and MUST NOT
   fork or copy the low-level bring-up sequence.
 - `RlvglBackend`, `RatatuiSurface`, `RatatuiView`, `CellMetrics`, and
-  `RlvglInput` are **owned by SCTD-04; they do not exist in either repo yet**.
+  `RlvglInput` are **as defined in
+  `vendor/ratatui/ratatui-rlvgl/src/{backend.rs,view.rs}`; implemented under
+  SCTD-04 and used without modification**.
 
 SCTD-04 execution is authorized by the 2026-07-12 ratification in §15.
 
@@ -52,10 +54,11 @@ end-to-end “Rust all the way down” proof.
 
 ## §2 Problem statement (informative)
 
-The current SCTD application is a target-neutral rlvgl widget tree. Its
-STM32H747I-DISCO entrypoint (`src/sctd_main.rs`) only allocates 64 KiB,
-constructs `SctdController`, and loops; it deliberately omits display, touch,
-LTDC/DSI, and DMA2D initialization. It is a compile gate, not a flashable demo.
+At ratification, the SCTD application was a target-neutral rlvgl widget tree.
+Its STM32H747I-DISCO entrypoint (`src/sctd_main.rs`) only allocated 64 KiB,
+constructed `SctdController`, and looped; it deliberately omitted display,
+touch, LTDC/DSI, and DMA2D initialization. That compile gate was the problem
+SCTD-04's shared `main.rs` payload mount had to replace.
 
 Ratatui's `Backend::draw` receives cell diffs, but an rlvgl `Renderer` is only
 borrowed during `Widget::draw`. Holding that renderer inside a long-lived
@@ -83,8 +86,9 @@ rlvgl superproject must test the same source against its in-tree `rlvgl-core`.
   `RatatuiSurface` through the `Renderer` supplied to `Widget::draw`. The same
   type can occupy the root content region or a child pane.
 - **`CellMetrics`** — *Owned by SCTD-04.* Fixed pixel width, pixel height, and
-  baseline offset for one Ratatui cell. V1 defaults to `FONT_6X10` and 6×10
-  pixels; alternate fonts are admitted only by §6's registration policy.
+  baseline offset for one Ratatui cell. V1 defaults to `FONT_6X10` at its
+  configured 2× display scale, producing 12×20-pixel cells; alternate fonts
+  are admitted only by §6's registration policy.
 - **Backend direction** — *Owned by SCTD-04.* Ratatui owns frame composition;
   `Terminal<RlvglBackend>` emits cells and rlvgl carries them to the display.
 - **Hosted-pane direction** — *Owned by SCTD-04.* A native rlvgl screen owns
@@ -322,8 +326,8 @@ video is the separate physical Rust-all-the-way-down proof.
 
 The hardware target SHALL be the CM7 bare-metal
 `thumbv7em-none-eabihf` path with rlvgl's Rust display/touch runtime and the
-`dma2d` feature. `sctd_main.rs`'s current construct-and-loop stub is not a
-conforming target.
+`dma2d` feature. The pre-SCTD-04 `sctd_main.rs` construct-and-loop stub was not
+a conforming target and is retained only as a historical note.
 
 Implementation SHALL make SCTD a payload of the established flashable
 bare-metal runtime, or extract a shared runtime mount used by both binaries.
@@ -345,8 +349,9 @@ the bench record.
 
 - Before UI layout is frozen, implementation SHALL measure `size_of::<Cell>()`
   and account for both Ratatui terminal buffers, the bridge surface, event log,
-  and rlvgl allocations. The existing 64 KiB `sctd_main.rs` heap MUST NOT be
-  assumed sufficient.
+  and rlvgl allocations. The preimplementation 64 KiB primary heap MUST NOT be
+  assumed sufficient. The shipped SCTD mount adds a reserved 8 MiB secondary
+  SDRAM allocation arena through the established platform memory map.
 - Any enlarged heap or SDRAM-backed arena SHALL reuse the established DISCO
   memory map and cache discipline. It MUST NOT overlap framebuffers, DMA
   scratch, CM4 ownership, or scanout memory.
@@ -437,7 +442,7 @@ A conforming SCTD-04 implementation MUST satisfy all of the following:
 - `examples/stm32h747i-disco/src/{main.rs,sctd_main.rs}`
 - `core/src/{bitmap_font.rs,event.rs,renderer.rs,widget.rs}`
 - `platform/src/{blit.rs,dma2d.rs,display_init.rs,dsi_cmd_mode.rs,stm32h747i_disco.rs}`
-- proposed `.gitmodules`, `vendor/ratatui/ratatui-rlvgl/`
+- `.gitmodules`, `vendor/ratatui/ratatui-rlvgl/`
 - Ratatui baseline:
   `ratatui-core/src/{backend.rs,buffer/cell.rs,terminal.rs}` and root
   `Cargo.toml`
@@ -606,9 +611,20 @@ Owner ratification unblocks the following ordered execution phases:
   seats occupied. Visual QA confirms native full → Depart → Arrive followed by
   Ratatui inherited-full → Depart → Arrive, with seat 5 visibly empty only in
   the two Depart frames.
+- 2026-07-12 — Advanced the Ratatui baseline from the preimplementation
+  `de5168de6ba2f4b310565c287764f213f249a61f` anchor to the implemented
+  contribution revision `fc7c6a70794eebeaad5a1b732b9d5446dc9a4cb0`, which
+  contains the `ratatui-rlvgl` crate and coordinated no-std facade/core/widget
+  changes. Documentation now pins that revision until the upstream Ratatui PR
+  and release provide matching crates.io packages.
 - 2026-07-12 — Owner authorized release preparation. The first
   `ratatui-rlvgl` publish is assigned to rlvgl's Gate P/publish chain after
   `rlvgl-core`; the Ratatui upstream PR remains a subsequent action.
+- 2026-07-12 — Added the five-chapter `docs/ratatui-tutorial/` implementation
+  walkthrough and updated the separate state-chart tutorial with the iState
+  MCP generation sequence plus current host, ESP32-P4, and STM32H747I-DISCO
+  paths. Bridge tests (12), SCTD app tests (39), host target checking,
+  formatting, and focused Markdown link validation pass.
 - Workspace-wide validation retains the repository's existing generated-code
   rustfmt drift and two unrelated `platform/src/bdma.rs` discipline-test
   baseline violations; scoped formatting, strict platform clippy, docs,

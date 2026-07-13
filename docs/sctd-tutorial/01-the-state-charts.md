@@ -13,8 +13,9 @@ and the In() normalization pattern.
 
 This chapter is about the "brain" half of the pipeline.  By the end you will
 have two ready-to-compile Rust state-machine crates — one per demo screen —
-downloaded from [iState](https://softoboros.com/istate).  You will not write
-any Rust by hand; the tool writes it for you.
+downloaded from [iState](https://softoboros.com/istate). You can generate in
+the browser or through the iState MCP tools. You will not write the generated
+Rust by hand; the tool writes it for you.
 
 ## The two state charts
 
@@ -85,10 +86,11 @@ contract between machine and screen.
 
 ## Converting with iState
 
-[iState](https://softoboros.com/istate) is a hosted web tool that takes an
-SCXML or scjson state chart and produces a ready-to-compile Rust crate
-implementing the state machine.  You author or import your chart in the
-browser, then download the generated crate.
+[iState](https://softoboros.com/istate) is a hosted state-chart tool that takes
+SCXML or scjson and produces a ready-to-compile Rust crate implementing the
+state machine. The browser and MCP service use the same generation boundary.
+
+### Browser workflow
 
 The general workflow:
 
@@ -110,6 +112,46 @@ The general workflow:
 
 Repeat for each chart.  The Dining Philosophers and the Bolero media player
 are independent crates; both live side by side in the demo.
+
+### MCP workflow
+
+Use MCP when generation needs to be repeatable from an agent session or when
+you are producing several target languages from the same chart. The iState MCP
+surface exposes four operations:
+
+| Tool | Purpose |
+|---|---|
+| `istate_upload_xml` | Upload the authoritative SCXML document and return its document identity |
+| `istate_codegen_create` | Start a code-generation job; request `target_langs=["rust"]` for this tutorial |
+| `istate_codegen_status` | Poll the job until it succeeds or returns a diagnostic |
+| `istate_codegen_download` | Download the generated artifact bundle |
+
+The exact argument envelope is shown by the MCP client when the tools are
+connected, but the sequence is stable:
+
+1. Read the complete SCXML source as text and call `istate_upload_xml`. Give
+   the document a durable slug that identifies the application and chart.
+2. Pass the returned document identity to `istate_codegen_create` with
+   `target_langs=["rust"]`.
+3. Poll `istate_codegen_status` using the returned job identity. Do not infer
+   success from elapsed time; preserve any generator diagnostic with the run
+   record.
+4. Call `istate_codegen_download` only after success, unpack the Rust bundle
+   into a temporary directory, and run its vector tests there.
+5. Replace the vendored machine crate as one generated unit. Keep the source
+   SCXML, generator provenance, and any emitted self-manifest alongside it.
+
+Do not patch generated `src/lib.rs` to make a failing chart compile. Correct
+the SCXML or the generator, rerun the MCP sequence, compare the new bundle,
+and then update the vendored output. Hand-maintained packaging metadata should
+be clearly separated; the reference machine manifests document which fields
+are restored after generation.
+
+The same MCP workflow can request other admitted targets. For example, the
+SCTD HDL probe uses `target_langs=["verilog", "vhdl"]`; that output is a
+separate projection and does not replace the Rust machine used by this demo.
+See [`examples/apps/sctd-demo/hdl/README.md`](../../examples/apps/sctd-demo/hdl/README.md)
+for its contract and limitations.
 
 > The finished generated crates are already present in the reference
 > implementation at

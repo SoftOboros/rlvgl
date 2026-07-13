@@ -1,5 +1,5 @@
 <!-- Chapter 5 of the SCTD tutorial: building and running the finished demo on
-     the desktop simulator and on the ESP32-P4. -->
+     the desktop simulator, ESP32-P4, and STM32H747I-DISCO bare metal. -->
 
 # Chapter 5 — Build and run it
 
@@ -10,7 +10,7 @@
 You have a generated state-machine crate, a generated widget tree, and the
 bindings that join them. This chapter shows how to run the result — first
 on your desktop to prove the logic and rendering before touching hardware,
-then on the ESP32-P4 panel.
+then on either embedded path.
 
 ---
 
@@ -26,7 +26,8 @@ cargo build -p rlvgl-example-disco-sim --bin rlvgl-sctd-sim
 cargo run   -p rlvgl-example-disco-sim --bin rlvgl-sctd-sim
 ```
 
-The simulator window opens at 800 × 480 (the P4 panel's native resolution).
+The simulator window opens at 800 × 480 (the logical display size shared by
+the P4 and STM32H747I-DISCO demo paths).
 You should see the screen-selector shell on the right edge and the first
 screen — Dining Philosophers — filling the left. Tap or click the
 media-player item in the selector to switch screens.
@@ -144,6 +145,46 @@ bring-up issues. You do not need them for a normal flash.
 
 ---
 
+## On hardware — STM32H747I-DISCO bare metal
+
+The STM32 target is the Rust-all-the-way-down path. The SCTD application is a
+payload of the established bare-metal runtime, so the demo reuses its Rust
+clock, SDRAM, touch, framebuffer, DMA2D, LTDC, and DSI initialization rather
+than carrying a tutorial-specific board port.
+
+Install the target once, then build:
+
+```sh
+rustup target add thumbv7em-none-eabihf
+
+RUSTFLAGS="-C target-cpu=cortex-m7" \
+cargo build \
+  --target thumbv7em-none-eabihf \
+  -p rlvgl-example-disco \
+  --bin rlvgl-stm32h747i-sctd \
+  --features cm7,sctd,dma2d
+```
+
+The selected feature set excludes `c_hal`, FreeRTOS, Zephyr, and ESP-IDF. To
+prove the target build does not invoke a C compiler, repeat it with `CC` and
+`CXX` set to nonexistent paths:
+
+```sh
+CC=/no-c-compiler CXX=/no-cxx-compiler \
+RUSTFLAGS="-C target-cpu=cortex-m7" \
+cargo build \
+  --target thumbv7em-none-eabihf \
+  -p rlvgl-example-disco \
+  --bin rlvgl-stm32h747i-sctd \
+  --features cm7,sctd,dma2d
+```
+
+The SCTD feature is selected in the existing board runtime's `main.rs`. The
+old `sctd_main.rs` is now only a historical note; it is not a second display
+bring-up path.
+
+---
+
 ## What you should see
 
 On the panel, the screen-selector shell appears on the right edge. The left
@@ -168,6 +209,12 @@ event into the machine; the machine steps; the updated state flows back
 through the bindings into the widget tree; the renderer writes updated
 pixels to the framebuffer.
 
+On the Dining Philosophers screen, the **Ratatui** button opens a hybrid hero:
+native rlvgl rounded chrome and graphical controls surround a Ratatui-rendered
+table driven by the same generated machine. The companion
+[Ratatui on rlvgl tutorial](../ratatui-tutorial/README.md) constructs that
+integration and explains the bare-metal proof in detail.
+
 ---
 
 ## Compare against the finished example
@@ -178,6 +225,8 @@ reference implementation under:
 - `examples/apps/sctd-demo/` — the shared, no-std UI controller (machine
   crates, widget tree, bindings, selector shell).
 - `examples/beetle-esp32p4-idf/` — the ESP32-P4 firmware that hosts it.
+- `examples/stm32h747i-disco/` — the established bare-metal runtime that
+  mounts the SCTD payload with `cm7,sctd,dma2d`.
 
 The parts the tutorial deliberately left out — the screen-selector shell,
 the Dining Philosophers table rasterizer, the setup screens — are ordinary

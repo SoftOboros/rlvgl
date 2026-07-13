@@ -17,15 +17,17 @@ finished demo was actually built, one stage at a time.
 The worked example is the **SCTD demo**: a Setup selector shell with two
 runnable screens — the classic **Dining Philosophers** concurrency puzzle
 and a **car-radio media player** modelled on the Škoda *Bolero*
-infotainment example. The reference app runs on your desktop in a
-simulator and on embedded hosts; this tutorial's hardware path uses an
-**ESP32-P4** panel.
+infotainment example. The reference app runs on your desktop in a simulator
+and on embedded hosts. This tutorial covers both the **ESP32-P4** hybrid and
+the **STM32H747I-DISCO** bare-metal path.
 
 You will use two public tools and nothing else:
 
-1. **[iState](https://softoboros.com/istate)** — a hosted web tool that
-   converts a *state chart* (SCXML/scjson) into a ready-to-compile Rust
-   **state-machine crate**. This is the "brain" of each screen.
+1. **[iState](https://softoboros.com/istate)** — a hosted web tool and MCP
+   service that converts a *state chart* (SCXML/scjson) into a
+   ready-to-compile Rust **state-machine crate**. This is the "brain" of each
+   screen. Chapter 1 shows both the browser workflow and the repeatable MCP
+   `upload → create → status → download` workflow.
 2. **`rlvgl-creator`** — the command-line tool shipped with
    [rlvgl](https://github.com/softoboros/rlvgl) (this repository). It
    converts a *Qt/QML screen* into a Rust **widget tree**, and converts
@@ -37,7 +39,7 @@ brain to the face so that machine state drives what you see, and taps on
 the screen drive the machine.
 
 > **You do not need access to any private repository to follow this.**
-> iState runs in your browser; `rlvgl-creator` is open source; the state
+> iState is available in the browser and through MCP; `rlvgl-creator` is open source; the state
 > charts and artwork come from a third-party tutorial whose license is
 > reproduced below. Everything here is reproducible from public tools.
 
@@ -49,7 +51,7 @@ the screen drive the machine.
 | End of Chapter 2 | The Bolero **artwork** (play/pause, repeat, shuffle, mute, source icons) transcoded into compact RLE blobs you can embed in firmware. |
 | End of Chapter 3 | A generated Rust **widget tree** for the media-player screen — every rectangle, label, and image from the QML, laid out and ready to draw. |
 | End of Chapter 4 | The widget tree **wired** to the state machine: the play icon flips to pause when the machine is playing, the mute icon hides when un-muted, tapping a transport button steps the machine, and the source caption reads live track text. |
-| End of Chapter 5 | The whole thing **running** — first in a desktop simulator, then flashed to an ESP32-P4 panel. |
+| End of Chapter 5 | The whole thing **running** — first in a desktop simulator, then on ESP32-P4 or the Rust-only STM32H747I-DISCO path. |
 
 ## The big picture
 
@@ -117,9 +119,9 @@ adds an optional hardware path.
   Every `rlvgl-creator …` command in this tutorial runs through that
   binary; the long form is
   `cargo run --features creator --bin rlvgl-creator -- <args>`.
-- **(Chapter 5, optional) An ESP32-P4 board** + the ESP-IDF toolchain,
-  if you want to flash the result. A desktop simulator path is given for
-  readers without the hardware.
+- **(Chapter 5, optional) An ESP32-P4 board** + ESP-IDF, or an
+  **STM32H747I-DISCO** + the `thumbv7em-none-eabihf` Rust target. A desktop
+  simulator path is given for readers without hardware.
 
 You do **not** need Qt installed. The `.qml` and `.scxml` source files
 travel with the tutorial assets; `rlvgl-creator` and iState read them
@@ -133,7 +135,7 @@ implementation lives in this repo at
 shared, no-std UI controller) and
 [`examples/beetle-esp32p4-idf/`](../../examples/beetle-esp32p4-idf/) (the
 ESP32-P4 firmware that hosts it). The same SCTD payload also has simulator,
-STM32H747I-DISCO, and UEFI host wrappers. The crate is at version
+STM32H747I-DISCO bare-metal, and UEFI host wrappers. The crate is at version
 **0.2.5** — the first release able to produce this demo end-to-end.
 Compare your work against it as you go.
 
@@ -145,7 +147,7 @@ Compare your work against it as you go.
 | [2](02-media-assets.md) | Converting the media assets | Embeddable RLE image blobs (with transparency) | `rlvgl-creator compress` |
 | [3](03-qml-to-rlvgl.md) | The QML screen → a Rust widget tree | A generated `build_screen()` widget module | `rlvgl-creator qt emit` |
 | [4](04-reactive-wiring.md) | Wiring it reactive | Bindings joining machine state ↔ widgets | `rlvgl-creator qt emit --scxml-context` |
-| [5](05-build-and-run.md) | Build and run it | The demo on desktop, then on an ESP32-P4 | `cargo` / `idf.py` |
+| [5](05-build-and-run.md) | Build and run it | The demo on desktop, ESP32-P4, or STM32H747I-DISCO | `cargo` / `idf.py` |
 
 Each chapter file starts and ends with a nav strip: **← Prev · Index ·
 Next →**. Read top to bottom, or jump using the table above.
@@ -154,11 +156,13 @@ Next →**. Read top to bottom, or jump using the table above.
 
 This tutorial teaches the *pipeline*, not every pixel of the finished
 demo. The screen-selector shell, the Dining Philosophers table
-rasterizer, the setup screens, and the desktop/board host glue are
-present in the finished example but are ordinary rlvgl UI code; they are
-not part of the state-chart-to-reactive-UI path and are left for you to
-read in the reference crate. Each chapter points at the specific
-reference file when it skips over something.
+rasterizer, the setup screens, and the desktop/board host glue are present in
+the finished example but are ordinary rlvgl UI code. The separate
+[Ratatui on rlvgl tutorial](../ratatui-tutorial/README.md) explains the hybrid
+Dining Philosophers popup added in v0.2.5. These pieces are not part of the
+state-chart-to-reactive-UI path and are left for you to read in the reference
+crate. Each chapter points at the specific reference file when it skips over
+something.
 
 ---
 

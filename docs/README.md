@@ -39,6 +39,7 @@ See crate overviews for:
 ## Rendering & Plugins
 - [BACKEND-ARCHITECTURE.md](./rendering/BACKEND-ARCHITECTURE.md) — Pluggable blitter backends (CPU, DMA2D, wgpu).
 - [ALPHA-BLENDING.md](./rendering/ALPHA-BLENDING.md) — Alpha-blending and layered widget rendering.
+- [Ratatui on rlvgl](./ratatui-tutorial/README.md) — Retained cell backend, rlvgl-hosted pane, hybrid composition, and bare-metal proof.
 - [IMAGE-COMPRESSION-FORMAT.md](./assets/IMAGE-COMPRESSION-FORMAT.md) — Palette + RLE codec for embedded assets.
 - [PLUGIN-ECOSYSTEM.md](./PLUGIN-ECOSYSTEM.md) — Media plugins: PNG, JPEG, GIF, Lottie, QR, fonts.
 
@@ -58,7 +59,8 @@ See crate overviews for:
 
 ## Tutorials
 - [Disco Demo Tutorial](./disco-tutorial/README.md) — Desktop, icons, wings, and indicators.
-- [SCXML Tutorial Demo](./sctd-tutorial/README.md) — Bringing SCXML Tutorial state machines and Qt media-player graphics into rlvgl.
+- [State Chart → Reactive UI](./sctd-tutorial/README.md) — MCP iState generation, Qt media-player graphics, reactive bindings, and embedded hosts.
+- [Ratatui on rlvgl](./ratatui-tutorial/README.md) — Rust-only Ratatui integration from host verification to STM32H747I-DISCO bare metal.
 
 ## Build & Test
 - [EMBEDDED-TOOLING.md](./EMBEDDED-TOOLING.md) — Install guide for ARM/STM32, ESP32 (RISC-V + Xtensa), and AVR toolchains, with Intel-macOS workarounds.

@@ -49,6 +49,7 @@ Package: `rlvgl`
 - [docs/disco-freertos-guide](./docs/disco-freertos-guide/README.md) – Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation
 - [docs/disco-zephyr-guide](./docs/disco-zephyr-guide/README.md) – Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix
 - [docs/sctd-tutorial](./docs/sctd-tutorial/README.md) – State Chart Tutorial Demo guide: SCXML machines, Qt media-player graphics, and reactive bindings
+- [docs/ratatui-tutorial](./docs/ratatui-tutorial/README.md) – Ratatui ↔ rlvgl integration from retained cells through the STM32H747I-DISCO bare-metal display path
 - [lvgl](https://github.com/lvgl/lvgl) – upstream C library (vendored as a git submodule under `lvgl/`; not mirrored on the site)
 
 ## Building Binary Targets
@@ -130,6 +131,9 @@ use the crate-local file for the package you are building:
 - `rlvgl-creator qt emit --target rlvgl --scxml-context` now emits reactive bindings from Qt/QML screens to iState-generated machines.
 - The SCTD demo brings SCXML Tutorial state machines and Bolero media-player graphics into a shared `no_std` app with Setup, DP, and Media Player slots.
 - The SCTD payload mounts on host simulator, STM32H747I-DISCO bare-metal, UEFI, and the FireBeetle-2 ESP32-P4 ESP-IDF hybrid.
+- `ratatui-rlvgl` adds a `no_std + alloc` Ratatui backend and an rlvgl-hosted
+  `RatatuiView`; the Dining Philosophers hero demonstrates both composition
+  directions on the host and through the Rust-only STM32H747I-DISCO path.
 - RGB565 RLE assets now support transparent-key conversion for Qt-derived icon artwork.
 
 ## Vendor chip databases

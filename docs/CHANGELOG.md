@@ -60,7 +60,11 @@ the start of this release line).
   datamodel variables.
 
 ### Added - docs
-- `docs/sctd-tutorial/` — five-chapter state-chart-to-reactive-UI tutorial.
+- `docs/sctd-tutorial/` — five-chapter state-chart-to-reactive-UI tutorial,
+  including browser and MCP iState generation plus host, ESP32-P4, and
+  STM32H747I-DISCO execution.
+- `docs/ratatui-tutorial/` — five-chapter retained-cell, hosted-pane, hybrid
+  composition, live-state, and Rust-only bare-metal tutorial.
 - `docs/qt-support/` QT-05g…05k binding chapters + media-player retrospective.
 - SCTD-04 architecture/execution record, deterministic capture tooling, and
   the first Ratatui/rlvgl integration artifact.
