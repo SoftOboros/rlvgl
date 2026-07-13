@@ -83,6 +83,36 @@ fn script_orders_publish_dependencies_topologically() {
     assert!(find("rlvgl-app-disco-demo") < find("rlvgl"));
 }
 
+#[test]
+fn publish_workflows_use_trusted_publishing() {
+    for path in [
+        ".github/workflows/publish.yml",
+        ".github/workflows/publish-continue.yml",
+    ] {
+        let workflow = fs::read_to_string(path).expect("read publish workflow");
+        assert!(workflow.contains("environment: release"), "{path}");
+        assert!(workflow.contains("id-token: write"), "{path}");
+        assert!(
+            workflow.contains("uses: rust-lang/crates-io-auth-action@v1"),
+            "{path}"
+        );
+        assert!(
+            workflow.contains("CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}"),
+            "{path}"
+        );
+        assert!(
+            !workflow.contains("secrets.CARGO_REGISTRY_TOKEN"),
+            "{path} must not restore the long-lived registry secret"
+        );
+    }
+
+    let workflow =
+        fs::read_to_string(".github/workflows/publish.yml").expect("read publish workflow");
+    assert!(
+        workflow.contains("bash scripts/publish_changed.sh \"${{ steps.shas.outputs.base }}\"")
+    );
+}
+
 /// CRATES-CI-01: every workspace crate with `publish = true` (or
 /// unrestricted publish) MUST appear in the script's `ordered_crates`
 /// list. Derived from `cargo metadata` so the list cannot silently

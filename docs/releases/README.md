@@ -5,6 +5,7 @@ one level up at [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 ## Release notes
 
+- [Trusted Publishing setup](./TRUSTED-PUBLISHING.md) — per-crate GitHub OIDC configuration, ownership checks, and first-publish bootstrap.
 - [v0.2.5.md](./v0.2.5.md)
 - [v0.2.5-pr.md](./v0.2.5-pr.md) — pull-request summary and release checklist
 - [v0.2.2.md](./v0.2.2.md)

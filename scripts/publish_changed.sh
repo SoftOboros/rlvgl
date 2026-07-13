@@ -323,7 +323,7 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
-  echo "CARGO_REGISTRY_TOKEN is not set." >&2
+  echo "CARGO_REGISTRY_TOKEN is not set by the crates.io authentication step." >&2
   exit 1
 fi
 

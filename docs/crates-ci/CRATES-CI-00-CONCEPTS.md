@@ -132,6 +132,17 @@ One owner per concept; Consumer Projects cite these, never restate them.
    pointing into the workspace. Violation = nonconforming run.
 4. The publish workflow (`publish.yml`) MUST require Gate P green on the
    release ref before `scripts/publish_changed.sh` executes.
+5. Crates.io publication MUST authenticate through Trusted Publishing, not a
+   repository-stored long-lived registry token. Every publishing job MUST use
+   the GitHub `release` Environment, grant only `contents: read` and
+   `id-token: write`, exchange its OIDC identity through
+   `rust-lang/crates-io-auth-action`, and pass that step's short-lived token to
+   Cargo. Each owned crate MUST trust both `publish.yml` and
+   `publish-continue.yml`, because either workflow can execute the same
+   dependency-ordered publisher. A brand-new crate MUST receive its first
+   publish manually before these configurations can be created; after that
+   bootstrap it MUST join both Trusted Publisher configurations before the
+   automated chain resumes.
 
 ## §6 Frozen decision — Staged Registry mechanism (Specification Required)
 
@@ -489,3 +500,12 @@ upstream — the standard pre-publish mechanism.)*
   retained registry `rlvgl-core 0.2.4` from the root package lock even after
   staged `rlvgl-core 0.2.5` was installed in `[patch.crates-io]`; Cargo therefore
   compiled the registry crate and correctly failed the provenance assertion.
+- **2026-07-13** — Trusted Publishing amendment (owner direction): the 403 on
+  `rlvgl-chips-silabs 0.2.1` showed that the repository token path was no
+  longer an accepted release authority. §5 now requires GitHub OIDC exchange
+  through `rust-lang/crates-io-auth-action`, the `release` Environment, and
+  per-crate trust for both publisher workflow filenames. The first
+  `ratatui-rlvgl` release remains a one-time manual bootstrap because crates.io
+  cannot configure a Trusted Publisher before a crate exists. The same change
+  quotes the workflow-supplied base revision so an empty/manual `*` value
+  cannot expand to a repository filename.
