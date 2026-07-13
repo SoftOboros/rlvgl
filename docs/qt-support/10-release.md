@@ -57,7 +57,7 @@ After QT-10:
   (`ingest` / `check` / `schema` / `emit` / `emit-scjson` /
   `emit-externals` / `emit-tokens` / `list-assets` /
   `list-qmldir` / `list-qrc`) is reachable via `qt --help`.
-- A `QT_FAMILY_STRICT_VERSION = 1` constant lives in the
+- A `QT_FAMILY_STRICT_VERSION = 2` constant lives in the
   emitter source and bumps when the strict-mode invariant set
   changes (e.g. a future amendment adds a new chapter).
 
@@ -85,7 +85,7 @@ Three new artifacts.
 ### `QT_FAMILY_STRICT_VERSION`
 
 ```rust
-pub const QT_FAMILY_STRICT_VERSION: u32 = 1;
+pub const QT_FAMILY_STRICT_VERSION: u32 = 2;
 ```
 
 Lives in `src/bin/creator/qt.rs`. Bumps when:
@@ -107,8 +107,9 @@ Lives next to the existing `creator_qt_*` tests.
 ### "strict-mode generation"
 
 Shorthand for the value of `QT_FAMILY_STRICT_VERSION`. A
-"strict-mode-1" build is one whose `QT_FAMILY_STRICT_VERSION
-== 1` and whose strict-mode test passes.
+"strict-mode-2" build is one whose `QT_FAMILY_STRICT_VERSION
+== 2` and whose strict-mode test passes. Strict-mode-1 remains the historical
+2026-04-30 snapshot recorded in §15.
 
 ## §4 — Source-of-Truth Map
 
@@ -127,7 +128,7 @@ Shorthand for the value of `QT_FAMILY_STRICT_VERSION`. A
 Registration policy: **Standards Action**. Adding or removing
 any item bumps `QT_FAMILY_STRICT_VERSION`.
 
-### Chapter file set (23 files)
+### Chapter file set (29 files)
 
 ```
 docs/qt-support/00-concepts.md
@@ -147,6 +148,11 @@ docs/qt-support/05b-handler-dispatch.md
 docs/qt-support/05c-machine-bindings.md
 docs/qt-support/05d-emit-scjson.md
 docs/qt-support/05e-externals-stubs.md
+docs/qt-support/05g-state-predicate-bindings.md
+docs/qt-support/05h-visibility-bindings.md
+docs/qt-support/05i-chained-predicate-bindings.md
+docs/qt-support/05j-button-event-bindings.md
+docs/qt-support/05k-external-text-bindings.md
 docs/qt-support/06-theme-tokens.md
 docs/qt-support/07-asset-handoff.md
 docs/qt-support/08-multi-file-cli.md
@@ -156,7 +162,7 @@ docs/qt-support/09-desktop-ui.md
 docs/qt-support/10-release.md
 ```
 
-24 entries (this chapter included). All are normative.
+29 entries (this chapter included). All are normative.
 
 ### CLI subcommand set (10 entries)
 
@@ -179,19 +185,21 @@ reachable.
 
 ## §6 — Frozen Decision: Version Constant Snapshot
 
-| Constant                       | Strict-mode-1 value | Owner                                                |
+| Constant                       | Strict-mode-2 value | Owner                                                |
 | ------------------------------ | ------------------- | ---------------------------------------------------- |
 | `QT_IR_VERSION`                | 2                   | QT-05 (see chapter §8)                               |
-| `QT_EMIT_VERSION_RLVGL`        | 13                  | QT-05c (see chapter §7) — was 11 at QT-05 close-out, +1 each at QT-05b/05c |
+| `QT_EMIT_VERSION_RLVGL`        | 23                  | QT emitter conformance amendment (2026-07-12)        |
 | `QT_EMIT_VERSION_DATA`         | 1                   | QT-03                                                |
-| `ISTATE_LINKAGE_VERSION`       | 1                   | QT-05 §6                                             |
+| `ISTATE_LINKAGE_VERSION`       | 1 (legacy) / 2 (`--scxml-context`) | QT-05 §6 / QT-05g                             |
 | `QT_EXTERNALS_VERSION`         | 1                   | QT-05e §8                                            |
-| `QT_FAMILY_STRICT_VERSION`     | 1                   | this chapter (§3)                                    |
+| `QT_FAMILY_STRICT_VERSION`     | 2                   | this chapter (§3)                                    |
 
-Strict-mode-1 means **all six** above hold simultaneously.
-A bump in any one (with the surrounding chapter amendment)
-bumps `QT_FAMILY_STRICT_VERSION` to 2 and the strict-mode
-test's expected snapshot updates with it.
+Strict-mode-2 means **all six version contracts** above hold simultaneously.
+The iState linkage contract is profile-selecting: legacy attached state
+machines emit v1, while dynamic-string `--scxml-context` modules emit v2.
+A bump in any one contract (with the surrounding chapter amendment)
+bumps `QT_FAMILY_STRICT_VERSION` and updates the strict-mode
+test's expected snapshot in lockstep.
 
 ## §7 — Frozen Decision: Strict-Mode Meta-Test
 
@@ -201,11 +209,12 @@ invariants:
 1. **Chapter files** (§5):
    - Every entry in the chapter set exists at the named
      path.
-   - Every existing file in `docs/qt-support/*.md` (excluding
-     `README.md`) is in the chapter set — guards against
-     drive-by additions that bypass the chapter discipline.
+   - Every existing digit-prefixed chapter in `docs/qt-support/*.md`
+     is in the chapter set — guards against drive-by normative additions
+     while excluding informative non-chapter documents such as `README.md`
+     and retrospectives.
 2. **Version constants** (§6):
-   - Each constant has the strict-mode-1 value.
+   - Each constant has the strict-mode-2 value.
 3. **CLI subcommand surface** (§5):
    - `rlvgl-creator qt --help` succeeds.
    - Each of the 10 subcommand labels appears in the help
@@ -259,19 +268,19 @@ runs it when ready.
 | Phase    | Concern                       | Resolution                                                                                          |
 | -------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
 | QT-00    | Phase enumeration policy.     | QT-10 added under Standards Action. The phase set frozen in QT-00 §5 is the authoritative input to QT-10 §5. |
-| QT-05*   | State-machine pipeline.       | QT-10 strict-mode-1 includes all six QT-05* chapters and pins `ISTATE_LINKAGE_VERSION = 1`.        |
+| QT-05*   | State-machine pipeline.       | QT-10 strict-mode-2 includes all eleven QT-05* chapters and pins linkage v1 for legacy modules plus v2 for dynamic `--scxml-context` modules. |
 | QT-06    | Theme tokens.                 | Pinned via §5 chapter set.                                                                          |
 | QT-07    | Asset handoff.                | Pinned via §5 chapter set.                                                                          |
-| QT-08*   | CLI surface family.           | All three chapters pinned. The 10 subcommands enumerated in §5 are the strict-mode-1 surface.        |
+| QT-08*   | CLI surface family.           | All three chapters pinned. The 10 subcommands enumerated in §5 are the strict-mode-2 surface.        |
 | QT-09    | Desktop-UI integration.       | Pinned. The Qt menu group's 10 entries match the §5 subcommand set 1:1.                            |
 
 ## §11 — Acceptance Checklist
 
-QT-10 strict-mode-1 is **ratified and shipped** when:
+QT-10 strict-mode-2 is **ratified and shipped** when:
 
-- [x] `QT_FAMILY_STRICT_VERSION = 1` lives at
+- [x] `QT_FAMILY_STRICT_VERSION = 2` lives at
       `src/bin/creator/qt.rs`.
-- [x] §5 freezes the chapter file set (24 entries) and the
+- [x] §5 freezes the chapter file set (29 entries) and the
       CLI subcommand set (10 entries).
 - [x] §6 freezes the version-constant snapshot (six
       constants).
@@ -284,7 +293,7 @@ QT-10 strict-mode-1 is **ratified and shipped** when:
       green with the new test in place.
 - [x] §15 carries a dated initial change-log entry.
 - [x] README.md and 00-concepts.md amended to mark the QT
-      family strict-mode-1 ratified.
+      family strict-mode-2 ratified.
 
 ## §12 — Files Cited
 
@@ -296,11 +305,11 @@ QT-10 strict-mode-1 is **ratified and shipped** when:
 
 ## §13 — Unblocks
 
-Ratifying QT-10 strict-mode-1 unblocks:
+Ratifying QT-10 strict-mode-2 unblocks:
 
 - The user-driven release-tag execution per §8.
 - A future "Qt 2.x" major-version bump that explicitly
-  invalidates strict-mode-1 (would bump to strict-mode-2).
+  invalidates strict-mode-2 (and therefore bumps the strict generation).
 - A CI workflow that runs the strict-mode test on every PR.
 
 ## §14 — Files Cited
@@ -312,6 +321,7 @@ Ratifying QT-10 strict-mode-1 unblocks:
 | Date       | Change                                                                          |
 | ---------- | ------------------------------------------------------------------------------- |
 | 2026-04-30 | QT-10 strict-mode-1 ratified and shipped (auto-mode half). Closes the Qt-support roadmap's enforcement story. New `pub const QT_FAMILY_STRICT_VERSION: u32 = 1;` in `src/bin/creator/qt.rs` pins the strict-mode generation. New meta-test `tests/creator_qt_strict_mode.rs` asserts (1) every chapter file in the §5 set exists, (2) every chapter file under `docs/qt-support/*.md` is in the §5 set (no drive-by chapters), (3) every version constant from the §6 snapshot has its strict-mode-1 value, and (4) every CLI subcommand from the §5 set is reachable via `rlvgl-creator qt --help`. Six version constants pinned: `QT_IR_VERSION = 2`, `QT_EMIT_VERSION_RLVGL = 13`, `QT_EMIT_VERSION_DATA = 1`, `ISTATE_LINKAGE_VERSION = 1`, `QT_EXTERNALS_VERSION = 1`, `QT_FAMILY_STRICT_VERSION = 1`. README.md and 00-concepts.md amended with strict-mode-1 ratification entries. The release-tag half (cutting `v0.x.0`, `cargo publish`, GitHub Release) is documented in §8 but **not performed** under auto-mode per the safety protocol; the user runs it when ready. Chapter file set: 24 entries (incl. this chapter). CLI subcommand set: 10 entries. |
+| 2026-07-12 | QT-10 strict-mode-2 amendment. Reconciles the live 29-chapter QT-05g–k surface with §5 and advances the §6 snapshot to `QT_EMIT_VERSION_RLVGL = 23`, `QT_FAMILY_STRICT_VERSION = 2`. Emit version 23 names the `BuiltScreen` result alias, routes helper binding writes through a private sink, emits leaf nodes directly, normalizes Rust identifiers to snake case while retaining QML tags, and uses precedence-aware bounds expressions without neutral operations. The CLI set and all other version constants remain unchanged. |
 
 ---
 

@@ -159,9 +159,7 @@ impl CanvasWidget {
 
     /// Flood-fill the entire pixel buffer with `color`.
     pub fn fill(&mut self, color: Color) {
-        for slot in &mut self.inner.pixels {
-            *slot = color;
-        }
+        self.inner.pixels.fill(color);
         self.dirty = true;
     }
 

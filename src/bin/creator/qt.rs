@@ -765,13 +765,21 @@ pub fn walk_asset_refs(item: &UiItem) -> AssetInventory {
 fn visit_for_assets(item: &UiItem, inv: &mut AssetInventory) {
     let stripped_type = item.type_name.rsplit('.').next().unwrap_or(&item.type_name);
 
-    // Images: any item whose stripped type is `Image` and which has
-    // a literal `source: "<path>"` assignment.
-    if stripped_type == "Image"
+    // Images: any item whose stripped type is `Image` / `BorderImage` /
+    // `AnimatedImage` with a `source:` assignment. A literal `source: "<path>"`
+    // is captured directly; a state-bound `source:` (e.g. a ternary choosing
+    // between artwork files) has every quoted image-path literal harvested so
+    // designer-authored conditional artwork still vendors.
+    if matches!(stripped_type, "Image" | "BorderImage" | "AnimatedImage")
         && let Some(raw_source) = lookup_assignment(item, "source")
-        && let Some(s) = parse_string_literal(raw_source)
     {
-        inv.images.insert(strip_qrc_prefix(&s).to_string());
+        if let Some(s) = parse_string_literal(raw_source) {
+            inv.images.insert(strip_qrc_prefix(&s).to_string());
+        } else {
+            for s in extract_asset_literals(raw_source) {
+                inv.images.insert(strip_qrc_prefix(&s).to_string());
+            }
+        }
     }
 
     // Standalone Font { family: "<name>" } blocks.
@@ -809,6 +817,88 @@ fn visit_for_assets(item: &UiItem, inv: &mut AssetInventory) {
     for child in &item.children {
         visit_for_assets(child, inv);
     }
+}
+
+/// Resolve an `Image { source: … }` to the single asset the emitter should
+/// blit: a literal `source: "path"` directly, or the first artwork branch of a
+/// state-bound ternary. Returns `None` when no image-path literal is present.
+fn pick_image_source(item: &UiItem) -> Option<AssetRef> {
+    let raw = lookup_assignment(item, "source")?;
+    let path = parse_string_literal(raw)
+        .filter(|s| {
+            let l = s.to_ascii_lowercase();
+            l.starts_with("qrc:") || is_image_path(&l)
+        })
+        .or_else(|| extract_asset_literals(raw).into_iter().next())?;
+    let stripped = strip_qrc_prefix(&path).to_string();
+    Some(AssetRef {
+        symbol: asset_symbol(&stripped),
+        path: stripped,
+    })
+}
+
+/// Whether a path looks like a supported raster/vector image by extension.
+fn is_image_path(lower: &str) -> bool {
+    const IMAGE_EXTS: [&str; 7] = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".webp"];
+    IMAGE_EXTS.iter().any(|e| lower.ends_with(e))
+}
+
+/// Derive a stable `qt_assets` module symbol from an image path: the file stem
+/// uppercased with every non-alphanumeric byte folded to `_`, prefixed `IMG_`.
+/// e.g. `Qml/Images/ImgPlay_48.png` → `IMG_IMGPLAY_48`.
+fn asset_symbol(path: &str) -> String {
+    let stem = path
+        .rsplit('/')
+        .next()
+        .unwrap_or(path)
+        .rsplit_once('.')
+        .map(|(s, _)| s)
+        .unwrap_or(path);
+    let mut sym = String::from("IMG_");
+    for ch in stem.chars() {
+        if ch.is_ascii_alphanumeric() {
+            sym.extend(ch.to_uppercase());
+        } else {
+            sym.push('_');
+        }
+    }
+    sym
+}
+
+/// Harvest quoted string literals that look like asset paths from a binding
+/// expression (e.g. the branches of a state-bound `source:` ternary). A
+/// literal qualifies if it carries a known image extension or a `qrc:` prefix.
+fn extract_asset_literals(expr: &str) -> Vec<String> {
+    let bytes = expr.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let q = bytes[i];
+        if q == b'"' || q == b'\'' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && bytes[j] != q {
+                // Honour simple backslash escapes so an escaped quote does not
+                // terminate the literal early.
+                if bytes[j] == b'\\' && j + 1 < bytes.len() {
+                    j += 2;
+                    continue;
+                }
+                j += 1;
+            }
+            if j <= bytes.len() {
+                let lit = &expr[start..j.min(expr.len())];
+                let lower = lit.to_ascii_lowercase();
+                if lower.starts_with("qrc:") || is_image_path(&lower) {
+                    out.push(lit.to_string());
+                }
+            }
+            i = j + 1;
+        } else {
+            i += 1;
+        }
+    }
+    out
 }
 
 /// QT-07 §5 — strip `qrc:/` and `qrc:///` prefixes verbatim. Any
@@ -1974,14 +2064,21 @@ pub const QT_EMIT_VERSION_DATA: u32 = 1;
 /// bumped to `11` by QT-04e when reactive Label-text bindings
 /// shipped (`docs/qt-support/04e-reactive-bindings.md` §8). Closes
 /// out the QT-04 family.
-pub const QT_EMIT_VERSION_RLVGL: u32 = 13;
+/// Bumped to `15` (QT-03b §15 2026-06-26): structural QML nodes
+/// (`Item`/`Row`/`Column`) now emit a transparent Container background
+/// instead of inheriting the opaque-white `Style::default()`, and
+/// `qt_image` emits a transparent image background plus QML-default
+/// `Image.Stretch` scaling (source→dest). Without this the emitted
+/// tree rendered all-white on real hardware (opaque structural
+/// containers buried the artwork; 1:1 blit never filled the slots).
+pub const QT_EMIT_VERSION_RLVGL: u32 = 23;
 
 /// QT-10 strict-mode generation. Bumps when the chapter file set
 /// (QT-10 §5), the CLI subcommand set (QT-10 §5), or the
 /// version-constant snapshot (QT-10 §6) changes. The strict-mode
 /// meta-test (`tests/creator_qt_strict_mode.rs`) asserts this
 /// constant matches the expected generation.
-pub const QT_FAMILY_STRICT_VERSION: u32 = 1;
+pub const QT_FAMILY_STRICT_VERSION: u32 = 2;
 
 /// Backward-compat alias for the data-target version constant.
 /// Removed when QT-04 ships per QT-03b §11.
@@ -2002,24 +2099,95 @@ pub enum EmitTarget {
 ///
 /// The emit-shape contracts are owned by QT-03 (data) and QT-03b
 /// (rlvgl); see the canonical goldens at `tests/fixtures/qt/`.
-pub(crate) fn emit(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
+pub(crate) fn emit(
+    input: &Path,
+    out: &Path,
+    target: EmitTarget,
+    scxml_context: Option<String>,
+) -> Result<()> {
     fs::create_dir_all(out).with_context(|| format!("creating output dir {}", out.display()))?;
+    // QT-05g: an externally-injected SCXML context object linked to a
+    // machine crate, as `--scxml-context <ctx>=<crate>`.
+    let ctx = scxml_context
+        .as_deref()
+        .map(parse_scxml_context)
+        .transpose()?;
     if input.is_dir() {
         for qml in qt08_collect_qml_files(input)? {
-            emit_one_file(&qml, out, target)?;
+            emit_one_file(&qml, out, target, ctx.as_ref())?;
         }
         return Ok(());
     }
-    emit_one_file(input, out, target)
+    emit_one_file(input, out, target, ctx.as_ref())
 }
 
-fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
+/// QT-05g: the `--scxml-context <ctx>=<crate>` linkage — declares that QML
+/// predicates qualified by context object `<ctx>` resolve against
+/// `<crate>::Machine` via the istate M1P6 (linkage-v2) surface.
+#[derive(Debug, Clone)]
+pub(crate) struct ScxmlContext {
+    /// The QML context-object id, e.g. `scxmlBolero`.
+    pub context: String,
+    /// The machine crate name, e.g. `media_player`.
+    pub krate: String,
+}
+
+/// Parse `--scxml-context <ctx>=<crate>` into a [`ScxmlContext`]. Both sides
+/// must be non-empty Rust-ident-shaped tokens.
+fn parse_scxml_context(s: &str) -> Result<ScxmlContext> {
+    let (ctx, krate) = s
+        .split_once('=')
+        .ok_or_else(|| anyhow::anyhow!("--scxml-context expects `<ctx>=<crate>`, got {s:?}"))?;
+    let (ctx, krate) = (ctx.trim(), krate.trim());
+    let ident_ok = |t: &str| {
+        !t.is_empty()
+            && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && !t.chars().next().unwrap().is_ascii_digit()
+    };
+    if !ident_ok(ctx) || !ident_ok(krate) {
+        anyhow::bail!("--scxml-context `<ctx>=<crate>` parts must be identifiers, got {s:?}");
+    }
+    Ok(ScxmlContext {
+        context: ctx.to_string(),
+        krate: krate.to_string(),
+    })
+}
+
+fn emit_one_file(
+    input: &Path,
+    out: &Path,
+    target: EmitTarget,
+    scxml_context: Option<&ScxmlContext>,
+) -> Result<()> {
     let source =
         fs::read_to_string(input).with_context(|| format!("reading {}", input.display()))?;
     let mut module =
         parse_module(&source, input).with_context(|| format!("parsing {}", input.display()))?;
     // QT-05a: link sibling .scjson side-file (silent fall-through if absent).
     attach_scjson_side_file(&mut module, input)?;
+
+    // Cross-component instantiation (rlvgl target): inline user-defined
+    // component children (`<Type>.qml`) so the full composed widget tree —
+    // including leaf artwork inside reusable components — reaches the emitter.
+    if matches!(target, EmitTarget::Rlvgl) {
+        let root_dir = component_search_root(input);
+        let mut stack = Vec::new();
+        let mut cache = std::collections::HashMap::new();
+        expand_components_in(&mut module.root, &root_dir, &mut stack, &mut cache);
+        // QT-Repeater: turn `Repeater { model: [...] }` arrays into positioned
+        // icon children (runs after component inlining so the model literals are
+        // present and stable). When a state-machine context is linked
+        // (QT-05g), a model item's `imageKeySource:` predicate ternary is
+        // preserved verbatim so the Image arm can lower it to a reactive
+        // binding; otherwise the resting else-branch literal is used.
+        expand_repeaters_in(&mut module.root, 0, 0, scxml_context.is_some());
+        // QT-05j: when a state-machine context is linked, give every untagged
+        // button that dispatches a `submitBtnSetupEvent("…")` a synthetic tag so
+        // the emitted `BUTTON_TAP_EVENTS` table can name it for the consumer.
+        if scxml_context.is_some() {
+            synthesize_button_tap_tags(&mut module.root);
+        }
+    }
 
     let stem = input
         .file_stem()
@@ -2028,10 +2196,477 @@ fn emit_one_file(input: &Path, out: &Path, target: EmitTarget) -> Result<()> {
 
     let (out_path, rust) = match target {
         EmitTarget::Data => (out.join(format!("{stem}.rs")), render_rs(&module)),
-        EmitTarget::Rlvgl => (out.join(format!("{stem}.rlvgl.rs")), render_rlvgl(&module)),
+        EmitTarget::Rlvgl => {
+            // QT-03c: build the dimension resolver (JS constants + root-property
+            // defaults) so the anchor solver can evaluate non-literal extents.
+            let resolver = DimResolver::from_qml(input, &module.root);
+            (
+                out.join(format!("{stem}.rlvgl.rs")),
+                render_rlvgl_with_resolver(&module, &resolver, scxml_context),
+            )
+        }
     };
     fs::write(&out_path, rust).with_context(|| format!("writing {}", out_path.display()))?;
     Ok(())
+}
+
+/// Pick the directory to resolve user-component `.qml` files against: the
+/// nearest ancestor directory named `Qml` (the conventional QML source root),
+/// else the input file's own directory.
+fn component_search_root(input: &Path) -> PathBuf {
+    let mut cur = input.parent();
+    let fallback = cur
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    while let Some(d) = cur {
+        if d.file_name().and_then(|s| s.to_str()) == Some("Qml") {
+            return d.to_path_buf();
+        }
+        cur = d.parent();
+    }
+    fallback
+}
+
+/// Find `<type_name>.qml` under `root` via a bounded recursive search.
+fn find_component_file(root: &Path, type_name: &str) -> Option<PathBuf> {
+    fn walk(dir: &Path, target: &str, depth: u32) -> Option<PathBuf> {
+        if depth > 6 {
+            return None;
+        }
+        let entries = fs::read_dir(dir).ok()?;
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                subdirs.push(path);
+            } else if path.file_name().and_then(|s| s.to_str()) == Some(target) {
+                return Some(path);
+            }
+        }
+        for sub in subdirs {
+            if let Some(hit) = walk(&sub, target, depth + 1) {
+                return Some(hit);
+            }
+        }
+        None
+    }
+    let target = format!("{type_name}.qml");
+    walk(root, &target, 0)
+}
+
+/// Load and parse a component `.qml` root item, cached by type name. Returns
+/// `None` (cached) when the file is absent or fails to parse — the instance is
+/// then left as a fallback container.
+fn load_component(
+    type_name: &str,
+    root_dir: &Path,
+    cache: &mut std::collections::HashMap<String, Option<UiItem>>,
+) -> Option<UiItem> {
+    if let Some(hit) = cache.get(type_name) {
+        return hit.clone();
+    }
+    let resolved = find_component_file(root_dir, type_name).and_then(|path| {
+        let src = fs::read_to_string(&path).ok()?;
+        parse_module(&src, &path).ok().map(|m| m.root)
+    });
+    cache.insert(type_name.to_string(), resolved.clone());
+    resolved
+}
+
+/// Merge a component definition's root into an instance node: the node renders
+/// as the component root's type with the component body prepended to any
+/// instance-provided children, instance assignments overriding component
+/// defaults (so the parent's anchors win), and the instance `id` preserved.
+fn merge_component_into_instance(instance: &mut UiItem, def: UiItem) {
+    instance.type_name = def.type_name;
+    // Component body first, then instance-supplied extra children.
+    let mut children = def.children;
+    children.append(&mut instance.children);
+    instance.children = children;
+    // Assignments: component defaults, then instance overrides by target.
+    let mut merged = def.assignments;
+    for asn in std::mem::take(&mut instance.assignments) {
+        if let Some(slot) = merged.iter_mut().find(|a| a.target == asn.target) {
+            *slot = asn;
+        } else {
+            merged.push(asn);
+        }
+    }
+    instance.assignments = merged;
+    // Handlers / declarations: component then instance.
+    let mut handlers = def.handlers;
+    handlers.append(&mut instance.handlers);
+    instance.handlers = handlers;
+    let mut props = def.properties;
+    props.append(&mut instance.properties);
+    instance.properties = props;
+    let mut signals = def.signals;
+    signals.append(&mut instance.signals);
+    instance.signals = signals;
+}
+
+/// Recursively inline user-defined component children of `item`. `stack` guards
+/// against component-reference cycles; `cache` memoises parsed component roots.
+fn expand_components_in(
+    item: &mut UiItem,
+    root_dir: &Path,
+    stack: &mut Vec<String>,
+    cache: &mut std::collections::HashMap<String, Option<UiItem>>,
+) {
+    // Expand this node if it instantiates a user-defined component: an
+    // uppercase type that the widget table doesn't map and that resolves to a
+    // sibling `.qml`, and isn't already being expanded (cycle guard).
+    // Chase the component base-type chain: each merge may retype the node to
+    // another user component (e.g. MediaRepeatButton → SelectButton →
+    // FocusButton → Rectangle), so loop until the node is a mapped widget, a
+    // framework type with no `.qml`, or a cycle is detected.
+    let mut pushed = 0usize;
+    loop {
+        let stripped = item
+            .type_name
+            .rsplit('.')
+            .next()
+            .unwrap_or(&item.type_name)
+            .to_string();
+        if !(starts_uppercase(&stripped)
+            && matches!(map_qml_type(&stripped), WidgetKind::Fallback)
+            && !stack.contains(&stripped))
+        {
+            break;
+        }
+        let Some(def) = load_component(&stripped, root_dir, cache) else {
+            break;
+        };
+        stack.push(stripped);
+        pushed += 1;
+        merge_component_into_instance(item, def);
+    }
+
+    for child in &mut item.children {
+        expand_components_in(child, root_dir, stack, cache);
+    }
+
+    for _ in 0..pushed {
+        stack.pop();
+    }
+}
+
+/// QT-Repeater: expand a `Repeater { model: [ {…}, … ] }` whose model is a
+/// literal array into one positioned `Image` child per model entry's
+/// `imageKeySource`. The delegate's button frame is intentionally dropped (it
+/// lowers to a transparent background); the visible artwork is the per-item
+/// icon. Icons are laid out left-to-right and centred as a group across the
+/// containing layout's width via sibling anchors (so the anchor solver, which
+/// already handles `verticalCenter` + `<id>.right` chains, does the placement).
+///
+/// `layout_w` / `spacing` are the containing Row/RowLayout's `width:` /
+/// `spacing:` (0 when unknown — the Repeater is then left untouched).
+fn expand_repeaters_in(item: &mut UiItem, layout_w: i32, spacing: i32, preserve_ternary: bool) {
+    // A Repeater nested directly in this node uses this node's width/spacing.
+    let my_w = lookup_assignment(item, "width")
+        .and_then(parse_int_literal)
+        .unwrap_or(layout_w);
+    let my_spacing = lookup_assignment(item, "spacing")
+        .and_then(parse_int_literal)
+        .unwrap_or(spacing);
+    for child in &mut item.children {
+        if child.type_name == "Repeater" && my_w > 0 {
+            expand_one_repeater(child, my_w, my_spacing, preserve_ternary);
+        }
+        expand_repeaters_in(child, my_w, my_spacing, preserve_ternary);
+    }
+}
+
+fn expand_one_repeater(rep: &mut UiItem, layout_w: i32, spacing: i32, preserve_ternary: bool) {
+    let items: Vec<String> = match rep.assignments.iter().find(|a| a.target == "model") {
+        Some(UiAssignment {
+            value: UiAssignmentValue::List { items },
+            ..
+        }) => items
+            .iter()
+            .filter_map(|v| match v {
+                UiAssignmentValue::Expression { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => return,
+    };
+    // Each model entry contributes its `imageKeySource` (the icon) and, when
+    // present, its `eventName` (the QT-05j button event the delegate dispatches
+    // via `submitBtnSetupEvent(eventName, …)`).
+    let entries: Vec<(String, Option<String>)> = items
+        .iter()
+        .filter_map(|t| {
+            extract_image_key_source(t, preserve_ternary).map(|s| (s, extract_model_event_name(t)))
+        })
+        .collect();
+    let n = entries.len() as i32;
+    if n == 0 {
+        return;
+    }
+    // The model-driven transport icons in this corpus are 48px square.
+    let icon = 48;
+    let group_w = n * icon + (n - 1) * spacing.max(0);
+    let start = ((layout_w - group_w) / 2).max(0);
+    let mut kids = Vec::new();
+    for (i, (src, event)) in entries.iter().enumerate() {
+        let id = format!("__rep_btn_{i}");
+        let mut a: Vec<UiAssignment> = vec![
+            ui_assign("source", src.clone()),
+            ui_assign("width", format!("{icon}")),
+            ui_assign("height", format!("{icon}")),
+            ui_assign(
+                "anchors.verticalCenter",
+                "parent.verticalCenter".to_string(),
+            ),
+        ];
+        if i == 0 {
+            a.push(ui_assign("anchors.left", "parent.left".to_string()));
+            a.push(ui_assign("anchors.leftMargin", format!("{start}")));
+        } else {
+            a.push(ui_assign(
+                "anchors.left",
+                format!("__rep_btn_{}.right", i - 1),
+            ));
+            a.push(ui_assign(
+                "anchors.leftMargin",
+                format!("{}", spacing.max(0)),
+            ));
+        }
+        // QT-05j: carry the model item's `eventName` as a resolved
+        // `submitBtnSetupEvent("<EVENT>")` handler on the synthesized icon node
+        // (the delegate button frame is dropped), so the button-event walker
+        // wires this tap target like any literal-arg button.
+        let handlers = match event {
+            Some(ev) => vec![UiHandler {
+                signal: "onReleased".to_string(),
+                body: format!("submitBtnSetupEvent(\"{ev}\")"),
+            }],
+            None => Vec::new(),
+        };
+        kids.push(UiItem {
+            type_name: "Image".to_string(),
+            id: Some(id),
+            properties: Vec::new(),
+            assignments: a,
+            signals: Vec::new(),
+            handlers,
+            children: Vec::new(),
+        });
+    }
+    rep.children = kids;
+}
+
+/// Build an `Expression`-valued assignment.
+fn ui_assign(target: &str, text: String) -> UiAssignment {
+    UiAssignment {
+        target: target.to_string(),
+        value: UiAssignmentValue::Expression { text },
+    }
+}
+
+/// QT-05j: parse the first `submitBtnSetupEvent("<EVENT>"…)` call out of a
+/// handler body, returning the QML button-event name `<EVENT>` (the first
+/// string-literal argument). Returns `None` when the call is absent or its
+/// first argument is a bare identifier (the Repeater delegate's
+/// `submitBtnSetupEvent(eventName, 1)` form — resolved during expansion).
+fn parse_submit_btn_event(body: &str) -> Option<String> {
+    let idx = body.find("submitBtnSetupEvent")?;
+    let args = &body[idx + "submitBtnSetupEvent".len()..];
+    let args = args.trim_start().strip_prefix('(')?;
+    // The first argument must be a string literal (`"MediaFunc.X"`); a bare
+    // identifier before the first quote (e.g. a `,`-separated later arg) means
+    // the event name is dynamic and not lowerable here.
+    let q1 = args.find('"')?;
+    if args[..q1].contains(',') {
+        return None;
+    }
+    let rest = &args[q1 + 1..];
+    let q2 = rest.find('"')?;
+    Some(rest[..q2].to_string())
+}
+
+/// QT-05j: the QML button-event name a node's handlers dispatch via
+/// `submitBtnSetupEvent("…")`, if any.
+fn extract_submit_btn_event(item: &UiItem) -> Option<String> {
+    item.handlers
+        .iter()
+        .find_map(|h| parse_submit_btn_event(&h.body))
+}
+
+/// QT-05j: pull the `eventName: "<EVENT>"` literal out of a Repeater model
+/// entry (the per-item button event the delegate dispatches via
+/// `submitBtnSetupEvent(eventName, …)`).
+fn extract_model_event_name(obj_text: &str) -> Option<String> {
+    let idx = obj_text.find("eventName")?;
+    let after = obj_text[idx + "eventName".len()..]
+        .trim_start()
+        .strip_prefix(':')?;
+    let q1 = after.find('"')?;
+    let rest = &after[q1 + 1..];
+    let q2 = rest.find('"')?;
+    Some(rest[..q2].to_string())
+}
+
+/// QT-05j: give every untagged button that dispatches a
+/// `submitBtnSetupEvent("…")` a synthetic, deterministic `id` (hence a node
+/// tag) so the consumer can resolve its bounds to route a tap. Tagged buttons
+/// (a real QML `id:`, e.g. `repeatBtn`) keep their tag. Runs after component +
+/// Repeater expansion so synthesized delegate handlers are present.
+fn synthesize_button_tap_tags(item: &mut UiItem) {
+    if item.id.is_none()
+        && let Some(ev) = extract_submit_btn_event(item)
+    {
+        item.id = Some(format!(
+            "__btn_{}",
+            rust_snake_ident(&ev.to_ascii_lowercase())
+        ));
+    }
+    for child in &mut item.children {
+        synthesize_button_tap_tags(child);
+    }
+}
+
+/// Pull the `imageKeySource:` value out of a model entry. When
+/// `preserve_ternary` is set (QT-05g: a state-machine context is linked) and
+/// the value is a predicate ternary (`<ctx>.<state> ? "A" : "B"`), the full
+/// ternary expression is returned verbatim so the Image arm can lower it to a
+/// reactive `Binding::Predicate`. Otherwise — no context linked, or a plain
+/// single-literal source — the resting else-branch literal is returned,
+/// re-quoted as a string literal for `pick_image_source`.
+fn extract_image_key_source(obj_text: &str, preserve_ternary: bool) -> Option<String> {
+    let idx = obj_text.find("imageKeySource")?;
+    let after = obj_text[idx + "imageKeySource".len()..].trim_start();
+    let after = after.strip_prefix(':')?;
+    // `imageKeySource` is the last property in the model object literal; trim
+    // the closing `}` of the object so only the value expression remains.
+    let expr = after
+        .rsplit_once('}')
+        .map(|(e, _)| e)
+        .unwrap_or(after)
+        .trim();
+    if preserve_ternary && split_ternary(expr).is_some() {
+        // Preserve the full predicate ternary; the Image arm lowers it.
+        return Some(expr.to_string());
+    }
+    // For a `cond ? A : B` source, the else-branch (B, the last literal) is the
+    // resting-state icon (`mediaPlaying ? Pause : Play` → Play at rest). For a
+    // single-literal source, last == only.
+    let lit = extract_asset_literals(expr).into_iter().last()?;
+    Some(format!("\"{lit}\""))
+}
+
+/// Quote-aware split of a `cond ? then : else` ternary into its three parts.
+/// The scan tracks string-literal state so a `:` inside a `qrc:/…` path does
+/// not masquerade as the ternary colon. Returns `None` if `expr` is not a
+/// single top-level ternary. Chained ternaries (an `else` that is itself a
+/// ternary) are detected by the caller via a `?` in the returned `else` part.
+fn split_ternary(expr: &str) -> Option<(&str, &str, &str)> {
+    let bytes = expr.as_bytes();
+    let mut in_q = 0u8;
+    let mut qpos = None;
+    let mut cpos = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_q != 0 {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == in_q {
+                in_q = 0;
+            }
+        } else if b == b'"' || b == b'\'' {
+            in_q = b;
+        } else if b == b'?' && qpos.is_none() {
+            qpos = Some(i);
+        } else if b == b':' && qpos.is_some() && cpos.is_none() {
+            cpos = Some(i);
+            break;
+        }
+        i += 1;
+    }
+    let (q, c) = (qpos?, cpos?);
+    Some((
+        expr[..q].trim(),
+        expr[q + 1..c].trim(),
+        expr[c + 1..].trim(),
+    ))
+}
+
+/// QT-05g: parse a predicate-bound `source:` ternary `<ctx>.<state> ? "A" : "B"`
+/// into `(state_id, on_path, off_path)` (qrc-stripped), for the declared
+/// context `ctx`. Returns `None` for a non-ternary, a non-matching context, a
+/// chained ternary (deferred — `then`/`else` carry a nested `?`), or a branch
+/// that is not a single asset literal.
+fn parse_predicate_source(expr: &str, ctx: &str) -> Option<(String, String, String)> {
+    let (cond, then_b, else_b) = split_ternary(expr)?;
+    if then_b.contains('?') || else_b.contains('?') {
+        return None; // chained ternary deferred (QT-05g §5)
+    }
+    let state = cond.strip_prefix(ctx)?.strip_prefix('.')?.trim();
+    if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    let on = extract_asset_literals(then_b).into_iter().next()?;
+    let off = extract_asset_literals(else_b).into_iter().next()?;
+    Some((
+        state.to_string(),
+        strip_qrc_prefix(&on).to_string(),
+        strip_qrc_prefix(&off).to_string(),
+    ))
+}
+
+/// QT-05i: parse a chained predicate `source:` of the form
+/// `<ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : … : "Z"` into ordered first-true-wins
+/// arms `[(state_id, asset_path), …]` plus the final else asset (`"Z"`, the
+/// resting icon). For the declared context `ctx`. Returns `None` for a plain
+/// single (non-chained) ternary — that is `parse_predicate_source`'s job and is
+/// tried first — a non-matching context, a then-branch that is itself a ternary,
+/// or a branch that is not a single asset literal. qrc prefixes are stripped.
+fn parse_chained_predicate_source(
+    expr: &str,
+    ctx: &str,
+) -> Option<(Vec<(String, String)>, String)> {
+    let mut arms: Vec<(String, String)> = Vec::new();
+    let mut cur = expr.trim();
+    loop {
+        let (cond, then_b, else_b) = split_ternary(cur)?;
+        if then_b.contains('?') {
+            return None; // a then-branch must be a single asset literal
+        }
+        let state = cond.strip_prefix(ctx)?.strip_prefix('.')?.trim();
+        if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return None;
+        }
+        let on = extract_asset_literals(then_b).into_iter().next()?;
+        arms.push((state.to_string(), strip_qrc_prefix(&on).to_string()));
+        let else_b = else_b.trim();
+        if split_ternary(else_b).is_some() {
+            cur = else_b; // the else is itself a ternary — continue the chain
+            continue;
+        }
+        // Final else: the resting asset literal. Require ≥2 arms so a binary
+        // ternary (handled by `parse_predicate_source`) never reaches here.
+        if arms.len() < 2 {
+            return None;
+        }
+        let default = extract_asset_literals(else_b).into_iter().next()?;
+        return Some((arms, strip_qrc_prefix(&default).to_string()));
+    }
+}
+
+/// QT-05h: parse a bare visibility predicate `<ctx>.<state>` into `state_id`
+/// for the declared context `ctx`. Returns `None` for a non-matching context
+/// or a non-bare-predicate expression (negation / boolean / literal), which
+/// are deferred (QT-05h §5).
+fn parse_visible_predicate(expr: &str, ctx: &str) -> Option<String> {
+    let state = expr.trim().strip_prefix(ctx)?.strip_prefix('.')?.trim();
+    if state.is_empty() || !state.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some(state.to_string())
 }
 
 /// Render a [`UiModule`] as the canonical QT-03 Rust emit-shape.
@@ -2234,20 +2869,50 @@ fn rust_str_lit(s: &str) -> String {
 /// Public so the schema-drift test can compare in-memory output against
 /// `tests/fixtures/qt/hello.rlvgl.rs` without going through a tempdir.
 pub fn render_rlvgl(module: &UiModule) -> String {
+    render_rlvgl_with_resolver(module, &DimResolver::default(), None)
+}
+
+/// As [`render_rlvgl`], but with a pre-built [`DimResolver`] so the anchor
+/// solver can evaluate JS-constant / root-property dimension expressions, and
+/// an optional QT-05g `--scxml-context` linkage that attaches an istate
+/// linkage-v2 machine for state-predicate Image bindings.
+fn render_rlvgl_with_resolver(
+    module: &UiModule,
+    resolver: &DimResolver,
+    scxml_context: Option<&ScxmlContext>,
+) -> String {
     let state_fields = collect_state_fields(&module.root);
-    let sm_id = module.state_machine.as_ref().map(|sm| sm.id.clone());
+    // QT-05g: linkage v2 attaches via `--scxml-context` when there is no
+    // `.scjson` side-file (v1). The two are mutually exclusive here; a v1 SM
+    // takes precedence if both are somehow present.
+    let v1_sm_id = module.state_machine.as_ref().map(|sm| sm.id.clone());
+    let v2 = v1_sm_id.is_none() && scxml_context.is_some();
+    let sm_id = v1_sm_id
+        .clone()
+        .or_else(|| scxml_context.map(|c| c.krate.clone()));
+    let sm_context = scxml_context.map(|c| c.context.clone());
     let dm_field_ids: Vec<String> = module
         .state_machine
         .as_ref()
         .map(|sm| sm.datamodel.iter().map(|f| f.id.clone()).collect())
         .unwrap_or_default();
     let mut ctx = RlvglEmitCtx::new_with_fields(state_fields.clone())
+        .with_resolver(resolver.clone())
         .with_sm(sm_id.clone())
-        .with_dm_fields(dm_field_ids);
+        .with_dm_fields(dm_field_ids)
+        .with_v2(v2, sm_context.clone());
     let root_fn = ctx.alloc_fn_name(&module.root);
     let root_body = ctx.emit_helper(&module.root, &root_fn, true);
     let has_sm = sm_id.is_some();
+    let used_predicate = ctx.used_predicate;
+    let used_visibility = ctx.used_visibility;
+    let used_predicate_chain = ctx.used_predicate_chain;
+    let button_tap_events = ctx.button_tap_events.clone();
+    let used_external_text = ctx.used_external_text;
+    let external_text_bindings = ctx.external_text_bindings.clone();
     let used_dm_fields = ctx.used_dm_fields.clone();
+    let used_assets = ctx.used_assets.clone();
+    let has_images = !used_assets.is_empty();
 
     let mut out = String::new();
     out.push_str("// SPDX-License-Identifier: MIT\n");
@@ -2287,32 +2952,57 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     out.push('\n');
     out.push_str("extern crate alloc;\n");
     out.push('\n');
+    if has_images {
+        // Image-bearing modules reference the generated `qt_assets` module
+        // (one `&[u8]` RLE blob per symbol). Emitted first — `crate` sorts
+        // ahead of external crates under rustfmt, so the output stays
+        // idempotent under `cargo fmt`. The integrator provides
+        // `crate::qt_assets` (hand-written or vendored).
+        out.push_str("use crate::qt_assets;\n");
+    }
     out.push_str("use alloc::rc::Rc;\n");
     out.push_str("use alloc::string::String;\n");
     out.push_str("use alloc::vec::Vec;\n");
     out.push_str("use core::cell::RefCell;\n");
     out.push('\n');
+    // QT-05g: the linkage-v2 machine crate (`--scxml-context`) is an external
+    // crate sorting before `rlvgl_*` — emit it here so the file stays
+    // fmt-idempotent. (v1's `<sm>_gen` sorts after `rlvgl_widgets`; emitted
+    // below.)
+    if v2 && let Some(id) = &sm_id {
+        out.push_str(&format!("use {id}::Machine;\n"));
+    }
     // Emit order matches rustfmt's preferred sort within the
     // `rlvgl_core::*` group (uppercase items before lowercase
     // modules), so the generated file stays idempotent under
     // `cargo fmt`.
     out.push_str("use rlvgl_core::WidgetNode;\n");
+    if has_images {
+        // `image` sorts after `WidgetNode` and before `widget` within the
+        // `rlvgl_core::*` group (uppercase item, then lowercase modules
+        // alphabetically) — fmt-stable. `BlitOpts` drives the `qt_image`
+        // Stretch scaling below.
+        out.push_str("use rlvgl_core::image::BlitOpts;\n");
+    }
     out.push_str("use rlvgl_core::widget::{Color, Rect, Widget};\n");
     out.push_str("use rlvgl_widgets::button::Button;\n");
     out.push_str("use rlvgl_widgets::click_area::ClickArea;\n");
     out.push_str("use rlvgl_widgets::container::Container;\n");
+    if has_images {
+        // `image` sorts between `container` and `label` — fmt-stable.
+        out.push_str("use rlvgl_widgets::image::Image;\n");
+    }
     out.push_str("use rlvgl_widgets::label::Label;\n");
     // QT-05b §6: import the istate-codegen 6-symbol linkage surface
     // (the ones we actually reference at this phase: `Event` for
     // dispatch lowering, `Machine` for the threading parameter).
     // `State`/`DataModel`/`Externals` join when QT-05c/e land.
-    if let Some(id) = &sm_id {
-        // QT-05c §3 / §6: SM-attached modules import the full v1
-        // linkage surface trio that QT-05b/05c reference — `Event`
-        // for dispatch lowering, `Machine` for the threading
-        // parameter, `DataModel` for QT-05c MachineBinding accessors.
-        // The file's `#![allow(unused_imports)]` covers fixtures
-        // that have an SM but no DM bindings.
+    // QT-05c §3 / §6: SM-attached (linkage v1) modules import the full
+    // linkage surface trio — `Event` for dispatch lowering, `Machine` for
+    // the threading parameter, `DataModel` for MachineBinding accessors.
+    // `<sm>_gen` sorts after `rlvgl_widgets`. (v2 imports `Machine` from the
+    // `--scxml-context` crate above, where it sorts before `rlvgl_*`.)
+    if !v2 && let Some(id) = &sm_id {
         out.push_str(&format!("use {id}_gen::{{DataModel, Event, Machine}};\n"));
     }
     out.push('\n');
@@ -2328,6 +3018,7 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     ));
     out.push_str(&format!(
         "/// Source `.qml` file path as recorded at emit time.\n\
+         #[rustfmt::skip]\n\
          pub const QT_SOURCE: &str = {};\n\n",
         rust_str_lit(&module.source)
     ));
@@ -2336,45 +3027,150 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     // and SM name as `pub const`s so reviewers can confirm what
     // istate template their module is built against.
     if let Some(id) = &sm_id {
-        out.push_str(
-            "/// QT-05 §6 linkage version. v1 pins the istate Rust\n\
-             /// template's std-profile shape (VecDeque + Box<dyn Externals>).\n\
-             pub const ISTATE_LINKAGE_VERSION: u32 = 1;\n\n",
-        );
+        if v2 {
+            out.push_str(
+                "/// QT-05 §6 linkage version. v2 is the istate M1P6 dynamic-string\n\
+                 /// surface (`step`/`is_active`/`get_var`), linked via `--scxml-context`.\n\
+                 pub const ISTATE_LINKAGE_VERSION: u32 = 2;\n\n",
+            );
+        } else {
+            out.push_str(
+                "/// QT-05 §6 linkage version. v1 pins the istate Rust\n\
+                 /// template's std-profile shape (VecDeque + Box<dyn Externals>).\n\
+                 pub const ISTATE_LINKAGE_VERSION: u32 = 1;\n\n",
+            );
+        }
         out.push_str(&format!(
             "/// QT-05a §8 derived state-machine ID; matches the\n\
-             /// `<sm>_gen` crate name stem.\n\
+             /// `<sm>_gen` crate name stem (v1) or the `--scxml-context` crate (v2).\n\
              pub const QT_SM_NAME: &str = {};\n\n",
             rust_str_lit(id)
         ));
     }
 
+    // QT-05j: tap-target table lowered from `<ctx>.submitBtnSetupEvent("…")`
+    // button handlers. Each entry is `(node tag, raw QML button-event)`; the
+    // QML event string round-trips verbatim (authority: derive). The consumer
+    // owns the QML-event → machine-event vocabulary map (the role Bolero's C++
+    // `submitBtnSetupEvent` plays), so this table is deliberately app-agnostic.
+    if !button_tap_events.is_empty() {
+        out.push_str(
+            "/// QT-05j — tap targets lowered from `submitBtnSetupEvent(\"…\")` button\n\
+             /// handlers: `(node tag, raw QML button-event)`. The consumer maps each\n\
+             /// QML event to a machine event via `machine.step(…)`.\n\
+             pub const BUTTON_TAP_EVENTS: &[(&str, &str)] = &[\n",
+        );
+        for (tag, ev) in &button_tap_events {
+            out.push_str(&format!(
+                "    ({}, {}),\n",
+                rust_str_lit(tag),
+                rust_str_lit(ev)
+            ));
+        }
+        out.push_str("];\n\n");
+    }
+
+    // QT-05k: external-text table lowered from Label `text: <obj>.<prop>`
+    // sources. Each entry is `(node tag, verbatim external key)`; the key
+    // round-trips verbatim (authority: derive). The consumer owns the
+    // key → value resolver supplied to `apply_external_text`, so this table is
+    // deliberately app-agnostic — it only declares which tags carry which keys.
+    if !external_text_bindings.is_empty() {
+        out.push_str(
+            "/// QT-05k — external-text targets lowered from Label `text: <obj>.<prop>`\n\
+             /// sources: `(node tag, verbatim external key)`. The consumer resolves\n\
+             /// each key to a string via `apply_external_text`.\n\
+             #[rustfmt::skip]\n\
+             pub const EXTERNAL_TEXT_BINDINGS: &[(&str, &str)] = &[\n",
+        );
+        for (tag, key) in &external_text_bindings {
+            out.push_str(&format!(
+                "    ({}, {}),\n",
+                rust_str_lit(tag),
+                rust_str_lit(key)
+            ));
+        }
+        out.push_str("];\n\n");
+    }
+
     emit_screen_state_struct(&state_fields, &mut out);
     emit_label_binding_struct(&mut out);
     if has_sm {
-        emit_machine_binding_struct(&mut out);
-        emit_binding_enum(&mut out);
+        if v2 {
+            if used_predicate || used_visibility || used_predicate_chain {
+                emit_image_art_struct(&mut out);
+            }
+            if used_predicate {
+                emit_predicate_binding_struct(&mut out);
+            }
+            if used_visibility {
+                emit_visibility_binding_struct(&mut out);
+            }
+            if used_predicate_chain {
+                emit_predicate_chain_binding_struct(&mut out);
+            }
+            if used_external_text {
+                emit_external_text_binding_struct(&mut out);
+            }
+            emit_binding_enum_v2(
+                &mut out,
+                used_predicate,
+                used_visibility,
+                used_predicate_chain,
+                used_external_text,
+            );
+        } else {
+            emit_machine_binding_struct(&mut out);
+            emit_binding_enum(&mut out);
+        }
     }
+    emit_binding_sink_struct(&mut out);
+    emit_built_screen_alias(&mut out, has_sm);
 
     if has_sm {
-        out.push_str(
-            "/// Build the screen widget tree at `bounds` and return it\n\
-             /// alongside the `ScreenState` handle (QT-04b §3), the\n\
-             /// `Rc<RefCell<Machine>>` istate-codegen handle (QT-05b §3),\n\
-             /// and the `Vec<Binding>` of reactive bindings (QT-04e §3,\n\
-             /// QT-05c §3). Callers may dispatch external events via\n\
-             /// `machine.borrow_mut().dispatch(Event::…)` — the QML-side\n\
-             /// `dispatch(\"…\")` handlers route through this same machine.\n\
-             #[rustfmt::skip]\n\
-             pub fn build_screen(\n    \
-                 bounds: Rect,\n) \
-             -> (WidgetNode, Rc<RefCell<ScreenState>>, Rc<RefCell<Machine>>, Vec<Binding>) {\n",
-        );
+        if v2 {
+            out.push_str(
+                "/// Build the screen widget tree at `bounds` and return it\n\
+                 /// alongside the `ScreenState` handle (QT-04b §3), the\n\
+                 /// `Rc<RefCell<Machine>>` istate (linkage v2) handle, and the\n\
+                 /// `Vec<Binding>` of reactive bindings (QT-05g §3). Callers\n\
+                 /// drive the machine via `machine.borrow_mut().step(\"…\", …)`\n\
+                 /// and call `refresh_bindings` to re-apply state-predicate\n\
+                 /// artwork (e.g. Play↔Pause via `is_active`).\n\
+                 #[rustfmt::skip]\n\
+                 pub fn build_screen(\n    \
+                     bounds: Rect,\n) \
+                 -> BuiltScreen {\n",
+            );
+        } else {
+            out.push_str(
+                "/// Build the screen widget tree at `bounds` and return it\n\
+                 /// alongside the `ScreenState` handle (QT-04b §3), the\n\
+                 /// `Rc<RefCell<Machine>>` istate-codegen handle (QT-05b §3),\n\
+                 /// and the `Vec<Binding>` of reactive bindings (QT-04e §3,\n\
+                 /// QT-05c §3). Callers may dispatch external events via\n\
+                 /// `machine.borrow_mut().dispatch(Event::…)` — the QML-side\n\
+                 /// `dispatch(\"…\")` handlers route through this same machine.\n\
+                 #[rustfmt::skip]\n\
+                 pub fn build_screen(\n    \
+                     bounds: Rect,\n) \
+                 -> BuiltScreen {\n",
+            );
+        }
         emit_screen_state_init(&state_fields, &mut out);
-        out.push_str("    let machine = Rc::new(RefCell::new(Machine::new()));\n");
+        if v2 {
+            // Linkage v2: the M1P6 machine must be `start()`ed to enter its
+            // initial configuration before `is_active` is meaningful.
+            out.push_str(
+                "    let machine = Rc::new(RefCell::new({ let mut m = Machine::new(); m.start(); m }));\n",
+            );
+        } else {
+            out.push_str("    let machine = Rc::new(RefCell::new(Machine::new()));\n");
+        }
         out.push_str("    let mut bindings: Vec<Binding> = Vec::new();\n");
+        out.push_str("    let mut binding_sink = BindingSink::new(&mut bindings);\n");
         out.push_str(&format!(
-            "    let node = {root_fn}(bounds, Rc::clone(&state), Rc::clone(&machine), &mut bindings);\n    \
+            "    let node = {root_fn}(bounds, Rc::clone(&state), Rc::clone(&machine), &mut binding_sink);\n    \
              (node, state, machine, bindings)\n}}\n\n"
         ));
     } else {
@@ -2387,16 +3183,28 @@ pub fn render_rlvgl(module: &UiModule) -> String {
              #[rustfmt::skip]\n\
              pub fn build_screen(\n    \
                  bounds: Rect,\n) \
-             -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {\n",
+             -> BuiltScreen {\n",
         );
         emit_screen_state_init(&state_fields, &mut out);
         out.push_str("    let mut label_bindings: Vec<LabelBinding> = Vec::new();\n");
+        out.push_str("    let mut binding_sink = BindingSink::new(&mut label_bindings);\n");
         out.push_str(&format!(
-            "    let node = {root_fn}(bounds, Rc::clone(&state), &mut label_bindings);\n    \
+            "    let node = {root_fn}(bounds, Rc::clone(&state), &mut binding_sink);\n    \
              (node, state, label_bindings)\n}}\n\n"
         ));
     }
-    emit_refresh_bindings_fn(&mut out, has_sm);
+    emit_refresh_bindings_fn(
+        &mut out,
+        has_sm,
+        v2,
+        used_predicate,
+        used_visibility,
+        used_predicate_chain,
+        used_external_text,
+    );
+    if used_external_text {
+        emit_apply_external_text_fn(&mut out);
+    }
     // QT-05c §6: per-field `format_dm_<field>` free functions —
     // one per used DM field, emitted in first-use order. The
     // `f64::to_string()` representation is chosen for determinism;
@@ -2410,6 +3218,35 @@ pub fn render_rlvgl(module: &UiModule) -> String {
                  dm.{field}.to_string()\n}}\n\n"
         ));
     }
+    if has_images {
+        emit_qt_image_helper(&used_assets, &mut out);
+    }
+    if used_predicate || used_visibility || used_predicate_chain {
+        emit_qt_image_art_helper(&mut out);
+    }
+    if used_predicate {
+        emit_qt_predicate_image_helper(&mut out);
+    }
+    if used_visibility {
+        emit_qt_visibility_image_helper(&mut out);
+    }
+    if used_predicate_chain {
+        emit_qt_predicate_chain_image_helper(&mut out);
+    }
+    if root_body.contains("qt_label(") {
+        // QML `Text`/`Label` items have no background; emit a constructor that
+        // clears the opaque-white `Style::default()` so text never sits on an
+        // opaque white box that buries content drawn beneath it.
+        out.push_str(
+            "/// Construct a `Label` with a transparent background (QML text has\n\
+             /// no fill), so it does not paint the opaque-white default `Style`.\n\
+             fn qt_label(text: impl Into<String>, bounds: Rect) -> Label {\n    \
+                 let mut l = Label::new(text, bounds);\n    \
+                 l.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                 l\n}\n\n",
+        );
+    }
+
     out.push_str(&root_body);
 
     // Trim the trailing blank line that comes from the last helper's
@@ -2417,6 +3254,193 @@ pub fn render_rlvgl(module: &UiModule) -> String {
     // with a single newline. Keeps the emit byte-stable under
     // `cargo fmt`, which strips trailing blank lines.
     format!("{}\n", out.trim_end())
+}
+
+/// Emit the `qt_image` decode helper plus a `qt_assets` symbol manifest. The
+/// helper decodes a vendored RLE blob into an owned, leaked pixel buffer and
+/// wraps it in an [`rlvgl_widgets::image::Image`]; leaking is acceptable because
+/// demo artwork is allocated once at startup and lives for the program.
+///
+/// The manifest lists every `qt_assets::<SYMBOL>` the module references. The
+/// integrator provides a `qt_assets` module (hand-written or generated by
+/// `rlvgl-creator` vendoring) exposing one `pub static <SYMBOL>: &[u8]` RLE blob
+/// per entry. Decode mirrors the sctd-demo philosophers-table pipeline.
+fn emit_qt_image_helper(used_assets: &[AssetRef], out: &mut String) {
+    out.push_str("// Required `qt_assets` symbols (one RLE `&[u8]` blob each):\n");
+    for a in used_assets {
+        out.push_str(&format!("//   qt_assets::{}  ←  {}\n", a.symbol, a.path));
+    }
+    out.push_str(
+        "/// Decode a vendored RLE asset into an owned, leaked pixel buffer and\n\
+         /// wrap it in an `Image` widget (see emit-time docs above).\n\
+         #[rustfmt::skip]\n\
+         fn qt_image(bounds: Rect, rle: &'static [u8]) -> Rc<RefCell<dyn Widget>> {\n    \
+             let (w, h, palette_bytes, stream) =\n        \
+                 rlvgl_decomp::parse_rle_blob(rle).expect(\"qt_image: malformed RLE asset\");\n    \
+             let palette_len = palette_bytes.len() / 2;\n    \
+             let mut palette = alloc::vec![0u16; palette_len];\n    \
+             for i in 0..palette_len {\n        \
+                 palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);\n    \
+             }\n    \
+             let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
+                 .expect(\"qt_image: RLE decode failed\");\n    \
+             let pixels: Vec<Color> = rgba\n        \
+                 .as_chunks::<4>().0.iter()\n        \
+                 .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
+                     Color(0x00, 0x00, 0x00, 0x00) // magenta sentinel → transparent (RGB565 has no alpha)\n        \
+                 } else {\n            \
+                     Color(c[0], c[1], c[2], c[3])\n        \
+                 })\n        \
+                 .collect();\n    \
+             let pixels: &'static [Color] = Vec::leak(pixels);\n    \
+             let mut img = Image::new(bounds, w as i32, h as i32, pixels);\n    \
+             // An Image paints its own pixels; the widget background MUST be\n    \
+             // transparent so the default opaque-white `Style` does not bury\n    \
+             // the artwork (and content drawn behind it).\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML's default `fillMode` is `Image.Stretch`: scale the source to\n    \
+             // fill the destination bounds. `scale` is 8.8 fixed-point, so 256 =\n    \
+             // 1:1; dest/src * 256 stretches source pixels across `bounds`.\n    \
+             let scale_x = if w > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / w as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if h > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / h as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             Rc::new(RefCell::new(img))\n}\n\n",
+    );
+}
+
+/// QT-05g: emit the shared `qt_image_art` RLE decoder (one asset → leaked
+/// `ImageArt`). Emitted when any predicate or visibility binding is present.
+fn emit_qt_image_art_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05g: decode one vendored RLE asset into a leaked `ImageArt`\n\
+         /// (magenta-keyed → transparent, RGB565 has no alpha).\n\
+         #[rustfmt::skip]\n\
+         fn qt_image_art(rle: &'static [u8]) -> ImageArt {\n    \
+             let (w, h, palette_bytes, stream) =\n        \
+                 rlvgl_decomp::parse_rle_blob(rle).expect(\"qt_image_art: malformed RLE asset\");\n    \
+             let palette_len = palette_bytes.len() / 2;\n    \
+             let mut palette = alloc::vec![0u16; palette_len];\n    \
+             for i in 0..palette_len {\n        \
+                 palette[i] = u16::from_le_bytes([palette_bytes[i * 2], palette_bytes[i * 2 + 1]]);\n    \
+             }\n    \
+             let rgba = rlvgl_decomp::decode_rgba(w as usize, h as usize, &palette, stream)\n        \
+                 .expect(\"qt_image_art: RLE decode failed\");\n    \
+             let pixels: Vec<Color> = rgba\n        \
+                 .as_chunks::<4>().0.iter()\n        \
+                 .map(|c| if c[0] == 0xFF && c[1] == 0x00 && c[2] == 0xFF {\n            \
+                     Color(0x00, 0x00, 0x00, 0x00)\n        \
+                 } else {\n            \
+                     Color(c[0], c[1], c[2], c[3])\n        \
+                 })\n        \
+                 .collect();\n    \
+             let pixels: &'static [Color] = Vec::leak(pixels);\n    \
+             ImageArt { width: w as i32, height: h as i32, pixels }\n}\n\n",
+    );
+}
+
+/// QT-05g: build a predicate-bound Image — decodes both branches, builds the
+/// concrete `Rc<RefCell<Image>>` at the machine-driven branch, and returns it
+/// as a `dyn Widget` alongside the `Binding::Predicate` that swaps it.
+fn emit_qt_predicate_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05g: build a predicate-bound Image. Decodes both branches, builds\n\
+         /// the Image at the machine-driven branch, and returns it as a\n\
+         /// `dyn Widget` plus the `Binding::Predicate` that swaps it on refresh.\n\
+         #[rustfmt::skip]\n\
+         fn qt_predicate_image(\n    \
+             bounds: Rect,\n    on_rle: &'static [u8],\n    off_rle: &'static [u8],\n    \
+             state_id: &'static str,\n    active: bool,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let on = qt_image_art(on_rle);\n    \
+             let off = qt_image_art(off_rle);\n    \
+             let cur = if active { on } else { off };\n    \
+             let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).\n    \
+             let scale_x = if cur.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if cur.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Predicate(PredicateBinding { image, state_id, on, off }))\n}\n\n",
+    );
+}
+
+/// QT-05h: build a visibility-bound Image — decodes the single source asset,
+/// builds the concrete `Rc<RefCell<Image>>` initialised hidden-or-shown from
+/// the machine, and returns it as a `dyn Widget` plus the `Binding::Visibility`
+/// that drives its visibility on refresh.
+fn emit_qt_visibility_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05h: build a visibility-bound Image. Decodes the source, builds\n\
+         /// the Image (initially hidden iff the bound state is inactive), and\n\
+         /// returns it as a `dyn Widget` plus its `Binding::Visibility`.\n\
+         #[rustfmt::skip]\n\
+         fn qt_visibility_image(\n    \
+             bounds: Rect,\n    rle: &'static [u8],\n    \
+             state_id: &'static str,\n    visible: bool,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let art = qt_image_art(rle);\n    \
+             let mut img = Image::new(bounds, art.width, art.height, art.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             let scale_x = if art.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / art.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if art.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / art.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let mut img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             img.set_hidden(!visible);\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Visibility(VisibilityBinding { image, state_id }))\n}\n\n",
+    );
+}
+
+/// QT-05i: build a chained-predicate Image — decodes every arm asset plus the
+/// default, builds the concrete `Rc<RefCell<Image>>` at the machine-driven arm
+/// (first active wins, else default), and returns it as a `dyn Widget` plus the
+/// `Binding::Chain` that swaps it on refresh.
+fn emit_qt_predicate_chain_image_helper(out: &mut String) {
+    out.push_str(
+        "/// QT-05i: build a chained-predicate Image. Decodes every arm + the\n\
+         /// default, builds the Image at the machine-driven arm (first active\n\
+         /// wins, else default), and returns it as a `dyn Widget` plus the\n\
+         /// `Binding::Chain` that swaps it on refresh.\n\
+         #[rustfmt::skip]\n\
+         fn qt_predicate_chain_image(\n    \
+             bounds: Rect,\n    arms: &[(&'static [u8], &'static str)],\n    \
+             default_rle: &'static [u8],\n    machine: &Machine,\n) -> (Rc<RefCell<dyn Widget>>, Binding) {\n    \
+             let decoded: Vec<PredicateArm> = arms\n        \
+                 .iter()\n        \
+                 .map(|(rle, state_id)| PredicateArm { state_id, art: qt_image_art(rle) })\n        \
+                 .collect();\n    \
+             let default = qt_image_art(default_rle);\n    \
+             let cur = decoded\n        \
+                 .iter()\n        \
+                 .find(|a| machine.is_active(a.state_id))\n        \
+                 .map(|a| a.art)\n        \
+                 .unwrap_or(default);\n    \
+             let mut img = Image::new(bounds, cur.width, cur.height, cur.pixels);\n    \
+             img.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+             // QML default `Image.Stretch`: scale source → bounds (8.8 fixed-point).\n    \
+             let scale_x = if cur.width > 0 {\n        \
+                 ((bounds.width.max(0) as i64 * 256 / cur.width as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let scale_y = if cur.height > 0 {\n        \
+                 ((bounds.height.max(0) as i64 * 256 / cur.height as i64).clamp(1, 0xffff)) as u16\n    \
+             } else { 256 };\n    \
+             let img = img.with_blit_opts(BlitOpts { scale_x, scale_y, ..BlitOpts::default() });\n    \
+             let image = Rc::new(RefCell::new(img));\n    \
+             let widget: Rc<RefCell<dyn Widget>> = image.clone();\n    \
+             (widget, Binding::Chain(PredicateChainBinding { image, arms: decoded, default }))\n}\n\n",
+    );
 }
 
 /// Per-emit context carrying the linear node index counter and the
@@ -2441,6 +3465,54 @@ struct RlvglEmitCtx {
     /// free functions at the tail of `render_rlvgl` so the function
     /// definition order is byte-stable.
     used_dm_fields: Vec<String>,
+    /// Helper-function names already emitted, to de-duplicate `build_<id>`
+    /// collisions produced by inlining multiple instances of a component.
+    used_fn_names: std::collections::HashSet<String>,
+    /// Image assets referenced by emitted `Image` widgets, in first-use
+    /// order. Each entry is `(symbol, qrc_stripped_path)`. Drives the
+    /// conditional `qt_image` helper / import emission and the companion
+    /// `qt_assets` module reference list.
+    used_assets: Vec<AssetRef>,
+    /// QT-03c dimension resolver (JS constants + root-property defaults) used
+    /// by the anchor solver to evaluate non-literal `width`/`height`/margins.
+    resolver: DimResolver,
+    /// QT-05g: istate linkage v2 (M1P6 `step`/`is_active`/`get_var` surface)
+    /// rather than v1 (`dispatch(Event)`/`dm.<f64>`). Set when attachment came
+    /// from `--scxml-context` rather than a `.scjson` side-file.
+    linkage_v2: bool,
+    /// QT-05g: the QML context-object id (`scxmlBolero`) whose `<ctx>.<state>`
+    /// predicates lower to `machine.is_active("<state>")`. Set with `linkage_v2`.
+    sm_context: Option<String>,
+    /// QT-05g: set once at least one `Binding::Predicate` is emitted, so the
+    /// `qt_image_art` / `qt_predicate_image` helpers are emitted at the tail.
+    used_predicate: bool,
+    /// QT-05h: set once at least one `Binding::Visibility` is emitted, so the
+    /// `qt_visibility_image` helper + `VisibilityBinding` type are emitted.
+    used_visibility: bool,
+    /// QT-05i: set once at least one `Binding::Chain` is emitted, so the
+    /// `qt_predicate_chain_image` helper + `PredicateChainBinding`/`PredicateArm`
+    /// types are emitted.
+    used_predicate_chain: bool,
+    /// QT-05j: `(node tag, raw QML button-event)` for every button whose
+    /// handlers dispatch `<ctx>.submitBtnSetupEvent("…")`, in emit order. Drives
+    /// the emitted `BUTTON_TAP_EVENTS` table.
+    button_tap_events: Vec<(String, String)>,
+    /// QT-05k: set once at least one `Binding::ExternalText` is emitted, so the
+    /// `ExternalTextBinding` type + `apply_external_text` fn are emitted.
+    used_external_text: bool,
+    /// QT-05k: `(node tag, verbatim external key)` for every Label whose `text:`
+    /// is a direct external-object property, in emit order. Drives the emitted
+    /// `EXTERNAL_TEXT_BINDINGS` table.
+    external_text_bindings: Vec<(String, String)>,
+}
+
+/// One image asset referenced by the emitted widget tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AssetRef {
+    /// `qt_assets` module symbol, e.g. `IMG_IMGPLAY_48`.
+    symbol: String,
+    /// `qrc:`-stripped source path, e.g. `Qml/Images/ImgPlay_48.png`.
+    path: String,
 }
 
 impl RlvglEmitCtx {
@@ -2451,11 +3523,35 @@ impl RlvglEmitCtx {
             sm_id: None,
             dm_field_ids: Vec::new(),
             used_dm_fields: Vec::new(),
+            used_assets: Vec::new(),
+            used_fn_names: std::collections::HashSet::new(),
+            resolver: DimResolver::default(),
+            linkage_v2: false,
+            sm_context: None,
+            used_predicate: false,
+            used_visibility: false,
+            used_predicate_chain: false,
+            button_tap_events: Vec::new(),
+            used_external_text: false,
+            external_text_bindings: Vec::new(),
         }
+    }
+
+    fn with_resolver(mut self, resolver: DimResolver) -> Self {
+        self.resolver = resolver;
+        self
     }
 
     fn with_sm(mut self, sm_id: Option<String>) -> Self {
         self.sm_id = sm_id;
+        self
+    }
+
+    /// QT-05g: mark this emit as istate linkage v2 with the given QML
+    /// context-object id (`scxmlBolero`).
+    fn with_v2(mut self, v2: bool, sm_context: Option<String>) -> Self {
+        self.linkage_v2 = v2;
+        self.sm_context = sm_context;
         self
     }
 
@@ -2471,12 +3567,24 @@ impl RlvglEmitCtx {
 
     /// Allocate a helper-function name per QT-03b §8.
     fn alloc_fn_name(&mut self, item: &UiItem) -> String {
-        let name = match &item.id {
-            Some(id) => format!("build_{}", sanitize_ident(id)),
-            None => format!("build_node_{}", self.node_index),
-        };
+        let idx = self.node_index;
         self.node_index += 1;
-        name
+        let base = match &item.id {
+            Some(id) => format!("build_{}", rust_snake_ident(id)),
+            // Index-keyed names are already unique.
+            None => return format!("build_node_{idx}"),
+        };
+        // Component instantiation can inline several instances that share a QML
+        // `id`, which would collide as `build_<id>`. Suffix collisions with the
+        // node index so they stay unique. Non-colliding ids keep the bare form,
+        // preserving the byte-stable emit shape for single-instance modules.
+        if self.used_fn_names.insert(base.clone()) {
+            base
+        } else {
+            let unique = format!("{base}_{idx}");
+            self.used_fn_names.insert(unique.clone());
+            unique
+        }
     }
 
     /// Recursively emit one helper function for `item` and all its
@@ -2495,7 +3603,6 @@ impl RlvglEmitCtx {
         }
 
         let has_children = !child_fns.is_empty();
-        let mut_kw = if has_children { "mut " } else { "" };
 
         let mut out = String::new();
         out.push_str(&format!(
@@ -2518,12 +3625,12 @@ impl RlvglEmitCtx {
             out.push_str(&format!(
                 "fn {fn_name}(\n    bounds: Rect,\n    state: Rc<RefCell<ScreenState>>,\n    \
                  machine: Rc<RefCell<Machine>>,\n    \
-                 bindings: &mut Vec<Binding>,\n) -> WidgetNode {{\n"
+                 bindings: &mut BindingSink<'_, Binding>,\n) -> WidgetNode {{\n"
             ));
         } else {
             out.push_str(&format!(
                 "fn {fn_name}(\n    bounds: Rect,\n    state: Rc<RefCell<ScreenState>>,\n    \
-                 label_bindings: &mut Vec<LabelBinding>,\n) -> WidgetNode {{\n"
+                 label_bindings: &mut BindingSink<'_, LabelBinding>,\n) -> WidgetNode {{\n"
             ));
         }
 
@@ -2534,6 +3641,14 @@ impl RlvglEmitCtx {
             self.sm_id.as_deref(),
             &self.dm_field_ids,
             &mut self.used_dm_fields,
+            &mut self.used_assets,
+            self.sm_context.as_deref(),
+            self.linkage_v2,
+            &mut self.used_predicate,
+            &mut self.used_visibility,
+            &mut self.used_predicate_chain,
+            &mut self.used_external_text,
+            &mut self.external_text_bindings,
             &mut out,
         );
         emit_skipped_summary(item, is_root, &self.state_fields, &mut out);
@@ -2542,24 +3657,64 @@ impl RlvglEmitCtx {
             Some(id) => format!("Some({})", rust_str_lit(id)),
             None => "None".to_string(),
         };
-        out.push_str(&format!(
-            "    let {mut_kw}node = WidgetNode {{\n        \
-             widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
-        ));
+        // QT-05j: record this node as a tap target when it dispatches a
+        // `submitBtnSetupEvent("…")` and the module is SM-attached. The tag is
+        // guaranteed present (`synthesize_button_tap_tags` ran in the pre-pass).
+        if self.sm_context.is_some()
+            && let Some(id) = &item.id
+            && let Some(ev) = extract_submit_btn_event(item)
+        {
+            self.button_tap_events.push((id.clone(), ev));
+        }
+        if has_children {
+            out.push_str(&format!(
+                "    let mut node = WidgetNode {{\n        \
+                 widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }};\n"
+            ));
+        } else {
+            out.push_str(&format!(
+                "    WidgetNode {{\n        \
+                 widget,\n        children: Vec::new(),\n        tag: {tag_lit},\n    }}\n}}\n\n"
+            ));
+            return out;
+        }
 
-        for (child_name, child) in &child_fns {
-            emit_child_bounds(child, &mut out);
-            // QT-05b/05c: thread `Rc::clone(&machine)` and the
-            // sealed `Vec<Binding>` into the child call when a state
-            // machine is attached.
-            if self.has_sm() {
-                out.push_str(&format!(
-                    "    node.children.push({child_name}(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
-                ));
-            } else {
-                out.push_str(&format!(
-                    "    node.children.push({child_name}(child_bounds, Rc::clone(&state), label_bindings));\n"
-                ));
+        // QT-03c sibling-relative extension: if any child anchors to a
+        // sibling (`<id>.<edge>`), switch to the layout-solver path — resolve
+        // each child's bounds into a uniquely-named `cb_<i>` Rect in dependency
+        // order so later siblings can reference earlier ones, then push the
+        // children in source (z) order. Parents with no sibling anchors keep
+        // the legacy per-child `child_bounds` path verbatim (byte-stable
+        // goldens).
+        let needs_solver = item.children.iter().any(child_has_sibling_anchor);
+        if needs_solver {
+            emit_solved_child_bounds(&child_fns, &self.resolver, &mut out);
+            for (i, (child_name, _child)) in child_fns.iter().enumerate() {
+                if self.has_sm() {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(cb_{i}, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(cb_{i}, Rc::clone(&state), label_bindings));\n"
+                    ));
+                }
+            }
+        } else {
+            for (child_name, child) in &child_fns {
+                emit_child_bounds(child, &mut out);
+                // QT-05b/05c: thread `Rc::clone(&machine)` and the
+                // sealed `Vec<Binding>` into the child call when a state
+                // machine is attached.
+                if self.has_sm() {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(child_bounds, Rc::clone(&state), Rc::clone(&machine), bindings));\n"
+                    ));
+                } else {
+                    out.push_str(&format!(
+                        "    node.children.push({child_name}(child_bounds, Rc::clone(&state), label_bindings));\n"
+                    ));
+                }
             }
         }
 
@@ -2587,6 +3742,14 @@ enum WidgetKind {
     /// region) with optional `set_on_click` wiring. See
     /// `docs/qt-support/04d-mousearea.md` §5.
     ClickArea,
+    /// Lowers QML `Image` / `AnimatedImage` to
+    /// [`rlvgl_widgets::image::Image`] backed by a vendored RLE asset
+    /// (runtime-decoded to an owned, leaked pixel buffer). The asset is
+    /// referenced through the generated `qt_assets` module by a symbol
+    /// derived from the `source:` path. State-bound `source:` ternaries
+    /// default to the first artwork branch (reactive swapping is wired by
+    /// the integrator via the returned image handle).
+    Image,
     Fallback,
 }
 
@@ -2608,6 +3771,10 @@ fn map_qml_type(name: &str) -> WidgetKind {
         // to a typed ClickArea mapping with handler support.
         "MouseArea" => WidgetKind::ClickArea,
 
+        // Image family → rlvgl Image widget backed by a vendored asset.
+        // `BorderImage` (9-slice) is approximated as a plain Image for now.
+        "Image" | "AnimatedImage" | "BorderImage" => WidgetKind::Image,
+
         // QT-03b §5: Column/Row remain Container fallbacks at
         // QT-03b initial implementation; `VStack`/`HStack`
         // lowering is deferred (per-child-height constructor needs
@@ -2621,6 +3788,7 @@ fn map_qml_type(name: &str) -> WidgetKind {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_widget_construction(
     kind: &WidgetKind,
     item: &UiItem,
@@ -2628,6 +3796,14 @@ fn emit_widget_construction(
     sm_id: Option<&str>,
     dm_field_ids: &[String],
     used_dm_fields: &mut Vec<String>,
+    used_assets: &mut Vec<AssetRef>,
+    sm_context: Option<&str>,
+    v2: bool,
+    used_predicate: &mut bool,
+    used_visibility: &mut bool,
+    used_predicate_chain: &mut bool,
+    used_external_text: &mut bool,
+    external_text: &mut Vec<(String, String)>,
     out: &mut String,
 ) {
     match kind {
@@ -2640,15 +3816,34 @@ fn emit_widget_construction(
                         "    w.style.bg_color = Color({r:#04x}, {g:#04x}, {b:#04x}, {a:#04x});\n"
                     ));
                 } else {
+                    // Non-literal `color:` (theme ref / gradient / binding)
+                    // that QT-04e cannot resolve to an RGBA literal yet. Default
+                    // to a transparent background rather than inheriting the
+                    // opaque-white `Style::default()` — a full-bounds node whose
+                    // real fill we could not determine MUST NOT bury content
+                    // beneath an arbitrary white rectangle.
                     out.push_str("    // TODO QT-04e: bind color (non-literal QML expression)\n");
+                    out.push_str("    w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n");
                 }
                 out.push_str(
                     "    let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
                 );
             } else {
+                // Every container we cannot resolve to a literal fill — pure
+                // structural nodes (`Item`, `Row`, `Column`, layouts) and
+                // `Rectangle`s whose fill is a theme ref / `gradient:` we cannot
+                // yet evaluate — defaults to a TRANSPARENT background. The
+                // opaque-white `Style::default()` actively buries content drawn
+                // beneath (root background image, sibling artwork), so only a
+                // resolved literal `color:` (the branch above) paints opaque.
+                // Faithful gradient/theme resolution is a separate follow-up;
+                // until then transparent is strictly safer than an arbitrary
+                // white rectangle. A truly bare `Rectangle {}` (QML default
+                // white) is rare and accepted as transparent here.
                 out.push_str(
-                    "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Container::new(bounds)));\n",
+                    "    let mut w = Container::new(bounds);\n    \
+                     w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
                 );
             }
         }
@@ -2658,7 +3853,7 @@ fn emit_widget_construction(
             if let Some(text) = text_lit {
                 out.push_str(&format!(
                     "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Label::new({}, bounds)));\n",
+                     Rc::new(RefCell::new(qt_label({}, bounds)));\n",
                     rust_str_lit(&text)
                 ));
             } else if sm_id.is_some()
@@ -2682,7 +3877,7 @@ fn emit_widget_construction(
                 ));
                 out.push_str(&format!(
                     "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
-                     Label::new(\n            \
+                     qt_label(\n            \
                          {{ let m = machine.borrow(); format_dm_{field}(&m.dm) }},\n        \
                          bounds,\n    ),\n    ));\n"
                 ));
@@ -2701,7 +3896,7 @@ fn emit_widget_construction(
                 out.push_str(&format!("    // QT-04c bound: text → state.{field}\n"));
                 out.push_str(&format!(
                     "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
-                     Label::new(state.borrow().{field}.clone(), bounds),\n    ));\n"
+                     qt_label(state.borrow().{field}.clone(), bounds),\n    ));\n"
                 ));
                 out.push_str("    let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();\n");
                 out.push_str(&format!(
@@ -2723,13 +3918,40 @@ fn emit_widget_construction(
                          accessor: |s| s.{field}.clone(),\n    }});\n"
                     ));
                 }
+            } else if v2
+                && let Some(id) = &item.id
+                && let Some(key) = raw_text.and_then(|e| parse_external_text_ref(e, sm_context))
+            {
+                // QT-05k §5/§6: `text: <obj>.<prop>` rooted at a non-context
+                // object lowers to a `Binding::ExternalText`. The Label is built
+                // empty; the value comes from a consumer resolver applied via
+                // `apply_external_text` (authority: derive — the emitter owns
+                // neither the external object nor the string). The node's tag
+                // (`id`) + key are also recorded for the `EXTERNAL_TEXT_BINDINGS`
+                // table so tag-keyed consumers can find it.
+                out.push_str(&format!(
+                    "    // QT-05k external-text: text → {key} (consumer-resolved, tag `{id}`)\n"
+                ));
+                out.push_str(
+                    "    let label_handle: Rc<RefCell<Label>> = Rc::new(RefCell::new(\n        \
+                     qt_label(\"\", bounds),\n    ));\n",
+                );
+                out.push_str("    let widget: Rc<RefCell<dyn Widget>> = label_handle.clone();\n");
+                out.push_str(&format!(
+                    "    bindings.push(Binding::ExternalText(ExternalTextBinding {{\n        \
+                     label: Rc::clone(&label_handle),\n        \
+                     key: {},\n    }}));\n",
+                    rust_str_lit(&key)
+                ));
+                *used_external_text = true;
+                external_text.push((id.clone(), key));
             } else {
                 out.push_str(
                     "    // TODO QT-04e: reactive bind text (non-literal QML expression)\n",
                 );
                 out.push_str(
                     "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                     Rc::new(RefCell::new(Label::new(\"\", bounds)));\n",
+                     Rc::new(RefCell::new(qt_label(\"\", bounds)));\n",
                 );
             }
         }
@@ -2757,6 +3979,13 @@ fn emit_widget_construction(
             out.push_str(&format!(
                 "    let mut button = Button::new({ctor_arg}, bounds);\n"
             ));
+            // rlvgl's `Button` paints its internal `Label`'s background, which
+            // defaults to opaque white — so a themed QML button (whose real
+            // `background:` is a translucent/gradient `Rectangle`) renders as a
+            // solid white box. Clear it to transparent; the button's visual is
+            // its child content (icon/text) over the dark UI. (Faithful
+            // gradient/theme-colour fills are a separate follow-up.)
+            out.push_str("    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);\n");
             for handler in item.handlers.iter().filter(|h| h.signal == "onClicked") {
                 emit_qt04b_or_qt04_handler(&handler.body, state_fields, sm_id, out);
             }
@@ -2766,8 +3995,17 @@ fn emit_widget_construction(
             );
         }
         WidgetKind::ClickArea => {
-            out.push_str("    let mut click_area = ClickArea::new(bounds);\n");
-            for handler in item.handlers.iter().filter(|h| h.signal == "onClicked") {
+            let click_handlers: Vec<_> = item
+                .handlers
+                .iter()
+                .filter(|handler| handler.signal == "onClicked")
+                .collect();
+            if click_handlers.is_empty() {
+                out.push_str("    let click_area = ClickArea::new(bounds);\n");
+            } else {
+                out.push_str("    let mut click_area = ClickArea::new(bounds);\n");
+            }
+            for handler in click_handlers {
                 emit_qt04b_or_qt04_handler_for(
                     "click_area",
                     &handler.body,
@@ -2781,14 +4019,197 @@ fn emit_widget_construction(
                  Rc::new(RefCell::new(click_area));\n",
             );
         }
+        WidgetKind::Image => {
+            // QT-05g: when a state-machine context is linked (`--scxml-context`)
+            // and the `source:` is a predicate ternary `<ctx>.<state> ? "A" : "B"`,
+            // lower it to a reactive `Binding::Predicate` driven by
+            // `machine.is_active("<state>")` rather than a static asset.
+            let predicate = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "source"))
+                    .and_then(|(ctx, raw)| parse_predicate_source(raw, ctx))
+            } else {
+                None
+            };
+            if let Some((state, on_path, off_path)) = predicate {
+                let on = AssetRef {
+                    symbol: asset_symbol(&on_path),
+                    path: on_path,
+                };
+                let off = AssetRef {
+                    symbol: asset_symbol(&off_path),
+                    path: off_path,
+                };
+                for a in [&on, &off] {
+                    if !used_assets.iter().any(|x| x.symbol == a.symbol) {
+                        used_assets.push(a.clone());
+                    }
+                }
+                *used_predicate = true;
+                out.push_str(&format!(
+                    "    // QT-05g predicate-bound: source → {ctx}.{state} ? \
+                     on={on_sym} : off={off_sym}\n",
+                    ctx = sm_context.unwrap_or(""),
+                    on_sym = on.symbol,
+                    off_sym = off.symbol,
+                ));
+                out.push_str(&format!(
+                    "    let active = machine.borrow().is_active({state_lit});\n    \
+                     let (widget, __pb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_predicate_image(bounds, qt_assets::{on_sym}, qt_assets::{off_sym}, {state_lit}, active);\n    \
+                     bindings.push(__pb);\n",
+                    state_lit = rust_str_lit(&state),
+                    on_sym = on.symbol,
+                    off_sym = off.symbol,
+                ));
+                return;
+            }
+            // QT-05i: a chained predicate `source:`
+            // `<ctx>.<s1> ? "A" : <ctx>.<s2> ? "B" : "C"` (the repeat-mode icon)
+            // lowers to a `Binding::Chain` — first active arm wins, else the
+            // resting default — driven by `machine.is_active(<state>)`.
+            let chain = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "source"))
+                    .and_then(|(ctx, raw)| parse_chained_predicate_source(raw, ctx))
+            } else {
+                None
+            };
+            if let Some((arms, default_path)) = chain {
+                let arm_refs: Vec<(AssetRef, String)> = arms
+                    .into_iter()
+                    .map(|(state, path)| {
+                        (
+                            AssetRef {
+                                symbol: asset_symbol(&path),
+                                path,
+                            },
+                            state,
+                        )
+                    })
+                    .collect();
+                let default_ref = AssetRef {
+                    symbol: asset_symbol(&default_path),
+                    path: default_path,
+                };
+                for a in arm_refs
+                    .iter()
+                    .map(|(r, _)| r)
+                    .chain(core::iter::once(&default_ref))
+                {
+                    if !used_assets.iter().any(|x| x.symbol == a.symbol) {
+                        used_assets.push(a.clone());
+                    }
+                }
+                *used_predicate_chain = true;
+                out.push_str(&format!(
+                    "    // QT-05i predicate-chain-bound: source → {ctx} chain \
+                     [{arms}] default={def_sym}\n",
+                    ctx = sm_context.unwrap_or(""),
+                    arms = arm_refs
+                        .iter()
+                        .map(|(r, s)| format!("{s}→{}", r.symbol))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    def_sym = default_ref.symbol,
+                ));
+                out.push_str("    let __arms: &[(&'static [u8], &'static str)] = &[\n");
+                for (r, state) in &arm_refs {
+                    out.push_str(&format!(
+                        "        (qt_assets::{}, {}),\n",
+                        r.symbol,
+                        rust_str_lit(state),
+                    ));
+                }
+                out.push_str("    ];\n");
+                out.push_str(&format!(
+                    "    let (widget, __pcb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_predicate_chain_image(bounds, __arms, qt_assets::{def_sym}, &machine.borrow());\n    \
+                     bindings.push(__pcb);\n",
+                    def_sym = default_ref.symbol,
+                ));
+                return;
+            }
+            // QT-05h: an `Image` with a literal `source:` and a predicate
+            // `visible: <ctx>.<state>` lowers to a `Binding::Visibility` that
+            // hides/shows the artwork from `machine.is_active("<state>")`.
+            let visible_state = if v2 {
+                sm_context
+                    .zip(lookup_assignment(item, "visible"))
+                    .and_then(|(ctx, raw)| parse_visible_predicate(raw, ctx))
+            } else {
+                None
+            };
+            if let Some(state) = visible_state
+                && let Some(asset) = pick_image_source(item)
+            {
+                if !used_assets.iter().any(|a| a.symbol == asset.symbol) {
+                    used_assets.push(asset.clone());
+                }
+                *used_visibility = true;
+                out.push_str(&format!(
+                    "    // QT-05h visibility-bound: visible → {ctx}.{state} (source {sym})\n",
+                    ctx = sm_context.unwrap_or(""),
+                    sym = asset.symbol,
+                ));
+                out.push_str(&format!(
+                    "    let visible = machine.borrow().is_active({state_lit});\n    \
+                     let (widget, __vb): (Rc<RefCell<dyn Widget>>, Binding) =\n        \
+                         qt_visibility_image(bounds, qt_assets::{sym}, {state_lit}, visible);\n    \
+                     bindings.push(__vb);\n",
+                    state_lit = rust_str_lit(&state),
+                    sym = asset.symbol,
+                ));
+                return;
+            }
+            // Resolve the `source:` to a single vendored asset. A literal
+            // path maps directly; a state-bound ternary uses its first
+            // artwork branch as the static default (the integrator can swap
+            // the image at runtime via the node's tagged handle).
+            match pick_image_source(item) {
+                Some(asset) => {
+                    if !used_assets.iter().any(|a| a.symbol == asset.symbol) {
+                        used_assets.push(asset.clone());
+                    }
+                    out.push_str(&format!(
+                        "    // QT-IMG: Image source → qt_assets::{} ({})\n",
+                        asset.symbol, asset.path
+                    ));
+                    out.push_str(&format!(
+                        "    let widget: Rc<RefCell<dyn Widget>> = \
+                         qt_image(bounds, qt_assets::{});\n",
+                        asset.symbol
+                    ));
+                }
+                None => {
+                    out.push_str(
+                        "    // QT-IMG: Image with no resolvable source literal; \
+                         emitting an empty transparent container\n",
+                    );
+                    // A QML `Image` with no source draws nothing; the placeholder
+                    // MUST be transparent, not the opaque-white `Style::default()`.
+                    out.push_str(
+                        "    let mut w = Container::new(bounds);\n    \
+                         w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                         let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
+                    );
+                }
+            }
+        }
         WidgetKind::Fallback => {
             out.push_str(&format!(
                 "    // emitter-fallback (QT-03b): unmapped QML type `{}`\n",
                 item.type_name
             ));
+            // A fallback is a transparent placeholder for an unmapped type: it
+            // only carries its children. It MUST NOT paint the opaque-white
+            // `Style::default()` background, or an unmapped layout node that
+            // receives full parent bounds (e.g. anchor-fallback `RowLayout` /
+            // `Repeater`) buries everything drawn beneath it.
             out.push_str(
-                "    let widget: Rc<RefCell<dyn Widget>> =\n        \
-                 Rc::new(RefCell::new(Container::new(bounds)));\n",
+                "    let mut w = Container::new(bounds);\n    \
+                 w.style.bg_color = Color(0x00, 0x00, 0x00, 0x00);\n    \
+                 let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(w));\n",
             );
         }
     }
@@ -2868,6 +4289,936 @@ fn emit_skipped_summary(
     }
 }
 
+/// A small Rust integer-expression tree used by QML dimension lowering.
+///
+/// Keeping precedence in the tree lets the emitter preserve QML's integer
+/// evaluation order without wrapping every intermediate expression in another
+/// pair of parentheses. The constructors also remove only semantics-preserving
+/// identity operations (`+ 0`, `- 0`, `* 1`, `/ 1`).
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum RustExpr {
+    Int(i64),
+    Atom(String),
+    Binary {
+        op: RustBinOp,
+        left: Box<RustExpr>,
+        right: Box<RustExpr>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum RustBinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+impl RustBinOp {
+    fn symbol(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+        }
+    }
+
+    fn precedence(self) -> u8 {
+        match self {
+            Self::Add | Self::Sub => 1,
+            Self::Mul | Self::Div => 2,
+        }
+    }
+}
+
+impl RustExpr {
+    fn atom(value: impl Into<String>) -> Self {
+        Self::Atom(value.into())
+    }
+
+    fn binary(op: RustBinOp, left: Self, right: Self) -> Self {
+        match (&op, &left, &right) {
+            (RustBinOp::Add, _, Self::Int(0)) | (RustBinOp::Sub, _, Self::Int(0)) => left,
+            (RustBinOp::Add, Self::Int(0), _) => right,
+            (RustBinOp::Mul, _, Self::Int(1)) | (RustBinOp::Div, _, Self::Int(1)) => left,
+            (RustBinOp::Mul, Self::Int(1), _) => right,
+            _ => Self::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            },
+        }
+    }
+
+    fn add(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Add, left, right)
+    }
+
+    fn sub(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Sub, left, right)
+    }
+
+    fn mul(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Mul, left, right)
+    }
+
+    fn div(left: Self, right: Self) -> Self {
+        Self::binary(RustBinOp::Div, left, right)
+    }
+
+    fn precedence(&self) -> u8 {
+        match self {
+            Self::Int(_) | Self::Atom(_) => 3,
+            Self::Binary { op, .. } => op.precedence(),
+        }
+    }
+
+    fn render(&self) -> String {
+        self.render_child(0, false)
+    }
+
+    fn render_child(&self, parent_precedence: u8, right_child: bool) -> String {
+        let rendered = match self {
+            Self::Int(value) => value.to_string(),
+            Self::Atom(value) => value.clone(),
+            Self::Binary { op, left, right } => format!(
+                "{} {} {}",
+                left.render_child(op.precedence(), false),
+                op.symbol(),
+                right.render_child(op.precedence(), true)
+            ),
+        };
+        let precedence = self.precedence();
+        if precedence < parent_precedence || (right_child && precedence == parent_precedence) {
+            format!("({rendered})")
+        } else {
+            rendered
+        }
+    }
+}
+
+/// Resolved child geometry as Rust expressions (absolute, i.e. each already
+/// includes the parent's `bounds.x`/`bounds.y` offset).
+struct ResolvedBounds {
+    x: RustExpr,
+    y: RustExpr,
+    w: RustExpr,
+    h: RustExpr,
+}
+
+/// An anchor value of the form `<obj>.<edge>` where `<obj>` is a sibling id
+/// (not `parent`). Drives the layout-solver activation and dependency sort.
+fn anchor_sibling_target(value: &str) -> Option<&str> {
+    let v = value.trim();
+    let (obj, edge) = v.split_once('.')?;
+    let edge_ok = matches!(
+        edge,
+        "left" | "right" | "top" | "bottom" | "horizontalCenter" | "verticalCenter"
+    );
+    if edge_ok && obj != "parent" && is_ident_str(obj) {
+        Some(obj)
+    } else {
+        None
+    }
+}
+
+/// Whether `s` is a plain identifier (no dots, ident chars only).
+fn is_ident_str(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes().next().map(is_ident_start).unwrap_or(false)
+        && s.bytes().all(is_ident_cont)
+}
+
+/// QT-05k §5: detect a direct external-object text source — a `text:` whose
+/// value is a pure dotted-identifier path `<obj>.<prop>(.<prop>)*` rooted at a
+/// bare identifier that is NOT the scxml context (state belongs to QT-05c /
+/// QT-05h, not external text). Returns the verbatim expression as the external
+/// *key*; the string value is supplied at runtime by a consumer-owned resolver
+/// (authority: derive — input is the upstream external object, output is local).
+///
+/// Rejects anything that is not a plain dotted-identifier path: function calls
+/// (`getWarningCodeText(warningPanel.code)`), ternaries, binary expressions, and
+/// string/number literals all return `None`, deferring them to a later phase.
+/// A single bare identifier (no dot) is a QT-04c state field, not external text.
+fn parse_external_text_ref(expr: &str, ctx: Option<&str>) -> Option<String> {
+    let e = expr.trim();
+    let mut parts = e.split('.');
+    let head = parts.next()?;
+    if !is_ident_str(head) {
+        return None;
+    }
+    if Some(head) == ctx {
+        // `<ctx>.<…>` is state, owned by QT-05c/05h, not external text.
+        return None;
+    }
+    let mut count = 1usize;
+    for p in parts {
+        if !is_ident_str(p) {
+            return None;
+        }
+        count += 1;
+    }
+    if count < 2 {
+        // A bare identifier is a QT-04c state field, not an external property.
+        return None;
+    }
+    Some(e.to_string())
+}
+
+/// Does any of this child's `anchors.*` assignments reference a sibling
+/// (`<id>.<edge>`)? Such parents need the sibling-aware layout solver.
+fn child_has_sibling_anchor(child: &UiItem) -> bool {
+    child.assignments.iter().any(|a| {
+        a.target.starts_with("anchors.")
+            && matches!(&a.value, UiAssignmentValue::Expression { text }
+                if anchor_sibling_target(text).is_some())
+    })
+}
+
+/// Sibling ids this child's anchors depend on (deduplicated, source order).
+fn child_anchor_deps(child: &UiItem) -> Vec<String> {
+    let mut deps = Vec::new();
+    for a in &child.assignments {
+        if !a.target.starts_with("anchors.") {
+            continue;
+        }
+        if let UiAssignmentValue::Expression { text } = &a.value
+            && let Some(obj) = anchor_sibling_target(text)
+            && !deps.iter().any(|d| d == obj)
+        {
+            deps.push(obj.to_string());
+        }
+    }
+    deps
+}
+
+/// Resolve an anchor edge value (`parent.left`, `imageSource.bottom`, …) to an
+/// absolute Rust expression. `base_of` maps a sibling id to its emitted Rect
+/// variable name; `parent` maps to `bounds`. Returns `None` for unresolvable
+/// references (unknown sibling), so the caller can fall back.
+fn anchor_edge_expr(value: &str, base_of: &dyn Fn(&str) -> Option<String>) -> Option<RustExpr> {
+    let v = value.trim();
+    let (obj, edge) = v.split_once('.')?;
+    let base = if obj == "parent" {
+        "bounds".to_string()
+    } else {
+        base_of(obj)?
+    };
+    let expr = match edge {
+        "left" => RustExpr::atom(format!("{base}.x")),
+        "right" => RustExpr::add(
+            RustExpr::atom(format!("{base}.x")),
+            RustExpr::atom(format!("{base}.width")),
+        ),
+        "top" => RustExpr::atom(format!("{base}.y")),
+        "bottom" => RustExpr::add(
+            RustExpr::atom(format!("{base}.y")),
+            RustExpr::atom(format!("{base}.height")),
+        ),
+        "horizontalCenter" => RustExpr::add(
+            RustExpr::atom(format!("{base}.x")),
+            RustExpr::div(RustExpr::atom(format!("{base}.width")), RustExpr::Int(2)),
+        ),
+        "verticalCenter" => RustExpr::add(
+            RustExpr::atom(format!("{base}.y")),
+            RustExpr::div(RustExpr::atom(format!("{base}.height")), RustExpr::Int(2)),
+        ),
+        _ => return None,
+    };
+    Some(expr)
+}
+
+/// Read a literal-int margin (`anchors.<name>`), defaulting to 0 when absent or
+/// non-literal (e.g. a JS-constant margin the emitter can't evaluate).
+/// QT-03c dimension resolver: evaluates QML width/height/margin expressions
+/// that reference imported JS numeric constants (`AppConstants.js`, exposed via
+/// `import "…" as AppConsts`) and root-scope property defaults
+/// (e.g. `panelHeight: height / 6 - AppConsts.i_DISPLAY_PADDING`). Without this
+/// such dimensions fell back to `bounds.width`/`bounds.height`, collapsing the
+/// layout (an anchored sibling computed against the wrong full-parent extent
+/// got zero/negative height). Fail-closed: anything it cannot resolve returns
+/// `None`, preserving the prior fallback behaviour.
+#[derive(Default, Clone)]
+struct DimResolver {
+    /// `i_DISPLAY_PADDING` → 8.0, parsed from `AppConstants.js`.
+    consts: std::collections::HashMap<String, f64>,
+    /// Root-scope QML property name → its raw default expression
+    /// (e.g. `panelHeight` → `height / 6 - AppConsts.i_DISPLAY_PADDING`).
+    root_props: std::collections::HashMap<String, String>,
+    /// The root item's `id:` (e.g. `pane`), so root-property references written
+    /// `pane.panelHeight` resolve the same as the bare `panelHeight` form.
+    root_id: Option<String>,
+    /// Directory the `qrc:`-stripped asset paths resolve against (the QML
+    /// project root — the parent of the nearest ancestor `Qml/` dir). Used to
+    /// read an `Image` source's natural pixel size for content-sizing.
+    asset_root: Option<PathBuf>,
+    /// The nearest ancestor `Qml/` directory — a second candidate root for
+    /// component-relative `source:` paths (`Images/Foo.png` declared inside a
+    /// `Qml/`-rooted component), plus the base for a basename fallback search.
+    qml_root: Option<PathBuf>,
+}
+
+impl DimResolver {
+    /// Build a resolver for `qml_path`: ingest the nearest `AppConstants.js`
+    /// numeric `var` constants and capture every root-scope property's default
+    /// expression (so dimension references to them resolve recursively).
+    fn from_qml(qml_path: &Path, root: &UiItem) -> Self {
+        let consts = parse_js_numeric_constants(qml_path);
+        let mut root_props = std::collections::HashMap::new();
+        for p in &root.properties {
+            if let Some(d) = &p.default_value {
+                root_props.insert(p.name.clone(), d.clone());
+            }
+        }
+        // `qrc:/Qml/Images/Foo.png` → file `<projectRoot>/Qml/Images/Foo.png`,
+        // where `<projectRoot>` is the parent of the nearest ancestor `Qml/`.
+        let qml_root = component_search_root(qml_path);
+        let asset_root = qml_root.parent().map(|p| p.to_path_buf());
+        Self {
+            consts,
+            root_props,
+            root_id: root.id.clone(),
+            asset_root,
+            qml_root: Some(qml_root),
+        }
+    }
+
+    /// Natural pixel size of an `Image` item's source asset, read from the PNG
+    /// header at emit time. `None` when the source is non-literal, the file is
+    /// absent/unreadable, or not a PNG. Tries the project root and the `Qml/`
+    /// root (component-relative paths lose their source dir during inlining),
+    /// then a basename search under `Qml/`.
+    fn image_natural_size(&self, item: &UiItem) -> Option<(i32, i32)> {
+        let asset = pick_image_source(item)?;
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(root) = &self.asset_root {
+            candidates.push(root.join(&asset.path));
+        }
+        if let Some(root) = &self.qml_root {
+            candidates.push(root.join(&asset.path));
+        }
+        if let Some(hit) = candidates.into_iter().find(|p| p.exists()) {
+            return png_dimensions(&hit);
+        }
+        // Fallback: locate the file by basename anywhere under the `Qml/` root.
+        let base = asset.path.rsplit('/').next()?;
+        let found = self
+            .qml_root
+            .as_ref()
+            .and_then(|r| find_file_by_name(r, base, 0))?;
+        png_dimensions(&found)
+    }
+
+    /// Resolve a width/height expression into a Rust `i32` expression in terms
+    /// of `bounds`, or `None` if any term is unresolvable.
+    fn resolve_dim(&self, expr: &str) -> Option<String> {
+        self.resolve_dim_expr(expr)
+            .map(|resolved| resolved.render())
+    }
+
+    /// Parse a width/height expression while retaining its precedence tree for
+    /// callers that need to compose it with anchor arithmetic.
+    fn resolve_dim_expr(&self, expr: &str) -> Option<RustExpr> {
+        let toks = tokenize_expr(expr)?;
+        let mut p = ExprParser {
+            toks: &toks,
+            pos: 0,
+            res: self,
+            depth: 0,
+        };
+        let out = p.parse_expr()?;
+        if p.pos == p.toks.len() {
+            Some(out)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve a margin expression to a constant `i32` (literal or a pure
+    /// numeric expression over JS constants — no `bounds` reference). Returns
+    /// `None` if it references layout extents or is otherwise unresolvable.
+    fn resolve_margin_i32(&self, expr: &str) -> Option<i32> {
+        if let Some(n) = parse_int_literal(expr) {
+            return Some(n);
+        }
+        let rust = self.resolve_dim(expr)?;
+        // Only accept pure-constant results (no runtime `bounds` reference).
+        if rust.contains("bounds") {
+            return None;
+        }
+        // The constant path emits plain integer arithmetic; evaluate it.
+        eval_const_int_rust(&rust)
+    }
+}
+
+/// Recursive-descent evaluator producing Rust `i32` expressions. Grammar:
+/// `expr := term (('+'|'-') term)*`, `term := factor (('*'|'/') factor)*`,
+/// `factor := NUMBER | IDENT('.'IDENT)? | '(' expr ')'`.
+struct ExprParser<'a> {
+    toks: &'a [String],
+    pos: usize,
+    res: &'a DimResolver,
+    depth: usize,
+}
+
+impl ExprParser<'_> {
+    fn peek(&self) -> Option<&str> {
+        self.toks.get(self.pos).map(|s| s.as_str())
+    }
+    fn bump(&mut self) -> Option<String> {
+        let t = self.toks.get(self.pos).cloned();
+        if t.is_some() {
+            self.pos += 1;
+        }
+        t
+    }
+    fn parse_expr(&mut self) -> Option<RustExpr> {
+        let mut lhs = self.parse_term()?;
+        while let Some(op) = self.peek()
+            && (op == "+" || op == "-")
+        {
+            let op = self.bump().unwrap();
+            let rhs = self.parse_term()?;
+            lhs = match op.as_str() {
+                "+" => RustExpr::add(lhs, rhs),
+                "-" => RustExpr::sub(lhs, rhs),
+                _ => return None,
+            };
+        }
+        Some(lhs)
+    }
+    fn parse_term(&mut self) -> Option<RustExpr> {
+        let mut lhs = self.parse_factor()?;
+        while let Some(op) = self.peek()
+            && (op == "*" || op == "/")
+        {
+            let op = self.bump().unwrap();
+            let rhs = self.parse_factor()?;
+            lhs = match op.as_str() {
+                "*" => RustExpr::mul(lhs, rhs),
+                "/" => RustExpr::div(lhs, rhs),
+                _ => return None,
+            };
+        }
+        Some(lhs)
+    }
+    fn parse_factor(&mut self) -> Option<RustExpr> {
+        let t = self.bump()?;
+        if t == "(" {
+            let e = self.parse_expr()?;
+            if self.bump().as_deref() != Some(")") {
+                return None;
+            }
+            return Some(e);
+        }
+        if let Ok(n) = t.parse::<f64>() {
+            return Some(RustExpr::Int(n.round() as i64));
+        }
+        // Identifier, optionally `<a>.<b>`.
+        let (head, member) = if self.peek() == Some(".") {
+            self.bump(); // '.'
+            let m = self.bump()?;
+            (t, Some(m))
+        } else {
+            (t, None)
+        };
+        self.resolve_ident(&head, member.as_deref())
+    }
+    fn resolve_ident(&mut self, head: &str, member: Option<&str>) -> Option<RustExpr> {
+        match (head, member) {
+            // `parent.width` / `parent.height` → local bounds.
+            ("parent", Some("width")) => Some(RustExpr::atom("bounds.width")),
+            ("parent", Some("height")) => Some(RustExpr::atom("bounds.height")),
+            // `<rootId>.<prop>` (e.g. `pane.panelHeight`) → recurse the root
+            // property's default expression, same as the bare form. NOTE: the
+            // expression evaluates against the *local* `bounds` at the use site,
+            // an approximation when the property derives from the root extent
+            // and is referenced from a non-root-sized parent (acceptable: it
+            // keeps the layout from collapsing; full root-extent threading is a
+            // follow-up).
+            (id, Some(name))
+                if self.res.root_id.as_deref() == Some(id)
+                    && self.res.root_props.contains_key(name) =>
+            {
+                self.recurse_root_prop(name)
+            }
+            // `AppConsts.<NAME>` → ingested numeric constant.
+            (_, Some(name)) => self
+                .res
+                .consts
+                .get(name)
+                .map(|v| RustExpr::Int(v.round() as i64)),
+            // Bare `width` / `height` (appear inside a root-property default,
+            // referring to the root's own extent → local bounds at the use site).
+            ("width", None) => Some(RustExpr::atom("bounds.width")),
+            ("height", None) => Some(RustExpr::atom("bounds.height")),
+            // Bare identifier: a JS constant, or a root property to recurse into.
+            (id, None) => {
+                if let Some(v) = self.res.consts.get(id) {
+                    return Some(RustExpr::Int(v.round() as i64));
+                }
+                self.recurse_root_prop(id)
+            }
+        }
+    }
+
+    /// Resolve a root property name by evaluating its default expression
+    /// (recursion-guarded).
+    fn recurse_root_prop(&self, name: &str) -> Option<RustExpr> {
+        if self.depth >= 8 {
+            return None;
+        }
+        let expr = self.res.root_props.get(name).cloned()?;
+        let toks = tokenize_expr(&expr)?;
+        let mut sub = ExprParser {
+            toks: &toks,
+            pos: 0,
+            res: self.res,
+            depth: self.depth + 1,
+        };
+        let out = sub.parse_expr()?;
+        if sub.pos == sub.toks.len() {
+            Some(out)
+        } else {
+            None
+        }
+    }
+}
+
+/// Tokenize a QML numeric expression into numbers, identifiers, `.`, operators,
+/// and parens. Returns `None` on any unexpected character (fail-closed).
+fn tokenize_expr(s: &str) -> Option<Vec<String>> {
+    let mut out = Vec::new();
+    let mut chars = s.chars().peekable();
+    while let Some(&c) = chars.peek() {
+        if c.is_whitespace() {
+            chars.next();
+        } else if c.is_ascii_digit() {
+            let mut num = String::new();
+            while let Some(&d) = chars.peek() {
+                if d.is_ascii_digit() || d == '.' {
+                    num.push(d);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            out.push(num);
+        } else if c.is_alphabetic() || c == '_' {
+            let mut id = String::new();
+            while let Some(&d) = chars.peek() {
+                if d.is_alphanumeric() || d == '_' {
+                    id.push(d);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            out.push(id);
+        } else if "+-*/().".contains(c) {
+            out.push(c.to_string());
+            chars.next();
+        } else {
+            return None;
+        }
+    }
+    Some(out)
+}
+
+/// Evaluate a Rust integer-arithmetic expression string (only digits, spaces,
+/// `+ - * /`, parens — as emitted by the constant path) into an `i32`.
+fn eval_const_int_rust(s: &str) -> Option<i32> {
+    let toks = tokenize_expr(s)?;
+    // Reuse the parser with an empty resolver, then fold the all-numeric output.
+    let empty = DimResolver::default();
+    let mut p = ExprParser {
+        toks: &toks,
+        pos: 0,
+        res: &empty,
+        depth: 0,
+    };
+    let folded = p.parse_expr()?.render();
+    if p.pos != p.toks.len() || folded.contains("bounds") {
+        return None;
+    }
+    fold_int_expr(&folded)
+}
+
+/// Fold a fully-numeric Rust arithmetic expression to an `i32` (integer math,
+/// matching the emitted runtime semantics).
+fn fold_int_expr(s: &str) -> Option<i32> {
+    let toks = tokenize_expr(s)?;
+    fn expr(t: &[String], i: &mut usize) -> Option<i64> {
+        let mut v = term(t, i)?;
+        while let Some(op) = t.get(*i) {
+            if op == "+" || op == "-" {
+                *i += 1;
+                let r = term(t, i)?;
+                v = if op == "+" { v + r } else { v - r };
+            } else {
+                break;
+            }
+        }
+        Some(v)
+    }
+    fn term(t: &[String], i: &mut usize) -> Option<i64> {
+        let mut v = factor(t, i)?;
+        while let Some(op) = t.get(*i) {
+            if op == "*" || op == "/" {
+                *i += 1;
+                let r = factor(t, i)?;
+                if op == "*" {
+                    v *= r;
+                } else {
+                    if r == 0 {
+                        return None;
+                    }
+                    v /= r;
+                }
+            } else {
+                break;
+            }
+        }
+        Some(v)
+    }
+    fn factor(t: &[String], i: &mut usize) -> Option<i64> {
+        let tok = t.get(*i)?;
+        if tok == "(" {
+            *i += 1;
+            let v = expr(t, i)?;
+            if t.get(*i).map(|s| s.as_str()) != Some(")") {
+                return None;
+            }
+            *i += 1;
+            return Some(v);
+        }
+        *i += 1;
+        tok.parse::<i64>().ok()
+    }
+    let mut i = 0;
+    let v = expr(&toks, &mut i)?;
+    if i == toks.len() {
+        i32::try_from(v).ok()
+    } else {
+        None
+    }
+}
+
+/// Parse numeric `var NAME = <number>` declarations from the nearest
+/// `AppConstants.js` (searched in the same `Qml/` root used for component
+/// resolution, then the QML file's own directory). Non-numeric `var`s and
+/// anything else are ignored. Missing file → empty map.
+fn parse_js_numeric_constants(qml_path: &Path) -> std::collections::HashMap<String, f64> {
+    let mut out = std::collections::HashMap::new();
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    let root = component_search_root(qml_path);
+    candidates.push(root.join("AppConstants.js"));
+    if let Some(parent) = qml_path.parent() {
+        candidates.push(parent.join("AppConstants.js"));
+    }
+    let Some(path) = candidates.into_iter().find(|p| p.exists()) else {
+        return out;
+    };
+    let Ok(text) = fs::read_to_string(&path) else {
+        return out;
+    };
+    for line in text.lines() {
+        let line = line.trim();
+        let Some(rest) = line.strip_prefix("var ") else {
+            continue;
+        };
+        let Some((name, val)) = rest.split_once('=') else {
+            continue;
+        };
+        let name = name.trim();
+        // strip trailing `;` / comment from the value
+        let val = val.split([';', '/']).next().unwrap_or("").trim();
+        if name.is_empty() || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            continue;
+        }
+        if let Ok(n) = val.parse::<f64>() {
+            out.insert(name.to_string(), n);
+        }
+    }
+    out
+}
+
+/// Read a PNG's pixel dimensions from its IHDR chunk (width at byte offset 16,
+/// height at 20, both big-endian u32). Returns `None` if the file is missing,
+/// too short, or lacks the PNG signature.
+fn png_dimensions(path: &Path) -> Option<(i32, i32)> {
+    let bytes = fs::read(path).ok()?;
+    if bytes.len() < 24 || &bytes[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+    let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+    Some((i32::try_from(w).ok()?, i32::try_from(h).ok()?))
+}
+
+/// Bounded recursive search for a file named `name` under `dir` (depth ≤ 6).
+fn find_file_by_name(dir: &Path, name: &str, depth: usize) -> Option<PathBuf> {
+    if depth > 6 {
+        return None;
+    }
+    let entries = fs::read_dir(dir).ok()?;
+    let mut subdirs = Vec::new();
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            subdirs.push(p);
+        } else if p.file_name().and_then(|n| n.to_str()) == Some(name) {
+            return Some(p);
+        }
+    }
+    for d in subdirs {
+        if let Some(hit) = find_file_by_name(&d, name, depth + 1) {
+            return Some(hit);
+        }
+    }
+    None
+}
+
+fn lit_margin(child: &UiItem, name: &str, resolver: &DimResolver) -> i32 {
+    let Some(raw) = lookup_assignment(child, name) else {
+        return 0;
+    };
+    resolver.resolve_margin_i32(raw.trim()).unwrap_or(0)
+}
+
+/// Full QML anchor box-model solver: resolves a child's `x/y/w/h` from its
+/// `anchors.*` (fill / centerIn / per-edge, parent- or sibling-relative) plus
+/// per-edge margins and literal `x/y/width/height`. Sibling references resolve
+/// through `base_of`. This is the QT-03c sibling-relative extension.
+fn solve_child_bounds(
+    child: &UiItem,
+    base_of: &dyn Fn(&str) -> Option<String>,
+    resolver: &DimResolver,
+) -> ResolvedBounds {
+    // anchors.fill: parent expands to all four parent edges.
+    let fill = lookup_assignment(child, "anchors.fill")
+        .map(|s| s.trim() == "parent")
+        .unwrap_or(false);
+    let center_in = lookup_assignment(child, "anchors.centerIn")
+        .map(|s| s.trim() == "parent")
+        .unwrap_or(false);
+    let all_margin = lookup_assignment(child, "anchors.margins")
+        .and_then(|raw| resolver.resolve_margin_i32(raw.trim()));
+
+    // Per-edge anchor values, fill/centerIn synthesised into edges.
+    let edge = |name: &str, fill_val: Option<&str>| -> Option<String> {
+        if let Some(v) = lookup_assignment(child, name) {
+            Some(v.trim().to_string())
+        } else {
+            fill_val.map(|s| s.to_string())
+        }
+    };
+    let a_left = edge("anchors.left", fill.then_some("parent.left"));
+    let a_right = edge("anchors.right", fill.then_some("parent.right"));
+    let a_top = edge("anchors.top", fill.then_some("parent.top"));
+    let a_bottom = edge("anchors.bottom", fill.then_some("parent.bottom"));
+    let a_hcenter = lookup_assignment(child, "anchors.horizontalCenter")
+        .map(|s| s.trim().to_string())
+        .or_else(|| center_in.then(|| "parent.horizontalCenter".to_string()));
+    let a_vcenter = lookup_assignment(child, "anchors.verticalCenter")
+        .map(|s| s.trim().to_string())
+        .or_else(|| center_in.then(|| "parent.verticalCenter".to_string()));
+
+    let x_lit = lookup_assignment(child, "x").and_then(parse_int_literal);
+    let y_lit = lookup_assignment(child, "y").and_then(parse_int_literal);
+    // `implicitWidth`/`implicitHeight` are QML's content-size hints, used when
+    // `width`/`height` are unset — honour them as a dimension fallback so a
+    // button declaring only `implicitWidth: 65` is 65px wide, not full-parent.
+    let w_lit = lookup_assignment(child, "width")
+        .or_else(|| lookup_assignment(child, "implicitWidth"))
+        .and_then(parse_int_literal);
+    let h_lit = lookup_assignment(child, "height")
+        .or_else(|| lookup_assignment(child, "implicitHeight"))
+        .and_then(parse_int_literal);
+
+    let lm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.leftMargin", resolver));
+    let rm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.rightMargin", resolver));
+    let tm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.topMargin", resolver));
+    let bm = all_margin.unwrap_or_else(|| lit_margin(child, "anchors.bottomMargin", resolver));
+
+    let add_margin = |expr: RustExpr, m: i32| RustExpr::add(expr, RustExpr::Int(m.into()));
+    let sub_margin = |expr: RustExpr, m: i32| RustExpr::sub(expr, RustExpr::Int(m.into()));
+    // Non-literal `width:` / `height:` (e.g. `height: panelHeight`,
+    // `parent.width / 2 - AppConsts.i_DISPLAY_PADDING`) resolve through the
+    // DimResolver into a Rust expression over `bounds`; an `Image` with no
+    // explicit extent falls back to its source's natural pixel size (QML sizes
+    // an Image to its `sourceSize`, not the parent); only a genuinely
+    // unresolvable extent falls back to the full parent dimension.
+    let w_expr = lookup_assignment(child, "width");
+    let h_expr = lookup_assignment(child, "height");
+    let img_natural = if matches!(map_qml_type(&child.type_name), WidgetKind::Image) {
+        resolver.image_natural_size(child)
+    } else {
+        None
+    };
+    let default_w = || match w_lit {
+        Some(n) => RustExpr::Int(n.into()),
+        None => w_expr
+            .and_then(|e| resolver.resolve_dim_expr(e.trim()))
+            .or_else(|| img_natural.map(|(w, _)| RustExpr::Int(w.into())))
+            .unwrap_or_else(|| RustExpr::atom("bounds.width")),
+    };
+    let default_h = || match h_lit {
+        Some(n) => RustExpr::Int(n.into()),
+        None => h_expr
+            .and_then(|e| resolver.resolve_dim_expr(e.trim()))
+            .or_else(|| img_natural.map(|(_, h)| RustExpr::Int(h.into())))
+            .unwrap_or_else(|| RustExpr::atom("bounds.height")),
+    };
+
+    // ---- X axis ----
+    let left_e = a_left
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| add_margin(e, lm));
+    let right_e = a_right
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| sub_margin(e, rm));
+    let hcenter_e = a_hcenter
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of));
+
+    let (x, w) = match (left_e, right_e, hcenter_e) {
+        (Some(l), Some(r), _) => {
+            let w = RustExpr::sub(r, l.clone());
+            (l, w)
+        }
+        (Some(l), None, _) => (l, default_w()),
+        (None, Some(r), _) => {
+            let w = default_w();
+            (RustExpr::sub(r, w.clone()), w)
+        }
+        (None, None, Some(c)) => {
+            let w = default_w();
+            (
+                RustExpr::sub(c, RustExpr::div(w.clone(), RustExpr::Int(2))),
+                w,
+            )
+        }
+        (None, None, None) => (
+            RustExpr::add(
+                RustExpr::atom("bounds.x"),
+                RustExpr::Int(x_lit.unwrap_or(0).into()),
+            ),
+            default_w(),
+        ),
+    };
+
+    // ---- Y axis ----
+    let top_e = a_top
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| add_margin(e, tm));
+    let bottom_e = a_bottom
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of))
+        .map(|e| sub_margin(e, bm));
+    let vcenter_e = a_vcenter
+        .as_deref()
+        .and_then(|v| anchor_edge_expr(v, base_of));
+
+    let (y, h) = match (top_e, bottom_e, vcenter_e) {
+        (Some(t), Some(b), _) => {
+            let h = RustExpr::sub(b, t.clone());
+            (t, h)
+        }
+        (Some(t), None, _) => (t, default_h()),
+        (None, Some(b), _) => {
+            let h = default_h();
+            (RustExpr::sub(b, h.clone()), h)
+        }
+        (None, None, Some(c)) => {
+            let h = default_h();
+            (
+                RustExpr::sub(c, RustExpr::div(h.clone(), RustExpr::Int(2))),
+                h,
+            )
+        }
+        (None, None, None) => (
+            RustExpr::add(
+                RustExpr::atom("bounds.y"),
+                RustExpr::Int(y_lit.unwrap_or(0).into()),
+            ),
+            default_h(),
+        ),
+    };
+
+    ResolvedBounds { x, y, w, h }
+}
+
+/// Emit one `let cb_<i> = Rect { … };` per child (source-indexed names) using
+/// the sibling-aware [`solve_child_bounds`], ordered so a child is declared
+/// after every sibling it anchors to. Children are pushed in source order by
+/// the caller; only the *declaration* order is topologically sorted here.
+fn emit_solved_child_bounds(
+    child_fns: &[(String, &UiItem)],
+    resolver: &DimResolver,
+    out: &mut String,
+) {
+    use std::collections::BTreeMap;
+    let n = child_fns.len();
+
+    // Sibling id → source index.
+    let mut id_to_idx: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, (_name, child)) in child_fns.iter().enumerate() {
+        if let Some(id) = &child.id {
+            id_to_idx.insert(id.clone(), i);
+        }
+    }
+    let base_of = |id: &str| -> Option<String> { id_to_idx.get(id).map(|i| format!("cb_{i}")) };
+
+    // Dependency edges to known siblings only.
+    let mut deps: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for (i, (_name, child)) in child_fns.iter().enumerate() {
+        for dep_id in child_anchor_deps(child) {
+            if let Some(&j) = id_to_idx.get(&dep_id)
+                && j != i
+            {
+                deps[i].push(j);
+            }
+        }
+    }
+
+    // DFS topological order; stable by source index and cycle-tolerant
+    // (a back-edge into an in-progress node is skipped rather than looped).
+    fn visit(i: usize, deps: &[Vec<usize>], st: &mut [u8], order: &mut Vec<usize>) {
+        if st[i] != 0 {
+            return;
+        }
+        st[i] = 1;
+        for &j in &deps[i] {
+            visit(j, deps, st, order);
+        }
+        st[i] = 2;
+        order.push(i);
+    }
+    let mut order = Vec::with_capacity(n);
+    let mut st = vec![0u8; n];
+    for i in 0..n {
+        visit(i, &deps, &mut st, &mut order);
+    }
+
+    for &i in &order {
+        let (_name, child) = &child_fns[i];
+        let rb = solve_child_bounds(child, &base_of, resolver);
+        out.push_str(&format!(
+            "    let cb_{i} = Rect {{\n        x: {},\n        y: {},\n        \
+             width: {},\n        height: {},\n    }};\n",
+            rb.x.render(),
+            rb.y.render(),
+            rb.w.render(),
+            rb.h.render()
+        ));
+    }
+}
+
 /// Emit a `let child_bounds = …;` line per QT-03b §7 trivial path.
 fn emit_child_bounds(child: &UiItem, out: &mut String) {
     let fill = lookup_assignment(child, "anchors.fill")
@@ -2933,7 +5284,7 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
         if center_in {
             out.push_str("    // QT-03c override: anchors.fill supersedes anchors.centerIn\n");
         }
-        if let Some(m) = margins {
+        if let Some(m) = margins.filter(|m| *m != 0) {
             out.push_str(&format!(
                 "    let child_bounds = Rect {{\n        \
                  x: bounds.x + {m},\n        y: bounds.y + {m},\n        \
@@ -2948,8 +5299,15 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
 
     let x_lit = lookup_assignment(child, "x").and_then(parse_int_literal);
     let y_lit = lookup_assignment(child, "y").and_then(parse_int_literal);
-    let w_lit = lookup_assignment(child, "width").and_then(parse_int_literal);
-    let h_lit = lookup_assignment(child, "height").and_then(parse_int_literal);
+    // `implicitWidth`/`implicitHeight` are QML's content-size hints, used when
+    // `width`/`height` are unset — honour them as a dimension fallback so a
+    // button declaring only `implicitWidth: 65` is 65px wide, not full-parent.
+    let w_lit = lookup_assignment(child, "width")
+        .or_else(|| lookup_assignment(child, "implicitWidth"))
+        .and_then(parse_int_literal);
+    let h_lit = lookup_assignment(child, "height")
+        .or_else(|| lookup_assignment(child, "implicitHeight"))
+        .and_then(parse_int_literal);
 
     // QT-03c §7 step 2: anchors.centerIn with literal width+height.
     if center_in {
@@ -3023,6 +5381,8 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
     // parent-inherited).
     let x = x_lit.unwrap_or(0);
     let y = y_lit.unwrap_or(0);
+    let x_expr = parent_offset_expr("bounds.x", x);
+    let y_expr = parent_offset_expr("bounds.y", y);
     let width = match w_lit {
         Some(n) => format!("{n}"),
         None => "bounds.width".to_string(),
@@ -3034,9 +5394,19 @@ fn emit_child_bounds(child: &UiItem, out: &mut String) {
 
     out.push_str(&format!(
         "    let child_bounds = Rect {{\n        \
-         x: bounds.x + {x},\n        y: bounds.y + {y},\n        \
+         x: {x_expr},\n        y: {y_expr},\n        \
          width: {width},\n        height: {height},\n    }};\n"
     ));
+}
+
+/// Compose an absolute parent coordinate with a literal offset without
+/// emitting the Clippy-triggering identity form `parent + 0`.
+fn parent_offset_expr(parent: &str, offset: i32) -> String {
+    if offset == 0 {
+        parent.to_string()
+    } else {
+        format!("{parent} + {offset}")
+    }
 }
 
 /// Try to lower a single edge anchor per the QT-03c §5 amendment
@@ -3070,10 +5440,11 @@ fn lower_single_edge_anchor(
             return false;
         }
         let y = y_lit.unwrap_or(0);
+        let y_expr = parent_offset_expr("bounds.y", y);
         out.push_str("    // QT-03c edge: anchors.left: parent.left\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x,\n        y: bounds.y + {y},\n        \
+             x: bounds.x,\n        y: {y_expr},\n        \
              width: {width_expr},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -3090,10 +5461,11 @@ fn lower_single_edge_anchor(
             return false;
         };
         let y = y_lit.unwrap_or(0);
+        let y_expr = parent_offset_expr("bounds.y", y);
         out.push_str("    // QT-03c edge: anchors.right: parent.right\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + bounds.width - {w},\n        y: bounds.y + {y},\n        \
+             x: bounds.x + bounds.width - {w},\n        y: {y_expr},\n        \
              width: {w},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -3103,10 +5475,11 @@ fn lower_single_edge_anchor(
             return false;
         }
         let x = x_lit.unwrap_or(0);
+        let x_expr = parent_offset_expr("bounds.x", x);
         out.push_str("    // QT-03c edge: anchors.top: parent.top\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + {x},\n        y: bounds.y,\n        \
+             x: {x_expr},\n        y: bounds.y,\n        \
              width: {width_expr},\n        height: {height_expr},\n    }};\n"
         ));
         return true;
@@ -3122,10 +5495,11 @@ fn lower_single_edge_anchor(
             return false;
         };
         let x = x_lit.unwrap_or(0);
+        let x_expr = parent_offset_expr("bounds.x", x);
         out.push_str("    // QT-03c edge: anchors.bottom: parent.bottom\n");
         out.push_str(&format!(
             "    let child_bounds = Rect {{\n        \
-             x: bounds.x + {x},\n        y: bounds.y + bounds.height - {h},\n        \
+             x: {x_expr},\n        y: bounds.y + bounds.height - {h},\n        \
              width: {width_expr},\n        height: {h},\n    }};\n"
         ));
         return true;
@@ -3367,15 +5741,15 @@ fn collect_state_fields_walk(
         if !is_root && owner_id.is_none() {
             continue;
         }
-        let field_name = match &owner_id {
-            None => prop.name.clone(),
-            Some(id) => format!("{}_{}", sanitize_ident(id), prop.name),
+        let base_field_name = match &owner_id {
+            None => rust_snake_ident(&prop.name),
+            Some(id) => rust_snake_ident(&format!("{id}_{}", prop.name)),
         };
-        if seen.contains(&field_name) {
-            // §5 collision rule: rare; emit a comment-bearing
-            // placeholder rather than aborting the build, but keep
-            // the field collision visible.
-            continue;
+        let mut field_name = base_field_name.clone();
+        let mut suffix = 2usize;
+        while seen.contains(&field_name) {
+            field_name = format!("{base_field_name}_{suffix}");
+            suffix += 1;
         }
         seen.push(field_name.clone());
         let (init_expr, init_comment) = lower_property_default(prop, ty);
@@ -3486,6 +5860,54 @@ fn emit_screen_state_init(fields: &[StateField], out: &mut String) {
     out.push_str("    }));\n");
 }
 
+/// Emit the private binding accumulator passed through generated helpers.
+/// This preserves `Vec::push` for binding-producing leaves without exposing
+/// `&mut Vec<_>` in every helper signature (which triggers `clippy::ptr_arg`
+/// for leaves that do not append a binding themselves).
+fn emit_binding_sink_struct(out: &mut String) {
+    out.push_str(
+        "struct BindingSink<'a, T> {\n    \
+             values: &'a mut Vec<T>,\n}\n\n\
+         impl<'a, T> BindingSink<'a, T> {\n    \
+             fn new(values: &'a mut Vec<T>) -> Self {\n        \
+                 Self { values }\n    \
+             }\n\n    \
+             fn push(&mut self, value: T) {\n        \
+                 self.values.push(value);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// Emit a named alias for the public `build_screen` result. Tuple
+/// destructuring remains source-compatible while the signature no longer
+/// triggers `clippy::type_complexity` on state-machine-linked screens.
+fn emit_built_screen_alias(out: &mut String, has_sm: bool) {
+    if has_sm {
+        out.push_str(
+            "/// Widget tree, screen state, state machine, and reactive bindings\n\
+             /// returned by [`build_screen`].\n\
+             #[rustfmt::skip]\n\
+             pub type BuiltScreen = (\n    \
+                 WidgetNode,\n    \
+                 Rc<RefCell<ScreenState>>,\n    \
+                 Rc<RefCell<Machine>>,\n    \
+                 Vec<Binding>,\n\
+             );\n\n",
+        );
+    } else {
+        out.push_str(
+            "/// Widget tree, screen state, and reactive label bindings returned\n\
+             /// by [`build_screen`].\n\
+             #[rustfmt::skip]\n\
+             pub type BuiltScreen = (\n    \
+                 WidgetNode,\n    \
+                 Rc<RefCell<ScreenState>>,\n    \
+                 Vec<LabelBinding>,\n\
+             );\n\n",
+        );
+    }
+}
+
 /// Emit the QT-04e `pub struct LabelBinding` + `impl LabelBinding`
 /// pair. Always emitted (even when no Labels are bound) so the
 /// per-fixture API stays stable.
@@ -3503,6 +5925,26 @@ fn emit_label_binding_struct(out: &mut String) {
              pub fn refresh(&self, state: &ScreenState) {\n        \
                  self.label.borrow_mut().set_text((self.accessor)(state));\n    \
              }\n}\n\n",
+    );
+}
+
+/// QT-05k §3 — `pub struct ExternalTextBinding`: a Label whose text is sourced
+/// from an external object property (`audioPlayer.currentPlayUrlFileName`), NOT
+/// from machine state. The binding carries the Label handle plus the verbatim
+/// external `key`; the value is supplied by a consumer-owned resolver applied
+/// via [`apply_external_text`] (authority: derive — the emitter owns neither the
+/// external object nor the string value).
+fn emit_external_text_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05k §3 — reactive Label-text binding sourced from an external\n\
+         /// object property (e.g. `audioPlayer.currentPlayUrlFileName`). `key`\n\
+         /// is the QML expression passed through verbatim (authority: derive);\n\
+         /// the string value is supplied by a consumer resolver via\n\
+         /// [`apply_external_text`]. The matching `(node tag, key)` pair is also\n\
+         /// surfaced in [`EXTERNAL_TEXT_BINDINGS`] for tag-keyed consumers.\n\
+         pub struct ExternalTextBinding {\n    \
+             pub label: Rc<RefCell<Label>>,\n    \
+             pub key: &'static str,\n}\n\n",
     );
 }
 
@@ -3539,12 +5981,213 @@ fn emit_binding_enum(out: &mut String) {
     );
 }
 
-/// Emit the QT-04e §7 / QT-05c §7 `pub fn refresh_bindings` free
-/// function. Signature varies by SM presence; single-line per branch
-/// to stay rustfmt-idempotent.
-fn emit_refresh_bindings_fn(out: &mut String, has_sm: bool) {
+/// QT-05g §3 — `pub struct PredicateBinding` + `pub struct ImageArt`:
+/// a reactive `Image`-artwork binding driven by `machine.is_active(state_id)`
+/// (istate linkage v2). Both branches' pixels are decoded once at build time;
+/// `refresh` is a pointer swap.
+/// QT-05g §3 — the shared decoded-artwork record. Emitted on linkage-v2
+/// modules that have any predicate or visibility binding.
+fn emit_image_art_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05g §3 — a decoded, magenta-keyed, `'static`-leaked artwork\n\
+         /// buffer plus its natural dimensions.\n\
+         #[derive(Clone, Copy)]\n\
+         pub struct ImageArt {\n    \
+             pub width: i32,\n    \
+             pub height: i32,\n    \
+             pub pixels: &'static [Color],\n}\n\n",
+    );
+}
+
+fn emit_predicate_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05g §3 — reactive `Image`-source binding. Shows `on` when the\n\
+         /// bound state is active, else `off`. `state_id` is the QML predicate\n\
+         /// passed through verbatim to `Machine::is_active` (authority: derive).\n\
+         pub struct PredicateBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub state_id: &'static str,\n    \
+             pub on: ImageArt,\n    \
+             pub off: ImageArt,\n}\n\n\
+         impl PredicateBinding {\n    \
+             /// Re-apply this binding from the supplied machine.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 let art = if machine.is_active(self.state_id) {\n            \
+                     &self.on\n        \
+                 } else {\n            \
+                     &self.off\n        \
+                 };\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_pixels(art.width, art.height, art.pixels);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// QT-05h §3 — reactive `Image`-visibility binding. Hides the Image when the
+/// bound state is inactive, shows it when active.
+fn emit_visibility_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05h §3 — reactive `Image`-visibility binding driven by\n\
+         /// `Machine::is_active`. `state_id` is the QML predicate passed\n\
+         /// through verbatim (authority: derive).\n\
+         pub struct VisibilityBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub state_id: &'static str,\n}\n\n\
+         impl VisibilityBinding {\n    \
+             /// Hide the Image when the bound state is inactive, else show it.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_hidden(!machine.is_active(self.state_id));\n    \
+             }\n}\n\n",
+    );
+}
+
+/// QT-05i §3 — reactive `Image`-source binding over a CHAIN of predicates:
+/// the first `arm` whose `state_id` is active wins; if none are active the
+/// `default` (resting) artwork shows. Models the repeat-mode icon
+/// (`mediaRepeatTrack ? … : mediaRepeatFolder ? … : NoRepeat`).
+fn emit_predicate_chain_binding_struct(out: &mut String) {
+    out.push_str(
+        "/// QT-05i §3 — one arm of a chained predicate binding: the artwork\n\
+         /// shown when `state_id` is the first active arm.\n\
+         pub struct PredicateArm {\n    \
+             pub state_id: &'static str,\n    \
+             pub art: ImageArt,\n}\n\n\
+         /// QT-05i §3 — reactive `Image`-source binding driven by a chain of\n\
+         /// `Machine::is_active` checks (first-true wins; `default` is the\n\
+         /// resting else). Each `state_id` is the QML predicate passed through\n\
+         /// verbatim (authority: derive).\n\
+         pub struct PredicateChainBinding {\n    \
+             pub image: Rc<RefCell<Image<'static>>>,\n    \
+             pub arms: Vec<PredicateArm>,\n    \
+             pub default: ImageArt,\n}\n\n\
+         impl PredicateChainBinding {\n    \
+             /// Re-apply this binding: show the first active arm's artwork,\n    \
+             /// else the resting default.\n    \
+             pub fn refresh(&self, machine: &Machine) {\n        \
+                 let art = self\n            \
+                     .arms\n            \
+                     .iter()\n            \
+                     .find(|a| machine.is_active(a.state_id))\n            \
+                     .map(|a| &a.art)\n            \
+                     .unwrap_or(&self.default);\n        \
+                 self.image\n            \
+                     .borrow_mut()\n            \
+                     .set_pixels(art.width, art.height, art.pixels);\n    \
+             }\n}\n\n",
+    );
+}
+
+/// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed binding enum for linkage-v2
+/// modules: `Label` always; `Predicate` (state-driven artwork), `Visibility`
+/// (state-driven hide/show), and `Chain` (chained-predicate artwork) when those
+/// bindings are present.
+fn emit_binding_enum_v2(
+    out: &mut String,
+    used_predicate: bool,
+    used_visibility: bool,
+    used_predicate_chain: bool,
+    used_external_text: bool,
+) {
+    out.push_str(
+        "/// QT-05g §3 / QT-05h §3 / QT-05i §3 — sealed enum over the binding\n\
+         /// sources reactive `refresh_bindings` knows how to drive.\n\
+         pub enum Binding {\n    \
+             Label(LabelBinding),\n",
+    );
+    if used_predicate {
+        out.push_str("    Predicate(PredicateBinding),\n");
+    }
+    if used_visibility {
+        out.push_str("    Visibility(VisibilityBinding),\n");
+    }
+    if used_predicate_chain {
+        out.push_str("    Chain(PredicateChainBinding),\n");
+    }
+    if used_external_text {
+        // QT-05k §3 — externally-sourced Label text. Driven by the consumer
+        // resolver (`apply_external_text`), NOT by `refresh_bindings`.
+        out.push_str("    ExternalText(ExternalTextBinding),\n");
+    }
+    out.push_str("}\n\n");
+}
+
+/// QT-05k §6 — emit the `apply_external_text` consumer entry point. The consumer
+/// supplies a `key → Option<String>` resolver; each `Binding::ExternalText`
+/// whose key resolves has its Label text set. Kept separate from
+/// `refresh_bindings` (which is machine/state-driven and takes no resolver) so
+/// the external-data refresh cadence is the consumer's to choose.
+fn emit_apply_external_text_fn(out: &mut String) {
+    out.push_str(
+        "/// QT-05k §6 — apply a consumer-owned resolver to every external-text\n\
+         /// binding. `resolve(key)` returns the current value for the verbatim\n\
+         /// QML key (e.g. `\"audioPlayer.currentPlayUrlFileName\"`); `None` leaves\n\
+         /// the Label unchanged. Call whenever the external source may have\n\
+         /// changed (every frame, or on a data-change signal). No-op when there\n\
+         /// are no external-text bindings.\n\
+         pub fn apply_external_text(bindings: &[Binding], resolve: impl Fn(&str) -> Option<String>) {\n    \
+             for b in bindings {\n        \
+                 if let Binding::ExternalText(t) = b\n            \
+                     && let Some(v) = resolve(t.key)\n        \
+                 {\n            \
+                     t.label.borrow_mut().set_text(v);\n        \
+                 }\n    \
+             }\n}\n\n",
+    );
+}
+
+/// Emit the QT-04e §7 / QT-05c §7 / QT-05g §7 / QT-05h §7 `pub fn
+/// refresh_bindings` free function. Signature varies by SM presence + linkage
+/// version; the v2 match arms track the emitted `Binding` variants.
+fn emit_refresh_bindings_fn(
+    out: &mut String,
+    has_sm: bool,
+    v2: bool,
+    used_predicate: bool,
+    used_visibility: bool,
+    used_predicate_chain: bool,
+    used_external_text: bool,
+) {
+    if has_sm && v2 {
+        let mut arms =
+            String::from("                         Binding::Label(lb) => lb.refresh(&s),\n");
+        if used_predicate {
+            arms.push_str("                         Binding::Predicate(pb) => pb.refresh(&m),\n");
+        }
+        if used_visibility {
+            arms.push_str("                         Binding::Visibility(vb) => vb.refresh(&m),\n");
+        }
+        if used_predicate_chain {
+            arms.push_str("                         Binding::Chain(cb) => cb.refresh(&m),\n");
+        }
+        if used_external_text {
+            // QT-05k: external-text bindings are driven by the consumer resolver
+            // (`apply_external_text`), NOT by machine/state — a no-op here, but
+            // named so the match stays exhaustive.
+            arms.push_str("                         Binding::ExternalText(_) => {}\n");
+        }
+        out.push_str(&format!(
+            "/// Re-apply every QT-04e / QT-05g / QT-05h binding from the\n\
+             /// current state and machine. Idempotent; safe to call after any\n\
+             /// `machine.step(…)`. No-op when `bindings` is empty.\n\
+             #[rustfmt::skip]\n\
+             pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, machine: &Rc<RefCell<Machine>>, bindings: &[Binding]) {{\n    \
+                 let s = state.borrow();\n    \
+                 let m = machine.borrow();\n    \
+                 for b in bindings {{\n        \
+                     match b {{\n\
+{arms}    \
+                     }}\n    \
+                 }}\n}}\n\n"
+        ));
+        return;
+    }
     if has_sm {
-        // `#[rustfmt::skip]` on the SM-attached form because the
+        // Linkage v1 (`<sm>_gen`): `Machine`/`MachineBinding` read DM via
+        // `m.dm`. `#[rustfmt::skip]` because the signature exceeds rustfmt's
+        // wrap threshold; one line keeps the output byte-stable.
         // signature exceeds rustfmt's wrap threshold; keeping the
         // emit on one line keeps the output byte-stable across
         // `cargo fmt` runs.
@@ -4007,16 +6650,117 @@ fn parse_dm_text_ref(expr: &str) -> Option<String> {
     Some(after.to_string())
 }
 
-fn sanitize_ident(s: &str) -> String {
-    s.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' {
-                c
-            } else {
-                '_'
+/// Convert a QML identifier to a deterministic Rust snake-case identifier.
+/// Original QML IDs remain untouched in `WidgetNode::tag` and resolution
+/// metadata; this function is only for emitted Rust symbols.
+fn rust_snake_ident(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut previous_source: Option<char> = None;
+
+    for (index, ch) in chars.iter().copied().enumerate() {
+        if !ch.is_ascii_alphanumeric() {
+            if !out.ends_with('_') {
+                out.push('_');
             }
-        })
-        .collect()
+            previous_source = Some(ch);
+            continue;
+        }
+
+        if ch.is_ascii_uppercase() {
+            let next_is_lower = chars
+                .get(index + 1)
+                .is_some_and(|next| next.is_ascii_lowercase());
+            let boundary = previous_source.is_some_and(|previous| {
+                previous.is_ascii_lowercase()
+                    || previous.is_ascii_digit()
+                    || (previous.is_ascii_uppercase() && next_is_lower)
+            });
+            if boundary && !out.ends_with('_') {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+        previous_source = Some(ch);
+    }
+
+    while out.ends_with('_') {
+        out.pop();
+    }
+    while out.starts_with('_') {
+        out.remove(0);
+    }
+    if out.is_empty() {
+        out.push_str("generated");
+    }
+    if out.as_bytes()[0].is_ascii_digit() {
+        out.insert_str(0, "n_");
+    }
+    if is_rust_keyword(&out) {
+        out.push('_');
+    }
+    out
+}
+
+fn is_rust_keyword(ident: &str) -> bool {
+    matches!(
+        ident,
+        "abstract"
+            | "as"
+            | "async"
+            | "await"
+            | "become"
+            | "box"
+            | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "dyn"
+            | "do"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "final"
+            | "fn"
+            | "for"
+            | "gen"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "macro"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "override"
+            | "priv"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "try"
+            | "type"
+            | "typeof"
+            | "union"
+            | "unsafe"
+            | "unsized"
+            | "use"
+            | "virtual"
+            | "where"
+            | "while"
+            | "yield"
+    )
 }
 
 /// Parse a `.qml` file and write `qt-ir.json` into `out/`.
@@ -4436,6 +7180,31 @@ impl<'a> Parser<'a> {
             item.signals.push(sig);
             return Ok(());
         }
+        if self.match_keyword("enum") {
+            // QML enum declaration: `enum Name { A, B = 2, C }`. Enums are
+            // referenced only inside opaque expression text, so the structural
+            // emit doesn't need them — parse and discard.
+            let _name = self.read_ident().context("enum name")?;
+            self.skip_trivia();
+            let _body = self.read_balanced(b'{', b'}')?;
+            return Ok(());
+        }
+        if self.match_keyword("required") {
+            // `required property <ty> <name>` (optionally combined with
+            // `default`/`readonly`), or a bare `required <inheritedName>` that
+            // marks an inherited property as required (no value follows).
+            if self.match_keyword("default") {
+                return self.finish_property_decl(item, true, false);
+            }
+            if self.match_keyword("readonly") {
+                return self.finish_property_decl(item, false, true);
+            }
+            if self.match_keyword("property") {
+                return self.finish_property_decl(item, false, false);
+            }
+            let _name = self.read_ident().context("required property name")?;
+            return Ok(());
+        }
         if self.match_keyword("function") {
             // Capture as a special handler with name `function:<name>`. Body
             // is balanced-brace text. Out of scope for structural emit but
@@ -4463,6 +7232,15 @@ impl<'a> Parser<'a> {
         // member we have based on what follows.
         let lead = self.read_dotted_ident()?;
         self.skip_trivia();
+        // `<Type> on <property> { ... }` — a property value source (Behavior,
+        // NumberAnimation on x, …). Non-visual; consume and discard so the
+        // structural emit isn't tripped by animation primitives.
+        if starts_uppercase(&lead) && self.match_keyword("on") {
+            let _prop = self.read_dotted_ident().context("`on` target property")?;
+            self.skip_trivia();
+            let _body = self.read_balanced(b'{', b'}')?;
+            return Ok(());
+        }
         match self.peek() {
             Some(b':') => {
                 self.pos += 1;
@@ -4710,10 +7488,19 @@ impl<'a> Parser<'a> {
         let mut paren = 0i32;
         let mut bracket = 0i32;
         let mut brace = 0i32;
+        // Last two significant (non-whitespace) bytes consumed, newest first.
+        // Used to decide whether a bare newline continues the expression onto
+        // the next line (multi-line bindings, e.g. chained ternaries).
+        let mut last_sig: Option<u8> = None;
+        let mut last_sig2: Option<u8> = None;
         while let Some(b) = self.peek() {
             match b {
                 b'"' | b'\'' => {
                     self.skip_string();
+                    // A string literal is a complete operand; record the
+                    // closing quote so a trailing-operator check sees it.
+                    last_sig2 = last_sig;
+                    last_sig = Some(b'"');
                     continue;
                 }
                 b'/' if self.peek_at(1) == Some(b'/') => {
@@ -4743,8 +7530,19 @@ impl<'a> Parser<'a> {
                     brace -= 1;
                 }
                 b';' if paren == 0 && bracket == 0 && brace == 0 => break,
-                b'\n' if paren == 0 && bracket == 0 && brace == 0 => break,
+                b'\n' if paren == 0 && bracket == 0 && brace == 0 => {
+                    // A newline ends the binding unless the expression is
+                    // syntactically incomplete (QML/JS line continuation).
+                    if !self.expr_newline_continues(last_sig, last_sig2) {
+                        break;
+                    }
+                    // Continuation: fall through to consume the newline.
+                }
                 _ => {}
+            }
+            if !matches!(b, b' ' | b'\t' | b'\n' | b'\r') {
+                last_sig2 = last_sig;
+                last_sig = Some(b);
             }
             self.pos += 1;
         }
@@ -4757,6 +7555,89 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         text
+    }
+
+    /// Decide whether a depth-0 newline continues the current binding
+    /// expression onto the next line, mirroring JS/QML automatic-semicolon
+    /// rules closely enough for designer-authored bindings.
+    ///
+    /// Continues when either the line's last significant byte demands a right
+    /// operand (`a +`, `cond ?`, `x :`) — guarding against postfix `++`/`--` —
+    /// or the next line begins with a binary/ternary operator that can never
+    /// start a new QML member (`. + - * / ? :` …).
+    fn expr_newline_continues(&self, last_sig: Option<u8>, last_sig2: Option<u8>) -> bool {
+        if let Some(b) = last_sig {
+            let trailing = matches!(
+                b,
+                b'?' | b':'
+                    | b','
+                    | b'.'
+                    | b'+'
+                    | b'-'
+                    | b'*'
+                    | b'/'
+                    | b'%'
+                    | b'&'
+                    | b'|'
+                    | b'^'
+                    | b'='
+                    | b'<'
+                    | b'>'
+                    | b'~'
+            );
+            if trailing {
+                let postfix = matches!((last_sig2, b), (Some(b'+'), b'+') | (Some(b'-'), b'-'));
+                if !postfix {
+                    return true;
+                }
+            }
+        }
+        match self.peek_next_significant() {
+            Some(b) => matches!(
+                b,
+                b'?' | b':'
+                    | b','
+                    | b'.'
+                    | b'+'
+                    | b'-'
+                    | b'*'
+                    | b'/'
+                    | b'%'
+                    | b'&'
+                    | b'|'
+                    | b'^'
+                    | b'='
+                    | b'<'
+                    | b'>'
+            ),
+            None => false,
+        }
+    }
+
+    /// Peek the next non-whitespace, non-comment byte from the current position
+    /// without consuming anything.
+    fn peek_next_significant(&self) -> Option<u8> {
+        let mut i = self.pos;
+        while i < self.src.len() {
+            let b = self.src[i];
+            if matches!(b, b' ' | b'\t' | b'\n' | b'\r') {
+                i += 1;
+            } else if b == b'/' && self.src.get(i + 1) == Some(&b'/') {
+                i += 2;
+                while i < self.src.len() && self.src[i] != b'\n' {
+                    i += 1;
+                }
+            } else if b == b'/' && self.src.get(i + 1) == Some(&b'*') {
+                i += 2;
+                while i + 1 < self.src.len() && !(self.src[i] == b'*' && self.src[i + 1] == b'/') {
+                    i += 1;
+                }
+                i += 2;
+            } else {
+                return Some(b);
+            }
+        }
+        None
     }
 
     /// Variant of `read_expression_text` used inside list literals: stops at
@@ -5101,6 +7982,139 @@ mod tests {
         let json = serde_json::to_string(&m).unwrap();
         let m2: UiModule = serde_json::from_str(&json).unwrap();
         assert_eq!(m, m2);
+    }
+
+    #[test]
+    fn dimension_expressions_preserve_precedence_and_remove_identities() {
+        let resolver = DimResolver::default();
+        assert_eq!(
+            resolver.resolve_dim("parent.width + 0").as_deref(),
+            Some("bounds.width")
+        );
+        assert_eq!(
+            resolver
+                .resolve_dim("parent.width / (2 + 3) * 4")
+                .as_deref(),
+            Some("bounds.width / (2 + 3) * 4")
+        );
+        assert_eq!(
+            resolver.resolve_dim("parent.width - (8 - 3)").as_deref(),
+            Some("bounds.width - (8 - 3)")
+        );
+        assert_eq!(
+            resolver.resolve_dim("parent.width / (8 / 2)").as_deref(),
+            Some("bounds.width / (8 / 2)")
+        );
+        assert_eq!(
+            resolver.resolve_dim("(parent.width + 8) / 2").as_deref(),
+            Some("(bounds.width + 8) / 2")
+        );
+    }
+
+    #[test]
+    fn solved_bounds_omit_zero_offsets() {
+        let module = parse(
+            r#"
+            Item {
+                Rectangle { x: 0; y: 0; width: 10; height: 20 }
+            }
+            "#,
+        );
+        let bounds =
+            solve_child_bounds(&module.root.children[0], &|_| None, &DimResolver::default());
+        assert_eq!(bounds.x.render(), "bounds.x");
+        assert_eq!(bounds.y.render(), "bounds.y");
+        assert_eq!(bounds.w.render(), "10");
+        assert_eq!(bounds.h.render(), "20");
+    }
+
+    #[test]
+    fn generated_helpers_distinguish_leaf_and_parent_nodes() {
+        let leaf = render_rlvgl(&parse("Item { id: leafNode }"));
+        assert!(leaf.contains("fn build_leaf_node("));
+        assert!(leaf.contains("    WidgetNode {\n        widget,"));
+        assert!(!leaf.contains("let node = WidgetNode"));
+
+        let parent = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: parentNode
+                Rectangle { id: childNode }
+            }
+            "#,
+        ));
+        assert!(parent.contains("fn build_parent_node("));
+        assert!(parent.contains("let mut node = WidgetNode"));
+        assert!(parent.contains("node.children.push(build_child_node"));
+    }
+
+    #[test]
+    fn generated_binding_leaves_use_binding_sink() {
+        let generated = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: root
+                property string title: "Hello"
+                Text { id: titleLabel; text: root.title }
+            }
+            "#,
+        ));
+        assert!(generated.contains("struct BindingSink<'a, T>"));
+        assert!(generated.contains("label_bindings: &mut BindingSink<'_, LabelBinding>"));
+        assert!(generated.contains("label_bindings.push(LabelBinding"));
+        assert!(generated.contains("fn build_title_label("));
+    }
+
+    #[test]
+    fn generated_rust_identifiers_are_snake_case_and_collision_safe() {
+        let generated = render_rlvgl(&parse(
+            r#"
+            Item {
+                id: root
+                property int i_ROW_SPACING: 1
+                property int fooBar: 2
+                property int foo_bar: 3
+                Item {
+                    id: paneMouseArea
+                    property bool itemSelected: false
+                }
+                Item { id: __buttonTarget }
+            }
+            "#,
+        ));
+        assert!(generated.contains("pub i_row_spacing: i32"));
+        assert!(generated.contains("pub foo_bar: i32"));
+        assert!(generated.contains("pub foo_bar_2: i32"));
+        assert!(generated.contains("pub pane_mouse_area_item_selected: bool"));
+        assert!(generated.contains("fn build_pane_mouse_area("));
+        assert!(generated.contains("tag: Some(\"paneMouseArea\")"));
+        assert!(generated.contains("fn build_button_target("));
+        assert!(generated.contains("tag: Some(\"__buttonTarget\")"));
+    }
+
+    #[test]
+    fn generated_rust_identifiers_escape_reserved_keywords() {
+        for keyword in ["abstract", "become", "box", "do", "gen", "match", "try"] {
+            assert_eq!(rust_snake_ident(keyword), format!("{keyword}_"));
+        }
+    }
+
+    #[test]
+    fn click_area_is_mutable_only_when_a_handler_is_lowered() {
+        let immutable = render_rlvgl(&parse("MouseArea { id: target }"));
+        assert!(immutable.contains("let click_area = ClickArea::new(bounds);"));
+        assert!(!immutable.contains("let mut click_area = ClickArea::new(bounds);"));
+
+        let mutable = render_rlvgl(&parse(
+            r#"
+            MouseArea {
+                id: target
+                property int taps: 0
+                onClicked: taps += 1
+            }
+            "#,
+        ));
+        assert!(mutable.contains("let mut click_area = ClickArea::new(bounds);"));
     }
 
     /// QT-02 schema-drift gate: regenerate `qt-ir.schema.json` and

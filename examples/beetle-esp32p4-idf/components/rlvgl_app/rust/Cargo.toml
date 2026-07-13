@@ -19,7 +19,17 @@ crate-type = ["staticlib"]
 [dependencies]
 rlvgl-core = { path = "../../../../../core", default-features = false }
 rlvgl-platform = { path = "../../../../../platform", default-features = false }
-rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false }
+rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false, optional = true }
+rlvgl-app-sctd-demo = { path = "../../../../apps/sctd-demo", default-features = false, optional = true }
+
+[features]
+# Build-time payload selection (SCTD-02 PCDN-02-01). Default = the SCTD
+# interactive tutorial demo; build with
+#   --no-default-features --features app_disco
+# (and CMake EXTRA_CARGO_ARGS) to restore the original disco-demo payload.
+default = ["app_sctd"]
+app_sctd = ["dep:rlvgl-app-sctd-demo"]
+app_disco = ["dep:rlvgl-app-disco-demo"]
 
 [profile.release]
 opt-level = "s"

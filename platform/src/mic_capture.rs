@@ -124,9 +124,9 @@ impl MicCapture {
 
     /// Stop recording.
     pub fn stop(&mut self) {
-        self.sai.disable();
         self.sai.disable_dma();
         self.bdma.stop();
+        self.sai.disable();
         self.state = State::Ready;
     }
 

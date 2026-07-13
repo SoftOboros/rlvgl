@@ -120,9 +120,14 @@ One owner per concept; Consumer Projects cite these, never restate them.
    tag; Gate R verifies registry truth after publish and on a 3×-daily
    schedule (mirroring `publish-continue.yml` cadence).
 2. Gate P consumes the full ordered publish list (`ordered_crates` in
-   `scripts/publish_changed.sh`; 25 crates as of CRATES-CI-01) — packaging
+   `scripts/publish_changed.sh`; 26 crates as of the 2026-07-12 SCTD-04
+   amendment) — packaging
    every crate is part of the gate even when a Consumer Project only
    depends on a subset, because P-META/P-INCLUDE failures are per-crate.
+   The list includes the upstream-shaped `ratatui-rlvgl` crate in the
+   initialized `vendor/ratatui` submodule. Because that crate is intentionally
+   excluded from the rlvgl workspace, Gate P packages it by manifest path
+   immediately after `rlvgl-core`, its sole rlvgl dependency.
 3. Consumer Projects MUST NOT use `path` dependencies or `[patch]` entries
    pointing into the workspace. Violation = nonconforming run.
 4. The publish workflow (`publish.yml`) MUST require Gate P green on the
@@ -151,6 +156,26 @@ upstream — the standard pre-publish mechanism.)*
    `cargo publish` (P-ORDER caught pre-tag). Consumer Projects consume
    the finished table as their `.cargo/config.toml`; third-party
    dependencies continue to resolve from crates.io.
+   The excluded `ratatui-rlvgl` submodule crate uses the equivalent
+   `cargo package --manifest-path vendor/ratatui/ratatui-rlvgl/Cargo.toml`;
+   its version and archive location are discovered from that manifest's
+   workspace rather than the rlvgl root workspace. Its staged consumer patch
+   entry is appended after all root-workspace packages complete. The bridge is
+   first packaged against extracted `rlvgl-core`; Gate P then defers both
+   extracted patch entries while later root packages run because the live root
+   already consumes the bridge from the submodule path and patches its own
+   core. Exposing both live and extracted paths creates an ambiguous duplicate
+   `rlvgl-core` source in Cargo's lockfile. No later publish crate depends on
+   `ratatui-rlvgl`, and consumer gates receive both extracted entries after the
+   package loop, so the deferral does not weaken publish-order or packaged-core
+   verification. Gate P restores the submodule `Cargo.lock` after packaging so
+   validation leaves the pinned gitlink clean.
+   After installing the completed patch table, every Gate P Consumer Project
+   MUST discard any `Cargo.lock` embedded by `cargo package` and resolve a fresh
+   lock before building. Otherwise Cargo can retain an older registry version
+   that still satisfies a caret requirement and mark the newer staged patch
+   unused. Gate R retains registry-native lock behavior because it has no staged
+   patch table.
 2. The extracted package directories are NOT the workspace: they contain
    the normalized Cargo.toml and the packaged file set, so P-INCLUDE,
    P-META, and P-RESOLVE failures manifest exactly as they would for a
@@ -439,3 +464,28 @@ upstream — the standard pre-publish mechanism.)*
   (FC-1). Note: requested feature spelling `linux_evdev` does not
   exist — `linux_fbdev` gates both the fbdev and evdev modules
   (`platform/src/lib.rs:76-79`).
+- **2026-07-12** — SCTD-04 release amendment: Gate P and the publish chain
+  now include the first `ratatui-rlvgl` release. CI initializes the Ratatui
+  submodule; the excluded crate is versioned, packaged, staged, drift-checked,
+  and published by manifest path immediately after `rlvgl-core`. The ordered
+  release set is now 26 crates. The later PR to the Ratatui project is a
+  separate upstream action and is not a prerequisite for publishing the
+  bridge from the pinned SoftOboros contribution branch.
+- **2026-07-12** — SCTD-04 Gate P validation amendment: packaging the bridge
+  against staged `rlvgl-core` is retained at its dependency-ordered position,
+  then both its and extracted `rlvgl-core`'s `[patch.crates-io]` consumer entries
+  are deferred until the root package loop completes. This prevents the live
+  submodule/core paths and their extracted counterparts from producing an
+  ambiguous duplicate-core lockfile source. Consumer gates still receive both
+  extracted entries. The submodule lockfile is backed up and restored around
+  packaging.
+- **2026-07-12** — Gate P host-target amendment: the creator-cli and user-sim
+  harnesses locate debug binaries in either Cargo's default `target/debug`
+  layout or `target/<rustc-host>/debug` when a repository/user Cargo config
+  sets `build.target`. This makes local macOS release validation exercise the
+  same staged consumers as Linux CI without changing CI's artifact path.
+- **2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now
+  discards its pre-patch lockfile before resolution. The creator consumer had
+  retained registry `rlvgl-core 0.2.4` from the root package lock even after
+  staged `rlvgl-core 0.2.5` was installed in `[patch.crates-io]`; Cargo therefore
+  compiled the registry crate and correctly failed the provenance assertion.

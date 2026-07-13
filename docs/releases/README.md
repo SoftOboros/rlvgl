@@ -5,6 +5,8 @@ one level up at [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 ## Release notes
 
+- [v0.2.5.md](./v0.2.5.md)
+- [v0.2.5-pr.md](./v0.2.5-pr.md) — pull-request summary and release checklist
 - [v0.2.2.md](./v0.2.2.md)
 - [v0.2.0.md](./v0.2.0.md)
 - [v0.1.9.md](./v0.1.9.md)

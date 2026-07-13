@@ -61,9 +61,16 @@ impl Widget for ActionHotspot {
             return false;
         }
 
-        if matches!(event, Event::PressRelease { .. }) {
-            (self.on_tap)();
-            return true;
+        if let Event::PressRelease { x, y } = event {
+            let bounds = self.bounds;
+            if *x >= bounds.x
+                && *x < bounds.x + bounds.width
+                && *y >= bounds.y
+                && *y < bounds.y + bounds.height
+            {
+                (self.on_tap)();
+                return true;
+            }
         }
 
         false

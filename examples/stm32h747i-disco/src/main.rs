@@ -383,6 +383,88 @@ mod touch_isr {
 ))]
 use touch_isr::touch_ring_pop;
 
+/// Pointer tracking for raw FT5336 samples in the SCTD payload loop.
+#[cfg(all(
+    feature = "sctd",
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+struct SctdTouchState {
+    last: Option<(u16, u16)>,
+    last_count: u8,
+    display_width: u16,
+}
+
+/// Convert the panel's portrait touch coordinates into landscape UI events.
+#[cfg(all(
+    feature = "sctd",
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+fn sctd_touch_event(
+    state: &mut SctdTouchState,
+    sample: touch_isr::RawTouchSample,
+) -> Option<rlvgl_core::event::Event> {
+    use rlvgl_core::event::{Event, MAX_TOUCH_POINTS, TouchPoint, TouchState};
+
+    let display_width = state.display_width as i32;
+    let count = sample.count;
+    if count >= 2 {
+        let mut points = [TouchPoint::default(); MAX_TOUCH_POINTS];
+        for (index, &(id, flag, x, y)) in sample.points[..count as usize].iter().enumerate() {
+            points[index] = TouchPoint {
+                id,
+                x: y as i32,
+                y: display_width - 1 - x as i32,
+                state: match flag {
+                    0 => TouchState::Down,
+                    1 => TouchState::Up,
+                    _ => TouchState::Contact,
+                },
+            };
+        }
+        let (_, _, x, y) = sample.points[0];
+        state.last = Some((x, y));
+        state.last_count = count;
+        return Some(Event::Touch { count, points });
+    }
+
+    let touch = (count == 1).then(|| {
+        let (_, _, x, y) = sample.points[0];
+        (x, y)
+    });
+    let was_multi = state.last_count >= 2;
+    state.last_count = count;
+    let landscape = |x: u16, y: u16| (y as i32, display_width - 1 - x as i32);
+    match (touch, state.last) {
+        (Some((x, y)), Some((last_x, last_y))) => {
+            state.last = Some((x, y));
+            if was_multi {
+                let (x, y) = landscape(x, y);
+                Some(Event::PointerDown { x, y })
+            } else if (x, y) != (last_x, last_y) {
+                let (x, y) = landscape(x, y);
+                Some(Event::PointerMove { x, y })
+            } else {
+                None
+            }
+        }
+        (Some((x, y)), None) => {
+            state.last = Some((x, y));
+            let (x, y) = landscape(x, y);
+            Some(Event::PointerDown { x, y })
+        }
+        (None, Some((x, y))) => {
+            state.last = None;
+            let (x, y) = landscape(x, y);
+            Some(Event::PointerUp { x, y })
+        }
+        (None, None) => None,
+    }
+}
+
 /// TIM6 update interrupt — fires at 120 Hz for touch sampling.
 /// In FreeRTOS builds, this runs from TIM6 enable until start()
 /// disables it; touch_task takes over I2C reads after that.
@@ -522,6 +604,35 @@ mod _dsi_isr {
 ))]
 pub(crate) fn take_erif() -> bool {
     ERIF_FLAG.swap(false, core::sync::atomic::Ordering::AcqRel)
+}
+
+#[cfg(all(
+    not(feature = "c_hal"),
+    not(feature = "zephyr"),
+    not(feature = "freertos"),
+    any(target_arch = "arm", target_arch = "aarch64")
+))]
+unsafe fn enable_dsi_erif_irq(nvic: &mut cortex_m::peripheral::NVIC) {
+    unsafe {
+        // Wrapper ERIF is the sole DSI interrupt source used by the render
+        // pipeline. The ISR clears LTDCEN at scan completion and latches the
+        // timestamp consumed by the phase-locked presenter.
+        (0x5000_00C4u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_00C8u32 as *mut u32).write_volatile(0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_0408u32 as *mut u32).write_volatile(1 << 1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        (0x5000_0410u32 as *mut u32).write_volatile(0x3FFF); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        let isr0 = (0x5000_00BCu32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        if isr0 != 0 {
+            (0x5000_00D8u32 as *mut u32).write_volatile(isr0); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
+        let isr1 = (0x5000_00C0u32 as *const u32).read_volatile(); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        if isr1 != 0 {
+            (0x5000_00DCu32 as *mut u32).write_volatile(isr1); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+        }
+        cortex_m::peripheral::NVIC::unpend(stm32h7::stm32h747cm7::Interrupt::DSI);
+        cortex_m::peripheral::NVIC::unmask(stm32h7::stm32h747cm7::Interrupt::DSI);
+        nvic.set_priority(stm32h7::stm32h747cm7::Interrupt::DSI, 1);
+    }
 }
 
 /// Cycles elapsed since last ERIF (T=0 for all scheduling decisions).
@@ -795,6 +906,7 @@ struct SdramFbReader {
     width: u32,
     height: u32,
     present_count: u32,
+    rotated_landscape: bool,
 }
 
 #[cfg(all(
@@ -805,10 +917,20 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
     fn read_pixel(&self, x: i32, y: i32) -> u32 {
         let ux = x as u32;
         let uy = y as u32;
-        if ux >= self.width || uy >= self.height {
+        let (logical_width, logical_height) = if self.rotated_landscape {
+            (self.height, self.width)
+        } else {
+            (self.width, self.height)
+        };
+        if ux >= logical_width || uy >= logical_height {
             return 0;
         }
-        let offset = ((uy * self.width + ux) * 4) as usize;
+        let (physical_x, physical_y) = if self.rotated_landscape {
+            (self.width - 1 - uy, ux)
+        } else {
+            (ux, uy)
+        };
+        let offset = ((physical_y * self.width + physical_x) * 4) as usize;
         let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         unsafe { ptr.read_volatile() }
     }
@@ -816,16 +938,24 @@ impl rlvgl_playit::FramebufferReader for SdramFbReader {
     fn read_row(&self, x: i32, y: i32, width: u16, out: &mut [u32]) -> usize {
         let ux = x.max(0) as u32;
         let uy = y.max(0) as u32;
-        if uy >= self.height || ux >= self.width {
+        let logical_width = if self.rotated_landscape {
+            self.height
+        } else {
+            self.width
+        };
+        let logical_height = if self.rotated_landscape {
+            self.width
+        } else {
+            self.height
+        };
+        if uy >= logical_height || ux >= logical_width {
             return 0;
         }
-        let available = ((self.width - ux) as usize)
+        let available = ((logical_width - ux) as usize)
             .min(width as usize)
             .min(out.len());
-        for i in 0..available {
-            let offset = ((uy * self.width + ux + i as u32) * 4) as usize;
-            let ptr = (self.fb_addr as usize + offset) as *const u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            out[i] = unsafe { ptr.read_volatile() };
+        for (index, pixel) in out[..available].iter_mut().enumerate() {
+            *pixel = self.read_pixel(x + index as i32, y);
         }
         available
     }
@@ -979,7 +1109,107 @@ fn serial_hex_u32(v: u32) {
     runtime_serial::write_bytes(&out);
 }
 
+/// Two-stage allocator used by the SCTD payload.
+///
+/// Early board bring-up allocates from DTCM. Once the display has initialized
+/// SDRAM, new allocations switch to a larger arena while deallocation remains
+/// routed to the heap that owns each pointer.
+#[cfg(feature = "sctd")]
+struct SwitchingHeap {
+    primary: Heap,
+    secondary: Heap,
+    secondary_start: core::sync::atomic::AtomicUsize,
+    secondary_end: core::sync::atomic::AtomicUsize,
+    secondary_active: core::sync::atomic::AtomicBool,
+}
+
+#[cfg(feature = "sctd")]
+impl SwitchingHeap {
+    const fn empty() -> Self {
+        Self {
+            primary: Heap::empty(),
+            secondary: Heap::empty(),
+            secondary_start: core::sync::atomic::AtomicUsize::new(0),
+            secondary_end: core::sync::atomic::AtomicUsize::new(0),
+            secondary_active: core::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    unsafe fn init_primary(&self, start: usize, size: usize) {
+        unsafe { self.primary.init(start, size) };
+    }
+
+    unsafe fn init_secondary(&self, start: usize, size: usize) {
+        unsafe { self.secondary.init(start, size) };
+        self.secondary_start
+            .store(start, core::sync::atomic::Ordering::Relaxed);
+        self.secondary_end.store(
+            start.saturating_add(size),
+            core::sync::atomic::Ordering::Relaxed,
+        );
+        self.secondary_active
+            .store(true, core::sync::atomic::Ordering::Release);
+    }
+
+    fn used(&self) -> usize {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            self.secondary.used()
+        } else {
+            self.primary.used()
+        }
+    }
+
+    fn free(&self) -> usize {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            self.secondary.free()
+        } else {
+            self.primary.free()
+        }
+    }
+}
+
+#[cfg(feature = "sctd")]
+unsafe impl core::alloc::GlobalAlloc for SwitchingHeap {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        if self
+            .secondary_active
+            .load(core::sync::atomic::Ordering::Acquire)
+        {
+            unsafe { core::alloc::GlobalAlloc::alloc(&self.secondary, layout) }
+        } else {
+            unsafe { core::alloc::GlobalAlloc::alloc(&self.primary, layout) }
+        }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        let address = ptr as usize;
+        let start = self
+            .secondary_start
+            .load(core::sync::atomic::Ordering::Relaxed);
+        let end = self
+            .secondary_end
+            .load(core::sync::atomic::Ordering::Relaxed);
+        if address >= start && address < end {
+            unsafe { core::alloc::GlobalAlloc::dealloc(&self.secondary, ptr, layout) };
+        } else {
+            unsafe { core::alloc::GlobalAlloc::dealloc(&self.primary, ptr, layout) };
+        }
+    }
+}
+
+/// Global allocator backed by DTCM during boot and SDRAM for SCTD runtime data.
+#[cfg(feature = "sctd")]
+#[global_allocator]
+static ALLOC: SwitchingHeap = SwitchingHeap::empty();
+
 /// Global allocator backed by a fixed-size heap in RAM.
+#[cfg(not(feature = "sctd"))]
 #[global_allocator]
 static ALLOC: Heap = Heap::empty();
 
@@ -1464,6 +1694,9 @@ fn main() -> ! {
     // Heap must be ready before any Rust allocation (including rlvgl_app_main).
     unsafe {
         let start = addr_of_mut!(HEAP_MEM) as usize;
+        #[cfg(feature = "sctd")]
+        ALLOC.init_primary(start, HEAP_SIZE);
+        #[cfg(not(feature = "sctd"))]
         ALLOC.init(start, HEAP_SIZE);
     }
 
@@ -2013,6 +2246,18 @@ fn main() -> ! {
             #[cfg(feature = "splash")]
             Some(SPLASH_RLE),
         );
+        #[cfg(feature = "sctd")]
+        {
+            // Ratatui keeps current and previous cell grids so it can publish
+            // only changed cells. Reserve that long-lived arena after the
+            // display has initialized SDRAM and claimed both framebuffer banks.
+            const SCTD_SDRAM_HEAP_SIZE: usize = 8 * 1024 * 1024;
+            let arena = rlvgl_platform::reserve_sdram_arena(SCTD_SDRAM_HEAP_SIZE, 32)
+                .expect("SCTD SDRAM heap reservation");
+            unsafe {
+                ALLOC.init_secondary(arena as usize, SCTD_SDRAM_HEAP_SIZE);
+            }
+        }
         unsafe {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0011u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         } // post-display::new
@@ -2345,6 +2590,185 @@ fn main() -> ! {
             HalInputPin(gpiok.pk5.into_pull_up_input()),
             HalInputPin(gpiok.pk6.into_pull_up_input()),
         );
+
+        // SCTD-04 payload swap: all board bring-up above is shared with the
+        // normal DISCO demo. Only the application/controller and render loop
+        // differ, preserving the Rust PAC/HAL, ISR, DSI, LTDC and DMA2D path.
+        #[cfg(feature = "sctd")]
+        {
+            use rlvgl_core::widget::Color;
+            use rlvgl_platform::{
+                BlitRect, Blitter, BlitterRenderer, CpuBlitter, Dma2dBlitter, PixelFmt, Surface,
+                hwcore::dca::{DcaCache, DcaCacheCtx},
+            };
+
+            serial_puts("SCTD:RUST-ALL-THE-WAY-DOWN\r\n");
+            let mut controller = rlvgl_app_sctd_demo::SctdController::new(
+                rlvgl_platform::Screen::landscape(800, 480),
+            );
+            let root = controller.root();
+            let mut tap = rlvgl_platform::gesture::TapRecognizer::new(FRAME_HZ);
+            let mut touch = SctdTouchState {
+                last: None,
+                last_count: 0,
+                display_width: display.dimensions().0 as u16,
+            };
+            let mut playit: alloc::boxed::Box<rlvgl_playit::PlayitExecutor<UsartTransport, 32>> =
+                alloc::boxed::Box::new(rlvgl_playit::PlayitExecutor::new(UsartTransport));
+            let (physical_width, physical_height) = display.dimensions();
+            let mut fb_reader = SdramFbReader {
+                fb_addr: display.front_phys().raw(),
+                width: physical_width,
+                height: physical_height,
+                present_count: 0,
+                rotated_landscape: true,
+            };
+            let mut tick_count = 0u32;
+            let mut present_count = 0u32;
+            let mut dirty_frames = 2u8;
+            let mut first_present = true;
+
+            // SCTD enters before the general demo's render pipeline setup, so
+            // explicitly join the same proven ERIF/TE state machine here.
+            unsafe { enable_dsi_erif_irq(&mut cp.NVIC) };
+            ERIF_FLAG.store(false, core::sync::atomic::Ordering::Release);
+
+            loop {
+                while let Some(sample) = unsafe { touch_ring_pop() } {
+                    if let Some(raw_event) = sctd_touch_event(&mut touch, sample) {
+                        if let Some(event) = tap.process(&raw_event) {
+                            controller.dispatch_event(&event);
+                            dirty_frames = 2;
+                        }
+                    }
+                }
+
+                if cp.SYST.has_wrapped() {
+                    tick_count = tick_count.wrapping_add(1);
+                    if let Some(event) = tap.tick() {
+                        controller.dispatch_event(&event);
+                        dirty_frames = 2;
+                    }
+                    if dirty_frames == 0 {
+                        let hero_generation = controller.hero_generation();
+                        let native_generation = controller.native_generation();
+                        controller.dispatch_event(&Event::Tick);
+                        let view_changed = controller.hero_generation() != hero_generation
+                            || controller.native_generation() != native_generation;
+                        if view_changed {
+                            dirty_frames = 2;
+                        }
+                    }
+                }
+
+                if let Some(event) = button_input.poll() {
+                    controller.dispatch_event(&event);
+                    dirty_frames = 2;
+                }
+                if let Some(event) = joystick.poll() {
+                    controller.dispatch_event(&event);
+                    dirty_frames = 2;
+                }
+
+                fb_reader.fb_addr = display.front_phys().raw();
+                fb_reader.present_count = present_count;
+                let status = rlvgl_playit::StatusData {
+                    tick_count,
+                    present_count,
+                };
+                let mut playit_dispatched = false;
+                playit.poll_with_callback(
+                    &mut root.borrow_mut(),
+                    &status,
+                    Some(&fb_reader),
+                    &mut rlvgl_playit::executor::NullPipeline,
+                    |_| {},
+                    |event| {
+                        controller.handle_event(event);
+                        playit_dispatched = true;
+                    },
+                );
+                if playit_dispatched {
+                    dirty_frames = 2;
+                }
+
+                if dirty_frames > 0 {
+                    if !first_present {
+                        // The DSI ISR clears LTDCEN and latches ERIF only after
+                        // the current scan has stopped reading the front bank.
+                        while !ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
+                            cortex_m::asm::wfi();
+                        }
+                    }
+                    let back = display.back_phys().raw();
+                    let framebuffer_bytes = (physical_width * physical_height * 4) as usize;
+                    let stride = (physical_width * 4) as usize;
+                    let framebuffer = unsafe {
+                        core::slice::from_raw_parts_mut(back as *mut u8, framebuffer_bytes)
+                    };
+                    let mut surface = Surface::new(
+                        framebuffer,
+                        stride,
+                        PixelFmt::Argb8888,
+                        physical_width,
+                        physical_height,
+                    );
+                    let raw_dma2d = display.take_dma2d_raw().expect("DMA2D ownership");
+                    let mut dma2d = Dma2dBlitter::new(raw_dma2d);
+                    dma2d.fill(
+                        &mut surface,
+                        BlitRect {
+                            x: 0,
+                            y: 0,
+                            w: physical_width,
+                            h: physical_height,
+                        },
+                        Color(13, 19, 30, 255).to_argb8888(),
+                    );
+                    display.return_dma2d_raw(dma2d.into_inner());
+                    {
+                        // DMA2D updated cacheable WT SDRAM behind the CPU's
+                        // cache. Drop stale lines before alpha/blend code reads
+                        // destination pixels from the freshly cleared buffer.
+                        let mut cache_ctx = DcaCacheCtx::new(&mut cp.SCB);
+                        cache_ctx.cache_mut().barrier();
+                        cache_ctx
+                            .cache_mut()
+                            .invalidate(back as usize, framebuffer_bytes);
+                    }
+                    {
+                        // Small cell and bitmap-glyph spans are substantially
+                        // faster as direct CPU writes than as one blocking
+                        // DMA2D transaction per span. DMA2D owns the large
+                        // frame clear above; Rust rasterization owns the tree.
+                        let mut cpu = CpuBlitter;
+                        let mut blit_renderer: BlitterRenderer<'_, CpuBlitter, 64> =
+                            BlitterRenderer::new(&mut cpu, surface);
+                        let mut renderer = rlvgl_platform::blit::RotatedRenderer::new(
+                            &mut blit_renderer,
+                            physical_width,
+                        );
+                        root.borrow().draw(&mut renderer);
+                    }
+                    if !first_present {
+                        const PRESENT_HOLDOFF: u32 = 6_000_000;
+                        while cycles_since_erif() < PRESENT_HOLDOFF {
+                            core::hint::spin_loop();
+                        }
+                        if !take_erif() {
+                            continue;
+                        }
+                    }
+                    display.present();
+                    ERIF_FLAG.store(false, core::sync::atomic::Ordering::Release);
+                    first_present = false;
+                    present_count = present_count.wrapping_add(1);
+                    dirty_frames -= 1;
+                } else {
+                    cortex_m::asm::wfi();
+                }
+            }
+        }
 
         serial_puts("PRE-TREE\r\n");
         // Build a minimal root widget tree. The demo app tree has a white
@@ -2690,7 +3114,7 @@ fn main() -> ! {
         unsafe {
             (0x3800_0664u32 as *mut u32).write_volatile(0xA0A0_0001); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
         }
-        // ── Icon strip (right edge, 3 slots) + wings ────────────────────
+        // ── Icon strip (right edge, 4 slots) + wings ────────────────────
         // Shared crawl toggle flag — set by info wing favicon callback.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         let crawl_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
@@ -2701,14 +3125,15 @@ fn main() -> ! {
         // Audio scope toggle flag — set by settings wing audio icon callback.
         #[cfg(feature = "audio")]
         let scope_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
+        let stop_effects_flag: Rc<core::cell::Cell<bool>> = Rc::new(core::cell::Cell::new(false));
 
         // Wings are created first so icon strip callbacks can reference them.
         let settings_wing = {
             use rlvgl_app_disco_demo::wing::Wing;
             Rc::new(RefCell::new(Wing::new(&[
                 (include_bytes!("../assets/icons/48/audio48.rle"), true),
-                (include_bytes!("../assets/icons/48/camera48.rle"), false),
-                (include_bytes!("../assets/icons/48/monitor48.rle"), false),
+                (include_bytes!("../assets/icons/48/camera48.rle"), true),
+                (include_bytes!("../assets/icons/48/monitor48.rle"), true),
                 (include_bytes!("../assets/icons/48/globe48.rle"), true),
                 (include_bytes!("../assets/icons/48/bug48.rle"), true),
             ])))
@@ -2758,32 +3183,21 @@ fn main() -> ! {
 
         // Wire settings wing callbacks
         {
-            // Audio (slot 0): toggle audio scope
-            #[cfg(feature = "audio")]
-            {
-                let sf = scope_flag.clone();
-                settings_wing.borrow_mut().slots_mut()[0]
+            // Setup items should stay in setup. The audio scope is available
+            // from the Info wing; all Setup wing entries open the config panel.
+            for index in 0..5 {
+                let cm = config_menu.clone();
+                settings_wing.borrow_mut().slots_mut()[index]
                     .as_mut()
                     .unwrap()
-                    .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                    sf.set(true);
+                    .on_tap = Some(alloc::boxed::Box::new(move |slot| {
+                    unsafe {
+                        let p = 0x3800_06B4u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                        p.write_volatile(0x5E00_0000 | slot as u32);
+                    }
+                    cm.borrow_mut().toggle_visible();
                 }));
             }
-            // Globe (slot 3) + Bug (slot 4): both toggle the config menu
-            let cm1 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[3]
-                .as_mut()
-                .unwrap()
-                .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                cm1.borrow_mut().toggle_visible();
-            }));
-            let cm2 = config_menu.clone();
-            settings_wing.borrow_mut().slots_mut()[4]
-                .as_mut()
-                .unwrap()
-                .on_tap = Some(alloc::boxed::Box::new(move |_| {
-                cm2.borrow_mut().toggle_visible();
-            }));
         }
 
         // ADC3 temp init deferred — calibration hangs without further debug
@@ -2830,6 +3244,15 @@ fn main() -> ! {
             ))
         };
 
+        let media_player_skin = Rc::new(RefCell::new(rlvgl_app_disco_demo::MediaPlayerSkin::new(
+            rlvgl_core::widget::Rect {
+                x: 0,
+                y: 0,
+                width: ICON_STRIP_X,
+                height: 480,
+            },
+        )));
+
         // Wire info wing callbacks
         // Slot 0 (cpu): toggle chip info panel
         {
@@ -2838,6 +3261,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0000);
+                }
                 cip.borrow_mut().toggle();
             }));
         }
@@ -2848,6 +3275,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0001);
+                }
                 lsp.borrow_mut().toggle();
             }));
         }
@@ -2859,6 +3290,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0002);
+                }
                 cf.set(true);
             }));
         }
@@ -2870,6 +3305,10 @@ fn main() -> ! {
                 .as_mut()
                 .unwrap()
                 .on_tap = Some(alloc::boxed::Box::new(move |_| {
+                unsafe {
+                    let p = 0x3800_06B0u32 as *mut u32; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
+                    p.write_volatile(0x1F00_0003);
+                }
                 sf.set(true);
             }));
         }
@@ -2916,9 +3355,10 @@ fn main() -> ! {
                 ICON_STRIP_GAP,
             );
 
-            let icons: [(&[u8], bool); 3] = [
+            let icons: [(&[u8], bool); 4] = [
                 (include_bytes!("../assets/icons/settings.rle"), true),
                 (include_bytes!("../assets/icons/file.rle"), true),
+                (include_bytes!("../assets/icons/48/play48.rle"), true),
                 (include_bytes!("../assets/icons/info.rle"), true),
             ];
 
@@ -2936,8 +3376,14 @@ fn main() -> ! {
             // Settings tap (slot 0) → close info wing, toggle settings wing
             let sw = settings_wing.clone();
             let iw = info_wing.clone();
+            let fbp = file_browser_panel.clone();
+            let mp = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[0].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp.borrow_mut().set_visible(false);
+                    fbp.borrow_mut().hide();
                     iw.borrow_mut().close();
                     let vis = sw.borrow_mut().toggle_visible();
                     unsafe {
@@ -2948,16 +3394,46 @@ fn main() -> ! {
 
             // File tap (slot 1) → toggle file browser panel
             let fbp = file_browser_panel.clone();
+            let sw = settings_wing.clone();
+            let iw = info_wing.clone();
+            let mp = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[1].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp.borrow_mut().set_visible(false);
+                    sw.borrow_mut().close();
+                    iw.borrow_mut().close();
                     fbp.borrow_mut().toggle();
                 }));
 
-            // Info tap (slot 2) → close settings wing, toggle info wing
+            // Play tap (slot 2) → show/hide the Bolero media-player skin.
             let sw2 = settings_wing.clone();
             let iw2 = info_wing.clone();
+            let fbp2 = file_browser_panel.clone();
+            let mp2 = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
             strip.slots_mut()[2].as_mut().unwrap().on_tap =
                 Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    sw2.borrow_mut().close();
+                    iw2.borrow_mut().close();
+                    fbp2.borrow_mut().hide();
+                    let next = !mp2.borrow().is_visible();
+                    mp2.borrow_mut().set_visible(next);
+                }));
+
+            // Info tap (slot 3) → close settings wing, toggle info wing
+            let sw2 = settings_wing.clone();
+            let iw2 = info_wing.clone();
+            let fbp3 = file_browser_panel.clone();
+            let mp3 = media_player_skin.clone();
+            let stop = stop_effects_flag.clone();
+            strip.slots_mut()[3].as_mut().unwrap().on_tap =
+                Some(alloc::boxed::Box::new(move |_| {
+                    stop.set(true);
+                    mp3.borrow_mut().set_visible(false);
+                    fbp3.borrow_mut().hide();
                     sw2.borrow_mut().close();
                     let vis = iw2.borrow_mut().toggle_visible();
                     unsafe {
@@ -2998,6 +3474,11 @@ fn main() -> ! {
             });
             root.borrow_mut().children.push(rlvgl_core::WidgetNode {
                 widget: info_wing.clone(),
+                children: alloc::vec![],
+                tag: None,
+            });
+            root.borrow_mut().children.push(rlvgl_core::WidgetNode {
+                widget: media_player_skin.clone(),
                 children: alloc::vec![],
                 tag: None,
             });
@@ -3172,6 +3653,7 @@ fn main() -> ! {
             width: display.dimensions().0,
             height: display.dimensions().1,
             present_count: 0,
+            rotated_landscape: false,
         };
         let mut present_count: u32 = 0;
 
@@ -3214,11 +3696,22 @@ fn main() -> ! {
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
         #[allow(unused_imports)]
         use crate::crawl_buffers::LegacyCrawlApi;
-        // Bare-metal runs the NT35510 in adapted-command portrait mode,
-        // so the framebuffer is 480 × 800. Zephyr's video-mode path
-        // passes (800, 480) to the same builder.
+        // Bare-metal's desktop coordinates are landscape (800 x 480),
+        // while the NT35510 adapted-command scanout is portrait
+        // (480 x 800). Render the widgets-side crawl in desktop space;
+        // the paint path below rotates the finished scratch frame into
+        // the physical framebuffer.
         #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
-        let mut star_crawl = crawl_buffers::build_star_crawl_window(480, 800, FRAME_HZ);
+        let mut star_crawl = {
+            // The current bare-metal widgets path renders a full
+            // landscape scratch frame, then CPU-rotates it into the
+            // portrait scanout buffer. Measured frame time is about
+            // 200 ms, so the crawl's frame-based scroll accumulator
+            // must use the effective crawl cadence, not the 30 Hz UI
+            // SysTick cadence, to preserve wall-clock speed.
+            const CRAWL_FRAME_HZ: u32 = 5;
+            crawl_buffers::build_star_crawl_window(800, 480, CRAWL_FRAME_HZ)
+        };
 
         // Audio read cursor: tracks position in SDRAM PCM buffer.
         // Pre-fill consumed the first 2 * buf_size bytes.
@@ -3707,7 +4200,7 @@ fn main() -> ! {
                         }
                         (AppFocus::InfoWing(_), Key::ArrowLeft | Key::ArrowRight) => {
                             info_wing.borrow_mut().close();
-                            app_focus = AppFocus::Main(2);
+                            app_focus = AppFocus::Main(3);
                         }
                         (AppFocus::Main(idx), Key::Enter) => {
                             // Synthesize PressRelease at icon strip slot's center.
@@ -3745,7 +4238,7 @@ fn main() -> ! {
                             let press = Event::PressRelease { x: cx, y: cy };
                             root.borrow_mut().dispatch_event(&press);
                             if !info_wing.borrow().is_visible() {
-                                app_focus = AppFocus::Main(2);
+                                app_focus = AppFocus::Main(3);
                             }
                         }
                         _ => {}
@@ -3943,6 +4436,23 @@ fn main() -> ! {
                         dirty_frames = dirty_frames.max(2);
                     }
                 }
+                // Track media player visibility
+                {
+                    let vis = media_player_skin.borrow().is_visible();
+                    static mut MP_WAS_VIS: bool = false; // rlvgl-discipline: allow(static_mut)
+                    if vis != unsafe { MP_WAS_VIS } {
+                        dirty_frames = 4;
+                        if !vis {
+                            compositor.mark_pristine_restore(media_player_skin.borrow().bounds());
+                        }
+                        unsafe {
+                            MP_WAS_VIS = vis;
+                        }
+                    }
+                    if vis {
+                        dirty_frames = dirty_frames.max(2);
+                    }
+                }
                 // Live stats refresh (~2 Hz) — skip first frame after becoming visible
                 {
                     let lsp_now = live_stats_panel.borrow().is_visible();
@@ -4017,6 +4527,36 @@ fn main() -> ! {
                 // Keep rendering while restores are pending
                 if compositor.has_pending() {
                     dirty_frames = dirty_frames.max(2);
+                }
+
+                // ── Full-screen effect stop latch ───────────────────────
+                if stop_effects_flag.get() {
+                    stop_effects_flag.set(false);
+                    let mut stopped = false;
+                    #[cfg(all(
+                        feature = "dma2d",
+                        any(target_arch = "arm", target_arch = "aarch64")
+                    ))]
+                    if star_crawl.is_active() {
+                        star_crawl.deactivate();
+                        stopped = true;
+                    }
+                    #[cfg(feature = "audio")]
+                    if audio_scope.is_active() {
+                        audio_scope.deactivate();
+                        mic_capture.stop();
+                        stopped = true;
+                    }
+                    if stopped {
+                        let (cw, ch) = display.dimensions();
+                        compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                            x: 0,
+                            y: 0,
+                            width: ch as i32,
+                            height: cw as i32,
+                        });
+                        dirty_frames = 4;
+                    }
                 }
 
                 // ── Star crawl toggle + render override ─────────────────
@@ -4348,29 +4888,19 @@ fn main() -> ! {
                         if let Some(raw) = display.take_dma2d_raw() {
                             let mut blitter = rlvgl_platform::Dma2dBlitter::new(raw);
                             blitter.enable_tc_interrupt();
-                            let back_bytes = unsafe {
-                                core::slice::from_raw_parts_mut(
-                                    back as *mut u8,
-                                    (w as usize) * (h as usize) * 4,
-                                )
-                            };
-                            let mut dst = rlvgl_platform::Surface::new(
-                                back_bytes,
-                                w as usize * 4,
-                                rlvgl_platform::PixelFmt::Argb8888,
-                                w,
-                                h,
-                            );
+                            let mut dst = crate::crawl_buffers::frame_scratch_surface(h, w);
                             let painted = star_crawl.paint_frame(&mut blitter, &mut dst);
                             display.return_dma2d_raw(blitter.into_inner());
                             let _ = sync; // retained for future cooperative path
-                            if painted {
-                                frame_ready = true;
-                            } else {
-                                render_active = false;
-                            }
                             if !star_crawl.is_active() {
-                                render_active = false;
+                                // Completion can coincide with a painted
+                                // terminal frame. Do not present that frame
+                                // and then wait for a new ERIF; adapted-cmd
+                                // mode may have no scan in flight. Keep the
+                                // current ERIF window and immediately run the
+                                // normal restore render on the next loop.
+                                render_active = true;
+                                frame_ready = false;
                                 serial_puts("CRAWL:done\r\n");
                                 let (w, h) = display.dimensions();
                                 compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
@@ -4380,6 +4910,15 @@ fn main() -> ! {
                                     height: h as i32,
                                 });
                                 dirty_frames = 4;
+                            } else if painted {
+                                crate::crawl_buffers::rotate_frame_to_portrait(
+                                    &dst,
+                                    back as *mut u8,
+                                    w,
+                                );
+                                frame_ready = true;
+                            } else {
+                                render_active = false;
                             }
                         }
                         let _ = keep_rendering; // single-blocking paint: no cooperative yield
@@ -4543,9 +5082,12 @@ fn main() -> ! {
             // before TE+1 (~19ms after ERIF). Ensures every frame
             // catches the same TE slot → constant frame period.
             const PRESENT_HOLDOFF: u32 = 6_000_000; // 15ms at 400MHz
-            if buffer_ready && cycles_since_erif() >= PRESENT_HOLDOFF && take_erif() {
+            let first_present = present_count == 0;
+            if buffer_ready
+                && (first_present || (cycles_since_erif() >= PRESENT_HOLDOFF && take_erif()))
+            {
                 // Update ERIF-to-ERIF period estimate (EMA, α=1/8).
-                {
+                if !first_present {
                     let now_cyc = ERIF_CYCCNT.load(core::sync::atomic::Ordering::Acquire);
                     let delta = now_cyc.wrapping_sub(prev_erif_cyc);
                     // Sanity: 8ms..80ms at 400MHz (3.2M..32M cycles)
@@ -4586,6 +5128,17 @@ fn main() -> ! {
                     ))]
                     if crawl_running {
                         star_crawl.advance_scroll();
+                        if !star_crawl.is_active() {
+                            serial_puts("CRAWL:done\r\n");
+                            let (cw, ch) = display.dimensions();
+                            compositor.mark_pristine_restore(rlvgl_core::widget::Rect {
+                                x: 0,
+                                y: 0,
+                                width: ch as i32,
+                                height: cw as i32,
+                            });
+                            dirty_frames = 4;
+                        }
                     }
                     render_active = true;
                 } else if dirty_frames > 0 {
@@ -4600,10 +5153,10 @@ fn main() -> ! {
 
             // ── Pipeline stage: GATE RENDER ON ERIF ──────────────────────
             // Start rendering only after LTDC scan completes (ERIF set).
-            // IMPORTANT: Only consume ERIF when there's a pending render.
-            // In adapted command mode, ERIF fires only after present().
-            // Consuming it when nothing is pending creates a deadlock:
-            // no render → no present → no ERIF → no render.
+            // Leave ERIF latched for the present stage. Adapted command
+            // mode produces one ERIF per present; if render consumes it,
+            // the completed back buffer waits forever for a second ERIF
+            // that cannot arrive until the next present.
             if !render_active && !buffer_ready {
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
@@ -4618,7 +5171,7 @@ fn main() -> ! {
                 let scope_running = false;
 
                 let wants_render = crawl_running || scope_running || normal_render_pending;
-                if wants_render && take_erif() {
+                if wants_render && ERIF_FLAG.load(core::sync::atomic::Ordering::Acquire) {
                     render_active = true;
                     if normal_render_pending {
                         normal_render_pending = false;

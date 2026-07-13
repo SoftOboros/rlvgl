@@ -46,6 +46,7 @@ Build targets:
 | Platform | Build | Flash |
 |----------|-------|-------|
 | Bare-metal | `make build-disco` | `make flash-disco` |
+| SCTD Ratatui hero | `RUSTFLAGS="-C target-cpu=cortex-m7" cargo build --target thumbv7em-none-eabihf -p rlvgl-example-disco --bin rlvgl-stm32h747i-sctd --features cm7,sctd,dma2d` | `probe-rs download --chip STM32H747XIHx target/thumbv7em-none-eabihf/debug/rlvgl-stm32h747i-sctd && probe-rs reset --chip STM32H747XIHx` |
 | FreeRTOS | `make build-disco-freertos` | `make flash-disco-freertos` |
 | Zephyr (video) | `make zephyr-disco` | `make zephyr-disco-flash` |
 | Zephyr (ACM) | `make zephyr-disco-acm` | `make zephyr-disco-flash` |

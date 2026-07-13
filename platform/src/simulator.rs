@@ -220,11 +220,11 @@ impl WgpuState {
         let required = (surface_w * surface_h * 4) as usize;
         if self.blit_buf.len() != required {
             self.blit_buf.resize(required, 0);
-            for px in self.blit_buf.chunks_exact_mut(4) {
+            for px in self.blit_buf.as_chunks_mut::<4>().0 {
                 px[3] = 0xff;
             }
         } else {
-            for px in self.blit_buf.chunks_exact_mut(4) {
+            for px in self.blit_buf.as_chunks_mut::<4>().0 {
                 px[0] = 0;
                 px[1] = 0;
                 px[2] = 0;
@@ -249,7 +249,7 @@ impl WgpuState {
         // byte order; quantize through (R, G, B) and write back. For
         // ColorFormat::Argb8888 this is a no-op so we skip the loop.
         if self.color_format != ColorFormat::Argb8888 {
-            for px in self.blit_buf.chunks_exact_mut(4) {
+            for px in self.blit_buf.as_chunks_mut::<4>().0 {
                 let (qr, qg, qb) = self.color_format.quantize(px[2], px[1], px[0]);
                 px[0] = qb;
                 px[1] = qg;
@@ -267,7 +267,7 @@ impl WgpuState {
                 Cow::Borrowed(&self.blit_buf)
             }
             wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => {
-                for px in self.blit_buf.chunks_exact_mut(4) {
+                for px in self.blit_buf.as_chunks_mut::<4>().0 {
                     px.swap(0, 2);
                 }
                 Cow::Borrowed(&self.blit_buf)
@@ -670,14 +670,14 @@ impl WgpuDisplay {
         let mut frame = vec![0u8; width * height * 4];
         frame_callback(&mut frame);
         if color_format != ColorFormat::Argb8888 {
-            for px in frame.chunks_exact_mut(4) {
+            for px in frame.as_chunks_mut::<4>().0 {
                 let (qr, qg, qb) = color_format.quantize(px[2], px[1], px[0]);
                 px[0] = qb;
                 px[1] = qg;
                 px[2] = qr;
             }
         }
-        for px in frame.chunks_exact_mut(4) {
+        for px in frame.as_chunks_mut::<4>().0 {
             px.swap(0, 2);
         }
         save_buffer(path, &frame, width as u32, height as u32, ColorType::Rgba8)

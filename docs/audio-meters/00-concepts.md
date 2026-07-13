@@ -4,7 +4,7 @@ Load-bearing: this doc freezes the vocabulary, enums, JSON schema,
 and source-of-truth map for all subsequent AM-NN phases.
 -->
 
-**[Index](README.md) · [Next → AM-01 core math](01-core-math.md)**
+**[Index](README.md) · [Next → AM-03 scales](03-scales.md)**
 
 # AM-00 — Audio Meters Concepts
 

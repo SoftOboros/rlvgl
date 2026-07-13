@@ -41,12 +41,13 @@ use rlvgl_widgets::label::Label;
 
 /// rlvgl-target emit-shape version. Bumping is Specification-Required
 /// (see `docs/qt-support/04b-properties-bindings.md` §11).
-pub const QT_EMIT_VERSION: u32 = 13;
+pub const QT_EMIT_VERSION: u32 = 23;
 
 /// `qt-ir` schema version this module was generated from.
 pub const QT_IR_VERSION: u32 = 2;
 
 /// Source `.qml` file path as recorded at emit time.
+#[rustfmt::skip]
 pub const QT_SOURCE: &str = "tests/fixtures/qt/counter.qml";
 
 /// State threaded through every helper. One field per
@@ -75,6 +76,29 @@ impl LabelBinding {
     }
 }
 
+struct BindingSink<'a, T> {
+    values: &'a mut Vec<T>,
+}
+
+impl<'a, T> BindingSink<'a, T> {
+    fn new(values: &'a mut Vec<T>) -> Self {
+        Self { values }
+    }
+
+    fn push(&mut self, value: T) {
+        self.values.push(value);
+    }
+}
+
+/// Widget tree, screen state, and reactive label bindings returned
+/// by [`build_screen`].
+#[rustfmt::skip]
+pub type BuiltScreen = (
+    WidgetNode,
+    Rc<RefCell<ScreenState>>,
+    Vec<LabelBinding>,
+);
+
 /// Build the screen widget tree at `bounds` and return it
 /// alongside the `ScreenState` handle (QT-04b) and the
 /// `Vec<LabelBinding>` of reactive bindings (QT-04e §3).
@@ -83,12 +107,13 @@ impl LabelBinding {
 #[rustfmt::skip]
 pub fn build_screen(
     bounds: Rect,
-) -> (WidgetNode, Rc<RefCell<ScreenState>>, Vec<LabelBinding>) {
+) -> BuiltScreen {
     let state = Rc::new(RefCell::new(ScreenState {
         count: 0,
     }));
     let mut label_bindings: Vec<LabelBinding> = Vec::new();
-    let node = build_root(bounds, Rc::clone(&state), &mut label_bindings);
+    let mut binding_sink = BindingSink::new(&mut label_bindings);
+    let node = build_root(bounds, Rc::clone(&state), &mut binding_sink);
     (node, state, label_bindings)
 }
 
@@ -107,9 +132,10 @@ pub fn refresh_bindings(state: &Rc<RefCell<ScreenState>>, bindings: &[LabelBindi
 fn build_root(
     bounds: Rect,
     state: Rc<RefCell<ScreenState>>,
-    label_bindings: &mut Vec<LabelBinding>,
+    label_bindings: &mut BindingSink<'_, LabelBinding>,
 ) -> WidgetNode {
     let mut button = Button::new("Press me", bounds);
+    button.style_mut().bg_color = Color(0x00, 0x00, 0x00, 0x00);
     {
         let state = Rc::clone(&state);
         button.set_on_click(move |_b| {
@@ -119,10 +145,9 @@ fn build_root(
         });
     }
     let widget: Rc<RefCell<dyn Widget>> = Rc::new(RefCell::new(button));
-    let node = WidgetNode {
+    WidgetNode {
         widget,
         children: Vec::new(),
         tag: Some("root"),
-    };
-    node
+    }
 }

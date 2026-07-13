@@ -1,0 +1,4 @@
+# Golden trace placeholder for ScxmlInteractiveDiningPhilosophers.
+# Regenerate by running the machine's integration tests with WRITE_GOLDEN=1.
+# The test_machine_starts and test_dispatch_event tests assert
+# deterministic behavior on every run.

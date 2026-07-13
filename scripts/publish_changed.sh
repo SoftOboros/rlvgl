@@ -27,6 +27,7 @@ ordered_crates=(
   disco-assets
   rlvgl-api
   rlvgl-core
+  ratatui-rlvgl
   rlvgl-decomp
   rlvgl-i18n
   rlvgl-playit
@@ -50,10 +51,11 @@ BASE=${1:-origin/main}
 DRY_RUN=${DRY_RUN:-0}
 INDEX_WAIT_SECONDS=${INDEX_WAIT_SECONDS:-30}
 METADATA_JSON=$(mktemp)
+RATATUI_METADATA_JSON=$(mktemp)
 VERSIONS_TSV=$(mktemp)
 
 cleanup() {
-  rm -f "$METADATA_JSON" "$VERSIONS_TSV"
+  rm -f "$METADATA_JSON" "$RATATUI_METADATA_JSON" "$VERSIONS_TSV"
 }
 
 trap cleanup EXIT
@@ -178,6 +180,13 @@ HEAD_SHA=$(git rev-parse HEAD)
 BASE_DESC=$(git describe --tags --always "$BASE_SHA" 2>/dev/null || echo "$BASE_SHA")
 HEAD_DESC=$(git describe --tags --always "$HEAD_SHA" 2>/dev/null || echo "$HEAD_SHA")
 DIFF_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+if [[ "$DRY_RUN" == "1" ]]; then
+  WORKTREE_FILES=$(
+    git diff --name-only "$HEAD_SHA"
+    git ls-files --others --exclude-standard
+  )
+  DIFF_FILES=$(printf '%s\n%s\n' "$DIFF_FILES" "$WORKTREE_FILES" | sed '/^$/d' | sort -u)
+fi
 
 cargo metadata --no-deps --format-version 1 >"$METADATA_JSON"
 python3 - "$METADATA_JSON" >"$VERSIONS_TSV" <<'PY'
@@ -191,9 +200,33 @@ for package in metadata["packages"]:
     print(f"{package['name']}\t{package['version']}")
 PY
 
+RATATUI_RLVGL_MANIFEST="vendor/ratatui/ratatui-rlvgl/Cargo.toml"
+if [[ ! -f "$RATATUI_RLVGL_MANIFEST" ]]; then
+  echo "Missing $RATATUI_RLVGL_MANIFEST; initialize the Ratatui submodule." >&2
+  exit 1
+fi
+cargo metadata --no-deps --format-version 1 \
+  --manifest-path "$RATATUI_RLVGL_MANIFEST" >"$RATATUI_METADATA_JSON"
+python3 - "$RATATUI_METADATA_JSON" >>"$VERSIONS_TSV" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    metadata = json.load(handle)
+
+package = next(
+    package for package in metadata["packages"]
+    if package["name"] == "ratatui-rlvgl"
+)
+print(f"{package['name']}\t{package['version']}")
+PY
+
 echo "Publish diff:"
 echo "  base: $BASE_SHA ($BASE_DESC)"
 echo "  head: $HEAD_SHA ($HEAD_DESC)"
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "  worktree: staged, unstaged, and untracked files included"
+fi
 
 if [[ -z "$DIFF_FILES" ]]; then
   echo "No files changed between base and head."
@@ -218,6 +251,9 @@ if path_changed '^api/'; then
 fi
 if path_changed '^core/'; then
   append_unique "rlvgl-core"
+fi
+if path_changed '^vendor/ratatui$'; then
+  append_unique "ratatui-rlvgl"
 fi
 if path_changed '^rlvgl-decomp/'; then
   append_unique "rlvgl-decomp"
@@ -315,7 +351,10 @@ for crate in "${changed[@]}"; do
     sleep "$INDEX_WAIT_SECONDS"
   fi
   echo "Publishing $crate v$version"
-  if [[ "$crate" == "rlvgl-chips-stm" ]]; then
+  if [[ "$crate" == "ratatui-rlvgl" ]]; then
+    publish_crate "$crate" "$version" cargo publish \
+      --manifest-path "$RATATUI_RLVGL_MANIFEST" --no-verify
+  elif [[ "$crate" == "rlvgl-chips-stm" ]]; then
     scripts/stm32_afdb_pipeline.sh
     # The packaged chip database archive is generated during publish and is
     # intentionally gitignored in-tree, so force-add it for cargo packaging.

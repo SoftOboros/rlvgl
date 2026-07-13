@@ -26,6 +26,7 @@ const TITLE_HEIGHT: i32 = 32;
 const CLOSE_SIZE: i32 = 40;
 const ROW_HEIGHT: i32 = 30;
 const CLEAR_FRAMES: u8 = 3;
+const RIGHT_COMMAND_STRIP_X: i32 = 720;
 
 // ── Colors ────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,9 @@ impl Widget for FileBrowserPanel {
 
             // Tap outside panel: close
             if !Self::inside(self.bounds, *x, *y) {
+                if *x >= RIGHT_COMMAND_STRIP_X {
+                    return false;
+                }
                 self.hide();
                 return true;
             }

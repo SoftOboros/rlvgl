@@ -32,6 +32,7 @@ fn script_lists_publishable_workspace_crates() {
         "disco-assets",
         "rlvgl-api",
         "rlvgl-core",
+        "ratatui-rlvgl",
         "rlvgl-decomp",
         "rlvgl-i18n",
         "rlvgl-playit",
@@ -66,6 +67,7 @@ fn script_orders_publish_dependencies_topologically() {
     };
 
     assert!(find("rlvgl-core") < find("rlvgl-playit"));
+    assert!(find("rlvgl-core") < find("ratatui-rlvgl"));
     assert!(find("rlvgl-core") < find("rlvgl-platform"));
     assert!(find("rlvgl-decomp") < find("rlvgl-platform"));
     assert!(find("rlvgl-playit") < find("rlvgl-platform"));

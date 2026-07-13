@@ -57,6 +57,38 @@ STM32 and related marks are trademarks of STMicroelectronics. Use here is descri
 
 ---
 
+## SCXML Tutorial Artwork and State Machines (BSD-3-Clause)
+
+**Upstream project:** Alexander Zhornyak — “SCXML Tutorial”
+
+**License:** BSD-3-Clause (see `vendor/scjson/tutorial/LICENSE` and
+`examples/apps/sctd-demo/LICENSES/SCXML-TUTORIAL-BSD-3-Clause.txt`)
+
+**Copyright:** © 2017 Alexander Zhornyak
+
+**Local paths covered by this notice:**
+- `vendor/scjson/tutorial/` — read-only upstream reference material.
+- `examples/apps/sctd-demo/assets/bolero/` — compressed artwork derived from
+  the Skoda Bolero infotainment tutorial assets.
+- `examples/apps/sctd-demo/machines/` — SCXML-derived tutorial state-machine
+  crates regenerated through the iState pipeline.
+- `examples/apps/sctd-demo/src/qt_assets.rs` and related SCTD skin code —
+  demo integration code that embeds or displays the derived artwork.
+
+**How this material is used here:**
+- Upstream PNG artwork is converted to RLE blobs for firmware embedding.
+- Upstream SCXML tutorial state charts are normalized and regenerated as Rust
+  demo fixtures.
+- The Softoboros demo integration code remains MIT-licensed; distributed SCTD
+  demo artifacts that include the tutorial artwork or derived machines are
+  therefore effectively **MIT AND BSD-3-Clause**.
+
+**Trademarks / endorsement:**
+SCXML Tutorial attribution is descriptive only and does **not** imply
+endorsement by Alexander Zhornyak.
+
+---
+
 ## Softoboros Additions / Code Generators
 
 **Projects:** rlvgl-creator, templates, and helper code  
@@ -91,6 +123,10 @@ When adding vendor-specific data:
 
 - **Top-level code:** MIT  
 - **STM-related subtrees:** BSD-3-Clause (ST) for upstream and derived data; Softoboros additions under MIT; distributed artifacts may therefore be **MIT AND BSD-3-Clause**.  
+- **SCTD demo tutorial materials:** BSD-3-Clause (Alexander Zhornyak) for
+  upstream SCXML Tutorial artwork/state-machine sources and derived demo
+  assets; Softoboros integration code under MIT; distributed SCTD artifacts may
+  therefore be **MIT AND BSD-3-Clause**.
 - **Crates to check when publishing:**  
   - `chipdb/rlvgl-chips-stm` → should include BSD-3 text and this `NOTICES.md` in the crate package.  
   - Any crate that ships generated BSP modules under [`chips/stm/bsps`](chips/stm/bsps/README.md) should do the same.
@@ -98,4 +134,3 @@ When adding vendor-specific data:
 ---
 
 > Keep this file in sync with the submodule commit and any new generated artifacts that include upstream-derived content.
-

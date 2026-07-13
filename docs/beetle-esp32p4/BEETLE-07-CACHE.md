@@ -182,7 +182,7 @@ A conforming `cache::writeback(ptr, len)` MUST:
 - [ ] (g) **HIL verification:** confirm color cycles in BEETLE-06
       acceptance gate (g) do not exhibit the "colors briefly
       visible then fade" failure mode documented in
-      [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md).
+      `project_dfr1237_dfr0550v2.md`.
 
 ## §13 Files cited
 

@@ -8,12 +8,19 @@ publish = false
 name = "rlvgl-disco-sim"
 path = "src/main.rs"
 
+# SCTD-00 §7.2 — disco-sim wrapper mounting the SCTD tutorial demo app.
+# Build with: cargo build -p rlvgl-example-disco-sim --bin rlvgl-sctd-sim
+[[bin]]
+name = "rlvgl-sctd-sim"
+path = "src/sctd_main.rs"
+
 [dependencies]
 rlvgl-core = { path = "../../core" }
 rlvgl-platform = { path = "../../platform", features = ["simulator", "fontdue"] }
 rlvgl-widgets = { path = "../../widgets" }
 rlvgl-ui = { path = "../../ui" }
 rlvgl-app-disco-demo = { path = "../apps/disco-demo" }
+rlvgl-app-sctd-demo = { path = "../apps/sctd-demo" }
 rlvgl-playit = { path = "../../playit", features = ["std"] }
 
 [dev-dependencies]

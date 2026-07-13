@@ -4,16 +4,17 @@
 //! Asserts the three invariant sets from QT-10 §7:
 //!
 //! 1. The chapter file set (QT-10 §5) — every named chapter exists,
-//!    and every existing `docs/qt-support/*.md` file (excluding
-//!    README.md) is in the named set.
-//! 2. The version-constant snapshot (QT-10 §6) — six constants
-//!    have their strict-mode-1 values.
+//!    and every digit-prefixed `docs/qt-support/*.md` chapter is in
+//!    the named set. Informative non-chapter documents are excluded.
+//! 2. The version-contract snapshot (QT-10 §6) — all six contracts
+//!    have their strict-mode-2 values, including both supported iState
+//!    linkage profiles.
 //! 3. The CLI subcommand surface (QT-10 §5) — every named
 //!    subcommand is reachable via `rlvgl-creator qt --help`.
 //!
 //! Locked by `docs/qt-support/10-release.md` §11.
 //!
-//! Bumping `QT_FAMILY_STRICT_VERSION` from 1 to 2 (or beyond)
+//! Bumping `QT_FAMILY_STRICT_VERSION` beyond 2
 //! requires updating the §5 / §6 expectations encoded here.
 
 use std::collections::BTreeSet;
@@ -21,7 +22,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// QT-10 §5: the canonical chapter file set under `docs/qt-support/`.
-/// 24 entries (incl. `10-release.md`).
+/// 29 entries (incl. `10-release.md` and the QT-05g/05h/05i/05j/05k binding chapters).
 const QT_CHAPTERS: &[&str] = &[
     "00-concepts.md",
     "02-ir-schema.md",
@@ -40,6 +41,11 @@ const QT_CHAPTERS: &[&str] = &[
     "05c-machine-bindings.md",
     "05d-emit-scjson.md",
     "05e-externals-stubs.md",
+    "05g-state-predicate-bindings.md",
+    "05h-visibility-bindings.md",
+    "05i-chained-predicate-bindings.md",
+    "05j-button-event-bindings.md",
+    "05k-external-text-bindings.md",
     "06-theme-tokens.md",
     "07-asset-handoff.md",
     "08-multi-file-cli.md",
@@ -82,10 +88,15 @@ fn qt10_chapter_set_matches_filesystem() {
         let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
             continue;
         };
-        if name == "README.md" {
+        if !name.ends_with(".md") {
             continue;
         }
-        if !name.ends_with(".md") {
+        // Chapters are digit-prefixed (`NN[a-z]?-*.md`). Non-chapter docs —
+        // `README.md`, `QT-MEDIA-PLAYER-RETROSPECTIVE.md`, future `ERRATA.md` —
+        // are not part of the QT-10 §5 chapter set and are skipped. (The
+        // retrospective is an institutional-memory artifact, not a normative
+        // chapter — see CLAUDE.md "Initiative retrospective".)
+        if !name.chars().next().is_some_and(|c| c.is_ascii_digit()) {
             continue;
         }
         actual.insert(name.to_string());
@@ -116,12 +127,12 @@ fn qt10_chapter_files_carry_change_log_marker() {
 }
 
 #[test]
-fn qt10_version_constants_match_strict_mode_1_snapshot() {
+fn qt10_version_constants_match_strict_mode_2_snapshot() {
     use rlvgl_creator_qt_test_helpers as q;
     assert_eq!(q::qt_ir_version(), 2, "QT-10 §6: QT_IR_VERSION");
     assert_eq!(
         q::qt_emit_version_rlvgl(),
-        13,
+        23,
         "QT-10 §6: QT_EMIT_VERSION_RLVGL"
     );
     assert_eq!(
@@ -135,8 +146,13 @@ fn qt10_version_constants_match_strict_mode_1_snapshot() {
         "QT-10 §6: QT_EXTERNALS_VERSION"
     );
     assert_eq!(
+        q::istate_linkage_versions(),
+        (1, 2),
+        "QT-10 §6: ISTATE_LINKAGE_VERSION profiles"
+    );
+    assert_eq!(
         q::qt_family_strict_version(),
-        1,
+        2,
         "QT-10 §6: QT_FAMILY_STRICT_VERSION"
     );
 }
@@ -167,16 +183,16 @@ fn qt10_cli_surface_exposes_all_subcommands() {
 /// Tiny helper crate-local module so the test can read the version
 /// constants without going through the binary's `qt::*` namespace
 /// (which is gated behind `cli::*` and not directly exposed to
-/// integration tests). Mirrors the QT-10 §6 strict-mode-1 snapshot
+/// integration tests). Mirrors the QT-10 §6 strict-mode-2 snapshot
 /// exactly; if the constants drift, this module's hand-pinned
 /// values cause the test to fail at the assertion site.
 mod rlvgl_creator_qt_test_helpers {
     pub fn qt_ir_version() -> u32 {
-        // QT-10 §6 strict-mode-1: QT_IR_VERSION = 2
+        // QT-10 §6 strict-mode-2: QT_IR_VERSION = 2
         2
     }
     pub fn qt_emit_version_rlvgl() -> u32 {
-        13
+        23
     }
     pub fn qt_emit_version_data() -> u32 {
         1
@@ -184,12 +200,15 @@ mod rlvgl_creator_qt_test_helpers {
     pub fn qt_externals_version() -> u32 {
         1
     }
+    pub fn istate_linkage_versions() -> (u32, u32) {
+        (1, 2)
+    }
     pub fn qt_family_strict_version() -> u32 {
-        1
+        2
     }
 }
 
-/// QT-10 §6 cross-check: the `QT_FAMILY_STRICT_VERSION = 1` constant
+/// QT-10 §6 cross-check: the `QT_FAMILY_STRICT_VERSION = 2` constant
 /// must be reachable in source. The test cannot import it directly
 /// (the `qt` module is private to the bin crate), so we read the
 /// source file to assert its presence as a literal. This catches
@@ -201,22 +220,30 @@ fn qt10_strict_version_const_pinned_in_source() {
     let content =
         std::fs::read_to_string(&src).unwrap_or_else(|e| panic!("read {} ({e})", src.display()));
     assert!(
-        content.contains("pub const QT_FAMILY_STRICT_VERSION: u32 = 1"),
-        "QT-10 §3: `QT_FAMILY_STRICT_VERSION = 1` constant not found in qt.rs. \
-         Bumping to 2+ requires updating both QT-10 §6 and this test in lock-step."
+        content.contains("pub const QT_FAMILY_STRICT_VERSION: u32 = 2"),
+        "QT-10 §3: `QT_FAMILY_STRICT_VERSION = 2` constant not found in qt.rs. \
+         Bumping beyond 2 requires updating both QT-10 §6 and this test in lock-step."
     );
-    // Also verify the strict-mode-1 values for the other QT-10 §6
+    // Also verify the strict-mode-2 values for the other QT-10 §6
     // constants are anchored in source (catches accidental drift
     // even when the constant name is unchanged).
     for (name, expected) in [
         ("QT_IR_VERSION", 2),
-        ("QT_EMIT_VERSION_RLVGL", 13),
+        ("QT_EMIT_VERSION_RLVGL", 23),
         ("QT_EMIT_VERSION_DATA", 1),
+        ("QT_EXTERNALS_VERSION", 1),
     ] {
         let needle = format!("pub const {name}: u32 = {expected}");
         assert!(
             content.contains(&needle),
-            "QT-10 §6 strict-mode-1: expected `{needle}` in qt.rs but not found"
+            "QT-10 §6 strict-mode-2: expected `{needle}` in qt.rs but not found"
+        );
+    }
+    for expected in [1, 2] {
+        let needle = format!("pub const ISTATE_LINKAGE_VERSION: u32 = {expected}");
+        assert!(
+            content.contains(&needle),
+            "QT-10 §6 strict-mode-2: expected linkage profile `{needle}` in qt.rs but not found"
         );
     }
 }

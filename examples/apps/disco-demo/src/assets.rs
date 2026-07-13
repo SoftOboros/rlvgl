@@ -42,7 +42,7 @@ pub static ICON_GLOBE_48: &[u8] = include_bytes!("../assets/icons/48/globe48.rle
 pub static ICON_BUG_48: &[u8] = include_bytes!("../assets/icons/48/bug48.rle");
 /// CPU icon used for diagnostic pages.
 pub static ICON_CPU_48: &[u8] = include_bytes!("../assets/icons/48/cpu48.rle");
-/// Play icon used for effect demos.
+/// Play icon used for the media-player view and effect demos.
 pub static ICON_PLAY_48: &[u8] = include_bytes!("../assets/icons/48/play48.rle");
 
 /// Focus highlight border color (cyan accent).

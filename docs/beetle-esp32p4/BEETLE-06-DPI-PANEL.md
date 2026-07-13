@@ -168,7 +168,7 @@ The DPI controller MUST be configured in NON-BURST sync-event mode
 with LP transitions enabled between frames (`disable_lp = false`).
 Burst mode causes the bridge to lose sync; disabling LP causes the
 flickering-horizontal-lines failure mode documented in
-[`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md).
+`project_dfr1237_dfr0550v2.md`.
 
 **Registration policy:** **Standards Action**.
 

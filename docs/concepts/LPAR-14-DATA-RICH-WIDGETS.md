@@ -15,7 +15,7 @@ Parent initiative: [LPAR-00-CONCEPTS.md](LPAR-00-CONCEPTS.md). Baseline:
 [LPAR-10-LAYOUT.md](LPAR-10-LAYOUT.md). Selection/nav widgets:
 [LPAR-13-SELECTION-NAV-WIDGETS.md](LPAR-13-SELECTION-NAV-WIDGETS.md).
 Editable text contract:
-[WID-00-CONCEPTS.md](../../../docs/concepts/WID-00-CONCEPTS.md).
+[WID-00-CONCEPTS.md](WID-00-CONCEPTS.md).
 
 ## 0. Authority Policy
 

@@ -7,6 +7,91 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.5
+
+Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.5.md).
+
+Release comparison: `refs/tags/v0.2.4..v0.2.5` (the GitHub `main` baseline at
+the start of this release line).
+
+### Added - Ratatui ↔ rlvgl, Rust all the way down (SCTD-04)
+- First release of `ratatui-rlvgl` `0.1.0`: a `no_std + alloc` Ratatui backend
+  backed by a retained cell surface, plus `RatatuiView` for hosting that
+  surface as a native rlvgl widget. The bridge uses `ratatui-core` and
+  `rlvgl-core` directly—no C LVGL, FFI, embedded-graphics, or C toolchain.
+- The Dining Philosophers demo gains an additional near-full-screen hybrid
+  window: native rounded chrome, title and graphical buttons surround a
+  Ratatui-rendered spatial table. Native and Ratatui views share the same
+  generated state machine and preserve state across open/close transitions.
+- Host simulator and STM32H747I-DISCO mounts exercise the same integration.
+  The checked-in promotional GIF shows native full → Depart → Arrive, followed
+  by the corresponding Ratatui transitions.
+
+### Added - reactive Qt emitter (QT-03c, QT-05g…05k)
+- `qt emit --target rlvgl --scxml-context <ctx>=<crate>` links the emitted
+  widget tree to an iState-generated state-machine crate and emits typed
+  `Binding`s. Five kinds: state-predicate artwork swap (QT-05g), visibility
+  (QT-05h), chained-predicate first-active-wins ladder (QT-05i), button-event
+  taps → machine events (QT-05j), and external-text consumer-resolved labels
+  (QT-05k). One caller-driven `refresh_bindings(...)` pump. Emitter output
+  version `14` → `23`; istate linkage v2 (`step`/`is_active`/`get_var`/`Value`).
+- Sibling-anchor solver + component instantiation (QT-03c).
+- Emitter v23 produces strict-Clippy-clean Rust: precedence-aware bounds,
+  snake-case Rust identifiers with original QML tags, private binding sinks,
+  direct leaf returns, conditional widget mutability, and a documented
+  `BuiltScreen` result alias.
+
+### Added - widgets
+- `Image::set_pixels` (runtime artwork swap) and `Image::set_hidden`
+  (hidden image draws as a no-op).
+
+### Added - asset pipeline
+- `rlvgl-creator compress --transparent-key`: magenta (`#FF00FF`) sentinel for
+  1-bit transparency in RGB565 RLE blobs.
+
+### Added - SCTD demo (SCTD-00…03)
+- `examples/apps/sctd-demo`: SCXML Tutorial Demo — Setup + Dining Philosophers
+  + the Škoda Bolero media player under a right-edge selector shell. DP uses the
+  interactive true-parallel machine with Auto mode. Mounted on disco-sim
+  (`rlvgl-sctd-sim`), bare-metal STM32H747I-DISCO, UEFI, and the FireBeetle-2
+  ESP32-P4 ESP-IDF hybrid.
+- Two generated machine crates (media-player normalized from `bolero.scxml`;
+  interactive dining philosophers), with SCXML `In()` predicates normalized to
+  datamodel variables.
+
+### Added - docs
+- `docs/sctd-tutorial/` — five-chapter state-chart-to-reactive-UI tutorial,
+  including browser and MCP iState generation plus host, ESP32-P4, and
+  STM32H747I-DISCO execution.
+- `docs/ratatui-tutorial/` — five-chapter retained-cell, hosted-pane, hybrid
+  composition, live-state, and Rust-only bare-metal tutorial.
+- `docs/qt-support/` QT-05g…05k binding chapters + media-player retrospective.
+- SCTD-04 architecture/execution record, deterministic capture tooling, and
+  the first Ratatui/rlvgl integration artifact.
+
+### Added - state-chart HDL handoff
+- Dining Philosophers gains generated Verilog/VHDL previews plus a Quartus
+  project handoff for the five-seat LED demonstration.
+
+### Release and publishing
+- Publish order now includes the first `ratatui-rlvgl` crate immediately after
+  `rlvgl-core`; Gate P packages the excluded submodule crate by manifest path.
+- Changed publishable crates selected from `refs/tags/v0.2.4` are released in
+  dependency order. A Ratatui upstream PR follows this rlvgl release.
+- Documentation changes bump `rlvgl-chips-silabs` and `rlvgl-chips-ti` to
+  `0.2.1`. `rlvgl-ui` moves to `0.2.6` because `0.2.5` is already published
+  and the current package raises its `rlvgl-widgets` minimum to `0.2.5`.
+- `rlvgl-core` moves to `0.2.5`; image decoders, simulator pixel loops, canvas
+  fill, SCTD asset decoding, and Qt-emitted image helpers adopt the refreshed
+  nightly Clippy idioms without changing pixel-buffer behavior.
+
+### WIP - ESP32-P4 (BEETLE-IDF)
+- `dfr0550` raw-PAC `clk_init` + `regi2c` bring-up; software star crawl.
+
+### Attribution
+- SCTD charts + artwork derived from Alexander Zhornyak's SCXML Tutorial
+  (BSD 3-Clause, © 2017); vendored assets keep their upstream license.
+
 ## v0.2.4
 
 LPAR parity substrate and widget-family release.

@@ -26,7 +26,7 @@ Three folders at the repo root drive this chapter:
 |------|------|
 | [`.vscode/launch.json`](../../.vscode/launch.json) | Five debug configurations — three hardware, two host. |
 | [`.vscode/tasks.json`](../../.vscode/tasks.json) | Six `make`-backed build tasks wired as `preLaunchTask` hooks. |
-| [`.svd/STM32H747_CM7.svd`](../../.svd/STM32H747_CM7.svd) | Peripheral register descriptions — powers VS Code's register panel during a debug session. |
+| `.svd/STM32H747_CM7.svd` | Peripheral register descriptions — powers VS Code's register panel during a debug session. This is a local/generated support file rather than a checked-in repository artifact. |
 
 ## The launch configurations
 

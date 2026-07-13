@@ -141,7 +141,7 @@ touch IC at 0x38; "bridge" is the load-bearing consumer for v0/v1).
 - [BEETLE-03 §10](BEETLE-03-I2C-BRIDGE.md#10-reconciliation-vs-adjacent-repo-primitives)
   references this entry to explain why the yaml story is closed.
 - Project memory
-  [`project_dfr1237_dfr0550v2.md`](../../../../.claude/projects/-Users-iraabbott-rlvgl/memory/project_dfr1237_dfr0550v2.md)
+  `project_dfr1237_dfr0550v2.md`
   carries an inline note about the swap that is now stale — the
   memory entry pre-dates `41c9e16` and reads as if the yaml is
   still wrong. Memory will be patched on the next session-end memory
@@ -2052,6 +2052,35 @@ panel/bridge-side behavior until a full panel power-removal test proves
 otherwise. It is no longer a valid pass/fail signal for host framebuffer
 ownership. The reliable lock/debug signals remain JTAG `phy_status`,
 `phy_rstz`, `host_mode_cfg`, and explicit firmware logs.
+
+### 2026-06-14 — same-config register diff vs the Codex IDF control (BEETLE-06)
+
+Used the Codex IDF control app above (1 lane @ 750 Mbps / 26 MHz /
+800×480 — byte-identical config to our raw-PAC build) for the clean
+register diff the earlier EK79007 (2-lane/1000) comparison could not give.
+Flashed it (locks, `phy_status=0x1529` mid-cycle over JTAG), dumped the
+full `MIPI_DSI_HOST` + `HP_SYS_CLKRST` + `PMU` blocks, and diffed against
+our 1-lane/750 dump. With the config confound removed, the ONLY
+differences are:
+
+- **Post-lock host/video config we never write** (we early-return at
+  `PllLock`, `dsi_host.rs:499`): `CLKMGR_CFG`, `MODE_CFG`, `VID_*`,
+  `PHY_IF_CFG.stop_wait`, `PHY_TMR_*`, etc. — all read 0 in ours.
+- **Operating point** (`root_clk_ctrl0/1/2`) — already ported + eliminated.
+- **PMU dbias** (`0x18` DCM_VSET, `0x28` bit14) — ours higher voltage,
+  exonerated.
+- **DPI/pixel-clock dividers** (`peri_clk_ctrl03/04`) — post-lock pixel path.
+
+**Every pre-lock register is identical** — `PWR_UP`, `PHY_RSTZ` (0x0f),
+`PHY_IF_CFG` at lock-poll time (n_lanes=0, stop_wait set post-lock in
+both), `PHY_TST_CTRL0`, all DSI clock enables + src. `PHY_TST_CTRL1`
+differs only as last-poke residue (ours = our diagnostic `0x17` readback
+`0x10317`; IDF = its final `0x18=0x84` poke `0x484`). This is the
+register-level complement to Codex's visual-control isolation: with an
+exact same-config IDF reference, there is **no pre-lock register
+difference** — independently confirming the defect is physical/analog and
+register-invisible. The Codex control's `esp_ldo`/`esp_clk_tree` source
+paths are the reference for the instrumentation phase.
 
 ### Tracking
 

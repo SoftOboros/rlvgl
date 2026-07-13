@@ -248,6 +248,9 @@ impl ChipInfoPanel {
     fn collect_info(&mut self) {
         self.line_count = 0;
 
+        // Keep this panel display-only and side-effect-free. Earlier versions
+        // sampled RCC/System Memory directly here; one bad RCC address hard
+        // faulted when the Info wing opened.
         push_line(
             &mut self.lines,
             &mut self.line_count,
@@ -261,48 +264,6 @@ impl ChipInfoPanel {
         let mut buf = [0u8; VAL_BUF_LEN];
         let n = fmt_dec(self.fps, &mut buf);
         push_line(&mut self.lines, &mut self.line_count, b"FPS", &buf[..n]);
-
-        // Flash size
-        // Flash size lives in System Memory at 0x1FF1_E880 (factory option byte).
-        let flash_kb = unsafe { (0x1FF1_E880u32 as *const u16).read_volatile() } as u32; // rlvgl-discipline: allow(raw_addr_cast)
-        let mut buf = [0u8; VAL_BUF_LEN];
-        let n = fmt_dec(flash_kb, &mut buf);
-        buf[n] = b' ';
-        buf[n + 1] = b'K';
-        buf[n + 2] = b'B';
-        push_line(
-            &mut self.lines,
-            &mut self.line_count,
-            b"Flash",
-            &buf[..n + 3],
-        );
-
-        // SYSCLK
-        // RCC_CR / PLL config reads — typed RCC handle is future work
-        // (RCC has 70+ registers across all clock domains).
-        let rcc_cr = unsafe { (0x5802_4000u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-        let sysclk_mhz = if rcc_cr & (1 << 25) != 0 {
-            let pll1divr = unsafe { (0x5802_4830u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            let pllckselr = unsafe { (0x5802_4828u32 as *const u32).read_volatile() }; // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
-            let n1 = ((pll1divr & 0x1FF) + 1) as u32;
-            let p = (((pll1divr >> 9) & 0x7F) + 1) as u32;
-            let m = ((pllckselr >> 4) & 0x3F) as u32;
-            if m > 0 && p > 0 { 25 * n1 / m / p } else { 0 }
-        } else {
-            64
-        };
-        let mut buf = [0u8; VAL_BUF_LEN];
-        let n = fmt_dec(sysclk_mhz, &mut buf);
-        buf[n] = b' ';
-        buf[n + 1] = b'M';
-        buf[n + 2] = b'H';
-        buf[n + 3] = b'z';
-        push_line(
-            &mut self.lines,
-            &mut self.line_count,
-            b"SYSCLK",
-            &buf[..n + 4],
-        );
     }
 
     #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]

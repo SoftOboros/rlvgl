@@ -19,10 +19,22 @@ It is intentionally separate from the raw-PAC Rust example in
 - continuously fill the RGB888 framebuffer with red, green, blue, white,
   and black frames.
 
-## rlvgl Hybrid (BEETLE M1)
+## rlvgl Hybrid (BEETLE-IDF track)
+
+> **Docs:** the full milestone history and conformance frame for this
+> hybrid live in [`docs/beetle-esp32p4-idf/`](../../docs/beetle-esp32p4-idf/README.md)
+> (concepts gate + chapters). Milestones to date: **M1** render bridge,
+> **M3** FT5x06 touch, **M4** shared disco-demo mount, **M5** live
+> backlight (bridge PWM + slider), and the **software star crawl**
+> (BEETLE-IDF-05) on the Info → Star Crawl item.
 
 By default this app no longer cycles solid colors — it renders an **rlvgl
-widget tree** into the DPI framebuffer. The split is deliberate:
+widget tree** into the DPI framebuffer, interactively (capacitive touch + live
+backlight). The default payload is the **SCTD interactive SCXML tutorial demo**
+(Dining Philosophers + Media Player + Interactive Philosophers with on-screen
+arrive/depart/panic/reset + pause/speed touch controls); build
+`idf.py -DRLVGL_PAYLOAD=disco build` to render the original disco-demo widget
+tree instead (SCTD-02 PCDN-02-01). The split is deliberate:
 
 - **C owns the hardware.** `main/dfr0550_idf_compare.c` keeps the full,
   known-locking IDF bring-up (PSRAM, LDO_VO3, I2C bridge wake,

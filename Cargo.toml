@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -135,12 +135,12 @@ required-features = ["creator", "creator_ui"]
 
 [dependencies]
 rlvgl-core = { version = "0.2.4", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.2.4", path = "widgets", default-features = false }
+rlvgl-widgets = { version = "0.2.5", path = "widgets", default-features = false }
 rlvgl-platform = { version = "0.2.4", path = "platform", default-features = false }
-rlvgl-ui = { version = "0.2.5", path = "ui", default-features = false }
+rlvgl-ui = { version = "0.2.6", path = "ui", default-features = false }
 rlvgl-i18n = { version = "0.2.2", path = "i18n" }
-rlvgl-app-demo = { version = "0.2.4", path = "examples/apps/demo", default-features = false, optional = true }
-rlvgl-app-disco-demo = { version = "0.2.4", path = "examples/apps/disco-demo", default-features = false, optional = true }
+rlvgl-app-demo = { version = "0.2.5", path = "examples/apps/demo", default-features = false, optional = true }
+rlvgl-app-disco-demo = { version = "0.2.5", path = "examples/apps/disco-demo", default-features = false, optional = true }
 
 [dependencies.gif]
 version = "0.13.3"
@@ -346,10 +346,10 @@ rlvgl-chips-stm = { version = "0.2.0", path = "chipdb/rlvgl-chips-stm" }
 rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
 rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }
 rlvgl-chips-nxp = { version = "0.2.0", path = "chipdb/rlvgl-chips-nxp" }
-rlvgl-chips-silabs = { version = "0.2.0", path = "chipdb/rlvgl-chips-silabs" }
+rlvgl-chips-silabs = { version = "0.2.1", path = "chipdb/rlvgl-chips-silabs" }
 rlvgl-chips-microchip = { version = "0.2.2", path = "chipdb/rlvgl-chips-microchip" }
 rlvgl-chips-renesas = { version = "0.2.0", path = "chipdb/rlvgl-chips-renesas" }
-rlvgl-chips-ti = { version = "0.2.0", path = "chipdb/rlvgl-chips-ti" }
+rlvgl-chips-ti = { version = "0.2.1", path = "chipdb/rlvgl-chips-ti" }
 rlvgl-chips-rp2040 = { version = "0.2.0", path = "chipdb/rlvgl-chips-rp2040" }
 serde_json = "1"
 anyhow = "1"
@@ -494,10 +494,13 @@ objc2 = "0.6.2"
 objc2-foundation = "0.3.1"
 objc2-app-kit = "0.3.1"
 
+[patch.crates-io]
+rlvgl-core = { path = "core" }
+
 [workspace]
 members = [
     "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
-    "examples/apps/demo", "examples/apps/disco-demo",
+    "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
     "examples/beetle-esp32p4",
@@ -511,7 +514,8 @@ members = [
 ]
 # UEFI example is excluded from workspace — it conflicts with std on host targets.
 # Build it explicitly: cargo build -p rlvgl-example-uefi-disco --target aarch64-unknown-uefi
-# vendor/scjson is a reference-only submodule (BSD-1-Clause); never linked into our build.
+# vendor/scjson is a reference-only submodule: scjson code is BSD-1-Clause;
+# the SCXML Tutorial subtree/assets are BSD-3-Clause. Never linked into our build.
 # disco-demo-states is the APP-04b vendored SM crate (mcp-statechart output);
 # excluded so its non-idiomatic codegen variant naming doesn't fail workspace clippy.
 # It is built/tested separately by tests/creator_app_round_trip_disco_sm.rs.
@@ -519,7 +523,17 @@ exclude = [
     "examples/uefi-disco",
     "examples/beetle-avr",
     "vendor/scjson",
+    "vendor/ratatui",
     "examples/stm32h747i-disco/disco-demo-states",
+    # media-player is an iState-MCP-generated crate with non-idiomatic codegen
+    # style; excluded from workspace clippy per SCTD-00 §9.4. Run tests via
+    # --manifest-path or through the sctd-demo workspace member.
+    "examples/apps/sctd-demo/machines/media-player",
+    # dining-philosophers-interactive is the SCTD-02 normalized interactive
+    # variant (iState-MCP-generated, same rationale as media-player above; it is
+    # the sole DP machine since SCTD-03 folded the faithful auto-run into Auto
+    # mode). Excluded from workspace clippy; run vectors via --manifest-path.
+    "examples/apps/sctd-demo/machines/dining-philosophers-interactive",
     # CRATES-CI-01: extracted staged packages under target/crates-ci/staged/
     # are built in place by consumers/creator-cli/smoke.sh; a packaged
     # manifest has no [workspace] table and would otherwise be claimed by

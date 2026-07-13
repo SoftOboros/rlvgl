@@ -16,6 +16,16 @@ set(RUST_TARGET  "riscv32imafc-unknown-none-elf")
 set(RUST_PROFILE "release")
 set(RUST_LIB     "${RUST_DIR}/target/${RUST_TARGET}/${RUST_PROFILE}/librlvgl_app.a")
 
+# Build-time payload selection (SCTD-02 PCDN-02-01): the default `sctd` payload
+# is the interactive SCXML tutorial demo; `idf.py -DRLVGL_PAYLOAD=disco build`
+# restores the original disco-demo widget tree.
+set(RLVGL_PAYLOAD "sctd" CACHE STRING "rlvgl IDF payload: sctd | disco")
+if(RLVGL_PAYLOAD STREQUAL "disco")
+    set(RUST_CARGO_FEATURES --no-default-features --features app_disco)
+else()
+    set(RUST_CARGO_FEATURES "")
+endif()
+
 include(ExternalProject)
 ExternalProject_Add(rlvgl_rust_build
     PREFIX            "${CMAKE_CURRENT_BINARY_DIR}/rlvgl_rust_build"
@@ -24,6 +34,7 @@ ExternalProject_Add(rlvgl_rust_build
     BUILD_COMMAND     cargo build --release
                           --target ${RUST_TARGET}
                           --manifest-path "${RUST_DIR}/Cargo.toml"
+                          ${RUST_CARGO_FEATURES}
     BUILD_ALWAYS      1   # let cargo do its own incremental dependency tracking
     BUILD_IN_SOURCE   1
     INSTALL_COMMAND   ""

@@ -1,0 +1,40 @@
+[package]
+name = "dining-philosophers-interactive"
+version = "0.1.0"
+edition = "2021"
+description = "Generated SCXML state machine crate (Interactive Dining Philosophers, SCTD-02)"
+license = "BSD-3-Clause"
+# Never published: demo fixture path-dep of the sctd-demo app, not a release
+# artifact. `publish = false` keeps it out of CRATES-CI-01's publishable-crate
+# matrix (tests/publish_changed_matrix.rs) — workspace.exclude does not suffice
+# because cargo metadata still surfaces it as a path dep.
+publish = false
+
+# Provenance:
+#   Source:    examples/apps/sctd-demo/machines/dining-philosophers-interactive/
+#              source/dining_philosophers_interactive.scxml
+#              (NORMALIZED variant; provenance to the SCTD-01 faithful DP, in turn
+#               vendor/scjson/tutorial/.../machine_dining_philosphers.flat.scxml)
+#   Generator: Softoboros iState codegen (scjson exec_ir.lower_document +
+#              istate.codegen.rust_ir_emitter.emit_rust_crate)
+#   Spec:      docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md §5
+# lib.rs + vectors/ are regenerated from the .scxml source; this Cargo.toml is
+# hand-maintained post-emit (the emitter rewrites a bare default otherwise).
+
+[lib]
+name = "dining_philosophers_interactive"
+path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = []
+no_std = []
+
+[dev-dependencies]
+
+# No [workspace] table: this crate is a path dependency of the workspace member
+# rlvgl-app-sctd-demo and is listed in the root Cargo.toml `workspace.exclude`
+# (same pattern as the dining-philosophers / media-player machine crates), so it
+# is built/tested through the parent workspace. Run its vectors via
+#   cargo test --manifest-path \
+#     examples/apps/sctd-demo/machines/dining-philosophers-interactive/Cargo.toml

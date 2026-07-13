@@ -34,12 +34,14 @@
 #![allow(dead_code)]
 
 pub mod cache;
+pub mod clk_init;
 pub mod dpi_panel;
 pub mod dsi_host;
 pub mod i2c0;
 pub mod i2c_bridge;
 pub mod ldo;
 pub mod psram;
+pub mod regi2c;
 
 /// Native panel resolution (DFR0550-V2).
 pub const H_RES: u16 = 800;

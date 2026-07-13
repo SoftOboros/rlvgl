@@ -21,7 +21,7 @@ fn generated_nested_module_lowers_namespaced_handler() {
         height: 100,
     };
     let (node, state, _bindings) = generated_nested::build_screen(bounds);
-    assert_eq!(generated_nested::QT_EMIT_VERSION, 13);
+    assert_eq!(generated_nested::QT_EMIT_VERSION, 23);
     // QT-04f's hallmark: the non-root id'd `Rectangle { id: bg }`
     // contributed `bg_alpha` to ScreenState. The default literal
     // `100` was lowered.

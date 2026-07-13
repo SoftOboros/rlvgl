@@ -1329,8 +1329,6 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         // Gesture pipeline — only dispatch action
                         // events (PressRelease/DoubleTap) to root,
                         // and only when in an interactive zone.
-                        // ActionHotspot doesn't check bounds, so
-                        // stray touches fire the first hotspot.
                         if let Some(gesture) = tap.process(evt) {
                             let (a, b) = dtap.process(&gesture);
                             for g in a.into_iter().chain(b) {
@@ -1348,10 +1346,12 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                                             core::ptr::addr_of_mut!(DIRTY_FRAMES),
                                             1,
                                         );
+                                        core::ptr::write_volatile(
+                                            core::ptr::addr_of_mut!(NEEDS_PRISTINE),
+                                            true,
+                                        );
                                     }
-                                    // Touch PressRelease dispatch disabled —
-                                    // ActionHotspot bounds bug. Use joystick.
-                                    let _ = &g;
+                                    ctrl.dispatch_event(&g);
                                 }
                             }
                         }
@@ -1371,8 +1371,12 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         if in_zone {
                             unsafe {
                                 core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                                core::ptr::write_volatile(
+                                    core::ptr::addr_of_mut!(NEEDS_PRISTINE),
+                                    true,
+                                );
                             }
-                            ctrl.root().borrow_mut().dispatch_event(&g);
+                            ctrl.dispatch_event(&g);
                         }
                     }
                 }
@@ -1386,10 +1390,12 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                     if in_zone {
                         unsafe {
                             core::ptr::write_volatile(core::ptr::addr_of_mut!(DIRTY_FRAMES), 1);
+                            core::ptr::write_volatile(
+                                core::ptr::addr_of_mut!(NEEDS_PRISTINE),
+                                true,
+                            );
                         }
-                        // Touch PressRelease dispatch disabled —
-                        // ActionHotspot bounds bug. Use joystick.
-                        let _ = &gesture;
+                        ctrl.dispatch_event(&gesture);
                     }
                 }
             }
@@ -1441,11 +1447,17 @@ unsafe extern "C" fn render_task(_arg: *mut core::ffi::c_void) {
                         DiscoCommand::StartEffect(DiscoEffect::AudioScope) => {
                             ctrl.publish_status("FreeRTOS runtime: audio scope");
                         }
+                        DiscoCommand::StartEffect(DiscoEffect::Spectrum) => {
+                            ctrl.publish_status("FreeRTOS runtime: spectrum unsupported");
+                        }
                         DiscoCommand::StopEffect(_) => {}
                         DiscoCommand::SetBacklight(_level) => {
                             // TODO: PWM backlight control
                         }
-                        DiscoCommand::ShowStatus(_) | DiscoCommand::NoOp => {}
+                        DiscoCommand::ShowStatus(text) => {
+                            write_status_line(text.as_bytes());
+                        }
+                        DiscoCommand::NoOp => {}
                     }
                 }
             }
@@ -1619,6 +1631,15 @@ fn handle_command(line: &[u8]) {
             crate::runtime_serial::write_bytes(b"CRAWL:toggled\r\n");
             crate::runtime_serial::kick_tx();
         }
+        b'T' | b't' => {
+            if let Some((x, y)) = parse_tap(line) {
+                queue_synthetic_tap(x, y);
+                crate::runtime_serial::write_bytes(b"TAP:queued\r\n");
+            } else {
+                crate::runtime_serial::write_bytes(b"ERR:tap\r\n");
+            }
+            crate::runtime_serial::kick_tx();
+        }
         b'F' | b'f' => {
             // Pause touch_task, then do clean I2C4 reads
             use crate::touch_i2c;
@@ -1710,6 +1731,64 @@ fn handle_command(line: &[u8]) {
             crate::runtime_serial::kick_tx();
         }
     }
+}
+
+fn parse_tap(line: &[u8]) -> Option<(u16, u16)> {
+    if line.len() < 4 {
+        return None;
+    }
+    let mut i = 1;
+    let x = parse_u16(line, &mut i)?;
+    if line.get(i).copied()? != b',' {
+        return None;
+    }
+    i += 1;
+    let y = parse_u16(line, &mut i)?;
+    if i != line.len() || x >= 800 || y >= 480 {
+        return None;
+    }
+    Some((x, y))
+}
+
+fn parse_u16(line: &[u8], i: &mut usize) -> Option<u16> {
+    let mut value: u32 = 0;
+    let start = *i;
+    while let Some(&b) = line.get(*i) {
+        if !b.is_ascii_digit() {
+            break;
+        }
+        value = value * 10 + (b - b'0') as u32;
+        if value > u16::MAX as u32 {
+            return None;
+        }
+        *i += 1;
+    }
+    if *i == start {
+        None
+    } else {
+        Some(value as u16)
+    }
+}
+
+fn queue_synthetic_tap(x: u16, y: u16) {
+    // Playit uses logical landscape coordinates. FreeRTOS stores raw
+    // FT5336 portrait coordinates, then maps them back with
+    // `(landscape_x, landscape_y) = (raw_y, 479 - raw_x)`.
+    let raw_x = 479u16.saturating_sub(y);
+    let raw_y = x;
+    let mut points = [(0, 0, 0, 0); 5];
+    points[0] = (0, 0, raw_x, raw_y);
+    touch_evt_push(RawTouchSample { count: 1, points });
+    points[0] = (0, 2, raw_x, raw_y);
+    touch_evt_push(RawTouchSample { count: 1, points });
+    touch_evt_push(RawTouchSample::EMPTY);
+}
+
+fn write_status_line(text: &[u8]) {
+    crate::runtime_serial::write_bytes(b"UI:");
+    crate::runtime_serial::write_bytes(text);
+    crate::runtime_serial::write_bytes(b"\r\n");
+    crate::runtime_serial::kick_tx();
 }
 
 fn write_slice(dst: &mut [u8], mut p: usize, s: &[u8]) -> usize {

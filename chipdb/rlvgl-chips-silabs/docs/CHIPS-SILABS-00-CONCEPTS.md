@@ -70,20 +70,19 @@ crate) build on.
 
 Evidence the parity gap is real, pinned to repo paths:
 
-- **Stub status.** `chipdb/rlvgl-chips-silabs/` ships today with
+- **Initial stub status.** `chipdb/rlvgl-chips-silabs/` began with
   the boilerplate-only adapter (`src/lib.rs`, `build.rs`) plus a
-  single placeholder pair: `db/chips/EFM32GG11.yaml` and
-  `db/boards/EFM32GG11.yaml`. The placeholder chip YAML has only
+  single seed pair: `db/chips/EFM32GG11.yaml` and
+  `db/boards/slstk3701a.yaml`. The original placeholder chip YAML had only
   four scalar fields (`name`, `arch`, `package`, `pac_crate`)
   and no `memory:`, `clock_tree:`, `peripherals:`, `io_mux:`, or
   `gpio_matrix:` sections. The placeholder board YAML has
   `pins: []`. By contrast `chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml`
   is 320 lines and includes a full IO MUX + GPIO matrix table.
-- **Generator routing.** `src/bin/creator/bsp/silabs.rs` is a
-  17-line stub that calls `serde_yaml::from_str::<Ir>` directly.
-  There is no per-vendor `src/bin/creator/bsp/silabs/` directory
-  paralleling `src/bin/creator/bsp/espressif/` — no `load.rs`,
-  no `templates/`, no peripheral-class router.
+- **Generator routing.** The original `src/bin/creator/bsp/silabs.rs`
+  was a 17-line stub that called `serde_yaml::from_str::<Ir>` directly.
+  The generation path now lives under `src/bin/creator/bsp/silabs/`
+  with `mod.rs`, `load.rs`, and renderer support.
 - **Pre-publish phase pressure.** `CLAUDE.md` Phase 4.6 / 4.7 /
   4.7b lists `bsp_esp32c3_compile`, `bsp_esp32p4_render`,
   `bsp_esp32c6_render`, `bsp_esp32c5_render`,
@@ -153,7 +152,7 @@ to grow, the vendor's spec lineage ratifies the change first.
 | CMU register-block names | Per-family RM (cited per chip YAML's `name:`) | `clock_tree.system_gates:` rows reference exact PAC field paths. |
 | GPIO routing register-block names | Per-family RM | `peripherals[].signals[].route_*` fields reference exact PAC field paths. Naming differs between Series 0/1 (ROUTELOC) and Series 2 (DPLLOC) — see §10. |
 | 6-file emission contract | This chapter §6 | Future `src/bin/creator/bsp/silabs/templates/*.rs.jinja`. |
-| BSP loader (`yaml_to_ir`) | `src/bin/creator/bsp/silabs.rs` (currently a 17-line stub) | Becomes per-vendor module `src/bin/creator/bsp/silabs/{mod.rs,load.rs}` once `CHIPS-SILABS-02` lands; the entry-point function name `yaml_to_ir` is preserved for caller-side stability. |
+| BSP loader (`yaml_to_ir`) | `src/bin/creator/bsp/silabs/mod.rs` | Per-vendor module split with `load.rs`; the entry-point function name `yaml_to_ir` is preserved for caller-side stability. |
 | Snapshot test family | This chapter §12 | Future `tests/bsp_silabs_<chip>_render.rs` paralleling `tests/bsp_esp32c3_render.rs`. |
 | `compile-verify` against a real PAC crate | This chapter §12 (optional gate) | Future `tests/bsp_silabs_<chip>_compile.rs` paralleling `tests/bsp_esp32c3_compile.rs`. Target triple is **chip-arch-dependent**: `thumbv8m.main-none-eabihf` for EFR32xG2x, `thumbv7em-none-eabihf` for EFM32GG/PG/MG1, `thumbv7m-none-eabi` for legacy Cortex-M3 parts. |
 
@@ -163,12 +162,11 @@ chapter owns their replacement or expansion):
 - `chipdb/rlvgl-chips-silabs/db/chips/EFM32GG11.yaml` (4-field
   placeholder) — superseded by `CHIPS-SILABS-01a` expansion to
   the full §5 schema.
-- `chipdb/rlvgl-chips-silabs/db/boards/EFM32GG11.yaml`
-  (`pins: []` placeholder) — superseded by `CHIPS-SILABS-01b`
-  expansion once at least one real board (e.g. EFM32GG11_STK) is
-  in scope.
-- `src/bin/creator/bsp/silabs.rs` (17-line `yaml_to_ir` stub) —
-  superseded by `CHIPS-SILABS-02`'s per-vendor module split.
+- `chipdb/rlvgl-chips-silabs/db/boards/slstk3701a.yaml`
+  — the first real Silicon Labs board pin map, added by
+  `CHIPS-SILABS-01b`.
+- `src/bin/creator/bsp/silabs/mod.rs` — `yaml_to_ir` entry point for
+  the per-vendor module split.
 
 Authoritative external documents:
 
@@ -868,12 +866,11 @@ Existing repo files this chapter references:
   build-time YAML loader; preserved.
 - [`chipdb/rlvgl-chips-silabs/db/chips/EFM32GG11.yaml`](../db/chips/EFM32GG11.yaml)
   — placeholder chip YAML; superseded by `CHIPS-SILABS-01a`.
-- [`chipdb/rlvgl-chips-silabs/db/boards/EFM32GG11.yaml`](../db/boards/EFM32GG11.yaml)
-  — placeholder board YAML; superseded by
+- [`chipdb/rlvgl-chips-silabs/db/boards/slstk3701a.yaml`](../db/boards/slstk3701a.yaml)
+  — first real Silicon Labs board pin map, added by
   `CHIPS-SILABS-01b`.
-- [`src/bin/creator/bsp/silabs.rs`](../../../src/bin/creator/bsp/silabs.rs)
-  — 17-line `yaml_to_ir` stub; superseded by
-  `CHIPS-SILABS-02`.
+- [`src/bin/creator/bsp/silabs/mod.rs`](../../../src/bin/creator/bsp/silabs/mod.rs)
+  — `yaml_to_ir` entry point for the per-vendor module split.
 - [`chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml`](../../rlvgl-chips-esp/db/chips/esp32c3.yaml)
   — reference shape for chip YAML.
 - [`chipdb/rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml`](../../rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml)
@@ -1006,7 +1003,7 @@ Ratifying this chapter unblocks:
     on the residual divergence above. E0433 count went from 5 to 0;
     E0282 count unchanged at 61; new E0599 count is 41.
   - The older `bsp_silabs.rs` round-trip test (against the generic
-    `Ir` adapter at `src/bin/creator/bsp/silabs.rs`) was already
+    `Ir` adapter at `src/bin/creator/bsp/silabs/mod.rs`) was already
     failing at v0.2.0 baseline (committed `.snap.new` artifacts);
     unaffected by this amendment.
 
