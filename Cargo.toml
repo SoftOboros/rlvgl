@@ -500,6 +500,10 @@ rlvgl-core = { path = "core" }
 [workspace]
 members = [
     "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
+    "devices/rlvgl-i2c-test-support", "devices/rlvgl-kria-i2c",
+    "devices/rlvgl-device-stts22h", "devices/rlvgl-device-veml3235sl",
+    "devices/rlvgl-device-ptn3460",
+    "devices/rlvgl-device-pcm3168a",
     "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",

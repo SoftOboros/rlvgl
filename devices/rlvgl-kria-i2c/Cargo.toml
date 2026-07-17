@@ -1,0 +1,31 @@
+[package]
+name = "rlvgl-kria-i2c"
+version = "0.2.5"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "Kria logical I2C topology and embedded-hal backend adapters for RLVGL."
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+keywords = ["embedded", "i2c", "kria", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
+publish = true
+
+[dependencies]
+embedded-hal = "1.0"
+embedded-hal-bus = { version = "0.3.0", default-features = false }
+rlvgl-device-pcm3168a = { path = "../rlvgl-device-pcm3168a" }
+rlvgl-device-ptn3460 = { path = "../rlvgl-device-ptn3460" }
+rlvgl-device-stts22h = { path = "../rlvgl-device-stts22h" }
+rlvgl-device-veml3235sl = { path = "../rlvgl-device-veml3235sl" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+linux-embedded-hal = { version = "0.4.1", default-features = false, features = ["i2c"], optional = true }
+
+[dev-dependencies]
+rlvgl-i2c-test-support = { path = "../rlvgl-i2c-test-support" }
+
+[features]
+default = []
+std = ["embedded-hal-bus/std"]
+linux = ["std", "dep:linux-embedded-hal"]

@@ -1,0 +1,18 @@
+[package]
+name = "rlvgl-device-ptn3460"
+version = "0.2.5"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "No-std embedded-hal control-plane driver for the NXP PTN3460 eDP-to-LVDS bridge."
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+keywords = ["embedded", "i2c", "displayport", "lvds", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
+publish = true
+
+[dependencies]
+embedded-hal = "1.0"
+
+[dev-dependencies]
+rlvgl-i2c-test-support = { path = "../rlvgl-i2c-test-support" }

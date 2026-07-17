@@ -158,6 +158,52 @@ disco-analyzer subrepo's first concepts doc).
     **Drafted 2026-05-19; not ratified.** DPR-01 remains blocked until
     DPR-00 §12 is accepted or amended.
 
+- **KI2C** — *Kria I2C Device and Backend*. Evidence-backed `no_std` Rust
+  crates for the STTS22H, VEML3235SL, PTN3460, and PCM3168A, plus a Kria
+  integration layer that maps the separate PS buses and shared PL bus onto
+  RLVGL's existing `embedded-hal` 1.0 contract. EEPROM and KSZ9897S admission
+  stays gated on missing board evidence.
+
+  - [KI2C-00-CONCEPTS.md](KI2C-00-CONCEPTS.md) — corrected bus/address
+    inventory, crate/backend boundary, per-device phase plan, deterministic
+    Rust gates, and the local-model expand/verify/compress discipline.
+    **Ratified 2026-07-15.** KI2C-01 is unblocked.
+  - [KI2C-01-SUPPORT-SUBSTRATE.md](KI2C-01-SUPPORT-SUBSTRATE.md) — strict
+    transaction recorder, corrected Kria topology constants, single-threaded
+    shared-bus adapter, optional Linux backend, model-loop evidence, and
+    cross-target gates. **Complete 2026-07-15; Llama verdict `ACCEPT`.**
+    KI2C-02 is unblocked.
+  - [KI2C-02-STTS22H.md](KI2C-02-STTS22H.md) — Rev 8 register evidence,
+    explicit configuration contract, coherent signed temperature reads,
+    one-shot/continuous modes, read-to-clear alerts, exact thresholds, model
+    loop record, and Rust gates. **Complete 2026-07-15; Llama verdict
+    `ACCEPT`.** KI2C-03 is unblocked.
+  - [KI2C-03-VEML3235SL.md](KI2C-03-VEML3235SL.md) — Rev 1.4 register
+    evidence, fixed-address identity, typed integration/analog/digital gain,
+    coherent raw channels, exact integer micro-lux conversion, model-loop
+    record, and Rust gates. **Complete 2026-07-15; Llama verdict `ACCEPT`.**
+    KI2C-04 is unblocked.
+  - [KI2C-04-PTN3460.md](KI2C-04-PTN3460.md) — normalized seven-bit
+    address correction, configuration-magic health probe, typed LVDS
+    electrical register, reserved-encoding rejection, model-loop record, and
+    Rust gates. **Complete 2026-07-15; Llama verdict `ACCEPT`.** KI2C-05 is
+    unblocked.
+  - [KI2C-05-PCM3168A.md](KI2C-05-PCM3168A.md) — readiness typestate,
+    truthful reset-state health probe, common slave audio formats,
+    sampling-mode-preserving resynchronization, model-loop record, and Rust
+    gates. **Complete 2026-07-15; Llama verdict `ACCEPT`.** KI2C-06 is
+    unblocked.
+  - [KI2C-06-KRIA-INTEGRATION.md](KI2C-06-KRIA-INTEGRATION.md) — explicit
+    three-controller ownership, typed leaf factories over the separate PS and
+    shared PL buses, caller-owned physical mappings, Linux mapped opening,
+    structured smoke diagnostics, model-loop record, and Rust gates.
+    **Complete 2026-07-15; Llama verdict `ACCEPT`.** KI2C-07 software
+    preparation is unblocked; physical conformance remains hardware-gated.
+  - [KI2C-07-HARDWARE-CONFORMANCE.md](KI2C-07-HARDWARE-CONFORMANCE.md) —
+    safe read-only probe order, required board/bitstream/mapping/electrical
+    inputs, result vocabulary, conformance-record schema, and release gates.
+    **Hardware-blocked 2026-07-15; no physical success is claimed.**
+
 - **SCTD** — *SCXML Tutorial Demo*. Target-neutral state-chart demo app
   for the Alex Z SCXML tutorial examples vendored through scjson. The
   first planned machines are Dining Philosophers and the Skoda Bolero

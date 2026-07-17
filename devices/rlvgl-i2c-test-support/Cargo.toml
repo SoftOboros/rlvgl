@@ -1,0 +1,13 @@
+[package]
+name = "rlvgl-i2c-test-support"
+version = "0.2.5"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "Strict embedded-hal I2C transaction recorder for RLVGL device-driver tests."
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+publish = false
+
+[dependencies]
+embedded-hal = "1.0"

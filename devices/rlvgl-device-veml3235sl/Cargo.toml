@@ -1,0 +1,18 @@
+[package]
+name = "rlvgl-device-veml3235sl"
+version = "0.2.5"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "No-std embedded-hal driver for the Vishay VEML3235SL ambient light sensor."
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+keywords = ["embedded", "i2c", "sensor", "light", "no-std"]
+categories = ["embedded", "hardware-support", "no-std"]
+publish = true
+
+[dependencies]
+embedded-hal = "1.0"
+
+[dev-dependencies]
+rlvgl-i2c-test-support = { path = "../rlvgl-i2c-test-support" }
