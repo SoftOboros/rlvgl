@@ -481,6 +481,14 @@ invariant.
   companion SCTD-04 §7 amendment; a `Bitmap6x10` opt-out reproducing the
   pre-RATATUI-00 behavior byte-for-byte. Landed on `SoftOboros/ratatui`
   `dev/ratatui-rlvgl-backend` @ `adc75755`.
+  - [RATATUI-RETROSPECTIVE.md](RATATUI-RETROSPECTIVE.md) — initiative-
+    completion retrospective (2026-07-18). Covers the single-day
+    draft-to-landed arc: the crate-local asset-placement correction, a
+    worktree/`isolation` dispatch near-miss, the 12×20→14×21 cell-geometry
+    divergence, uneven `.notdef` glyph coverage across font-style variants,
+    and forward constraints — most notably that the SCTD demo's hero-popup
+    pixel layout (tuned against the old 12×20 grid) has not yet been
+    re-verified against the new default geometry.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
