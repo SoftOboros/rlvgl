@@ -177,10 +177,15 @@ Registration policy: **Standards Action**.
   - `.gitmodules`' `branch = v0.2.5` pin for this submodule is stale
     against that; it was corrected to `v0.2.6` as a same-day housekeeping
     fix alongside this draft (§15).
-- New terminal font assets SHALL be added under `assets/fonts/` (source
-  TTFs, already present) and `examples/stm32h747i-disco/assets/fonts/`
-  (packed `.bin`/`.json` outputs, mirroring the existing DejaVuSans
-  proportional set's placement) — no new asset directory.
+- Source TTFs SHALL be read from the outer `rlvgl` repo's `assets/fonts/`
+  (already present; used only as a dev-time packing input). Packed
+  `.bin`/`.json` outputs SHALL be committed inside the crate itself, at
+  `vendor/ratatui/ratatui-rlvgl/assets/fonts/`, and embedded via
+  `include_bytes!` relative to the crate root — NOT under the outer
+  repo's `examples/stm32h747i-disco/assets/fonts/`. `ratatui-rlvgl` MUST
+  build standalone inside `SoftOboros/ratatui` per SCTD-04 §12's
+  independent-build gate; assets living outside the crate's own tree
+  would violate that the moment someone clones the Ratatui repo alone.
 - No new crate. All RATATUI-00 code lands inside the existing
   `ratatui-rlvgl` crate boundary (`vendor/ratatui/ratatui-rlvgl/`); the
   MIT / `no_std` / `alloc`-only / no-terminal-backend-by-default
@@ -439,8 +444,9 @@ phase it claims:
 - `vendor/ratatui/ratatui-rlvgl/README.md`
 - `core/src/{packed_font.rs,font.rs,bitmap_font.rs,renderer.rs}`
 - `src/bin/creator/fonts.rs`
-- `assets/fonts/DejaVuSansMono{,-Bold,-Oblique,-BoldOblique}.ttf`
-- `examples/stm32h747i-disco/assets/fonts/`
+- `assets/fonts/DejaVuSansMono{,-Bold,-Oblique,-BoldOblique}.ttf` (packing
+  input, outer repo)
+- `vendor/ratatui/ratatui-rlvgl/assets/fonts/` (packed output, crate-local)
 - `docs/concepts/{SCTD-04-RATATUI-RLVGL-INTEGRATION.md,FONT-00-CONCEPTS.md,FONT-05-FONT-REGISTRY.md,ANIM-00-CONCEPTS.md}`
 - `.gitmodules` (branch pin correction, landed same day as this draft)
 
@@ -478,3 +484,11 @@ This ratification unblocks, in dependency order:
   quartet (§6.3); blink resolved to Option B, the tick-driven blink-phase
   design (§8). The companion SCTD-04 §7 amendment landed in the same
   change (§10, §14). RATATUI-00a/b/c/d are all unblocked.
+- 2026-07-17 — **CORRECTION.** §5/§13 wrongly placed packed font outputs
+  under the outer repo's `examples/stm32h747i-disco/assets/fonts/`. That
+  location is unreachable from a standalone `SoftOboros/ratatui` checkout,
+  contradicting SCTD-04 §12's independent-build gate. Corrected to
+  `vendor/ratatui/ratatui-rlvgl/assets/fonts/` (crate-local, embedded via
+  `include_bytes!`), source TTFs remaining outer-repo dev-time inputs
+  only. Caught before RATATUI-00a execution began; no code existed yet
+  to revert.
