@@ -779,6 +779,12 @@ This discipline applies to:
   coverage migration, rotated-renderer glyph throughput, and the AA
   conformance fixture). Commit-subject prefix `FONT-NN[a-z]:`. Concepts doc
   ratified 2026-06-14 (FONT-00). Builds on the LPAR-08 text substrate.
+- `docs/concepts/RATATUI-*` (Curated Unicode repertoire, anti-aliased
+  glyphs, real bold/italic, and blink-fidelity extensions to the SCTD-04
+  `ratatui-rlvgl` backend). Commit-subject prefix `RATATUI-NN[a-z]:`.
+  Concepts doc ratified 2026-07-17 (RATATUI-00). Builds on the FONT-00
+  `PackedFont`/`WidgetFont` model and SCTD-04's shipped backend; amends
+  SCTD-04 §7's redraw-invariant for blink-phase advance.
 - Any future multi-chapter initiative with ≥3 phases.
 
 Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use

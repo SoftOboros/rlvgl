@@ -462,6 +462,24 @@ remaining gaps — font *selection* and anti-aliasing.
     reclassification, and forward constraints for the deferred `FontId`
     theming-registry work.
 
+### RATATUI — curated Unicode, AA text, and modifier fidelity for `ratatui-rlvgl`
+
+Extends the SCTD-04 `ratatui-rlvgl` backend with the capabilities that doc
+explicitly bypassed or deferred: box-drawing/block/arrow/status glyphs
+(today collapsed to ASCII `+`/`-`/`|`/`?`), anti-aliased text via the
+FONT-00 `PackedFont`/`WidgetFont` model (which postdates SCTD-04), real
+bold/italic font variants (replacing a pixel-offset hack and a no-op), and
+a blink-fidelity decision reconciled against SCTD-04 §7's redraw-on-change
+invariant.
+
+- [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) — **Ratified
+  2026-07-17.** Freezes the curated codepoint set (box drawing, block
+  elements, full arrow block, status symbols; Braille excluded this
+  pass), real bold/italic via existing vendored `DejaVuSansMono`
+  variants (§7), and a tick-driven blink-phase design (§8) whose
+  companion SCTD-04 §7 amendment is already landed. RATATUI-00a/b/c/d are
+  all unblocked.
+
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
 as additional families here when they cross the ~3-phase / ~3-subsystem

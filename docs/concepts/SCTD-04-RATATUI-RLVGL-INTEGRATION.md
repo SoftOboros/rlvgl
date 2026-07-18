@@ -228,8 +228,8 @@ Registration policy: **Specification Required**.
   redraw: a full redraw after background restoration SHALL produce identical
   pixels.
 - The SCTD consumer SHALL render a new Ratatui frame only when its snapshot,
-  event log, focus, cursor, or bounds changes. A display refresh alone MUST
-  NOT allocate or rebuild the Ratatui model.
+  event log, focus, cursor, bounds, or blink phase (RATATUI-00 §8) changes. A
+  display refresh alone MUST NOT allocate or rebuild the Ratatui model.
 - No allocation is permitted in the per-cell `RatatuiView::draw` inner loop.
 
 ## §8 Frozen decision — additional full-screen hybrid Dining Philosophers window
@@ -538,6 +538,15 @@ Owner ratification unblocks the following ordered execution phases:
   fifth and final seat already occupied. Native and Ratatui halves shall each
   show full → Depart → Arrive, with the popup inheriting the native full-table
   state.
+- 2026-07-17 — **RATIFIED AMENDMENT — RATATUI-00 §8.** §7's redraw-only-on-
+  change invariant now names an explicit blink-phase advance as an additional
+  trigger, alongside snapshot/event log/focus/cursor/bounds changes. This is
+  not a stealth revert of the "redraw only on change" guarantee: a blink-phase
+  advance remains an explicit, caller-driven, non-wall-clock signal — the
+  invariant's intent (no periodic redraw from a bare display refresh) is
+  unchanged. See
+  [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) §8 for the full
+  tick-driven blink-phase design this amendment unblocks.
 
 ## §16 Execution record
 
