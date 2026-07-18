@@ -533,3 +533,13 @@ This ratification unblocks, in dependency order:
   landed earlier at `9cc8141c`. All four RATATUI-00 phases are complete
   on `dev/ratatui-rlvgl-backend`, pending gitlink advances through
   `rlvgl` and `softoboros`.
+- 2026-07-18 — **DOWNSTREAM CONSUMER-COMPATIBILITY NOTE.** Defaulting
+  `RatatuiView`'s font family to `Packed` (14×21-designed) silently broke
+  the one existing consumer, the SCTD-04 hero popup, which still sizes
+  its grid from `CellMetrics::font_6x10()` (12×20) and never called
+  `set_font_family`. Found and fixed via the RATATUI-00 initiative
+  retrospective's own FC1 forward constraint. No RATATUI-00 §6/§7/§8
+  frozen decision changed; the fix is entirely consumer-side. Full
+  writeup: [RATATUI-RETROSPECTIVE.md](RATATUI-RETROSPECTIVE.md) §6 FC1,
+  [SCTD-04-RATATUI-RLVGL-INTEGRATION.md](SCTD-04-RATATUI-RLVGL-INTEGRATION.md)
+  §15 (2026-07-18 entry). Commit: `rlvgl` `v0.2.6` `9364094f`.

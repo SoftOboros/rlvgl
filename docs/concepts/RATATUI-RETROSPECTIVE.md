@@ -52,10 +52,9 @@ deferral.
   returns `Some` for them — no test or runtime signal distinguishes a real
   glyph from a `.notdef` box.
 - `CellMetrics` changed its effective default from 12×20 to 14×21 for any
-  consumer that accepts `RatatuiView`'s new default font family. No
-  existing consumer (the SCTD demo included) was verified to recompute its
-  terminal-grid-dependent pixel layout against the new geometry — see §5's
-  Coupled item.
+  consumer that accepts `RatatuiView`'s new default font family. **RESOLVED
+  2026-07-18** for the one existing consumer (the SCTD demo) — see §5's
+  Coupled item and §6 FC1.
 - `advance_blink_phase()` has zero real callers as of this writing; it is
   exercised only by its own unit tests, never by an integration path.
 - No STM32H747I-DISCO hardware verification was performed for this
@@ -239,16 +238,29 @@ deferral.
   - Scrollback/`Viewport::Inline` non-goal — permanent by design per §9;
     not a deferral in the "will revisit" sense.
 - **Coupled** (affects assumptions; must be revisited with context):
-  - **The SCTD demo's hero-popup pixel layout.** SCTD-04's own §15 history
-    hand-tuned title-bar insets, close-button hit regions, and the 63×17
-    terminal grid against `font_6x10()`'s 12×20 geometry on real 800×480
-    hardware. `RatatuiView` now defaults to `packed_terminal()`'s 14×21
-    geometry. The 39 existing SCTD-demo host tests pass unchanged, which
-    proves the code compiles and doesn't panic against whatever geometry
-    it's actually resolving — it does **not** prove the popup's tuned
-    pixel layout is still visually correct. This was not verified in
-    either direction (dynamic recompute vs. explicit `Bitmap6x10` opt-in)
-    during this initiative. See §6 FC1.
+  - **The SCTD demo's hero-popup pixel layout — RESOLVED 2026-07-18.**
+    SCTD-04's own §15 history hand-tuned title-bar insets, close-button
+    hit regions, and the 63×17 terminal grid against `font_6x10()`'s
+    12×20 geometry on real 800×480 hardware. `RatatuiView` now defaults
+    to `packed_terminal()`'s 14×21 geometry. The 39 existing SCTD-demo
+    host tests passed unchanged, which proved the code compiled and
+    didn't panic against whatever geometry it was actually resolving —
+    it did **not** prove the popup's tuned pixel layout was still
+    visually correct. Follow-up verification (prompted by re-reading this
+    exact retrospective) found `HeroContent::new()` retained
+    `CellMetrics::font_6x10()` for grid sizing but never called
+    `RatatuiView::set_font_family`, so it silently inherited the new
+    `Packed` AA default — several curated glyphs are up to 14px wide
+    against a 12px fixed-advance step, and the baseline sits 4px below
+    the font's design position within a cell 1px short of its design
+    height. The live dining-table content (all-caps ASCII, no glyph
+    wider than 11px, no descenders) happened not to visibly clip or
+    overlap, but the mismatch was real and would bite the next content
+    change. Fixed by explicitly opting into
+    `RatatuiTerminalFont::Bitmap6x10` — `rlvgl` `v0.2.6` `9364094f` —
+    restoring byte-for-byte pre-RATATUI-00 rendering, with a black-box
+    regression test (`hero_content_renders_through_the_bitmap6x10_path_matching_its_grid`)
+    verified to fail without the fix. See §6 FC1.
   - **The two `.notdef` glyphs (D4).** Dormant — no current consumer
     renders a BOLD+ITALIC or ITALIC-styled ✓/✗, so the gap has no observed
     effect yet. Revisit if/when a consumer does; see §6 FC2.
@@ -257,15 +269,22 @@ deferral.
 
 ## §6 Forward constraints
 
-- **FC1.** Before any consumer ships the new default `Packed` font family
-  to a real display, its terminal-grid-dependent pixel math (popup insets,
-  hit regions, title-bar layout — anything tuned against the old 12×20/
-  63×17 geometry per SCTD-04 §15) MUST be re-verified against the new
+- **FC1 — RESOLVED 2026-07-18 for the SCTD demo.** Before any consumer
+  ships the new default `Packed` font family to a real display, its
+  terminal-grid-dependent pixel math (popup insets, hit regions,
+  title-bar layout — anything tuned against the old 12×20/63×17 geometry
+  per SCTD-04 §15) MUST be re-verified against the new
   14×21/`packed_terminal()` geometry, either by confirming the layout
   recomputes from `CellMetrics` dynamically, or by explicitly opting into
   `RatatuiTerminalFont::Bitmap6x10` to preserve the old tuned geometry
   unchanged. Passing host tests are not sufficient evidence of visual
-  correctness on hardware for this specific risk.
+  correctness on hardware for this specific risk. The SCTD demo now takes
+  the `Bitmap6x10` branch (`rlvgl` `v0.2.6` `9364094f`), with a
+  black-box regression test guarding the pairing so a future edit can't
+  silently drop the `set_font_family` call again. This constraint remains
+  binding for any *other* consumer that adopts `RatatuiView` — it is not
+  retired, only satisfied for the one consumer that existed at
+  initiative close.
 - **FC2.** Any future addition to the RATATUI-00 §6.3 curated codepoint
   set MUST verify real (non-`.notdef`) glyph *content* across all four
   style variants before ratification — presence-only checks
@@ -293,9 +312,10 @@ deferral.
 - Commits — `SoftOboros/ratatui` `dev/ratatui-rlvgl-backend`: `9cc8141c`
   (00d), `d9380a36` (00a), `adc75755` (00a-wiring+00b+00c). `rlvgl`
   `v0.2.6`: `1a3827a7` (ratify), `1399e4a0` (asset-locality correction,
-  D1), `cdc0c59e` (gitlink advance to `adc75755`). `softoboros`
-  `webslinger`: `8aa8d2b73` (ratify + `.gitmodules` fix), `665ce3497`
-  (gitlink advance).
+  D1), `cdc0c59e` (gitlink advance to `adc75755`), `0e59da7b` (this
+  retrospective, first draft), `9364094f` (FC1 fix — SCTD hero popup
+  pinned to `Bitmap6x10`). `softoboros` `webslinger`: `8aa8d2b73` (ratify
+  + `.gitmodules` fix), `665ce3497` (gitlink advance).
 - Memory: `feedback_cd_into_subrepo_before_worktree_dispatch` (amended
   2026-07-17 with the D2 recurrence note, before this retrospective was
   drafted).
@@ -304,3 +324,12 @@ deferral.
 
 - 2026-07-18 — Drafted, covering RATATUI-00's single-day draft-to-landed
   arc (2026-07-17).
+- 2026-07-18 — **FC1 verified and resolved for the SCTD demo.** Explicit
+  follow-up verification (requested: "verify the SCTD hero popup layout
+  against the new geometry") confirmed the exact mismatch FC1 warned
+  about: `HeroContent::new()` sized its grid from `font_6x10()` (12×20)
+  but `RatatuiView` defaulted to the `Packed` AA family (designed for
+  14×21). Fixed by explicit `set_font_family(Bitmap6x10)` —
+  `rlvgl` `v0.2.6` `9364094f` — with a regression test confirmed to fail
+  pre-fix. §1, §5, and §6 amended in place to record resolution rather
+  than leaving stale "not yet verified" language beside this entry.

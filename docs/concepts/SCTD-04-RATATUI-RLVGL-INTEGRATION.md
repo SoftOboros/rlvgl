@@ -547,6 +547,21 @@ Owner ratification unblocks the following ordered execution phases:
   unchanged. See
   [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) §8 for the full
   tick-driven blink-phase design this amendment unblocks.
+- 2026-07-18 — **RATIFIED CORRECTION — post-RATATUI-00 font/grid mismatch.**
+  `RatatuiView` began defaulting to RATATUI-00's curated `Packed` AA font
+  family, designed for `CellMetrics::packed_terminal()` (14×21). The hero
+  popup's `HeroContent::new()` still sizes its grid from `CellMetrics::
+  font_6x10()` (12×20 — the exact geometry the 2026-07-12 bench reviews
+  above hand-tuned to avoid clipping/overlap) and never called
+  `RatatuiView::set_font_family`, so it silently inherited the new default
+  on the old grid: several curated glyphs run up to 14px wide against this
+  popup's 12px fixed-advance step. Live dining-table content (all-caps
+  ASCII, no descenders, no glyph wider than 11px) happened not to visibly
+  clip or overlap, but the mismatch was real. Corrected by explicitly
+  selecting `RatatuiTerminalFont::Bitmap6x10`, restoring byte-for-byte
+  pre-RATATUI-00 rendering fidelity for this popup — `rlvgl` `v0.2.6`
+  `9364094f` — with a regression test guarding the pairing. Full writeup:
+  [RATATUI-RETROSPECTIVE.md](RATATUI-RETROSPECTIVE.md) §6 FC1.
 
 ## §16 Execution record
 
