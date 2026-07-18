@@ -11,7 +11,7 @@ use ratatui::{
     style::{Color as TuiColor, Style},
     widgets::Widget as TuiWidget,
 };
-use ratatui_rlvgl::{CellMetrics, RatatuiView, RlvglBackend};
+use ratatui_rlvgl::{CellMetrics, RatatuiTerminalFont, RatatuiView, RlvglBackend};
 use rlvgl_core::{
     bitmap_font::FONT_6X10,
     event::Event,
@@ -239,10 +239,19 @@ impl HeroContent {
         let (backend, surface) = RlvglBackend::new(columns, rows, metrics)
             .expect("hero bounds always produce a valid bitmap-font terminal grid");
         let terminal = Terminal::new(backend).expect("rlvgl backend construction is infallible");
+        let view = RatatuiView::new(bounds, surface);
+        // RATATUI-00 shipped `RatatuiTerminalFont::Packed` as RatatuiView's
+        // new default, sized for `CellMetrics::packed_terminal()` (14x21).
+        // This popup's grid math above is still built on `font_6x10()`
+        // (12x20) — the geometry SCTD-04's own bench reviews hand-tuned
+        // against (§15, 2026-07-12) to avoid glyph clipping/overlap. Pin the
+        // font family to match, or the default AA glyphs render on the
+        // wrong grid. See RATATUI-RETROSPECTIVE.md FC1.
+        view.set_font_family(RatatuiTerminalFont::Bitmap6x10);
         Self {
             bounds,
             terminal: RefCell::new(terminal),
-            view: RatatuiView::new(bounds, surface),
+            view,
             snapshot: None,
             visible: false,
         }
@@ -543,6 +552,50 @@ mod tests {
 
         assert!(close.handle_event(&Event::PressDown { x: 712, y: 8 }));
         assert_eq!(activations.get(), 1);
+    }
+
+    /// Records whether any draw call used the anti-aliased coverage path
+    /// (`blend_row`, the RATATUI-00 `Packed` font family's rasterizer) as
+    /// opposed to the legacy `FONT_6X10` path, which only ever calls
+    /// `fill_rect`. Guards against `HeroContent` silently drifting back to
+    /// `RatatuiView`'s default `Packed` family while still sizing its grid
+    /// from `CellMetrics::font_6x10()` (RATATUI-RETROSPECTIVE.md FC1).
+    #[derive(Default)]
+    struct FontPathRenderer {
+        used_blend_row: bool,
+    }
+
+    impl Renderer for FontPathRenderer {
+        fn fill_rect(&mut self, _rect: Rect, _color: Color) {}
+
+        fn draw_text(&mut self, _position: (i32, i32), _text: &str, _color: Color) {}
+
+        fn blend_row(&mut self, _x: i32, _y: i32, _color: Color, _coverage: &[u8]) {
+            self.used_blend_row = true;
+        }
+    }
+
+    #[test]
+    fn hero_content_renders_through_the_bitmap6x10_path_matching_its_grid() {
+        let mut content = HeroContent::new(Rect {
+            x: 20,
+            y: 50,
+            width: 720,
+            height: 340,
+        });
+        content.set_visible(true);
+        content.update(snapshot());
+
+        let mut renderer = FontPathRenderer::default();
+        RlvglWidget::draw(&content, &mut renderer);
+
+        assert!(
+            !renderer.used_blend_row,
+            "HeroContent's grid is sized from CellMetrics::font_6x10() (12x20); \
+             it must render through Bitmap6x10 (fill_rect only), not the \
+             anti-aliased Packed default (blend_row), or glyphs render on \
+             the wrong grid"
+        );
     }
 
     #[test]
