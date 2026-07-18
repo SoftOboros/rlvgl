@@ -4,9 +4,10 @@ RATATUI-00-CONCEPTS.md — Ratatui text-graphics extension initiative.
 
 # RATATUI-00 — Curated Unicode, Anti-Aliased Text, and Style-Modifier Fidelity for `ratatui-rlvgl`
 
-**Status: RATIFIED 2026-07-17** (§15). §5–§9 frozen decisions are normative;
-RATATUI-00a/b/c/d are all unblocked — the companion SCTD-04 §7 amendment
-required for RATATUI-00c (§8, §10) has already landed the same day.
+**Status: RATIFIED AND IMPLEMENTED 2026-07-17** (§15). All four sub-phases
+(RATATUI-00a/b/c/d) are landed on `SoftOboros/ratatui`
+`dev/ratatui-rlvgl-backend` @ `adc75755`; the companion SCTD-04 §7 amendment
+required for RATATUI-00c landed the same day.
 
 New initiative family. Extends the `ratatui-rlvgl` backend and `RatatuiView`
 widget shipped by [SCTD-04](SCTD-04-RATATUI-RLVGL-INTEGRATION.md) with the
@@ -492,3 +493,43 @@ This ratification unblocks, in dependency order:
   `include_bytes!`), source TTFs remaining outer-repo dev-time inputs
   only. Caught before RATATUI-00a execution began; no code existed yet
   to revert.
+- 2026-07-17 — **RATATUI-00a IMPLEMENTED.** `SoftOboros/ratatui`
+  `dev/ratatui-rlvgl-backend` @ `d9380a36`. 375-codepoint curated
+  repertoire (95 ASCII + 128 box drawing + 32 block elements + 112
+  arrows + 8 status symbols, exactly matching §6.3's enumeration) packed
+  from `DejaVuSansMono{,-Bold,-Oblique,-BoldOblique}.ttf` into
+  `ratatui-rlvgl/src/fonts.rs` (4 `PackedFont` statics), crate-local per
+  the correction above. Cell geometry: 14×21 (baseline 16), not 12×20 —
+  DejaVu Sans Mono's proportions didn't round cleanly onto the old grid
+  at any integer size, exactly the case §6.1 anticipated; a new
+  `CellMetrics::packed_terminal()` constructor was added rather than
+  forcing the old geometry. Flash cost: 166,088 bytes total across the 4
+  variants. Known gap: `DejaVuSansMono-Oblique`/`-BoldOblique` lack real
+  glyphs for ✓/✗ (U+2713/U+2717) — fontdue rasterizes `.notdef` for those
+  two codepoints in the two oblique variants only; regular/bold have real
+  glyphs. `cargo build`/`test` (15/15)/`fmt`/`clippy`/`thumbv7em-none-eabihf`
+  cross-check all pass; no new crate dependency.
+- 2026-07-17 — **RATATUI-00a-wiring / RATATUI-00b / RATATUI-00c
+  IMPLEMENTED.** Same branch @ `adc75755`. Added `RatatuiTerminalFont`
+  (`Bitmap6x10` | `Packed{regular,bold,oblique,bold_oblique}`, default
+  `Packed`) and `RatatuiView::set_font_family` as the §6.2 opt-out
+  mechanism. `draw_cell` split into `draw_cell_bitmap6x10` (byte-for-byte
+  legacy path, regression-tested equal to pre-RATATUI-00 output) and
+  `draw_cell_packed` (§6.3 fallback-ordering: tries the curated font
+  first, only degrades through `bitmap_font_fallback` when genuinely
+  out-of-repertoire; §6 fixed-`metrics.width()`-per-glyph advance via
+  `Renderer::draw_glyph`, never the font's natural `advance_fp16`; §7
+  bold/italic variant selection by `(Modifier::BOLD, Modifier::ITALIC)`).
+  `RatatuiSurface::advance_blink_phase()` added per §8's exact API sketch
+  (flip `blink_phase`, mark full-dirty, unpublish — mirrors
+  `set_defaults`/`resize`); blink suppression applies identically in both
+  font modes. README updated to match. 22/22 tests pass (9 new, including
+  non-tautological regression guards: box-drawing-glyph-width divergence
+  from its ASCII fallback, bold-variant-width divergence from the old
+  double-draw hack, `Bitmap6x10`-mode fill-for-fill equality with the
+  pre-RATATUI-00 code path); `fmt`/`clippy`/`thumbv7em-none-eabihf`
+  cross-check all pass; no new crate dependency.
+  RATATUI-00a/b/c are now landed, not merely unblocked. RATATUI-00d
+  landed earlier at `9cc8141c`. All four RATATUI-00 phases are complete
+  on `dev/ratatui-rlvgl-backend`, pending gitlink advances through
+  `rlvgl` and `softoboros`.

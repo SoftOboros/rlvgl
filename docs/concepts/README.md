@@ -472,13 +472,15 @@ bold/italic font variants (replacing a pixel-offset hack and a no-op), and
 a blink-fidelity decision reconciled against SCTD-04 §7's redraw-on-change
 invariant.
 
-- [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) — **Ratified
-  2026-07-17.** Freezes the curated codepoint set (box drawing, block
-  elements, full arrow block, status symbols; Braille excluded this
-  pass), real bold/italic via existing vendored `DejaVuSansMono`
-  variants (§7), and a tick-driven blink-phase design (§8) whose
-  companion SCTD-04 §7 amendment is already landed. RATATUI-00a/b/c/d are
-  all unblocked.
+- [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) — **Ratified and
+  implemented 2026-07-17.** Curated 375-codepoint repertoire (box
+  drawing, block elements, full arrow block, status symbols; Braille
+  excluded this pass) packed into four crate-local `PackedFont` variants;
+  real bold/italic variant selection replacing the old pixel-offset hack;
+  a tick-driven `RatatuiSurface::advance_blink_phase()` with its
+  companion SCTD-04 §7 amendment; a `Bitmap6x10` opt-out reproducing the
+  pre-RATATUI-00 behavior byte-for-byte. Landed on `SoftOboros/ratatui`
+  `dev/ratatui-rlvgl-backend` @ `adc75755`.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land
