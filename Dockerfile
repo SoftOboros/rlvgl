@@ -70,7 +70,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-too
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
-RUN npm install -g yarn @openai/codex
+RUN npm install -g yarn
 
 # If you run as a non-root user at runtime, make sure they can read it
 ARG RLVGL_BUILDER_USER=rlvgl
