@@ -269,6 +269,14 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 ### Multi-wave UI/runtime initiatives
 
+- **MPY** — MicroPython-directed stage-and-actors runtime: language-neutral
+  object identity, actor descriptors and creation, requested layout with
+  rlvgl-performed geometry, queued callback cues, same-core proof, and CM7/CM4
+  transport.
+  - [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md) — **Draft 2026-08-09.** Defines
+    the director/stage/actor/cue vocabulary, semantic LVGL introspection parity
+    levels, ten initiative invariants, and the MPY-01 through MPY-09 dependency
+    map. Awaiting owner ratification before MPY-01 begins.
 - **LPAR** — LVGL parity backlog across runtime substrate, style,
   draw, layout, widget families, conformance fixtures, examples,
   documentation, and release tracking.

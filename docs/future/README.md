@@ -7,7 +7,7 @@ moves out of `future/` into the appropriate topic subdir.
 
 ## Documents
 
-- [MICROPYTHON-INTEGRATION.md](./MICROPYTHON-INTEGRATION.md) — MicroPython on CM7 + rlvgl on CM4.
+- [MICROPYTHON-INTEGRATION.md](./MICROPYTHON-INTEGRATION.md) — Historical hardware-first sketch for MicroPython on CM7 + rlvgl on CM4; the active runtime plan is [MPY-00](../concepts/MPY-00-CONCEPTS.md).
 
 ## Promoted out of `future/`
 

@@ -9,6 +9,11 @@
 > because it describes a planned epic, not current behaviour. The design
 > below is preserved for later pickup; nothing here is wired into any
 > shipping build.
+>
+> The active runtime concepts and phase plan now live in
+> [`MPY-00-CONCEPTS.md`](../concepts/MPY-00-CONCEPTS.md). This file remains
+> informative hardware and packaging input. Where the two conflict after
+> MPY-00 ratification, MPY-00 governs.
 
 > **Epic:** Run MicroPython on CM7, keep rlvgl rendering/input on CM4, and expose a unified, *Python‑first* top‑level API that works on MicroPython (device) and Rust (host/tests). The on‑device Python binding uses MicroPython’s C‑module API via a small Rust FFI shim (not PyO3). For desktop CPython parity and CI, we’ll also ship a PyO3 shim that mirrors the same API surface.
 
@@ -182,4 +187,3 @@ ui.present()
 - Input events from CM4 reach a Python callback on CM7.
 - Same script (modulo import name) runs on desktop via PyO3 + simulator and on device via MicroPython.
 - Flood test and snapshot tests pass.
-

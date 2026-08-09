@@ -1,0 +1,1022 @@
+{
+  "edge_count": 44,
+  "edges": [
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 379,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 381,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 382,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 383,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 384,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 385,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-9"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 388,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 469,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 472,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 476,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 479,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 482,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 485,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 487,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 493,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 494,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 495,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 496,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 497,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 498,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 499,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 500,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 501,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 502,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 503,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 503,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 546,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-9"
+    }
+  ],
+  "family": "mpy",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 12,
+    "invariant": 10,
+    "nongoal": 7,
+    "rationale": 1,
+    "term": 18
+  },
+  "object_count": 49,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "Owned by MPY; implemented over LPAR object/runtime semantics. Does not exist as a single repository type yet.",
+        "term": "Stage"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 91,
+      "obj_id": "mpy:term:stage",
+      "text": "A runtime-owned UI session containing one or more roots, their object trees, ordering, requested layout/style/state, focus routing, subscriptions, and pending directions. It is broader than a display screen."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-06; does not exist in the repository yet.",
+        "term": "Director"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 92,
+      "obj_id": "mpy:term:director",
+      "text": "The MicroPython application that owns high-level application state and decides which actors exist, how they are configured, and how cues affect later stage directions."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned jointly by MPY runtime identity and the applicable rlvgl widget implementation.",
+        "term": "Actor"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 93,
+      "obj_id": "mpy:term:actor",
+      "text": "A live, runtime-owned object instantiated from a registered native actor type. It measures, participates in layout, handles native input semantics, animates, and draws through rlvgl."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-05 and MPY-06; adapted from `core::object::ObjectEvent`.",
+        "term": "Cue"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 94,
+      "obj_id": "mpy:term:cue",
+      "text": "A typed notification emitted by rlvgl for a subscribed actor and delivered to a director callback at a VM-safe point. A cue reports completed or observed runtime activity; it is not a synchronous call into Python."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02 through MPY-05; does not exist as a complete command enum yet.",
+        "term": "Stage Direction"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 95,
+      "obj_id": "mpy:term:stage direction",
+      "text": "A typed command that requests object creation, deletion, tree mutation, property/state/style mutation, layout intent, subscription changes, or a commit boundary."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-05; does not exist as a named repository primitive yet.",
+        "term": "Performance Turn"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 96,
+      "obj_id": "mpy:term:performance turn",
+      "text": "One safe runtime turn in which a committed command batch is applied, native runtime work proceeds, and resulting cues become available in deterministic order."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02; does not exist in the repository yet.",
+        "term": "Object ID"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 97,
+      "obj_id": "mpy:term:object id",
+      "text": "An opaque, generation-checked handle that identifies one live actor without exposing a Rust or C pointer."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-05/06; does not exist in the repository yet.",
+        "term": "Callback ID"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 98,
+      "obj_id": "mpy:term:callback id",
+      "text": "An opaque token associating an rlvgl subscription with a callable retained by the MicroPython adapter."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02; does not exist in the repository yet.",
+        "term": "Request ID"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 99,
+      "obj_id": "mpy:term:request id",
+      "text": "A correlation token connecting a command or committed batch to exactly one structured success or failure result, independently of asynchronous cues."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-03; does not exist in the repository yet.",
+        "term": "Type Descriptor"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 100,
+      "obj_id": "mpy:term:type descriptor",
+      "text": "Discoverable schema for an actor type: stable identifier and name, ancestry or capabilities, constructor requirements, properties, actions, events, child policy, and target availability."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-03/04; extends but does not replace `core::property::Queryable`.",
+        "term": "Property Descriptor"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 101,
+      "obj_id": "mpy:term:property descriptor",
+      "text": "Schema for one named property, including value type, access mode, default or absence, constraints, invalidation effects, and applicable actor types."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-03/04; does not exist in the repository yet.",
+        "term": "Action Descriptor"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 102,
+      "obj_id": "mpy:term:action descriptor",
+      "text": "Schema for a typed actor operation that is not adequately represented as durable state, such as focus, scroll-to, start, stop, or collection mutation."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-05; adapted from LPAR-04 event semantics.",
+        "term": "Event Descriptor"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 103,
+      "obj_id": "mpy:term:event descriptor",
+      "text": "Schema for one event or cue, including payload fields, delivery policy, coalescing policy, and applicable actor types."
+    },
+    {
+      "attrs": {
+        "relationship": "Semantics owned by LPAR-10; scripting exposure owned by MPY-04.",
+        "term": "Requested Layout"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 104,
+      "obj_id": "mpy:term:requested layout",
+      "text": "Director-authored layout intent such as flex/grid configuration, dimensions, constraints, placement, alignment, growth, or span."
+    },
+    {
+      "attrs": {
+        "relationship": "Semantics owned by LPAR-10; introspection exposure owned by MPY-04.",
+        "term": "Computed Geometry"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 105,
+      "obj_id": "mpy:term:computed geometry",
+      "text": "Runtime-produced effective bounds and related layout results after actors measure and rlvgl performs layout. It is observable but not director-writable."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-04/07; does not exist in the repository yet.",
+        "term": "Runtime Snapshot"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 106,
+      "obj_id": "mpy:term:runtime snapshot",
+      "text": "A deterministic, read-only projection of stage roots, actor identity/type, hierarchy, requested state, computed state, and active subscriptions."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02/07/08.",
+        "term": "Transport Profile"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 107,
+      "obj_id": "mpy:term:transport profile",
+      "text": "The carrier used for the same command/event protocol, initially in-process and later bounded CM7/CM4 queues."
+    },
+    {
+      "attrs": {
+        "relationship": "Baseline owned by LPAR-01; scripting coverage owned by MPY-01 and closed incrementally by later phases.",
+        "term": "Introspection Parity"
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 108,
+      "obj_id": "mpy:term:introspection parity",
+      "text": "Named coverage of the pinned LVGL class, tree, creation, property, event, layout/style/state, and diagnostic surfaces using stable rlvgl semantics rather than raw LVGL pointers."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-02 dependency-direction build gate and binding-free core protocol tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 379,
+      "obj_id": "INV-MPY-1",
+      "text": "The core runtime and protocol MUST remain language-neutral; no core crate may depend on MicroPython headers, VM objects, or Python callback storage."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-02 stale-handle, slot-reuse, serialization, and pointer-leak tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 380,
+      "obj_id": "INV-MPY-2",
+      "text": "Every scripting-visible actor reference MUST be an opaque, generation-checked handle; no raw pointer may cross the API or transport boundary."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-03 descriptor completeness and MicroPython adapter projection tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 381,
+      "obj_id": "INV-MPY-3",
+      "text": "Generic creation plus property, action, and event discovery MUST derive from one canonical actor descriptor catalog rather than adapter-specific schema tables."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-04 requested-versus-computed snapshot and layout transaction tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 382,
+      "obj_id": "INV-MPY-4",
+      "text": "MicroPython MUST be able to set requested layout while computed geometry remains rlvgl-owned, read-only, and separately introspectable."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST",
+          "MUST NOT"
+        ],
+        "title": "",
+        "verified_by": "MPY-05/06 callback-context, ordering, and forbidden-reentrancy tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 383,
+      "obj_id": "INV-MPY-5",
+      "text": "rlvgl MUST deliver Python callbacks by tokenized queued cues at VM-safe points and MUST NOT invoke Python synchronously from native runtime or interrupt contexts."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST",
+          "MUST NOT"
+        ],
+        "title": "",
+        "verified_by": "MPY-04/05 dispatch-busy, rollback, and atomic-visibility tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 384,
+      "obj_id": "INV-MPY-6",
+      "text": "Callback-driven and multi-object mutations MUST enter through validated command batches and MUST NOT mutate the object tree during active native dispatch."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-07/08 shared trace conformance suite."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 385,
+      "obj_id": "INV-MPY-7",
+      "text": "In-process and dual-core transport profiles MUST preserve the same command meanings, event meanings, ordering rules, errors, and version negotiation."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-02/08 no-std builds, capacity boundary tests, and queue stress tests."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 386,
+      "obj_id": "INV-MPY-8",
+      "text": "Every bounded resource and variable-sized value MUST expose capacity, ownership, overflow, truncation, and backpressure behavior suitable for `no_std + alloc` targets."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-01 matrix schema and MPY-09 parity-claim audit."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 387,
+      "obj_id": "INV-MPY-9",
+      "text": "Every LVGL introspection parity claim MUST name its MPY-I level, covered surface, inherited LPAR pin, and deterministic evidence; generic full-parity claims are forbidden."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST",
+          "MUST NOT"
+        ],
+        "title": "",
+        "verified_by": "MPY-03/06 capability rejection tests and call-context instrumentation."
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 388,
+      "obj_id": "INV-MPY-10",
+      "text": "MPY v1 actor execution MUST remain native: Python may direct and compose actors but MUST NOT execute in draw, measurement, hit-test, or native propagation paths."
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 450,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:1",
+      "text": "Embedded Python rendering. MPY v1 does not call Python to draw pixels,"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 452,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:2",
+      "text": "Raw LVGL ABI compatibility. MPY does not expose LVGL or Rust pointers,"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 454,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:3",
+      "text": "Generic full-parity claim. MPY does not imply every LVGL widget or"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 456,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:4",
+      "text": "Application framework policy. Navigation architecture, domain models,"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 459,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:5",
+      "text": "Snapshot restoration. Runtime snapshots are diagnostic in v1; they are"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 461,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:6",
+      "text": "Unbounded dynamic behavior. Targets are not required to provide"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "nongoal",
+      "line": 463,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:nongoal:7",
+      "text": "Immediate dual-core-first development. The protocol is dual-core-ready,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-1"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 493,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:493",
+      "text": "`INV-MPY-1` ownership between the language-neutral runtime and the MicroPython adapter is accepted."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-2"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 494,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:494",
+      "text": "`INV-MPY-2` opaque generation-checked identity is accepted, with bit layout explicitly deferred to MPY-02."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-3"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 495,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:495",
+      "text": "`INV-MPY-3` establishes one descriptor catalog for creation and introspection."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-4"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 496,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:496",
+      "text": "`INV-MPY-4` accepts requested layout as director-owned and computed geometry as rlvgl-owned."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-5"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 497,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:497",
+      "text": "`INV-MPY-5` accepts queued VM-safe callbacks instead of synchronous Python event handlers."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 498,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:498",
+      "text": "`INV-MPY-6` accepts validated batches and post-dispatch callback mutations."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-7"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 499,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:499",
+      "text": "`INV-MPY-7` accepts one semantic protocol for in-process and dual-core profiles."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-8"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 500,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:500",
+      "text": "`INV-MPY-8` accepts explicit bounded-resource and ownership behavior."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-9"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 501,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:501",
+      "text": "`INV-MPY-9` accepts level-scoped introspection parity claims and the inherited LPAR pin."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-10"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 502,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:502",
+      "text": "`INV-MPY-10` accepts native-only actor execution for MPY v1."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-1",
+          "INV-MPY-7"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 503,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:503",
+      "text": "The MPY-01 through MPY-09 phase map is accepted without weakening `INV-MPY-1` or `INV-MPY-7`."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-MPY-2",
+          "INV-MPY-3",
+          "INV-MPY-5"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 504,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:504",
+      "text": "PCDN-MPY-001 through PCDN-MPY-006 are resolved or assigned to the named phase without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-5`."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-08-09",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Defines the MicroPython stage-and-actors ownership model,",
+        "touches": [
+          "INV-MPY-1",
+          "INV-MPY-2",
+          "INV-MPY-3",
+          "INV-MPY-4",
+          "INV-MPY-5",
+          "INV-MPY-6",
+          "INV-MPY-7",
+          "INV-MPY-8",
+          "INV-MPY-9",
+          "INV-MPY-10",
+          "§0–§14"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 540,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.1.0",
+      "text": "Defines the MicroPython stage-and-actors ownership model,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-1",
+          "INV-MPY-2",
+          "INV-MPY-3",
+          "INV-MPY-4",
+          "INV-MPY-5",
+          "INV-MPY-6",
+          "INV-MPY-7",
+          "INV-MPY-8",
+          "INV-MPY-9",
+          "INV-MPY-10",
+          "§0–§14"
+        ]
+      },
+      "doc": "docs/concepts/MPY-00-CONCEPTS.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 540,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.1.0-rationale",
+      "text": "The previous hardware-first sketch proved the binding and transport direction\nbut stopped at a fixed rectangle/text stack. MicroPython cannot orchestrate the\nfull UI from that surface. A discoverable, transport-independent runtime object\ncontract must precede additional Python wrappers so object identity, creation,\nproperties, layout, callbacks, and dual-core behavior do not diverge by widget\nor adapter."
+    }
+  ],
+  "schema_version": 2
+}

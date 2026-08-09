@@ -46,6 +46,7 @@ See crate overviews for:
 ## UI Framework
 - [UI-COMPONENT-ARCHITECTURE.md](./UI-COMPONENT-ARCHITECTURE.md) — Theme, components, Chakra-inspired widgets.
 - [SVELTE-DESIGN-TOKEN-ALIGNMENT.md](./SVELTE-DESIGN-TOKEN-ALIGNMENT.md) — Svelte design tokens and component IR.
+- [MPY-00-CONCEPTS.md](./concepts/MPY-00-CONCEPTS.md) — Draft MicroPython stage-and-actors runtime concepts, introspection parity levels, and phase map.
 
 ## Hardware Targets
 - [STM32H747I-DISCO hardware notes](../examples/stm32h747i-disco/HARDWARE.md) — Board reference (display, touch, pinout).
@@ -54,7 +55,7 @@ See crate overviews for:
 - [FreeRTOS Platform Guide](./disco-freertos-guide/README.md) — Volume IV: FreeRTOS preemptive tasks, interrupt-driven I2C4 touch, single-buffer rendering, joystick navigation.
 - [Zephyr Platform Guide](./disco-zephyr-guide/README.md) — Volume V: Zephyr C+Rust hybrid, video mode vs adapted command mode, DMA2D pipeline, CSleep/LPENR fix.
 - [FILESYSTEM-ASSET-LOADING.md](./assets/FILESYSTEM-ASSET-LOADING.md) — FAT32 asset loading on SD card + simulator.
-- [MICROPYTHON-INTEGRATION.md](./future/MICROPYTHON-INTEGRATION.md) — MicroPython on CM7 + rlvgl on CM4.
+- [MICROPYTHON-INTEGRATION.md](./future/MICROPYTHON-INTEGRATION.md) — Historical hardware-first sketch for MicroPython on CM7 + rlvgl on CM4; MPY-00 owns the active runtime plan.
 - [WIFI-TELEMETRY.md](../examples/stm32h747i-disco/WIFI-TELEMETRY.md) — Future WiFi telemetry design and D3 SRAM layout.
 
 ## Tutorials
