@@ -1,0 +1,722 @@
+{
+  "edge_count": 22,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 193,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 206,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 259,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 260,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 262,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 265,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 267,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 269,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 272,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 308,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 372,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 373,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 399,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 399,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 409,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 410,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 22,
+      "source": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 253,
+      "source": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 269,
+      "source": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 35,
+      "source": "docs/crates-ci/README.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 57,
+      "source": "docs/crates-ci/README.md",
+      "target": "INV-C1"
+    }
+  ],
+  "family": "crates-ci",
+  "kind_counts": {
+    "amendment": 17,
+    "invariant": 7
+  },
+  "object_count": 24,
+  "objects": [
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 259,
+      "obj_id": "INV-C1",
+      "text": "— No release tag without Gate P green on the same ref."
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 260,
+      "obj_id": "INV-C2",
+      "text": "— Consumer Projects contain zero `path`/`[patch]` routes into"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 262,
+      "obj_id": "INV-C3",
+      "text": "— Playit verb set is frozen vocabulary (Standards Action per"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 265,
+      "obj_id": "INV-C4",
+      "text": "— Snapshot comparisons always carry an explicit threshold;"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 267,
+      "obj_id": "INV-C5",
+      "text": "— No CI job for this initiative requires a display server or"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 269,
+      "obj_id": "INV-C6",
+      "text": "— `cargo package` artifacts consumed by Gate P are built from"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "invariant",
+      "line": 272,
+      "obj_id": "INV-C7",
+      "text": "— Layer W's stdout handshake string `PLAYIT_READY tcp://…` is"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — Initial draft (CRATES-CI-00). Gate topology (§5),",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 348,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@348",
+      "text": "**2026-06-10** — Initial draft (CRATES-CI-00). Gate topology (§5),"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — **RATIFIED** by owner. CLAUDE.md applicability list and",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 354,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@354",
+      "text": "**2026-06-10** — **RATIFIED** by owner. CLAUDE.md applicability list and"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — §6 amended during CRATES-CI-01 validation (per §6.4):",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 357,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@357",
+      "text": "**2026-06-10** — §6 amended during CRATES-CI-01 validation (per §6.4):"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-02 landed: `consumers/user-sim/` (custom",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 369,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@369",
+      "text": "**2026-06-10** — CRATES-CI-02 landed: `consumers/user-sim/` (custom"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-03 landed: Layer K via",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 391,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@391",
+      "text": "**2026-06-10** — CRATES-CI-03 landed: Layer K via"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-04 landed: Layer W. New root-crate feature",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 403,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@403",
+      "text": "**2026-06-10** — CRATES-CI-04 landed: Layer W. New root-crate feature"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-05 landed: Gate R.",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 423,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@423",
+      "text": "**2026-06-10** — CRATES-CI-05 landed: Gate R."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 8,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-01a: two Gate P blind spots closed after",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 433,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@433",
+      "text": "**2026-06-10** — CRATES-CI-01a: two Gate P blind spots closed after"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 9,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-01a amendment: the two asset-bearing",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 448,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@448",
+      "text": "**2026-06-10** — CRATES-CI-01a amendment: the two asset-bearing"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 10,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — CRATES-CI-06: initiative retrospective drafted at",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 459,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@459",
+      "text": "**2026-06-10** — CRATES-CI-06: initiative retrospective drafted at"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 11,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — Post-close amendment (owner request): pre-publish",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 465,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@465",
+      "text": "**2026-06-10** — Post-close amendment (owner request): pre-publish"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 12,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-12** — SCTD-04 release amendment: Gate P and the publish chain",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 478,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@478",
+      "text": "**2026-07-12** — SCTD-04 release amendment: Gate P and the publish chain"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 13,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-12** — SCTD-04 Gate P validation amendment: packaging the bridge",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 485,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@485",
+      "text": "**2026-07-12** — SCTD-04 Gate P validation amendment: packaging the bridge"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 14,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-12** — Gate P host-target amendment: the creator-cli and user-sim",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 493,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@493",
+      "text": "**2026-07-12** — Gate P host-target amendment: the creator-cli and user-sim"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 15,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 498,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@498",
+      "text": "**2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 16,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-13",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-13** — Trusted Publishing amendment (owner direction): the 403 on",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 503,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-13@503",
+      "text": "**2026-07-13** — Trusted Publishing amendment (owner direction): the 403 on"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-10** — Retrospective drafted at initiative completion",
+        "touches": null
+      },
+      "doc": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 313,
+      "obj_id": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md#2026-06-10@313",
+      "text": "**2026-06-10** — Retrospective drafted at initiative completion"
+    }
+  ],
+  "schema_version": 2
+}

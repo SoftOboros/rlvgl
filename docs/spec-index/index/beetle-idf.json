@@ -1,0 +1,1254 @@
+{
+  "edge_count": 59,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 70,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 98,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 156,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 169,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 176,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 188,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 194,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 249,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 251,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 23,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 37,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 44,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 48,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 61,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 69,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 70,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 105,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 110,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 114,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 159,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 163,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 165,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 40,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 47,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 48,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 56,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 58,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 94,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 98,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 133,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 136,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "target": "INV-BEETLE-IDF-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 21,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 63,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 116,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 131,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 153,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 18,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 84,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 113,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 123,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 127,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 133,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 139,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 141,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 143,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 144,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 181,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 183,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 185,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 187,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 188,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 217,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 218,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 219,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 220,
+      "source": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "target": "INV-BEETLE-IDF-5-4"
+    }
+  ],
+  "family": "beetle-idf",
+  "kind_counts": {
+    "amendment": 7,
+    "gate": 32,
+    "invariant": 16
+  },
+  "object_count": 55,
+  "objects": [
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Render entry signature is frozen",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 156,
+      "obj_id": "INV-BEETLE-IDF-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "ilp32f float ABI",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 169,
+      "obj_id": "INV-BEETLE-IDF-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Every drawn frame clears then writes back",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 176,
+      "obj_id": "INV-BEETLE-IDF-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Pixel byte order is B,G,R",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 188,
+      "obj_id": "INV-BEETLE-IDF-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Release-debounced single tap",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 194,
+      "obj_id": "INV-BEETLE-IDF-5",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 248,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md:gate:248",
+      "text": "(a) The hybrid builds: `idf.py build` compiles the Rust staticlib"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 250,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md:gate:250",
+      "text": "(b) The render entry signature matches between header and Rust"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 252,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md:gate:252",
+      "text": "(c) disco-demo paints and is interactive on the panel (chapters"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 254,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md:gate:254",
+      "text": "(d) Backlight is adjustable from the UI (chapter 04, HIL-verified)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 255,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md:gate:255",
+      "text": "(e) The star crawl runs on a tap of the Info → Star Crawl item and"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified) — Concepts gate authored to give the",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 277,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md#2026-06-19@277",
+      "text": "**2026-06-19** (ratified) — Concepts gate authored to give the"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 102,
+      "obj_id": "INV-BEETLE-IDF-1",
+      "text": "(render entry signature) — the `#[no_mangle]`"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 105,
+      "obj_id": "INV-BEETLE-IDF-2",
+      "text": "(ilp32f) — the payload MUST build for"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 110,
+      "obj_id": "INV-BEETLE-IDF-3",
+      "text": "(clear + writeback) — M1 establishes the writeback"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 114,
+      "obj_id": "INV-BEETLE-IDF-4",
+      "text": "(B,G,R byte order) — `Rgb888Renderer::put` stores"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 158,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md:gate:158",
+      "text": "(a) The hybrid builds: `idf.py build` compiles the Rust staticlib"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 160,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md:gate:160",
+      "text": "(b) The render entry resolves at link and is called every frame by"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 162,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md:gate:162",
+      "text": "(c) `Rgb888Renderer` writes `[B,G,R]` packed pixels; a logical blue"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 164,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md:gate:164",
+      "text": "(d) The C host writes the FB back with `esp_cache_msync(..., C2M)`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 166,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md:gate:166",
+      "text": "(e) **HIL control 2026-06-14:** IDF locked `phy_status=0x0000153d`"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified retroactively) — documents work that shipped on",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 185,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-01-RENDER-BRIDGE.md#2026-06-19@185",
+      "text": "**2026-06-19** (ratified retroactively) — documents work that shipped on"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 94,
+      "obj_id": "INV-BEETLE-IDF-1",
+      "text": "(render entry signature) — M3 is where the entry"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 98,
+      "obj_id": "INV-BEETLE-IDF-5",
+      "text": "(release-debounced single tap) — a finger lift is"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 128,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md:gate:128",
+      "text": "(a) The FT5x06 is read each frame on the shared I2C bus; point 1"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 130,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md:gate:130",
+      "text": "(b) Both axes are flipped into screen space; a tap \"follows my"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 132,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md:gate:132",
+      "text": "(c) The render entry carries `touch_x/touch_y/touch_active`;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 134,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md:gate:134",
+      "text": "(d) Release debounce collapses single-frame dropouts; one physical"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 137,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md:gate:137",
+      "text": "(e) A magenta feedback dot marks the live contact point each frame"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified retroactively) — documents work that shipped on",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 154,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-02-TOUCH.md#2026-06-19@154",
+      "text": "**2026-06-19** (ratified retroactively) — documents work that shipped on"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 102,
+      "obj_id": "INV-BEETLE-IDF-3",
+      "text": "(clear + writeback) — M4 implements the *clear*"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 148,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md:gate:148",
+      "text": "(a) The shared `rlvgl-app-disco-demo` crate mounts unforked, with"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 150,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md:gate:150",
+      "text": "(b) The controller persists across frames in `APP`, lazy-built on"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md:gate:152",
+      "text": "(c) The framebuffer is cleared every frame; wings open *and* close,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md:gate:154",
+      "text": "(d) `draw_pixels` blends per-pixel alpha; RLE icons composite"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 156,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md:gate:156",
+      "text": "(e) Taps reach the demo's `ActionHotspot`s via `dispatch_event`,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified retroactively) — documents work that shipped on",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 174,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-03-DISCO-DEMO.md#2026-06-19@174",
+      "text": "**2026-06-19** (ratified retroactively) — documents work that shipped on"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 127,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md:gate:127",
+      "text": "(a) `SetBacklight` is drained on P4 and forwarded to the host hook"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 129,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md:gate:129",
+      "text": "(b) The host hook clamps, maps to PWM, and writes `REG_PWM`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 131,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md:gate:131",
+      "text": "(c) The PWM register *dims* the panel — HIL log"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 133,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md:gate:133",
+      "text": "(d) Pointer platforms show the shared `BacklightPanel` slider;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 136,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md:gate:136",
+      "text": "(e) disco-demo carries regression tests:"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified retroactively) — documents work that shipped on",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 164,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-04-BACKLIGHT.md#2026-06-19@164",
+      "text": "**2026-06-19** (ratified retroactively) — documents work that shipped on"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Adapter owns the crawl lifecycle",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 113,
+      "obj_id": "INV-BEETLE-IDF-5-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Active crawl suppresses the widget tree and touch dispatch",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 123,
+      "obj_id": "INV-BEETLE-IDF-5-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Deterministic starfield",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 133,
+      "obj_id": "INV-BEETLE-IDF-5-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Crawl honors the frame contract",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "invariant",
+      "line": 139,
+      "obj_id": "INV-BEETLE-IDF-5-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 180,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:180",
+      "text": "(a) Activate the crawl on a drained `StartEffect(StarCrawl)`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 182,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:182",
+      "text": "(b) Render a starfield + perspective scrolling text through"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 184,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:184",
+      "text": "(c) Suppress the widget tree and touch dispatch while active;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 186,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:186",
+      "text": "(d) Deactivate at end-of-script and return to the widget tree"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": [
+          "INV-BEETLE-IDF-5-3"
+        ]
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 188,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:188",
+      "text": "(e) Generate the starfield deterministically (INV-BEETLE-IDF-5-3)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 189,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:189",
+      "text": "(f) Keep the build green: the staticlib compiles for"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "gate",
+      "line": 192,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md:gate:192",
+      "text": "(g) **HIL:** tapping Info → Star Crawl runs the crawl; a tap"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (ratified) — Spec authored ahead of implementation",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 216,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md#2026-06-19@216",
+      "text": "**2026-06-19** (ratified) — Spec authored ahead of implementation"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-19** (HIL-verified) — Flashed to the DFR1237 + DFR0550-V2",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md",
+      "family": "beetle-idf",
+      "kind": "amendment",
+      "line": 223,
+      "obj_id": "docs/beetle-esp32p4-idf/BEETLE-IDF-05-STAR-CRAWL.md#2026-06-19@223",
+      "text": "**2026-06-19** (HIL-verified) — Flashed to the DFR1237 + DFR0550-V2"
+    }
+  ],
+  "schema_version": 2
+}

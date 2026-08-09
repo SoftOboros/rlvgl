@@ -1,0 +1,1321 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "ki2c",
+  "kind_counts": {
+    "amendment": 18,
+    "gate": 70
+  },
+  "object_count": 88,
+  "objects": [
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 245,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:245",
+      "text": "Confirm one publishable leaf crate per confirmed device and the proposed"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 247,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:247",
+      "text": "Confirm that `rlvgl-kria-i2c` belongs in this workspace rather than a"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 249,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:249",
+      "text": "Confirm blocking `embedded-hal` 1.0 as the v1 contract and async as"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 251,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:251",
+      "text": "Confirm EEPROM and KSZ9897S remain gated on stronger board evidence."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 252,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:252",
+      "text": "Confirm PTN3460 and PCM3168A begin with board-required control-plane"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 254,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:254",
+      "text": "Confirm the local Qwen executor / Llama judge, one-candidate-path PUT,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 256,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:256",
+      "text": "Confirm Memory Alpha notebook 57 is the evidence root and that every"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 261,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:261",
+      "text": "All admitted leaf crates pass §8 gates and document their public APIs."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 262,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:262",
+      "text": "One shared PL bus can host VEML3235SL, PTN3460, and PCM3168A handles"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 264,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:264",
+      "text": "`PsI2c0`, `PsI2c1`, and `PlFrontPanelI2c` map without hard-coded Linux"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 266,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:266",
+      "text": "Hardware smoke evidence exists for every admitted fitted device, or a"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 268,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:268",
+      "text": "The PCM3168A electrical-level risk and reset/clock prerequisites appear"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 270,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:270",
+      "text": "RLVGL validation remains green and release versions are bumped where"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 272,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md:gate:272",
+      "text": "A retrospective records divergences, deferred items, and reusable"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-07 hardware-blocked handoff.** Recorded the exact board,",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 306,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@306",
+      "text": "**2026-07-15 — KI2C-07 hardware-blocked handoff.** Recorded the exact board,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-06 complete.** Added the three-controller backend",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 310,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@310",
+      "text": "**2026-07-15 — KI2C-06 complete.** Added the three-controller backend"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-05 complete.** Expanded TI SBAS452A Rev. A and added",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 316,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@316",
+      "text": "**2026-07-15 — KI2C-05 complete.** Expanded TI SBAS452A Rev. A and added"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-04 complete.** Expanded NXP Rev 4 and AN11128 Rev 1.9,",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 320,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@320",
+      "text": "**2026-07-15 — KI2C-04 complete.** Expanded NXP Rev 4 and AN11128 Rev 1.9,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-03 complete.** Added the `no_std` VEML3235SL leaf",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 325,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@325",
+      "text": "**2026-07-15 — KI2C-03 complete.** Added the `no_std` VEML3235SL leaf"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-02 complete.** Added the `no_std` STTS22H leaf driver",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 329,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@329",
+      "text": "**2026-07-15 — KI2C-02 complete.** Added the `no_std` STTS22H leaf driver"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-01 complete.** Added the strict reusable transaction",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 332,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@332",
+      "text": "**2026-07-15 — KI2C-01 complete.** Added the strict reusable transaction"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 8,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-07-15 — ratified",
+        "summary": "**2026-07-15 — Ratified.** The operator accepted §12 without amendment.",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 336,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@336",
+      "text": "**2026-07-15 — Ratified.** The operator accepted §12 without amendment."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 9,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-07-15 — drafted",
+        "summary": "**2026-07-15 — Drafted.** Recorded the corrected three-bus topology from",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-00-CONCEPTS.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 339,
+      "obj_id": "docs/concepts/KI2C-00-CONCEPTS.md#2026-07-15@339",
+      "text": "**2026-07-15 — Drafted.** Recorded the corrected three-bus topology from"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 147,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:147",
+      "text": "Both crates are workspace members."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 148,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:148",
+      "text": "Strict ordered transaction behavior is covered by fixed tests."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 149,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:149",
+      "text": "Corrected PS split and collision-free shared PL bus are covered."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 150,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:150",
+      "text": "Three logical device handles complete independent transactions."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:151",
+      "text": "Default surfaces are documented and `no_std`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:152",
+      "text": "Linux feature compiles for AArch64 Linux without fixed adapter numbers."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:153",
+      "text": "Format, test, clippy, cross-check, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md:gate:154",
+      "text": "Independent local tactical judge verdict is `ACCEPT`."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-06 integration amendment.** Extended the Kria crate's",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 179,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md#2026-07-15@179",
+      "text": "**2026-07-15 — KI2C-06 integration amendment.** Extended the Kria crate's"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — KI2C-04 address-format amendment.** NXP AN11128 protocol",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 185,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md#2026-07-15@185",
+      "text": "**2026-07-15 — KI2C-04 address-format amendment.** NXP AN11128 protocol"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Reactive gates passed after bounded local-Qwen",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 189,
+      "obj_id": "docs/concepts/KI2C-01-SUPPORT-SUBSTRATE.md#2026-07-15@189",
+      "text": "**2026-07-15 — Completed.** Reactive gates passed after bounded local-Qwen"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 149,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:149",
+      "text": "Publishable `no_std` embedded-hal 1.0 leaf crate."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 150,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:150",
+      "text": "Side-effect-free constructors and owned-handle release."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:151",
+      "text": "Typed legal addresses with Kria `0x38` default."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:152",
+      "text": "WHOAMI identity and backend error preservation."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:153",
+      "text": "Safe one-shot, low-ODR, and freerun configuration."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:154",
+      "text": "Coherent positive/negative centi-degree temperature reads."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 155,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:155",
+      "text": "Read-to-clear status semantics."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 156,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:156",
+      "text": "Exact high/low threshold encoding and rejection."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 157,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:157",
+      "text": "Host, lint, cross-target, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 158,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md:gate:158",
+      "text": "Independent Llama verdict `ACCEPT`."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Expanded DS12606 Rev 8, implemented and tested",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-02-STTS22H.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 179,
+      "obj_id": "docs/concepts/KI2C-02-STTS22H.md#2026-07-15@179",
+      "text": "**2026-07-15 — Completed.** Expanded DS12606 Rev 8, implemented and tested"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:151",
+      "text": "Publishable `no_std` embedded-hal 1.0 leaf crate."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:152",
+      "text": "Side-effect-free constructor and owned-handle release."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:153",
+      "text": "Fixed `0x10` address and low-byte identity probe."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:154",
+      "text": "Only legal integration, analog-gain, and digital-gain encodings."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 155,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:155",
+      "text": "Paired active/shutdown state with reserved-bit discipline."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 156,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:156",
+      "text": "Little-endian raw ALS and white channel reads."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 157,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:157",
+      "text": "Exact integer micro-lux conversion for all 30 table entries."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 158,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:158",
+      "text": "Configuration failure and inactive-state safety."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 159,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:159",
+      "text": "Host, lint, cross-target, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 160,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md:gate:160",
+      "text": "Independent Llama verdict `ACCEPT`."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Expanded Vishay document 80011 Rev 1.4,",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-03-VEML3235SL.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 181,
+      "obj_id": "docs/concepts/KI2C-03-VEML3235SL.md#2026-07-15@181",
+      "text": "**2026-07-15 — Completed.** Expanded Vishay document 80011 Rev 1.4,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 145,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:145",
+      "text": "Publishable `no_std` embedded-hal 1.0 leaf crate."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 146,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:146",
+      "text": "Side-effect-free constructors and owned-handle release."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 147,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:147",
+      "text": "Both NXP address bytes correctly normalized to seven-bit values."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 148,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:148",
+      "text": "Health probe preserves actual big-endian configuration magic."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 149,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:149",
+      "text": "No unsupported silicon-identity claim."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 150,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:150",
+      "text": "All legal register `0x82` settings typed and round-tripped."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:151",
+      "text": "Every reserved register `0x82` encoding rejected."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:152",
+      "text": "Kria topology and shared-bus fixtures corrected to `0x20`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:153",
+      "text": "Host, lint, cross-target, Linux, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md:gate:154",
+      "text": "Independent Llama verdict `ACCEPT`."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Expanded both primary NXP sources, corrected",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-04-PTN3460.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 180,
+      "obj_id": "docs/concepts/KI2C-04-PTN3460.md#2026-07-15@180",
+      "text": "**2026-07-15 — Completed.** Expanded both primary NXP sources, corrected"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 147,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:147",
+      "text": "Publishable `no_std` embedded-hal 1.0 leaf crate."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 148,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:148",
+      "text": "Side-effect-free constructors and owned-handle release."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 149,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:149",
+      "text": "All four legal seven-bit addresses with Kria `0x44` default."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 150,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:150",
+      "text": "I2C operations unavailable before readiness attestation."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:151",
+      "text": "All three external readiness conditions explicit."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 152,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:152",
+      "text": "Truthful reset-state health with reserved-bit rejection."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:153",
+      "text": "Exact common slave DAC/ADC format writes."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 154,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:154",
+      "text": "Sampling-mode-preserving, validated resynchronization."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 155,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:155",
+      "text": "Host, lint, cross-target, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 156,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md:gate:156",
+      "text": "Independent Llama verdict `ACCEPT`."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Expanded TI SBAS452A, implemented and tested",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-05-PCM3168A.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 179,
+      "obj_id": "docs/concepts/KI2C-05-PCM3168A.md#2026-07-15@179",
+      "text": "**2026-07-15 — Completed.** Expanded TI SBAS452A, implemented and tested"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 174,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:174",
+      "text": "Complete generic logical-to-physical mapping with no fixed paths."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 175,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:175",
+      "text": "One owned backend per physical controller."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 176,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:176",
+      "text": "STTS22H routed to PS I2C1."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 177,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:177",
+      "text": "VEML3235SL, PTN3460, and PCM3168A routed through one shared PL cell."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 178,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:178",
+      "text": "PCM3168A readiness remains an explicit board-owned attestation."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 179,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:179",
+      "text": "Allocation-free diagnostics retain endpoint, values, and leaf errors."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 180,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:180",
+      "text": "Host, lint, no-std, Linux cross-target, docs, and diff gates pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "gate",
+      "line": 181,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md:gate:181",
+      "text": "Independent Llama verdict `ACCEPT` with no blocking findings."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Completed.** Implemented the explicit three-controller",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 215,
+      "obj_id": "docs/concepts/KI2C-06-KRIA-INTEGRATION.md#2026-07-15@215",
+      "text": "**2026-07-15 — Completed.** Implemented the explicit three-controller"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-07-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-07-15 — Blocked handoff created.** Recorded the cumulative software",
+        "touches": null
+      },
+      "doc": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 184,
+      "obj_id": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md#2026-07-15@184",
+      "text": "**2026-07-15 — Blocked handoff created.** Recorded the cumulative software"
+    }
+  ],
+  "schema_version": 2
+}

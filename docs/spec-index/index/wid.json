@@ -1,0 +1,184 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "wid",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 7,
+    "term": 5
+  },
+  "object_count": 13,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "WID",
+        "term": "Edit buffer"
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "term",
+      "line": 55,
+      "obj_id": "wid:term:edit buffer",
+      "text": "The widget-owned `String` holding current content; ASCII-bounded in v1 (§5.2), so byte index == char index."
+    },
+    {
+      "attrs": {
+        "relationship": "WID",
+        "term": "Caret"
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "term",
+      "line": 56,
+      "obj_id": "wid:term:caret",
+      "text": "Insertion position as a char index into the edit buffer (`0..=len`). For `Textarea`, derived (row, col) against `'\\n'`-split lines."
+    },
+    {
+      "attrs": {
+        "relationship": "WID",
+        "term": "Active"
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "term",
+      "line": 57,
+      "obj_id": "wid:term:active",
+      "text": "The state in which a field consumes `KeyDown` (§7). Toggled only by `set_active(bool)`."
+    },
+    {
+      "attrs": {
+        "relationship": "WID",
+        "term": "Accepted charset"
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "term",
+      "line": 58,
+      "obj_id": "wid:term:accepted charset",
+      "text": "Predicate `Fn(char) -> bool` filtering insertions *after* the v1 ASCII bound (§5.2/§8.2)."
+    },
+    {
+      "attrs": {
+        "relationship": "WID",
+        "term": "Nominal char metrics"
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "term",
+      "line": 59,
+      "obj_id": "wid:term:nominal char metrics",
+      "text": "`char_width` / `line_height` used for caret geometry in lieu of backend glyph extents (§6.3)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 182,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:182",
+      "text": "Synthetic `KeyDown` streams produce expected buffer/caret states"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 184,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:184",
+      "text": "Inactive inputs ignore keys; `set_active` switches the recipient"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 186,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:186",
+      "text": "`on_change` fires once per successful edit; `on_submit` fires on"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 188,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:188",
+      "text": "Charset hook rejects out-of-set characters with buffer and caret"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 190,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:190",
+      "text": "playit `KD:`/`KU:` script types \"HI\" then `Backspace` into the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 193,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:193",
+      "text": "Existing rlvgl-ui tests stay green, unmodified."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "gate",
+      "line": 194,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md:gate:194",
+      "text": "Published in a crates.io 0.2.x release."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-11** — WID-00 drafted and ratified. Edit model §5 (ASCII",
+        "touches": null
+      },
+      "doc": "docs/concepts/WID-00-CONCEPTS.md",
+      "family": "wid",
+      "kind": "amendment",
+      "line": 223,
+      "obj_id": "docs/concepts/WID-00-CONCEPTS.md#2026-06-11@223",
+      "text": "**2026-06-11** — WID-00 drafted and ratified. Edit model §5 (ASCII"
+    }
+  ],
+  "schema_version": 2
+}

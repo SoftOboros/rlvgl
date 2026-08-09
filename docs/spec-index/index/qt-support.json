@@ -1,0 +1,780 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "qt-support",
+  "kind_counts": {
+    "gate": 64
+  },
+  "object_count": 64,
+  "objects": [
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 319,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:319",
+      "text": "§0 cites RFC 2119 / 8174."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 320,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:320",
+      "text": "§3 names every `Ui*` IR type currently defined in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 323,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:323",
+      "text": "§5 enumerates the phase set with one row per known phase."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 324,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:324",
+      "text": "§6 freezes the assignment-value kind set."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 325,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:325",
+      "text": "§7 freezes the schema version policy."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 326,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:326",
+      "text": "§8 freezes the commit prefix."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 327,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:327",
+      "text": "§10 names a reconciliation owner for every adjacent primitive"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/00-concepts.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 329,
+      "obj_id": "docs/qt-support/00-concepts.md:gate:329",
+      "text": "§15 carries a dated initial change-log entry."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 215,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:215",
+      "text": "[`schemas/qt-ir.schema.json`](../../schemas/qt-ir.schema.json) exists,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 217,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:217",
+      "text": "[`tests/fixtures/qt/hello.qt-ir.json`](../../tests/fixtures/qt/hello.qt-ir.json) exists."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 218,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:218",
+      "text": "The schema-drift unit test in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 221,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:221",
+      "text": "The golden-file integration test in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 224,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:224",
+      "text": "The roundtrip test (`canonical_fixture_roundtrips`) passes."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 225,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:225",
+      "text": "`pub const QT_IR_SCHEMA_ID` and `pub const QT_IR_SCHEMA_COMMENT`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 227,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:227",
+      "text": "[`docs/creator/QT-INGEST.md`](../creator/QT-INGEST.md) names the canonical schema location."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/02-ir-schema.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 228,
+      "obj_id": "docs/qt-support/02-ir-schema.md:gate:228",
+      "text": "§15 carries a dated initial change-log entry."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 234,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:234",
+      "text": "[`src/bin/creator/qt.rs`](../../src/bin/creator/qt.rs) defines"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 236,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:236",
+      "text": "[`src/bin/creator/qt.rs`](../../src/bin/creator/qt.rs) defines"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 238,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:238",
+      "text": "[`tests/fixtures/qt/hello.rs`](../../tests/fixtures/qt/hello.rs) exists."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 239,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:239",
+      "text": "The drift gate (`qt_emit_matches_canonical_golden_rs` in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 242,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:242",
+      "text": "The compile-as-mod gate"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 245,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:245",
+      "text": "The §6 emit-vs-skip table covers every QML construct currently"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 247,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:247",
+      "text": "The §8 string-escape rule names the canonical `rust_str_lit` helper."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03-rlvgl-emitter-widgets.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 248,
+      "obj_id": "docs/qt-support/03-rlvgl-emitter-widgets.md:gate:248",
+      "text": "§15 carries a dated initial change-log entry."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 299,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:299",
+      "text": "§5 mapping table covers every QML type currently produced by"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 302,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:302",
+      "text": "§6 names every QML property `target` the emitter is expected"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 304,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:304",
+      "text": "§7 specifies the bounds-resolution rule with no ambiguity in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 306,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:306",
+      "text": "§8 freezes the builder-function naming convention."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 307,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:307",
+      "text": "§11 documents the `--target` flag, the default-flip rule, and"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 309,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:309",
+      "text": "`qt::render_rlvgl(&UiModule) -> String` exists in [`src/bin/creator/qt.rs`](../../src/bin/creator/qt.rs)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 310,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:310",
+      "text": "`qt::emit(&Path, &Path, EmitTarget)` dispatches on the target;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 312,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:312",
+      "text": "Canonical golden at"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 315,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:315",
+      "text": "Drift gate `qt_emit_rlvgl_matches_canonical_golden_rs` (in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 317,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:317",
+      "text": "Compile-as-mod gate"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/03b-rlvgl-widget-mapping.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 320,
+      "obj_id": "docs/qt-support/03b-rlvgl-widget-mapping.md:gate:320",
+      "text": "`QT_EMIT_VERSION_DATA` and `QT_EMIT_VERSION_RLVGL` exported; the old"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 251,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:251",
+      "text": "§5 names the handler-supported widget set."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 252,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:252",
+      "text": "§6 names the lowered signal subset for each supported widget."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 253,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:253",
+      "text": "§7 fixes the closure shape and body-comment policy."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 254,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:254",
+      "text": "§8 fixes the emit order inside the widget-construction block."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 255,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:255",
+      "text": "§11 names the version bump and rationale."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 256,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:256",
+      "text": "`qt::render_rlvgl` emits `Button` widgets with `set_on_click`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 259,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:259",
+      "text": "`QT_EMIT_VERSION_RLVGL = 3` exported from"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 261,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:261",
+      "text": "New canonical fixture"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 264,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:264",
+      "text": "Goldens for the new fixture exist:"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 268,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:268",
+      "text": "Three drift gates pass — `qt_clickable_fixture_ingest_matches_golden`,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 272,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:272",
+      "text": "Compile-as-mod gate"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04-signal-handlers.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 276,
+      "obj_id": "docs/qt-support/04-signal-handlers.md:gate:276",
+      "text": "QT-03b §5 / §15 amended to record the Button row promotion."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 359,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:359",
+      "text": "§3 names the `ScreenState` shape, its derives, and the new"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 361,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:361",
+      "text": "§5 freezes the supported property type set."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 362,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:362",
+      "text": "§6 freezes the default-value lowering rules."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 363,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:363",
+      "text": "§7 freezes the handler-body lowering grammar."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 364,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:364",
+      "text": "§8 freezes the ID resolution scope (root only at QT-04b)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 365,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:365",
+      "text": "§11 names the version bump and rationale."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 366,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:366",
+      "text": "`qt::render_rlvgl` emits the `ScreenState` struct + the new"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 369,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:369",
+      "text": "Property defaults lower per §6 (helpers"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 372,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:372",
+      "text": "Handler bodies lower per §7 / §8 (`lower_handler_body`,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 375,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:375",
+      "text": "`QT_EMIT_VERSION_RLVGL = 4`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 376,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:376",
+      "text": "Existing rlvgl-target goldens"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 380,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:380",
+      "text": "Existing rlvgl compile-as-mod tests updated to consume the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 384,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:384",
+      "text": "New canonical fixture"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 386,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:386",
+      "text": "Goldens exist:"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 390,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:390",
+      "text": "Drift gates pass — `qt_counter_fixture_{ingest,data_emit,rlvgl_emit}_matches_golden`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 391,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:391",
+      "text": "Compile-as-mod gate"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/qt-support/04b-properties-bindings.md",
+      "family": "qt-support",
+      "kind": "gate",
+      "line": 396,
+      "obj_id": "docs/qt-support/04b-properties-bindings.md:gate:396",
+      "text": "QT-03b §3 / §15 amended to record the `build_screen`"
+    }
+  ],
+  "schema_version": 2
+}

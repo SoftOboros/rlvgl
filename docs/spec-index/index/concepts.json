@@ -1,0 +1,192 @@
+{
+  "edge_count": 7,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 34,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 34,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 35,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 183,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 617,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 636,
+      "source": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 227,
+      "source": "docs/concepts/README.md",
+      "target": "INV-SCTD02-1"
+    }
+  ],
+  "family": "concepts",
+  "kind_counts": {
+    "amendment": 5
+  },
+  "object_count": 5,
+  "objects": [
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-03 — drafted",
+        "summary": "**2026-05-03 — Drafted.** Initiative-completion",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "family": "concepts",
+      "kind": "amendment",
+      "line": 666,
+      "obj_id": "docs/concepts/DCB-RETROSPECTIVE.md#2026-05-03@666",
+      "text": "**2026-05-03 — Drafted.** Initiative-completion"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — Renamed `DCB-POST-MORTEM.md` →",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-RETROSPECTIVE.md",
+      "family": "concepts",
+      "kind": "amendment",
+      "line": 674,
+      "obj_id": "docs/concepts/DCB-RETROSPECTIVE.md#2026-05-03@674",
+      "text": "**2026-05-03 — Renamed `DCB-POST-MORTEM.md` →"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT retrospective drafted at initiative completion",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-RETROSPECTIVE.md",
+      "family": "concepts",
+      "kind": "amendment",
+      "line": 308,
+      "obj_id": "docs/concepts/FONT-RETROSPECTIVE.md#2026-06-15@308",
+      "text": "**2026-06-15** — FONT retrospective drafted at initiative completion"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15 (FONT-05 reopen — discharges the §5 Coupled carry-forward / FC2).**",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-RETROSPECTIVE.md",
+      "family": "concepts",
+      "kind": "amendment",
+      "line": 312,
+      "obj_id": "docs/concepts/FONT-RETROSPECTIVE.md#2026-06-15@312",
+      "text": "**2026-06-15 (FONT-05 reopen — discharges the §5 Coupled carry-forward / FC2).**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — Drafted at LPAR initiative completion (every named phase",
+        "touches": null
+      },
+      "doc": "docs/concepts/LPAR-RETROSPECTIVE.md",
+      "family": "concepts",
+      "kind": "amendment",
+      "line": 111,
+      "obj_id": "docs/concepts/LPAR-RETROSPECTIVE.md#2026-06-14@111",
+      "text": "**2026-06-14** — Drafted at LPAR initiative completion (every named phase"
+    }
+  ],
+  "schema_version": 2
+}

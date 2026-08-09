@@ -1,0 +1,144 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "ratatui",
+  "kind_counts": {
+    "gate": 11
+  },
+  "object_count": 11,
+  "objects": [
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 406,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:406",
+      "text": "§6.3's codepoint set is ratified (§15 dated entry) before any"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 408,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:408",
+      "text": "All four terminal `PackedFont` variants pack the identical"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 411,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:411",
+      "text": "`draw_cell` renders through the shared `FontMetrics` coverage"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 415,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:415",
+      "text": "Glyphs outside the ratified repertoire still degrade through the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 417,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:417",
+      "text": "`FONT_6X10` remains selectable as an explicit low-flash-cost"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 420,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:420",
+      "text": "`Modifier::BOLD`/`Modifier::ITALIC` select real font-variant"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 422,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:422",
+      "text": "A bold or italic box-drawing border (e.g. a `Block` with"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 426,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:426",
+      "text": "SCTD-04 §7's invariant carries a dated §15 amendment naming this"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 428,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:428",
+      "text": "Blink-phase advance is caller-driven only; no wall clock,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 430,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:430",
+      "text": "Advancing the blink phase marks the full surface dirty and is"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 434,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:434",
+      "text": "`Viewport::Inline` and `scrolling-regions` remain unimplemented,"
+    }
+  ],
+  "schema_version": 2
+}

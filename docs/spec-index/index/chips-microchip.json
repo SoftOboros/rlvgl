@@ -1,0 +1,1227 @@
+{
+  "edge_count": 29,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 131,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 138,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 152,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 155,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 155,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 271,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 279,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 295,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 304,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 313,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 322,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 330,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 384,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 437,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 438,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 540,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 603,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 623,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 630,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 644,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 645,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 838,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 838,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "target": "INV-MC8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 35,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 50,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 157,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 563,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "target": "INV-MC6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 36,
+      "source": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "target": "INV-MC6"
+    }
+  ],
+  "family": "chips-microchip",
+  "kind_counts": {
+    "amendment": 10,
+    "gate": 28,
+    "invariant": 8,
+    "nongoal": 11,
+    "term": 15
+  },
+  "object_count": 72,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "Microchip product taxonomy.",
+        "term": "SAM"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 127,
+      "obj_id": "chips-microchip:term:sam",
+      "text": "The Atmel-lineage Microchip MCU family branding (formerly \"SMART ARM-based Microcontrollers\"). Sub-families include SAM D / D5x / E5x / L / C / G / V / S, all ARM-Cortex-M cores. CHIPS-MICROCHIP scopes to the SAM Cortex-M slice; non-SAM Microchip parts are out of scope per §11."
+    },
+    {
+      "attrs": {
+        "relationship": "This doc.",
+        "term": "SAM D-class"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 128,
+      "obj_id": "chips-microchip:term:sam d-class",
+      "text": "The umbrella covering SAM D5x / E5x (Cortex-M4F at 120 MHz) and SAM D / SAM L / SAM C (Cortex-M0+ at 48 MHz). Used here to abstract over the part-number families when the distinction doesn't matter for IR shape."
+    },
+    {
+      "attrs": {
+        "relationship": "This doc; mirrors ESP's `pac_crate:` convention.",
+        "term": "PAC crate"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 129,
+      "obj_id": "chips-microchip:term:pac crate",
+      "text": "Per-chip svd2rust-generated peripheral access crate, published from `atsamd-rs/atsamd`. E.g. `atsamd51j19a` v0.13.x. The Microchip chip YAML's `pac_crate:` key names the crate; `pac_version:` pins the minor version. As defined in `chipdb/rlvgl-chips-microchip/db/chips/ATSAMD51J19A.yaml:5`; adapted: this doc adds the `pac_version:` key that the stub does not yet carry."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §15 (GCLK).",
+        "term": "GCLK"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 130,
+      "obj_id": "chips-microchip:term:gclk",
+      "text": "Generic Clock Controller. The SAM D-class central clock multiplexer that selects one of N clock sources and divides it down to drive one or more peripheral generic-clock channels. Distinct from the PCM (Power Manager Channel) gate that controls APB / AHB clock distribution."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §16 (MCLK).",
+        "term": "MCLK"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 131,
+      "obj_id": "chips-microchip:term:mclk",
+      "text": "Main Clock Controller (SAM D5x/E5x; the SAM D21 equivalent is **PM** — Power Manager). Owns the AHB and APBA/APBB/APBC/APBD bus clock enable masks. Asserting a peripheral's `MCLK.APBx_MASK` bit ungates its bus clock; the corresponding `GCLK.PCHCTRL` peripheral generic-clock channel ungates its functional clock. **Two-step gating** is normative for the SAM D-class — see §6 INV-MC1."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §32 (PORT).",
+        "term": "PORT"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 132,
+      "obj_id": "chips-microchip:term:port",
+      "text": "The SAM GPIO controller. Each pad is identified by a `(group, pin)` pair (`group` 0..3 = ports A..D; `pin` 0..31). Mux selection is via the `PMUX` register (4-bit selector encoding alternate functions A..H or N). The `PINCFG` register controls input-enable / pull / drive-strength bits. CHIPS-MICROCHIP's `io_mux.rs` template emits `PORT.GROUPx.PMUX` + `PINCFG` writes."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §34 (SERCOM).",
+        "term": "SERCOM"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 133,
+      "obj_id": "chips-microchip:term:sercom",
+      "text": "The Serial Communication peripheral block — six (D5x) or five (D21) instances per chip, each runtime-configurable as USART / I²C master / I²C slave / SPI master / SPI slave. The `mode:` field on a SERCOM instance in chip YAML names which protocol the generator emits init code for. SERCOM mode IS the IR shape's source of asymmetry vs. ESP's fixed-role peripherals (where `uart0` is always a UART)."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §25 (NVMCTRL).",
+        "term": "NVMCTRL"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 134,
+      "obj_id": "chips-microchip:term:nvmctrl",
+      "text": "The flash controller. The chip YAML's `memory:` block names the flash region size, but bring-up code does not currently touch NVMCTRL; only its wait-state count needs configuring as a function of CPU frequency. Captured in `clocks.rs` for the D5x line, per §7."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §22 (EIC).",
+        "term": "EIC"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 135,
+      "obj_id": "chips-microchip:term:eic",
+      "text": "External Interrupt Controller. Pin-routed interrupt source for the SAM D-class. Out of scope for CHIPS-MICROCHIP-01; the IR carries a placeholder field but emits no init code. Standards Action to extend."
+    },
+    {
+      "attrs": {
+        "relationship": "This doc.",
+        "term": "MicrochipIr"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 136,
+      "obj_id": "chips-microchip:term:microchipir",
+      "text": "The vendor-specific intermediate representation produced by `src/bin/creator/bsp/microchip/load.rs` from the chip+board YAML pair. Parallels `EspIr` in `src/bin/creator/bsp/espressif/ir.rs`. Owned by CHIPS-MICROCHIP-01; **does not exist in repo yet**."
+    },
+    {
+      "attrs": {
+        "relationship": "This doc; mirrors ESP's emission contract.",
+        "term": "template set"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 137,
+      "obj_id": "chips-microchip:term:template set",
+      "text": "The six MiniJinja templates the generator emits per board: `mod.rs.jinja`, `pac.rs.jinja`, `clocks.rs.jinja`, `io_mux.rs.jinja`, `peripherals.rs.jinja`, `board.rs.jinja`. Linker scripts (`memory.x.jinja`, optionally `chip.x.jinja`) are emitted alongside but counted separately. As defined in `src/bin/creator/bsp/espressif/templates/`; used without modification on filename + role."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §32.",
+        "term": "PMUX function letter"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 138,
+      "obj_id": "chips-microchip:term:pmux function letter",
+      "text": "One of A..H (D5x) or A..N (D21 superset) naming which of the eight alternate functions a SAM pad is multiplexed to. Distinct from the ESP `iomux_fn` integer slot 0..3. The Microchip IR MUST encode this as a single-character string in the YAML, not an integer. See §6 INV-MC2."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §32.",
+        "term": "Pad"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 139,
+      "obj_id": "chips-microchip:term:pad",
+      "text": "A SAM physical pin, identified by `(group, pin)` (e.g. `(0, 23)` = PA23). Distinct from \"GPIO\" in the ESP sense — a SAM pad does not carry an inherent GPIO number; it carries an alternate-function multiplexer."
+    },
+    {
+      "attrs": {
+        "relationship": "SAM D5x/E5x Family Data Sheet §15 Table 15-3.",
+        "term": "PCHCTRL channel"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 140,
+      "obj_id": "chips-microchip:term:pchctrl channel",
+      "text": "Per-peripheral generic-clock channel in GCLK. Each peripheral has a fixed PCHCTRL index (e.g. SERCOM0_CORE is channel 7 on D5x); the chip YAML's `peripherals.<name>.gclk_pchctrl_id:` key records it. Required for SERCOM / TC / TCC / ADC / DAC; not required for AHB-only blocks like NVMCTRL."
+    },
+    {
+      "attrs": {
+        "relationship": "This doc; mirrors ESP.",
+        "term": "compile-verify"
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "term",
+      "line": 141,
+      "obj_id": "chips-microchip:term:compile-verify",
+      "text": "The opt-in test pattern that materialises a throwaway cargo project around the generated BSP files and runs `cargo check` against the real upstream PAC on `thumbv7em-none-eabihf` (or `thumbv6m-none-eabi`). Encoded by CHIPS-MICROCHIP-NN as `tests/bsp_microchip_compile.rs` behind a `compile-verify` Cargo feature. As defined in `tests/bsp_esp32c3_compile.rs`; adapted: target triple and PAC crate name"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Two-step peripheral clock gating.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 271,
+      "obj_id": "INV-MC1",
+      "text": "The"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "PMUX letter encoding.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 279,
+      "obj_id": "INV-MC2",
+      "text": "The chip YAML's `io_mux:`"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "PAC instance access style.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 288,
+      "obj_id": "INV-MC3",
+      "text": "Generated code MUST"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "chipdb crate public API stability.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 295,
+      "obj_id": "INV-MC4",
+      "text": "The"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "PAC version pinning.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 304,
+      "obj_id": "INV-MC5",
+      "text": "Each chip YAML carries an"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Per-board 6-file template emission.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 313,
+      "obj_id": "INV-MC6",
+      "text": "Every"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Vendor key.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 322,
+      "obj_id": "INV-MC7",
+      "text": "`rlvgl-chips-microchip::vendor()`"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST NOT"
+        ],
+        "title": "No vendored PACs.",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "invariant",
+      "line": 330,
+      "obj_id": "INV-MC8",
+      "text": "CHIPS-MICROCHIP MUST NOT vendor"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 454,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:1",
+      "text": "PIC8 family (PIC10F / PIC12F / PIC16F / PIC18F). 8-bit"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 458,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:2",
+      "text": "PIC24 / dsPIC (16-bit). Same Rust-availability problem;"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 460,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:3",
+      "text": "PIC32 (MIPS-core) (PIC32MX / PIC32MZ). 32-bit MIPS; Rust"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 464,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:4",
+      "text": "megaAVR / tinyAVR / AVR DA / DB / DD / EA (8-bit Atmel-AVR"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 472,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:5",
+      "text": "Microchip / Microsemi FPGAs (PolarFire, IGLOO2, SmartFusion2,"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 475,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:6",
+      "text": "SmartFusion2 Cortex-M3 / PolarFire SoC RISC-V hard cores"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 480,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:7",
+      "text": "AT91SAM9 / SAMA5 Cortex-A line (e.g. SAMA5D27). These are"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 484,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:8",
+      "text": "AT32UC3 (AVR32 line) Pre-Microchip-acquisition Atmel AVR32"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 493,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:10",
+      "text": "MPLAB Harmony / MCC / Atmel START generated code parsing"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 501,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:11",
+      "text": "EIC (External Interrupt Controller) init code The chip"
+    },
+    {
+      "attrs": {},
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "nongoal",
+      "line": 512,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md:nongoal:13",
+      "text": "Hardware bench validation The CHIPS-MICROCHIP-NN family"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 9,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-15",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-15 — CHIPS-MICROCHIP-07 + -01b amendments.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 711,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-15@711",
+      "text": "**2026-05-15 — CHIPS-MICROCHIP-07 + -01b amendments.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-14",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-14 — CHIPS-MICROCHIP-06b SERCOM USART hello-world shipped.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 748,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-14@748",
+      "text": "**2026-05-14 — CHIPS-MICROCHIP-06b SERCOM USART hello-world shipped.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-14",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-14 — CHIPS-MICROCHIP-06a LED blink shipped.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 758,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-14@758",
+      "text": "**2026-05-14 — CHIPS-MICROCHIP-06a LED blink shipped.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-14",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-14 — CHIPS-MICROCHIP-06 ratified and v0 scaffold landed.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 766,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-14@766",
+      "text": "**2026-05-14 — CHIPS-MICROCHIP-06 ratified and v0 scaffold landed.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 8,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-14",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-14 — CHIPS-MICROCHIP-05 ratified and implemented.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 775,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-14@775",
+      "text": "**2026-05-14 — CHIPS-MICROCHIP-05 ratified and implemented.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-13",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-13 — MICROCHIP-02 amendment.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 782,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-13@782",
+      "text": "**2026-05-13 — MICROCHIP-02 amendment.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-13",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-13 — MICROCHIP-01a amendment.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 810,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-13@810",
+      "text": "**2026-05-13 — MICROCHIP-01a amendment.**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-11",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-11 — Ratified. Status: Ratified 2026-05-11 (owner:",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 828,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-11@828",
+      "text": "**2026-05-11 — Ratified. Status: Ratified 2026-05-11 (owner:"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-11",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-11 — draft. status: draft — awaiting ratification",
+        "summary": "**2026-05-11 — Draft. Status: DRAFT — awaiting ratification.**",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 834,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-00-CONCEPTS.md#2026-05-11@834",
+      "text": "**2026-05-11 — Draft. Status: DRAFT — awaiting ratification.**"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 526,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:526",
+      "text": "§0 authority table reviewed; DS60001507F §10 Table 10-1"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 528,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:528",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker per"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 530,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:530",
+      "text": "§4 source-of-truth map has exactly one owner per row."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 531,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:531",
+      "text": "§5.1 file-set frozen; concrete file-name substitution"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 533,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:533",
+      "text": "§5.2 ATSAMD51J19A memory map values match"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 538,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:538",
+      "text": "§5.3 v0 deferred slot rationale documented; future"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 540,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:540",
+      "text": "§5.5 cortex-m-rt linker-arg sequence consistent with the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 542,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:542",
+      "text": "§10.1 cortex-m-rt boundary documented; §10.2 PAC"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 544,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:544",
+      "text": "§15 dated ratification entry."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 549,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:549",
+      "text": "§7 verification gate 1 (snapshot render test) extended to"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 554,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-05-LINKER.md:gate:554",
+      "text": "§7 verification gate 2 (compile-verify) continues to pass;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 698,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:698",
+      "text": "§0 authority table reviewed; Adafruit Feather M4 Express"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 700,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:700",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker per"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 702,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:702",
+      "text": "§4 source-of-truth map has exactly one owner per row."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 703,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:703",
+      "text": "§5.1 directory location frozen at `examples/feather-m4-express/`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 704,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:704",
+      "text": "§5.2 package + binary names frozen."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 705,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:705",
+      "text": "§5.3 feature matrix frozen at single `bsp_pac` feature"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 707,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:707",
+      "text": "§5.4 binary entry-point shape frozen; access path"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 710,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:710",
+      "text": "§5.5 host `bsp_generated/mod.rs` index shape frozen."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 711,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:711",
+      "text": "§5.6 panic strategy frozen at `panic-halt 0.2`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 712,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:712",
+      "text": "§5.7 release profile shape frozen."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 713,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:713",
+      "text": "§6.1 `build.rs` shape frozen; copy-to-OUT_DIR pattern"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 715,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:715",
+      "text": "§6.2 `.cargo/config.toml` shape frozen; single `-Tlink.x`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 717,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:717",
+      "text": "§10.1 complementary-gate framing with compile-verify"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 719,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:719",
+      "text": "§11 non-goals enumerated explicitly; -06a / -06b / -06c"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 721,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:721",
+      "text": "§15 dated ratification entry."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 726,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:726",
+      "text": "§7 gate 3 (example-crate binary check)"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md",
+      "family": "chips-microchip",
+      "kind": "gate",
+      "line": 731,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-06-EXAMPLE.md:gate:731",
+      "text": "§7 gate 1 (snapshot render) and gate 2 (compile-verify)"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-15** — Initial draft. Captures the CHIPS-MICROCHIP",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-RETROSPECTIVE.md",
+      "family": "chips-microchip",
+      "kind": "amendment",
+      "line": 416,
+      "obj_id": "chipdb/rlvgl-chips-microchip/docs/CHIPS-MICROCHIP-RETROSPECTIVE.md#2026-05-15@416",
+      "text": "**2026-05-15** — Initial draft. Captures the CHIPS-MICROCHIP"
+    }
+  ],
+  "schema_version": 2
+}

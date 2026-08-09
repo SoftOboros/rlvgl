@@ -1,0 +1,408 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "app-schema",
+  "kind_counts": {
+    "gate": 33
+  },
+  "object_count": 33,
+  "objects": [
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 385,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:385",
+      "text": "§0 authority table reviewed against `CLAUDE.md` source-of-truth"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 387,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:387",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 388,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:388",
+      "text": "§4 source-of-truth map has exactly one owner per row."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 389,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:389",
+      "text": "§5.1 (prong set) and §5.2 (vendor delegation) confirmed."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 390,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:390",
+      "text": "§5.5 / §10.2 (state-machine boundary) decided — **Option A**"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 392,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:392",
+      "text": "§9 round-trip targets each have a reverse-engineered manifest"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 394,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:394",
+      "text": "§11 non-goals reviewed; nothing in scope is silently excluded."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/00-concepts.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 395,
+      "obj_id": "docs/app-schema/00-concepts.md:gate:395",
+      "text": "§15 has a dated ratification entry signed off by the initiative"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 672,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:672",
+      "text": "§5.1 top-level shape reviewed against"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 676,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:676",
+      "text": "§5.3 confirms Option A from"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 679,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:679",
+      "text": "§5.6 `hand_written` allow-list reviewed; H747 board + BBB"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 682,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:682",
+      "text": "§6 validation rule set has a corresponding test fixture —"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 685,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:685",
+      "text": "§7 minimal example accepted by the validator — all five"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/01-manifest-schema.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 691,
+      "obj_id": "docs/app-schema/01-manifest-schema.md:gate:691",
+      "text": "§15 has a dated ratification entry signed off by the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 821,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:821",
+      "text": "§5.1 stage graph matches the orchestrator implementation —"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 826,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:826",
+      "text": "§5.2 CLI flags reviewed — `--validate-only`, `--out`,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 828,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:828",
+      "text": "§5.4 emitted-crate layout reproduced by reverse extraction"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 830,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:830",
+      "text": "§7 contracts each have at least one existing or"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 838,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:838",
+      "text": "§8 per-prong templates each match an existing example's"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 842,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:842",
+      "text": "§9.4 inventory file format is settled — JSON with serde"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/02-generator-pipeline.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 845,
+      "obj_id": "docs/app-schema/02-generator-pipeline.md:gate:845",
+      "text": "§15 has a dated ratification entry signed off by the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 804,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:804",
+      "text": "§5.1–§5.4 manifests reviewed for accuracy against current"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 810,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:810",
+      "text": "§6 finding list reviewed; each finding has a disposition."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 815,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:815",
+      "text": "§6.2 controller-library amendment ACCEPTED — landed in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 818,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:818",
+      "text": "§6.9 Zephyr sibling-project amendment ACCEPTED — landed in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 821,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:821",
+      "text": "§6.3 `target.generator` enum decision recorded — added"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/03-round-trip.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 824,
+      "obj_id": "docs/app-schema/03-round-trip.md:gate:824",
+      "text": "§15 has a dated ratification entry signed off by the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 500,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:500",
+      "text": "§5.3 vendored-crate offline model is consistent with the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 506,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:506",
+      "text": "§5.5 self-manifest format is documented in a citable form"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 511,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:511",
+      "text": "§6 cross-validate rule (CV-1, CV-2, CV-3) implemented in"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 524,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:524",
+      "text": "§7 vector test-family naming pattern documented in the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 530,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:530",
+      "text": "§10 promotion criteria reviewed by the initiative owner"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/app-schema/04-state-machine-boundary.md",
+      "family": "app-schema",
+      "kind": "gate",
+      "line": 535,
+      "obj_id": "docs/app-schema/04-state-machine-boundary.md:gate:535",
+      "text": "§15 has a dated ratification entry signed off by the"
+    }
+  ],
+  "schema_version": 2
+}

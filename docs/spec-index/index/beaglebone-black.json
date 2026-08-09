@@ -1,0 +1,72 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "beaglebone-black",
+  "kind_counts": {
+    "gate": 5
+  },
+  "object_count": 5,
+  "objects": [
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beaglebone-black/05-zephyr-prong.md",
+      "family": "beaglebone-black",
+      "kind": "gate",
+      "line": 557,
+      "obj_id": "docs/beaglebone-black/05-zephyr-prong.md:gate:557",
+      "text": "**(a) — Software-only.** Zephyr boots on BBB hardware with"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beaglebone-black/05-zephyr-prong.md",
+      "family": "beaglebone-black",
+      "kind": "gate",
+      "line": 567,
+      "obj_id": "docs/beaglebone-black/05-zephyr-prong.md:gate:567",
+      "text": "**(b) — Software-only.** The `DiscoController` widget tree"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beaglebone-black/05-zephyr-prong.md",
+      "family": "beaglebone-black",
+      "kind": "gate",
+      "line": 574,
+      "obj_id": "docs/beaglebone-black/05-zephyr-prong.md:gate:574",
+      "text": "**(c) — Hardware-blocked.** FT5x06 touch events reach"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beaglebone-black/05-zephyr-prong.md",
+      "family": "beaglebone-black",
+      "kind": "gate",
+      "line": 585,
+      "obj_id": "docs/beaglebone-black/05-zephyr-prong.md:gate:585",
+      "text": "**(d) — Software-only.** Playit transport works over"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beaglebone-black/05-zephyr-prong.md",
+      "family": "beaglebone-black",
+      "kind": "gate",
+      "line": 591,
+      "obj_id": "docs/beaglebone-black/05-zephyr-prong.md:gate:591",
+      "text": "**(e) — Software-only.** The staticlib build is reproducible"
+    }
+  ],
+  "schema_version": 2
+}

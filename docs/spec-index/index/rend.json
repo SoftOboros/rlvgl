@@ -1,0 +1,210 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "rend",
+  "kind_counts": {
+    "amendment": 2,
+    "gate": 6,
+    "term": 6
+  },
+  "object_count": 14,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "ClipRenderer"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 57,
+      "obj_id": "rend:term:cliprenderer",
+      "text": "A `Renderer`-wrapping adapter (`core/src/renderer.rs`) that translates draws by an offset and intersects them with a clip rect before forwarding to the wrapped renderer. The clip-propagation mechanism of this initiative."
+    },
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "Viewport"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 58,
+      "obj_id": "rend:term:viewport",
+      "text": "A `ScrollView`'s own `bounds` — the screen-space window content is visible through."
+    },
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "Content space"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 59,
+      "obj_id": "rend:term:content space",
+      "text": "The coordinate space `ScrollView` children are positioned in: origin at the content's top-left, y ∈ `0..content_height`, independent of scroll offset."
+    },
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "Content extent"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 60,
+      "obj_id": "rend:term:content extent",
+      "text": "Total scrollable content height (`content_height`), ≥ viewport height when scrolling is meaningful."
+    },
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "ScrollView"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 61,
+      "obj_id": "rend:term:scrollview",
+      "text": "The container widget (`widgets/src/scroll_view.rs`) owning children in content space, a per-pixel scroll offset, and the viewport/extent query seam."
+    },
+    {
+      "attrs": {
+        "relationship": "REND",
+        "term": "Rect::intersect"
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "term",
+      "line": 63,
+      "obj_id": "rend:term:rect::intersect",
+      "text": "AABB intersection on `core::widget::Rect`, `None` when disjoint. Owned by REND-00; companion to the ANIM-00-introduced `Rect::union`."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 233,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:233",
+      "text": "Spike recorded: headless test demonstrates a child straddling"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 236,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:236",
+      "text": "Headless dump shows a child cropped exactly at the parent edge —"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 238,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:238",
+      "text": "ScrollView with 5+ rows of 200 px cells and a shorter viewport:"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 241,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:241",
+      "text": "Dirty rects: `take_dirty()` == viewport on offset change, `None`"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 243,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:243",
+      "text": "Existing pre-publish gauntlet stays green (disco-sim + playit"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "gate",
+      "line": 245,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md:gate:245",
+      "text": "Published in a crates.io 0.2.x release (critical path: the"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-11** — REND-00 drafted and ratified. Mechanism decision:",
+        "touches": null
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "amendment",
+      "line": 277,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md#2026-06-11@277",
+      "text": "**2026-06-11** — REND-00 drafted and ratified. Mechanism decision:"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-12** — §5.4 / §14 amendment (prerequisite for LPAR-08, the",
+        "touches": null
+      },
+      "doc": "docs/concepts/REND-00-CONCEPTS.md",
+      "family": "rend",
+      "kind": "amendment",
+      "line": 282,
+      "obj_id": "docs/concepts/REND-00-CONCEPTS.md#2026-06-12@282",
+      "text": "**2026-06-12** — §5.4 / §14 amendment (prerequisite for LPAR-08, the"
+    }
+  ],
+  "schema_version": 2
+}

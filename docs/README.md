@@ -63,6 +63,7 @@ See crate overviews for:
 - [Ratatui on rlvgl](./ratatui-tutorial/README.md) — Rust-only Ratatui integration from host verification to STM32H747I-DISCO bare metal.
 
 ## Build & Test
+- [SPEC-INDEX.md](./spec-index/README.md) — Subrepo-owned deterministic documentation-object index and local checks.
 - [EMBEDDED-TOOLING.md](./EMBEDDED-TOOLING.md) — Install guide for ARM/STM32, ESP32 (RISC-V + Xtensa), and AVR toolchains, with Intel-macOS workarounds.
 - [MAKE.md](./MAKE.md) — Makefile convenience targets.
 - [CROSS-TESTING.md](./CROSS-TESTING.md) — Cross-target test linker requirements.

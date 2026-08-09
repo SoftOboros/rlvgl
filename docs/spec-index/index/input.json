@@ -1,0 +1,184 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "input",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 6,
+    "term": 6
+  },
+  "object_count": 13,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "DragRecognizer"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 50,
+      "obj_id": "input:term:dragrecognizer",
+      "text": "The middleware (`platform/src/gesture.rs`) folding raw pointer events into `DragStart`/`DragMove`/`DragEnd` once movement crosses the start threshold."
+    },
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "Start threshold"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 51,
+      "obj_id": "input:term:start threshold",
+      "text": "Minimum pointer displacement from the press origin before a drag begins. Default [`DRAG_START_THRESHOLD_PX`] = 10. Metric: **Euclidean, compared squared** (§5.1)."
+    },
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "Origin"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 52,
+      "obj_id": "input:term:origin",
+      "text": "The `PointerDown` position the displacement is measured from; reported in `DragStart { origin_x, origin_y }` for drop-resolution math."
+    },
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "Armed"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 53,
+      "obj_id": "input:term:armed",
+      "text": "Recognizer state between `PointerDown` and either threshold crossing (→ Dragging) or `PointerUp` (→ tap path untouched)."
+    },
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "Click-vs-drag suppression"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 54,
+      "obj_id": "input:term:click-vs-drag suppression",
+      "text": "The contract that a movement crossing the drag threshold MUST NOT also produce a `PressRelease` (§6)."
+    },
+    {
+      "attrs": {
+        "relationship": "INPUT",
+        "term": "Canonical chain"
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "term",
+      "line": 55,
+      "obj_id": "input:term:canonical chain",
+      "text": "raw input → `DragRecognizer` → `TapRecognizer` → `DoubleTapRecognizer` → widget tree (§6.1)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 179,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:179",
+      "text": "Synthetic PD/PM/PU stream with < 10 px wander yields"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 182,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:182",
+      "text": "`DragStart` carries the press origin; move/end sequencing is"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 184,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:184",
+      "text": "Multi-recognizer coexistence: with the full chain wired, taps"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 187,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:187",
+      "text": "playit `PD`/`PM`/`PU` commands drive a drag end-to-end in a sim"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 190,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:190",
+      "text": "Existing gesture tests stay green, unmodified."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "gate",
+      "line": 191,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md:gate:191",
+      "text": "Published in a crates.io 0.2.x release (the requesting consumer"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-11** — INPUT-00 drafted and ratified. Euclidean-squared",
+        "touches": null
+      },
+      "doc": "docs/concepts/INPUT-00-CONCEPTS.md",
+      "family": "input",
+      "kind": "amendment",
+      "line": 217,
+      "obj_id": "docs/concepts/INPUT-00-CONCEPTS.md#2026-06-11@217",
+      "text": "**2026-06-11** — INPUT-00 drafted and ratified. Euclidean-squared"
+    }
+  ],
+  "schema_version": 2
+}

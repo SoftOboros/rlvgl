@@ -1,0 +1,345 @@
+{
+  "edge_count": 18,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 74,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 133,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 134,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 169,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 183,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 206,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 221,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 253,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 255,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 287,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 290,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 328,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 328,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 328,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 391,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 394,
+      "source": "docs/audio/01-codec-bringup.md",
+      "target": "INV-AUDIO-01-2"
+    }
+  ],
+  "family": "audio",
+  "kind_counts": {
+    "amendment": 3,
+    "gate": 6,
+    "invariant": 3
+  },
+  "object_count": 12,
+  "objects": [
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "FLL1 lock MUST be confirmed before AIF1ADC1 serializer arm",
+        "verified_by": ""
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "invariant",
+      "line": 169,
+      "obj_id": "INV-AUDIO-01-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Per-attempt timeout and retry budget",
+        "verified_by": ""
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "invariant",
+      "line": 206,
+      "obj_id": "INV-AUDIO-01-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "`init_record` return type extension",
+        "verified_by": ""
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "invariant",
+      "line": 221,
+      "obj_id": "INV-AUDIO-01-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-AUDIO-01-2"
+        ]
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 287,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:287",
+      "text": "(a) Poll R0x732 bit 5 (FLL1_LOCK_STS, level status) with the per-attempt timeout from §9 INV-AUDIO-01-2 after writing `FLL1_ENA = 1`."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-AUDIO-01-2"
+        ]
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 288,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:288",
+      "text": "(b) Re-arm FLL1 on per-attempt timeout up to the retry budget from §9 INV-AUDIO-01-2."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 289,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:289",
+      "text": "(c) Issue NO writes to R0x4 (AIF1ADC1L/R_ENA), R0x300, R0x302, R0x304, R0x305, R0x210 (or any other post-FLL AIF1 register) until either `FllLockOutcome::LockedFirstTry` or `LockedAfterRetry` is reached."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-AUDIO-01-3"
+        ]
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 290,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:290",
+      "text": "(d) Return `Result<FllLockOutcome, I2C::Error>` per §9 INV-AUDIO-01-3."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 291,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:291",
+      "text": "(e) On `FllLockOutcome::Failed`, NOT proceed with the remainder of `init_record` — return early."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "gate",
+      "line": 295,
+      "obj_id": "docs/audio/01-codec-bringup.md:gate:295",
+      "text": "(f) Log `LockedAfterRetry { attempts }` via the platform's `defmt`/`log`/USART telemetry path to support cold-boot-rate observability."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-19 — Initial ratification.** Drafted in response to the",
+        "touches": null
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "amendment",
+      "line": 324,
+      "obj_id": "docs/audio/01-codec-bringup.md#2026-05-19@324",
+      "text": "**2026-05-19 — Initial ratification.** Drafted in response to the"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-19-c — AIF1ADC_RATE / AIF1DAC_RATE field corrected from",
+        "touches": null
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "amendment",
+      "line": 331,
+      "obj_id": "docs/audio/01-codec-bringup.md#2026-05-19@331",
+      "text": "**2026-05-19-c — AIF1ADC_RATE / AIF1DAC_RATE field corrected from"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-19-b — INV-AUDIO-01-1 corrected from edge latch to",
+        "touches": null
+      },
+      "doc": "docs/audio/01-codec-bringup.md",
+      "family": "audio",
+      "kind": "amendment",
+      "line": 371,
+      "obj_id": "docs/audio/01-codec-bringup.md#2026-05-19@371",
+      "text": "**2026-05-19-b — INV-AUDIO-01-1 corrected from edge latch to"
+    }
+  ],
+  "schema_version": 2
+}

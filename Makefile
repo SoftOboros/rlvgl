@@ -106,6 +106,33 @@ help:
 	@echo "Icon extraction:"
 	@echo "  make extract-icons             # Extract Lucide SVGs to assets/icons/"
 	@echo "  make import-icons              # Extract + convert to .raw via creator"
+	@echo ""
+	@echo "Documentation index:"
+	@echo "  make spec-index                # Regenerate the committed rlvgl index"
+	@echo "  make spec-index-check          # Verify regeneration is a no-op"
+	@echo "  make spec-index-report         # Print diagnostic corpus findings"
+	@echo "  make spec-test                 # Run local index unit/regression tests"
+
+# ── Documentation object index ───────────────────────────────────
+# This is subrepo-owned. The parent softoboros scanner intentionally excludes
+# submodules and consumes this committed projection through separate tooling.
+.PHONY: spec-index spec-index-check spec-index-report spec-suspect spec-test
+
+spec-index:
+	python3 scripts/specidx/scan.py --emit-index
+
+spec-index-check:
+	python3 scripts/specidx/scan.py --check-index
+
+spec-index-report:
+	python3 scripts/specidx/scan.py
+
+spec-suspect:
+	python3 scripts/specidx/suspect.py
+
+spec-test:
+	python3 scripts/specidx/test_scan.py
+	python3 scripts/specidx/test_suspect.py
 
 # ── Build ─────────────────────────────────────────────────────────
 build-disco:
