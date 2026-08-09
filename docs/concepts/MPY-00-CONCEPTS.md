@@ -4,8 +4,9 @@ MPY-00-CONCEPTS.md - MicroPython stage-and-actors runtime concepts and phase map
 
 # MPY-00 — MicroPython Stage-and-Actors Runtime Concepts
 
-**Status:** Draft 2026-08-09. Not ratified. This document becomes normative
-for the MPY initiative only after an owner-ratified entry lands in §15.
+**Status:** Ratified 2026-08-09. Normative for the MPY initiative. Phase
+documents remain separately gated and MUST be ratified before their behavior
+implementation begins.
 
 Requesting direction: MicroPython should be able to set up the UI, create
 objects, register callbacks, set layout, and orchestrate application behavior,
@@ -464,44 +465,41 @@ flowchart LR
    but semantic behavior is proven in-process before board transport is allowed
    to obscure runtime errors.
 
-### 11.2 Open decisions
+### 11.2 Resolved and phase-assigned decisions
 
-- **PCDN-MPY-001:** What serialized widths and slot/generation partition should
-  `ObjectId` and other IDs use across host, 32-bit MCU, and shared-memory
-  transports? MPY-02 owns the decision.
-- **PCDN-MPY-002:** Should the Python module expose `Stage`/`Actor` as primary
-  class names, or expose neutral `UI`/`Object` names while retaining the
-  theatrical vocabulary only in concepts? Recommendation: primary Python
-  `Stage` and `Actor` wrappers over neutral protocol types.
-- **PCDN-MPY-003:** Should host binding conformance use the MicroPython Unix
-  port, a minimal test VM embedding, or a CPython/PyO3 mirror? Recommendation:
-  prove the actual MicroPython semantics first; treat PyO3 as optional.
-- **PCDN-MPY-004:** Which events allow declarative prevent-default,
-  stop-propagation, or coalescing policy at subscription time? Python callbacks
-  remain post-dispatch regardless of the selected policy.
-- **PCDN-MPY-005:** Which representative actor set closes MPY-03: one primitive,
-  one text actor, one container, one control, and one composite, or a larger
-  minimum catalog? MPY-01 must choose from the current widget inventory.
-- **PCDN-MPY-006:** Are descriptors authored as static widget-local tables,
-  derived by macros, or generated from a schema? Any choice must preserve
-  `INV-MPY-3` and work in `no_std + alloc` builds.
+- **PCDN-MPY-001 — Assigned to MPY-02:** MPY-02 selects serialized widths and
+  the slot/generation partition for `ObjectId` and other IDs across host,
+  32-bit MCU, and shared-memory transports.
+- **PCDN-MPY-002 — Resolved by owner ratification:** The Python API uses
+  `Stage` and `Actor` as its primary wrapper names over neutral protocol types.
+- **PCDN-MPY-003 — Resolved by owner ratification:** Host binding conformance
+  proves actual MicroPython behavior first. A CPython/PyO3 mirror remains an
+  optional convenience and does not define semantics.
+- **PCDN-MPY-004 — Assigned to MPY-05:** MPY-05 classifies which events allow
+  declarative prevent-default, stop-propagation, or coalescing policy. Python
+  callbacks remain post-dispatch regardless of the selected policy.
+- **PCDN-MPY-005 — Assigned to MPY-01:** MPY-01 selects the representative actor
+  set used to close the first creation and introspection wave.
+- **PCDN-MPY-006 — Assigned to MPY-03:** MPY-03 chooses static widget-local
+  tables, macro derivation, schema generation, or a documented combination.
+  The result must preserve `INV-MPY-3` and `no_std + alloc` support.
 
 ## 12. Acceptance Checklist
 
-MPY-00 is ready for ratification when:
+Owner ratification confirms:
 
-- [ ] `INV-MPY-1` ownership between the language-neutral runtime and the MicroPython adapter is accepted.
-- [ ] `INV-MPY-2` opaque generation-checked identity is accepted, with bit layout explicitly deferred to MPY-02.
-- [ ] `INV-MPY-3` establishes one descriptor catalog for creation and introspection.
-- [ ] `INV-MPY-4` accepts requested layout as director-owned and computed geometry as rlvgl-owned.
-- [ ] `INV-MPY-5` accepts queued VM-safe callbacks instead of synchronous Python event handlers.
-- [ ] `INV-MPY-6` accepts validated batches and post-dispatch callback mutations.
-- [ ] `INV-MPY-7` accepts one semantic protocol for in-process and dual-core profiles.
-- [ ] `INV-MPY-8` accepts explicit bounded-resource and ownership behavior.
-- [ ] `INV-MPY-9` accepts level-scoped introspection parity claims and the inherited LPAR pin.
-- [ ] `INV-MPY-10` accepts native-only actor execution for MPY v1.
-- [ ] The MPY-01 through MPY-09 phase map is accepted without weakening `INV-MPY-1` or `INV-MPY-7`.
-- [ ] PCDN-MPY-001 through PCDN-MPY-006 are resolved or assigned to the named phase without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-5`.
+- [x] `INV-MPY-1` ownership between the language-neutral runtime and the MicroPython adapter is accepted.
+- [x] `INV-MPY-2` opaque generation-checked identity is accepted, with bit layout explicitly deferred to MPY-02.
+- [x] `INV-MPY-3` establishes one descriptor catalog for creation and introspection.
+- [x] `INV-MPY-4` accepts requested layout as director-owned and computed geometry as rlvgl-owned.
+- [x] `INV-MPY-5` accepts queued VM-safe callbacks instead of synchronous Python event handlers.
+- [x] `INV-MPY-6` accepts validated batches and post-dispatch callback mutations.
+- [x] `INV-MPY-7` accepts one semantic protocol for in-process and dual-core profiles.
+- [x] `INV-MPY-8` accepts explicit bounded-resource and ownership behavior.
+- [x] `INV-MPY-9` accepts level-scoped introspection parity claims and the inherited LPAR pin.
+- [x] `INV-MPY-10` accepts native-only actor execution for MPY v1.
+- [x] The MPY-01 through MPY-09 phase map is accepted without weakening `INV-MPY-1` or `INV-MPY-7`.
+- [x] PCDN-MPY-001 through PCDN-MPY-006 are resolved or assigned to the named phase without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-5`.
 
 ## 13. Files Cited
 
@@ -531,9 +529,11 @@ MPY-00 is ready for ratification when:
 
 ## 14. Unblocks
 
-After owner ratification, MPY-00 unblocks MPY-01: the introspection baseline and
-current/partial/missing matrix. No behavior implementation phase is unblocked
-until MPY-01 lands and confirms the inherited LVGL pin and priority actor set.
+Owner ratification unblocks drafting and ratification of MPY-01: the
+introspection baseline and current/partial/missing matrix. MPY-02 through
+MPY-09 MAY be drafted for dependency review, but no behavior implementation
+phase is unblocked until MPY-01 lands and confirms the inherited LVGL pin and
+priority actor set.
 
 ## 15. Change Log
 
@@ -560,3 +560,25 @@ full UI from that surface. A discoverable, transport-independent runtime object
 contract must precede additional Python wrappers so object identity, creation,
 properties, layout, callbacks, and dual-core behavior do not diverge by widget
 or adapter.
+
+### 0.2.0 — 2026-08-09 — Ratified
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-1, INV-MPY-2, INV-MPY-3, INV-MPY-4, INV-MPY-5, INV-MPY-6, INV-MPY-7, INV-MPY-8, INV-MPY-9, INV-MPY-10, PCDN-MPY-001, PCDN-MPY-002, PCDN-MPY-003, PCDN-MPY-004, PCDN-MPY-005, PCDN-MPY-006, §0–§14
+
+**Commits:** pending
+
+**Summary:** Owner ratified the stage-and-actors ownership model, all ten
+initiative invariants, the introspection parity levels, and the MPY-01 through
+MPY-09 phase map. PCDN-MPY-002 and PCDN-MPY-003 are resolved as recommended;
+the other four decisions are assigned to their named phases.
+
+#### Rationale
+
+The concepts now establish a coherent separation between MicroPython direction
+and native rlvgl performance while preserving a single protocol across
+same-core and dual-core deployments. Phase-level detail can proceed without
+reopening the initiative's ownership, callback, layout, or parity boundaries.

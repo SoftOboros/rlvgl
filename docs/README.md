@@ -46,7 +46,7 @@ See crate overviews for:
 ## UI Framework
 - [UI-COMPONENT-ARCHITECTURE.md](./UI-COMPONENT-ARCHITECTURE.md) — Theme, components, Chakra-inspired widgets.
 - [SVELTE-DESIGN-TOKEN-ALIGNMENT.md](./SVELTE-DESIGN-TOKEN-ALIGNMENT.md) — Svelte design tokens and component IR.
-- [MPY-00-CONCEPTS.md](./concepts/MPY-00-CONCEPTS.md) — Draft MicroPython stage-and-actors runtime concepts, introspection parity levels, and phase map.
+- [MPY stage-and-actors initiative](./concepts/MPY-00-CONCEPTS.md) — Ratified runtime concepts, introspection parity levels, and phase map; MPY-01 through MPY-09 are separately gated drafts listed in the [concepts index](./concepts/README.md).
 
 ## Hardware Targets
 - [STM32H747I-DISCO hardware notes](../examples/stm32h747i-disco/HARDWARE.md) — Board reference (display, touch, pinout).

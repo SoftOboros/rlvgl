@@ -273,10 +273,46 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
   object identity, actor descriptors and creation, requested layout with
   rlvgl-performed geometry, queued callback cues, same-core proof, and CM7/CM4
   transport.
-  - [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md) — **Draft 2026-08-09.** Defines
+  - [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md) — **Ratified 2026-08-09.** Defines
     the director/stage/actor/cue vocabulary, semantic LVGL introspection parity
     levels, ten initiative invariants, and the MPY-01 through MPY-09 dependency
-    map. Awaiting owner ratification before MPY-01 begins.
+    map. Phase documents remain separately gated.
+  - [MPY-01-INTROSPECTION-BASELINE.md](MPY-01-INTROSPECTION-BASELINE.md) —
+    **Draft 2026-08-09; not ratified.** Pins the inherited LVGL reference,
+    defines the MPY-I coverage-row schema, inventories the first surfaces, and
+    selects Container, Label, Button, Slider, and List as the proof actors.
+  - [MPY-02-IDENTITY-VALUES-PROTOCOL.md](MPY-02-IDENTITY-VALUES-PROTOCOL.md) —
+    **Draft 2026-08-09; not ratified.** Proposes stable generation-checked IDs,
+    canonical tagged values and frames, atomic batches, correlation, errors,
+    and transport-neutral capacity behavior.
+  - [MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md](MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md)
+    — **Draft 2026-08-09; not ratified.** Proposes the Stage Registry,
+    actor-local descriptor source, generic native actor creation, type erasure,
+    and compatibility-first `ObjectNode` reconciliation.
+  - [MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md](MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md)
+    — **Draft 2026-08-09; not ratified.** Defines tree/property/action/style/
+    state directions, atomic stage revisions, requested layout, read-only
+    computed geometry, and deterministic snapshots.
+  - [MPY-05-CUES-SAFE-SCHEDULING.md](MPY-05-CUES-SAFE-SCHEDULING.md) —
+    **Draft 2026-08-09; not ratified.** Defines descriptor-backed
+    subscriptions, tokenized queued cues, Safe Turn ordering, declarative event
+    policy, coalescing, overflow, and loss metadata.
+  - [MPY-06-MICROPYTHON-DIRECTOR-BINDING.md](MPY-06-MICROPYTHON-DIRECTOR-BINDING.md)
+    — **Draft 2026-08-09; not ratified.** Proposes the public `Stage`, `Actor`,
+    `Subscription`, and `Transaction` API, descriptor-driven conversion,
+    polling, callback lifetime, and typed exception mapping.
+  - [MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md](MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md)
+    — **Draft 2026-08-09; not ratified.** Defines canonical scenarios and
+    direct-runtime versus actual-MicroPython trace, snapshot, geometry, and
+    simulator-frame equivalence before board transport.
+  - [MPY-08-CM7-CM4-TRANSPORT-BOARD-PROOF.md](MPY-08-CM7-CM4-TRANSPORT-BOARD-PROOF.md)
+    — **Draft 2026-08-09; not ratified.** Defines the CM7 director/CM4 runtime
+    roles, canonical-frame queues, platform-owned coherency, boot epochs,
+    backpressure, legacy-mailbox reconciliation, and board proof.
+  - [MPY-09-PARITY-CLOSURE-DOCS-RELEASE.md](MPY-09-PARITY-CLOSURE-DOCS-RELEASE.md)
+    — **Draft 2026-08-09; not ratified.** Defines row/profile parity closure,
+    evidence, resource and release gates, public docs, compatibility/SemVer
+    review, local indexing, and the owner closure record.
 - **LPAR** — LVGL parity backlog across runtime substrate, style,
   draw, layout, widget families, conformance fixtures, examples,
   documentation, and release tracking.
