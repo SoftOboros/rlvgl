@@ -485,9 +485,12 @@ flowchart LR
   `rlvgl_widgets::label::Label`, `rlvgl_widgets::button::Button`,
   `rlvgl_widgets::slider::Slider`, and `rlvgl_widgets::list::List`, frozen as
   `INV-MPY-01-4`. See MPY-01 §7.
-- **PCDN-MPY-006 — Assigned to MPY-03:** MPY-03 chooses static widget-local
-  tables, macro derivation, schema generation, or a documented combination.
-  The result must preserve `INV-MPY-3` and `no_std + alloc` support.
+- **PCDN-MPY-006 — Closed 2026-08-15 by MPY-03 ratification:** Actor-local
+  declarative Rust schemas are canonical and derive compact runtime tables,
+  constructor/operation functions, binding metadata, and optional generated
+  projections. Actor records use the additive parallel `ActorOps` adapter
+  selected in MPY-03 §6.3, preserving `INV-MPY-3`, `no_std + alloc`, and the
+  existing public `Widget` trait.
 
 ## 12. Acceptance Checklist
 
@@ -536,10 +539,11 @@ Owner ratification confirms:
 
 ## 14. Unblocks
 
-MPY-01 and MPY-02 are ratified. MPY-02 authorizes protocol implementation and
-golden-vector work; committed canonical encoder/decoder vectors satisfy its
-final prerequisite for MPY-03's separate ratification and implementation gate.
-MPY-03 through MPY-09 remain separately gated Draft phases and MUST close their
+MPY-01, MPY-02, and MPY-03 are ratified. MPY-02's canonical codec and vectors
+satisfy the protocol prerequisite, and MPY-03's five-actor adapter experiment
+satisfies its ratification evidence gate. MPY-03 implementation may now build
+the Stage Registry, descriptor catalog, and generic-construction fixture.
+MPY-04 through MPY-09 remain separately gated Draft phases and MUST close their
 own PCDNs and §12 acceptance gates before behavior implementation.
 
 ## 15. Change Log
@@ -656,3 +660,35 @@ What deliberately did not change: `PCDN-MPY-004` and `PCDN-MPY-006` remain
 assigned to MPY-05 and MPY-03; golden protocol vectors remain required before
 MPY-03 implementation; MPY-03 through MPY-09 remain Draft; and this amendment
 does not resolve any later phase's PCDNs.
+
+### 0.2.3 — 2026-08-15 — Amended: PCDN-MPY-006 closed
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** PCDN-MPY-006, INV-MPY-3, §0, §11.2, §13, §14
+
+**Commits:** pending
+
+**Summary:** Records the owner-ratified closure of `PCDN-MPY-006` by MPY-03.
+Actor-local declarative Rust schemas are the canonical source for runtime and
+binding projections, and the parallel `ActorOps` adapter supplies additive
+native erasure without changing `Widget`.
+
+#### Rationale
+
+MPY-00 delegated descriptor source ownership to MPY-03. MPY-03 now fixes the
+actor-local schema and derived-projection rule, selects the adapter boundary,
+and compile-proves that boundary for the representative actor set. Leaving the
+parent decision assigned would make the initiative source of truth stale.
+
+Considered and rejected: independently authored binding tables, which violate
+`INV-MPY-3`; treating the compile experiment as production descriptor
+implementation, which would overstate current coverage; and closing the PCDN
+only in MPY-03 without the parent back-amendment required by MPY-01 §14.
+
+What deliberately did not change: `PCDN-MPY-004` remains assigned to MPY-05;
+the Stage Registry, descriptor catalog, generic Create behavior, and coverage
+claims remain implementation work; and MPY-04 through MPY-09 remain separately
+gated Draft phases.

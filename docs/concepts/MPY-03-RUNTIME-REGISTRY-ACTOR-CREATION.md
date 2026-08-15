@@ -4,10 +4,12 @@ MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md - Stage registry, descriptors, and gen
 
 # MPY-03 — Runtime Registry and Actor Creation
 
-**Status:** Draft 2026-08-15. Not ratified. MPY-01 and MPY-02 dependencies,
-including the canonical MPY v1 codec and golden-vector prerequisite, are
-satisfied. Storage and descriptor mechanisms remain proposals until this
-phase's PCDNs and acceptance checklist close.
+**Status:** Ratified 2026-08-15. Normative for the Stage Registry, actor
+descriptors, generic actor creation, compatibility-first lookup, and stage-root
+model. MPY-01 and MPY-02 dependencies, including the canonical MPY v1 codec
+and golden-vector prerequisite, are satisfied. The additive erasure mechanism
+is compile-proven for the five representative actors in
+`widgets/tests/mpy_actor_ops_compile.rs`.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-01 baseline and MPY-02 protocol.
@@ -100,13 +102,29 @@ The v1 recommendation is an ID-bearing compatibility facade over
 - Reparent/reorder holds a detached subtree only inside the transaction and
   either attaches it before commit or restores/rejects the batch.
 
-If profiling proves traversal unacceptable, MPY-03 MAY introduce an internal
-ID-indexed arena, but public `ObjectNode` compatibility and MPY semantics must
-remain intact. Such a change requires a documented storage PCDN resolution and
-equivalent trace/snapshot tests.
+There is no actor-count threshold that independently triggers an arena or ID
+cache. MPY-07 MUST benchmark representative 50-, 250-, and 1,000-actor trees.
+MPY-03 MAY introduce an internal ID-indexed arena or cache only when those
+measurements show that traversal causes a negotiated latency or resource-budget
+failure. The evidence must isolate traversal as the cause, and the change must
+preserve public `ObjectNode` compatibility through equivalent trace/snapshot
+tests. Actor count alone is not evidence of a failure.
 
 `WidgetNode` can be adopted as native compatibility content, but only actors
 with registered descriptors receive scripting IDs and discovery.
+
+### 5.3 Stage roots
+
+A stage root is an ordinary registered actor with the explicit `StageRoot`
+capability and no parent. It receives the same `ObjectId`, `TypeId`, lifecycle,
+descriptor, capacity, and stale-handle treatment as every other actor. The
+registry MUST reject assigning a parent to a stage root and MUST reject placing
+a non-`StageRoot` actor in a named root slot.
+
+The root capability does not create a parallel screen type, identity space, or
+storage path. A descriptor MAY expose additional screen-related capabilities,
+but those capabilities do not replace `StageRoot` or relax the one-parent-or-
+one-root rule in `INV-MPY-03-1`.
 
 ## 6. Frozen Decisions — Descriptor Catalog
 
@@ -151,10 +169,20 @@ The runtime, not the MicroPython adapter, performs type erasure. Constructors
 receive validated neutral fields. Actor operations receive the resolved actor
 record plus neutral IDs/values and return protocol-level values/errors.
 
-The implementation MAY use descriptor function pointers, an additive
-`ScriptableActor` trait, or an equivalent adapter object. It MUST NOT require
-the C shim to downcast widgets, and it SHOULD avoid a breaking change to the
-public `Widget` trait. The final choice remains PCDN-MPY-03-001.
+Each actor record contains a parallel object-safe `ActorOps` adapter created at
+the same time as its native widget. A typed adapter retains
+`Rc<RefCell<T>>`, while `ObjectNode` receives an erased clone coerced to
+`Rc<RefCell<dyn Widget>>`; both handles therefore refer to the same native
+actor state. Descriptor-linked operations dispatch neutral IDs and values
+through the adapter's actor-specific functions. Neither the registry nor the C
+shim recovers `T` from `dyn Widget`, and the public `Widget` trait is unchanged.
+
+`widgets/tests/mpy_actor_ops_compile.rs` is the ratification compile experiment.
+It constructs this parallel-handle shape for `Container`, `Label`, `Button`,
+`Slider`, and `widgets::list::List`, then invokes actor-specific operations
+through one erased adapter interface. The experiment establishes mechanism
+viability only; the production registry, descriptors, IDs, errors, and bounded
+storage remain MPY-03 implementation work.
 
 ## 7. Frozen Decisions — Generic Creation
 
@@ -217,7 +245,7 @@ a limit returns Capacity before publication.
 | Native constructors | Wrapped by actor constructors receiving neutral validated fields; Python does not call Rust constructors directly. |
 | High-level `ui` wrappers | Admitted only when a descriptor names the native/composite ownership and does not duplicate a lower-level actor ID. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 1. **No generic mutation surface.** MPY-03 constructs actors and catalogs
    schemas; MPY-04 owns property/action/tree mutation behavior.
@@ -228,26 +256,29 @@ a limit returns Capacity before publication.
 4. **No mandatory O(1) lookup in v1.** Correct stable identity precedes an
    unmeasured internal tree refactor.
 
-- **PCDN-MPY-03-001:** Which additive Rust erasure mechanism should connect a
-  descriptor to a native widget: function-pointer vtables, a parallel
-  `ActorOps` object, or a new supertrait with compatibility adapters?
-  Ratification must cite a compile experiment for all five proof actors.
-- **PCDN-MPY-03-002:** What traversal threshold triggers an internal arena or
-  ID cache? Recommendation: benchmark representative 50-, 250-, and 1,000-actor
-  trees in MPY-07 before changing storage.
-- **PCDN-MPY-03-003:** Should stage roots be typed screen actors or registry
-  slots with a root capability? Recommendation: ordinary actors with an
-  explicit `StageRoot` capability and no parent.
+- **PCDN-MPY-03-001 — Resolved by owner direction 2026-08-15:** Actor records
+  use the parallel object-safe `ActorOps` adapter in §6.3. The typed adapter and
+  `ObjectNode` share one `Rc<RefCell<T>>` allocation through typed and erased
+  handles. `widgets/tests/mpy_actor_ops_compile.rs` compile-proves the shape for
+  all five representative actors without changing `Widget` or downcasting in C.
+- **PCDN-MPY-03-002 — Resolved by owner direction 2026-08-15:** No numeric
+  actor-count threshold triggers a storage rewrite. V1 remains traversal-first;
+  MPY-07 benchmarks 50-, 250-, and 1,000-actor trees, and an arena/cache requires
+  a measured budget failure attributable to traversal plus semantic-equivalence
+  evidence. See §5.2.
+- **PCDN-MPY-03-003 — Resolved by owner direction 2026-08-15:** Stage roots are
+  ordinary actors carrying an explicit `StageRoot` capability and no parent.
+  They use the common registry identity, lifecycle, and storage path. See §5.3.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-03-1` registry ownership and root/parent uniqueness are accepted.
-- [ ] `INV-MPY-03-2` compatibility-first lookup preserves opaque identity.
-- [ ] `INV-MPY-03-3` resolves PCDN-MPY-006 through actor-local schema and derived projections.
-- [ ] `INV-MPY-03-4` generic Create ordering and publication rules are accepted.
-- [ ] `INV-MPY-03-5` subtree deletion and subscription cleanup are accepted.
-- [ ] `INV-MPY-03-6` closes the MPY-01 representative actor decision.
-- [ ] PCDN-MPY-03-001 through PCDN-MPY-03-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`.
+- [x] `INV-MPY-03-1` registry ownership and root/parent uniqueness are accepted.
+- [x] `INV-MPY-03-2` compatibility-first lookup preserves opaque identity.
+- [x] `INV-MPY-03-3` resolves PCDN-MPY-006 through actor-local schema and derived projections.
+- [x] `INV-MPY-03-4` generic Create ordering and publication rules are accepted.
+- [x] `INV-MPY-03-5` subtree deletion and subscription cleanup are accepted.
+- [x] `INV-MPY-03-6` closes the MPY-01 representative actor decision.
+- [x] PCDN-MPY-03-001 through PCDN-MPY-03-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`.
 
 ## 13. Files Cited
 
@@ -264,12 +295,15 @@ a limit returns Capacity before publication.
 - `widgets/src/button.rs`
 - `widgets/src/slider.rs`
 - `widgets/src/list.rs`
+- `widgets/tests/mpy_actor_ops_compile.rs`
 
 ## 14. Unblocks
 
-After MPY-03 ratification and the five-actor generic construction fixture,
-MPY-03 unblocks MPY-04 stage directions and MPY-05 cue/subscription
-implementation in parallel.
+MPY-03 is ratified and its five-actor erasure mechanism is compile-proven.
+This authorizes Stage Registry, descriptor catalog, and generic-construction
+implementation. The committed production five-actor generic-construction
+fixture remains the implementation exit gate before MPY-04 stage directions
+and MPY-05 cue/subscription implementation proceed in parallel.
 
 ## 15. Change Log
 
@@ -294,3 +328,45 @@ runtime-owned native actors and one catalog supplies both construction and
 introspection metadata. A compatibility-first facade preserves existing
 `ObjectNode` consumers while keeping storage optimization behind the semantic
 contract.
+
+### 0.2.0 — 2026-08-15 — Ratified
+
+**Author:** Ira Abbott with OpenAI Codex compile evidence
+
+**Change kind:** semantic and compile evidence
+
+**Touches:** PCDN-MPY-006, PCDN-MPY-03-001, PCDN-MPY-03-002,
+PCDN-MPY-03-003, INV-MPY-03-1, INV-MPY-03-2, INV-MPY-03-3,
+INV-MPY-03-4, INV-MPY-03-5, INV-MPY-03-6, §0, §5.2, §5.3, §6.3,
+§11–§15
+
+**Commits:** pending
+
+**Summary:** Owner ratified MPY-03 and selected a parallel object-safe
+`ActorOps` adapter sharing native actor state with `ObjectNode`, retained
+traversal-first v1 storage behind a measurement gate, and made stage roots
+ordinary actors with the explicit `StageRoot` capability. Adds the required
+five-actor compile experiment and closes parent `PCDN-MPY-006` through the
+companion MPY-00 amendment.
+
+#### Rationale
+
+The existing `ObjectNode` stores `Rc<RefCell<dyn Widget>>`, which cannot recover
+actor-specific Rust APIs without adding a downcast surface or changing the
+public `Widget` contract. Retaining a typed handle inside a parallel adapter
+and giving `ObjectNode` an erased clone preserves one native allocation while
+keeping all type-specific dispatch inside Rust. The compile experiment proves
+this additive shape for every representative actor before production registry
+work begins.
+
+An actor-count threshold would turn an unmeasured implementation preference
+into architecture. The adopted evidence gate keeps the compatible nested tree
+until MPY-07 demonstrates a causal budget failure. Treating roots as ordinary
+capable actors likewise preserves one identity, descriptor, lifecycle, and
+storage model instead of introducing a second screen-object path.
+
+Considered and rejected: a raw function-pointer vtable over
+`Rc<RefCell<dyn Widget>>`, which has no safe route back to the concrete actor;
+a `Widget` supertrait change, which expands the public contract across every
+widget implementer; a speculative actor-count storage trigger; and a separate
+typed-screen root registry.
