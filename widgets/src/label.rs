@@ -1,5 +1,10 @@
 //! Basic text label.
 use alloc::string::String;
+use rlvgl_core::actor::{
+    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
+    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
+    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
@@ -98,6 +103,56 @@ impl Label {
             self.text_color.with_alpha(self.style.alpha),
         );
     }
+}
+
+const MPY_BOUNDS_FIELD: u32 = 1;
+const MPY_TEXT_FIELD: u32 = 2;
+
+/// Stable MPY actor type identifier for [`Label`].
+pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0002);
+
+/// Actor-local MPY descriptor for [`Label`].
+pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+    type_id: MPY_TYPE_ID,
+    stable_name: "rlvgl_widgets::label::Label",
+    schema_revision: 1,
+    family: ActorFamily::Text,
+    capabilities: ActorCapabilities::TEXT,
+    targets: TargetSet::ALL,
+    constructor_fields: &[
+        ConstructorFieldDescriptor {
+            id: MPY_BOUNDS_FIELD,
+            name: "bounds",
+            value_tag: ValueTag::Rect,
+            required: true,
+        },
+        ConstructorFieldDescriptor {
+            id: MPY_TEXT_FIELD,
+            name: "text",
+            value_tag: ValueTag::Text,
+            required: true,
+        },
+    ],
+    properties: &[],
+    actions: &[],
+    events: &[],
+    child_policy: ChildPolicy::None,
+    layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
+    resource_cost: ResourceCost {
+        text_bytes: 0,
+        resources: 0,
+    },
+    constructor: construct_mpy,
+};
+
+fn construct_mpy(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
+    Ok(construct_native_actor(
+        MPY_TYPE_ID,
+        Label::new(
+            args.required_text(MPY_TEXT_FIELD)?,
+            args.required_rect(MPY_BOUNDS_FIELD)?,
+        ),
+    ))
 }
 
 impl Widget for Label {

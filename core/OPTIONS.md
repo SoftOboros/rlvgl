@@ -10,6 +10,8 @@ other foundational runtime pieces. The crate is `no_std` by default.
 
 - Default features: none.
 - Runtime model: `no_std` with `alloc`.
+- MPY runtime: the actor descriptor types and bounded `StageRegistry` are
+  always available; they do not require a feature flag.
 - Important caveat: several media-oriented features are currently wired through
   dependencies that are only declared on host targets, so not every feature is
   suitable for bare-metal builds even though the base crate is.

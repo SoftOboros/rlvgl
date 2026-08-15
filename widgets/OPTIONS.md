@@ -10,6 +10,8 @@ OPTIONS.md - Cargo feature reference for the rlvgl-widgets crate.
 
 - Default features: none.
 - Runtime model: `no_std` with `alloc`.
+- MPY catalog: always enabled for the five proof actors; no feature switch is
+  required.
 
 ## Feature flags
 

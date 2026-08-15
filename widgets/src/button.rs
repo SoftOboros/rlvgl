@@ -1,5 +1,10 @@
 //! Interactive button widget with callback support.
 use alloc::{boxed::Box, string::String};
+use rlvgl_core::actor::{
+    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
+    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
+    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
@@ -57,6 +62,56 @@ impl Button {
         let b = self.bounds;
         x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height
     }
+}
+
+const MPY_BOUNDS_FIELD: u32 = 1;
+const MPY_TEXT_FIELD: u32 = 2;
+
+/// Stable MPY actor type identifier for [`Button`].
+pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0003);
+
+/// Actor-local MPY descriptor for [`Button`].
+pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+    type_id: MPY_TYPE_ID,
+    stable_name: "rlvgl_widgets::button::Button",
+    schema_revision: 1,
+    family: ActorFamily::Control,
+    capabilities: ActorCapabilities::TEXT.union(ActorCapabilities::CONTROL),
+    targets: TargetSet::ALL,
+    constructor_fields: &[
+        ConstructorFieldDescriptor {
+            id: MPY_BOUNDS_FIELD,
+            name: "bounds",
+            value_tag: ValueTag::Rect,
+            required: true,
+        },
+        ConstructorFieldDescriptor {
+            id: MPY_TEXT_FIELD,
+            name: "text",
+            value_tag: ValueTag::Text,
+            required: true,
+        },
+    ],
+    properties: &[],
+    actions: &[],
+    events: &[],
+    child_policy: ChildPolicy::None,
+    layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
+    resource_cost: ResourceCost {
+        text_bytes: 0,
+        resources: 0,
+    },
+    constructor: construct_mpy,
+};
+
+fn construct_mpy(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
+    Ok(construct_native_actor(
+        MPY_TYPE_ID,
+        Button::new(
+            args.required_text(MPY_TEXT_FIELD)?,
+            args.required_rect(MPY_BOUNDS_FIELD)?,
+        ),
+    ))
 }
 
 impl Widget for Button {

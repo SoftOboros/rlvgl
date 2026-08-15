@@ -541,10 +541,13 @@ Owner ratification confirms:
 
 MPY-01, MPY-02, and MPY-03 are ratified. MPY-02's canonical codec and vectors
 satisfy the protocol prerequisite, and MPY-03's five-actor adapter experiment
-satisfies its ratification evidence gate. MPY-03 implementation may now build
-the Stage Registry, descriptor catalog, and generic-construction fixture.
-MPY-04 through MPY-09 remain separately gated Draft phases and MUST close their
-own PCDNs and §12 acceptance gates before behavior implementation.
+satisfies its ratification evidence gate. The production Stage Registry,
+actor-local descriptor catalog, generic five-actor Create fixture, bounded
+preflight, stable lookup, and subtree deletion now satisfy MPY-03's
+implementation exit gate. MPY-04 and MPY-05 drafts are dependency-unblocked for
+PCDN review and separate ratification. MPY-04 through MPY-09 remain separately
+gated Draft phases and MUST close their own PCDNs and §12 acceptance gates
+before behavior implementation.
 
 ## 15. Change Log
 
@@ -692,3 +695,33 @@ What deliberately did not change: `PCDN-MPY-004` remains assigned to MPY-05;
 the Stage Registry, descriptor catalog, generic Create behavior, and coverage
 claims remain implementation work; and MPY-04 through MPY-09 remain separately
 gated Draft phases.
+
+### 0.2.4 — 2026-08-15 — Amended: MPY-03 implementation exit gate satisfied
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** implementation status
+
+**Touches:** INV-MPY-2, INV-MPY-3, INV-MPY-8, §0, §13, §14, §15
+
+**Commits:** pending
+
+**Summary:** Records production evidence for the MPY-03 Stage Registry,
+actor-local descriptor catalog, generic actor creation, deletion, identity
+generation, and conservative resource accounting. The MPY-03 implementation
+exit gate is satisfied, so the MPY-04 and MPY-05 Draft phases are now
+dependency-unblocked while retaining their own PCDNs and evidence gates.
+
+#### Rationale
+
+The production implementation replaces the earlier compile-only experiment
+with an always-on `no_std + alloc` registry in `rlvgl-core` and canonical
+actor-local descriptors in `rlvgl-widgets`. Focused tests cover all five proof
+actors, pre-publication validation failures, capacity failures, subtree
+deletion, stale-object rejection, generation advancement, unrelated-object
+preservation, and stage teardown.
+
+What deliberately did not change: MPY-04 and MPY-05 remain Draft; direction,
+introspection, cue, and scheduling semantics are not authorized by MPY-03;
+and incomplete coverage rows remain marked `partial` until their owning phases
+provide implementation evidence.

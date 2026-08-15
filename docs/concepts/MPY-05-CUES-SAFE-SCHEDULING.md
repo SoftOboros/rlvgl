@@ -4,8 +4,10 @@ MPY-05-CUES-SAFE-SCHEDULING.md - Event descriptors, subscriptions, cue queues, a
 
 # MPY-05 — Cues and Safe Scheduling
 
-**Status:** Draft 2026-08-09. Not ratified. Event policy and overflow classes
-remain proposals pending phase review.
+**Status:** Draft 2026-08-09; dependency gate satisfied 2026-08-15. Not
+ratified. The MPY-03 registry, actor lifecycle, and descriptor slices are now
+available; event IDs, propagation policy, overflow classes, three PCDNs, and
+the §12 checklist remain proposals pending owner review.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 actor registry and LPAR-04/05/06 native event semantics.
@@ -264,3 +266,18 @@ MicroPython callbacks must orchestrate later UI behavior without entering the
 native real-time path. Tokenized immutable cues preserve event semantics across
 same-core and dual-core deployments while explicit queue classes make embedded
 capacity failures observable and testable.
+
+### 0.1.1 — 2026-08-15 — Dependency gate satisfied
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** editorial
+
+**Touches:** §0, §14, §15
+
+**Commits:** pending
+
+**Summary:** Records the completed MPY-03 production registry, actor lifecycle,
+and event-descriptor slots. MPY-05 may now reconcile event/cue policy against
+code and walk `PCDN-MPY-05-001` through `PCDN-MPY-05-003`; it remains Draft and
+authorizes no MPY-05 behavior before owner ratification.

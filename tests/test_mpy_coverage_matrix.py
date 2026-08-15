@@ -102,6 +102,15 @@ def test_current_claims_cite_evidence():
                 assert claim["evidence"], (row["id"], claim["profile"])
 
 
+def test_repository_evidence_paths_exist():
+    """Evidence references with repository paths must resolve locally."""
+    for row in _ledger()["rows"]:
+        for claim in row["claims"]:
+            for evidence in claim["evidence"]:
+                path = evidence["ref"].split("::", 1)[0]
+                assert Path(path).exists(), (row["id"], claim["profile"], path)
+
+
 def test_unsupported_claims_name_the_rejecting_capability():
     """INV-MPY-01-3: unsupported is not a synonym for missing."""
     for row in _ledger()["rows"]:

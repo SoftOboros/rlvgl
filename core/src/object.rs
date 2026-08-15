@@ -456,6 +456,7 @@ pub struct ObjectMeta {
     flags: ObjectFlags,
     states: ObjectStates,
     detached: bool,
+    actor_identity: Option<crate::actor::ActorIdentity>,
 }
 
 impl ObjectMeta {
@@ -465,6 +466,7 @@ impl ObjectMeta {
             flags: ObjectFlags::EMPTY,
             states: ObjectStates::DEFAULT,
             detached: false,
+            actor_identity: None,
         }
     }
 
@@ -491,6 +493,15 @@ impl ObjectMeta {
     /// Return whether this node has been detached from a live object tree.
     pub const fn is_detached(&self) -> bool {
         self.detached
+    }
+
+    /// Return the optional MPY actor identity associated with this node.
+    pub const fn actor_identity(&self) -> Option<crate::actor::ActorIdentity> {
+        self.actor_identity
+    }
+
+    pub(crate) fn set_actor_identity(&mut self, identity: crate::actor::ActorIdentity) {
+        self.actor_identity = Some(identity);
     }
 
     fn set_detached(&mut self, detached: bool) {
@@ -711,6 +722,11 @@ impl ObjectNode {
     /// Return whether this node is detached from a live object tree.
     pub const fn is_detached(&self) -> bool {
         self.meta.is_detached()
+    }
+
+    /// Return the optional MPY actor identity associated with this node.
+    pub const fn actor_identity(&self) -> Option<crate::actor::ActorIdentity> {
+        self.meta.actor_identity()
     }
 
     /// Return this node's child list.
@@ -1249,7 +1265,7 @@ impl ObjectNode {
     // Internal helpers
     // -----------------------------------------------------------------------
 
-    fn set_detached_recursive(&mut self, detached: bool) {
+    pub(crate) fn set_detached_recursive(&mut self, detached: bool) {
         self.meta.set_detached(detached);
         for child in &mut self.children {
             child.set_detached_recursive(detached);

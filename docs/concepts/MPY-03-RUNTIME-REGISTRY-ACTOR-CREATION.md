@@ -4,12 +4,12 @@ MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md - Stage registry, descriptors, and gen
 
 # MPY-03 — Runtime Registry and Actor Creation
 
-**Status:** Ratified 2026-08-15. Normative for the Stage Registry, actor
-descriptors, generic actor creation, compatibility-first lookup, and stage-root
-model. MPY-01 and MPY-02 dependencies, including the canonical MPY v1 codec
-and golden-vector prerequisite, are satisfied. The additive erasure mechanism
-is compile-proven for the five representative actors in
-`widgets/tests/mpy_actor_ops_compile.rs`.
+**Status:** Ratified 2026-08-15; implementation exit evidence satisfied
+2026-08-15. Normative for the Stage Registry, actor descriptors, generic actor
+creation, compatibility-first lookup, and stage-root model. The additive
+erasure mechanism and production five-actor registry fixture are proven by
+`widgets/tests/mpy_actor_ops_compile.rs` and
+`widgets/tests/mpy_stage_registry.rs`.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-01 baseline and MPY-02 protocol.
@@ -19,7 +19,7 @@ MPY-01 baseline and MPY-02 protocol.
 | Concern | Owner | MPY-03 relationship |
 |---|---|---|
 | One canonical object model, native actor execution, descriptor catalog, and opaque IDs | MPY-00 | Used without modification. |
-| Coverage rows and representative actor set | MPY-01 | MPY-03 closes MPY-BL-001 through MPY-BL-004 for the proof actors and supplies the registry substrate for MPY-BL-005. |
+| Coverage rows and representative actor set | MPY-01 | MPY-03 makes MPY-BL-001, MPY-BL-003, and MPY-BL-004 Current for the in-process profile; MPY-BL-002 and MPY-BL-005 remain Partial pending their MPY-04/05-owned members. |
 | IDs, tagged values, errors, and protocol frames | MPY-02 | Consumed without redefining serialization. |
 | Native tree, lifecycle, event, style, animation, scroll, and layout semantics | LPAR phases and `core/src/object.rs` | Runtime behavior source. |
 | Stage registry, actor descriptor shape, schema ownership, constructor contract, and handle lookup | This document after ratification | MPY-03 is canonical. |
@@ -163,6 +163,14 @@ A `TypeDescriptor` contains at least:
 Names are source-level API. Stable numeric IDs are protocol-level API. Both
 derive from the same declaration.
 
+The production schema types and registry live in `core/src/actor.rs`. Each
+proof actor declares its `TypeId`, constructor fields, capabilities, child
+policy, layout capabilities, target set, cost, and constructor beside its
+native widget. `widgets/src/mpy.rs` aggregates those declarations without
+reauthoring them. Property/action and event slices are intentionally empty
+until MPY-04 and MPY-05 ratify their stable member IDs; empty means not yet
+claimed, not unsupported.
+
 ### 6.3 Operations boundary
 
 The runtime, not the MicroPython adapter, performs type erasure. Constructors
@@ -177,12 +185,12 @@ actor state. Descriptor-linked operations dispatch neutral IDs and values
 through the adapter's actor-specific functions. Neither the registry nor the C
 shim recovers `T` from `dyn Widget`, and the public `Widget` trait is unchanged.
 
-`widgets/tests/mpy_actor_ops_compile.rs` is the ratification compile experiment.
-It constructs this parallel-handle shape for `Container`, `Label`, `Button`,
-`Slider`, and `widgets::list::List`, then invokes actor-specific operations
-through one erased adapter interface. The experiment establishes mechanism
-viability only; the production registry, descriptors, IDs, errors, and bounded
-storage remain MPY-03 implementation work.
+`widgets/tests/mpy_actor_ops_compile.rs` retains the five-actor compile proof
+against the production `construct_native_actor` path.
+`widgets/tests/mpy_stage_registry.rs` proves catalog enumeration, descriptor-
+validated generic Create, root/parent policy, capacity preflight, opaque tree
+resolution, subtree teardown, stale-generation rejection, slot reuse, and
+stage teardown without changing the public `Widget` trait.
 
 ## 7. Frozen Decisions — Generic Creation
 
@@ -280,12 +288,18 @@ a limit returns Capacity before publication.
 - [x] `INV-MPY-03-6` closes the MPY-01 representative actor decision.
 - [x] PCDN-MPY-03-001 through PCDN-MPY-03-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`.
 
+Implementation evidence satisfies the phase exit gate for the in-process
+profile. Coverage rows MPY-BL-001, MPY-BL-003, and MPY-BL-004 are Current;
+MPY-BL-002 and MPY-BL-005 remain explicitly Partial rather than borrowing
+future MPY-04/05 behavior.
+
 ## 13. Files Cited
 
 - `docs/concepts/MPY-00-CONCEPTS.md`
 - `docs/concepts/MPY-01-INTROSPECTION-BASELINE.md`
 - `docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md`
 - `core/src/lib.rs`
+- `core/src/actor.rs`
 - `core/src/object.rs`
 - `core/src/widget.rs`
 - `core/src/property.rs`
@@ -295,15 +309,17 @@ a limit returns Capacity before publication.
 - `widgets/src/button.rs`
 - `widgets/src/slider.rs`
 - `widgets/src/list.rs`
+- `widgets/src/mpy.rs`
 - `widgets/tests/mpy_actor_ops_compile.rs`
+- `widgets/tests/mpy_stage_registry.rs`
 
 ## 14. Unblocks
 
-MPY-03 is ratified and its five-actor erasure mechanism is compile-proven.
-This authorizes Stage Registry, descriptor catalog, and generic-construction
-implementation. The committed production five-actor generic-construction
-fixture remains the implementation exit gate before MPY-04 stage directions
-and MPY-05 cue/subscription implementation proceed in parallel.
+MPY-03 is ratified and its production exit gate is satisfied. MPY-04 stage
+directions and MPY-05 cue/scheduling drafts may now reconcile against the
+implemented registry and catalog, resolve their own PCDNs, and seek separate
+owner ratification. This does not authorize MPY-04 or MPY-05 behavior before
+their respective §12 gates close.
 
 ## 15. Change Log
 
@@ -370,3 +386,32 @@ Considered and rejected: a raw function-pointer vtable over
 a `Widget` supertrait change, which expands the public contract across every
 widget implementer; a speculative actor-count storage trigger; and a separate
 typed-screen root registry.
+
+### 0.3.0 — 2026-08-15 — Implemented: production registry exit gate
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** implementation and evidence
+
+**Touches:** INV-MPY-03-1, INV-MPY-03-2, INV-MPY-03-3, INV-MPY-03-4,
+INV-MPY-03-5, INV-MPY-03-6, §0, §6.1, §6.3, §12–§15
+
+**Commits:** pending
+
+**Summary:** Implements the `no_std + alloc` compatibility-first Stage
+Registry in `rlvgl-core`, actor-local descriptors and constructors for the five
+proof actors, a derived widgets catalog, descriptor-validated generic Create,
+named roots, parent/child policy, bounded preflight, generation-checked lookup,
+subtree deletion, and deterministic teardown. Records in-process coverage
+claims without claiming MPY-04 property/action/tree mutation or MPY-05 event
+metadata early.
+
+#### Evidence
+
+`widgets/tests/mpy_stage_registry.rs` proves catalog uniqueness and discovery,
+all five generic constructors, no-publication failure paths, capacity limits,
+root/parent rules, traversal lookup, depth-first invalidation, generation
+advance on reuse, unrelated-handle preservation, and stage teardown.
+`widgets/tests/mpy_actor_ops_compile.rs` exercises the production parallel typed
+adapter for all five native widget types. Core and widgets cross-compile for
+`thumbv7em-none-eabihf` without default features.

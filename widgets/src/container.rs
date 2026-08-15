@@ -1,4 +1,9 @@
 //! Simple container grouping child widgets.
+use rlvgl_core::actor::{
+    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
+    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
+    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -20,6 +25,46 @@ impl Container {
             style: Style::default(),
         }
     }
+}
+
+const MPY_BOUNDS_FIELD: u32 = 1;
+
+/// Stable MPY actor type identifier for [`Container`].
+pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0001);
+
+/// Actor-local MPY descriptor for [`Container`].
+pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+    type_id: MPY_TYPE_ID,
+    stable_name: "rlvgl_widgets::container::Container",
+    schema_revision: 1,
+    family: ActorFamily::Container,
+    capabilities: ActorCapabilities::STAGE_ROOT.union(ActorCapabilities::CHILDREN),
+    targets: TargetSet::ALL,
+    constructor_fields: &[ConstructorFieldDescriptor {
+        id: MPY_BOUNDS_FIELD,
+        name: "bounds",
+        value_tag: ValueTag::Rect,
+        required: true,
+    }],
+    properties: &[],
+    actions: &[],
+    events: &[],
+    child_policy: ChildPolicy::AnyActor,
+    layout: LayoutCapabilities::FLEX_CONTAINER
+        .union(LayoutCapabilities::GRID_CONTAINER)
+        .union(LayoutCapabilities::ITEM_HINTS),
+    resource_cost: ResourceCost {
+        text_bytes: 0,
+        resources: 0,
+    },
+    constructor: construct_mpy,
+};
+
+fn construct_mpy(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
+    Ok(construct_native_actor(
+        MPY_TYPE_ID,
+        Container::new(args.required_rect(MPY_BOUNDS_FIELD)?),
+    ))
 }
 
 impl Widget for Container {

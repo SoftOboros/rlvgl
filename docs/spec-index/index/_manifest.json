@@ -48,7 +48,7 @@
     "input": 13,
     "ki2c": 88,
     "lpar": 501,
-    "mpy": 292,
+    "mpy": 294,
     "qt-support": 64,
     "ratatui": 11,
     "rend": 14,
@@ -56,6 +56,6 @@
     "wid": 13
   },
   "schema_version": 2,
-  "total_edges": 883,
-  "total_objects": 1731
+  "total_edges": 896,
+  "total_objects": 1733
 }

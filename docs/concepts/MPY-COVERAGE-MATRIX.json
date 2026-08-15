@@ -15,7 +15,22 @@
       "baseline_status": "missing",
       "baseline_note": "No actor catalog exists. `api/src/lib.rs` exposes a fixed `NodeKind` of `Rect` and `Text` with no discovery surface.",
       "owners": ["MPY-03"],
-      "claims": []
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::catalog_enumerates_five_actor_local_schemas"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "MPY-BL-002",
@@ -26,7 +41,19 @@
       "baseline_status": "missing",
       "baseline_note": "No descriptor type exists in any crate. Widget schema knowledge is implicit in each widget's Rust API.",
       "owners": ["MPY-03"],
-      "claims": []
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::catalog_enumerates_five_actor_local_schemas",
+              "note": "Type, family, capabilities, targets, constructor schema, child policy, layout, and cost are current. MPY-04/05 still own property, action, and event member IDs."
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "MPY-BL-003",
@@ -37,7 +64,22 @@
       "baseline_status": "partial",
       "baseline_note": "Fixed `Rect`/`Text` `NodeSpec` variants exist, but the runtime calls behind them are placeholders in `micropython/src/lib.rs` and the type set is closed.",
       "owners": ["MPY-03"],
-      "claims": [],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::generic_create_constructs_and_resolves_all_five_actors"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ],
       "differences": "Classified partial rather than current because the creation set is fixed and the calls do not own a live stage. `NodeSpec` remains compatibility evidence only (MPY-01 §7)."
     },
     {
@@ -49,7 +91,22 @@
       "baseline_status": "partial",
       "baseline_note": "`core/src/object.rs` carries detached state, but there is no handle registry, no generation, and no global lookup.",
       "owners": ["MPY-02", "MPY-03"],
-      "claims": []
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::subtree_delete_advances_generations_and_preserves_unrelated_actors"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "MPY-BL-005",
@@ -60,7 +117,19 @@
       "baseline_status": "partial",
       "baseline_note": "`ObjectNode` already implements the tree semantics; what is absent is stable lookup by identity rather than by held Rust value.",
       "owners": ["MPY-03", "MPY-04"],
-      "claims": []
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::subtree_delete_advances_generations_and_preserves_unrelated_actors",
+              "note": "Handle-based parent/children lookup and subtree deletion are current; MPY-04 still owns reparent, reorder, batch visibility, and lifecycle observation."
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "MPY-BL-006",

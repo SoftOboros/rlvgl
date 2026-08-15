@@ -10,6 +10,11 @@ Package: `rlvgl-widgets`
 toolkit. It depends only on `rlvgl-core` and is meant to be usable in both
 embedded and simulator builds.
 
+The crate also publishes the canonical MPY descriptor catalog for the proof
+actor set: `Container`, `Label`, `Button`, `Slider`, and `List`. Each descriptor
+lives beside its native widget implementation, and `widgets::mpy::CATALOG`
+derives the registry-facing catalog from those actor-local definitions.
+
 ## Included Widgets
 
 - `Button`
@@ -28,6 +33,10 @@ embedded and simulator builds.
 The crate keeps widget behavior and rendering logic separate from platform code.
 Widgets are composed into a `WidgetNode` tree and then rendered by whichever
 backend your application uses.
+
+The MPY catalog is always available and does not add a parallel widget model.
+Its constructors erase native widgets through `rlvgl-core`'s `ActorOps` adapter
+while preserving the same allocation behind the widget-tree handle.
 
 Use this crate directly when you want the toolkit's stock widgets without the
 higher-level theming and layout layer from `rlvgl-ui`.

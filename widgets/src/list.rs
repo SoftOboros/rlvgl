@@ -1,5 +1,10 @@
 //! Vertical scrolling list of selectable strings.
 use alloc::{string::String, vec::Vec};
+use rlvgl_core::actor::{
+    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
+    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
+    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
@@ -80,6 +85,46 @@ impl List {
             None
         }
     }
+}
+
+const MPY_BOUNDS_FIELD: u32 = 1;
+
+/// Stable MPY actor type identifier for [`List`].
+pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
+
+/// Actor-local MPY descriptor for [`List`].
+pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+    type_id: MPY_TYPE_ID,
+    stable_name: "rlvgl_widgets::list::List",
+    schema_revision: 1,
+    family: ActorFamily::Composite,
+    capabilities: ActorCapabilities::TEXT
+        .union(ActorCapabilities::CONTROL)
+        .union(ActorCapabilities::COLLECTION),
+    targets: TargetSet::ALL,
+    constructor_fields: &[ConstructorFieldDescriptor {
+        id: MPY_BOUNDS_FIELD,
+        name: "bounds",
+        value_tag: ValueTag::Rect,
+        required: true,
+    }],
+    properties: &[],
+    actions: &[],
+    events: &[],
+    child_policy: ChildPolicy::None,
+    layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
+    resource_cost: ResourceCost {
+        text_bytes: 0,
+        resources: 0,
+    },
+    constructor: construct_mpy,
+};
+
+fn construct_mpy(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
+    Ok(construct_native_actor(
+        MPY_TYPE_ID,
+        List::new(args.required_rect(MPY_BOUNDS_FIELD)?),
+    ))
 }
 
 impl Widget for List {

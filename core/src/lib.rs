@@ -32,6 +32,8 @@ extern crate std;
 
 extern crate alloc;
 
+/// MPY actor descriptors and compatibility-first Stage Registry.
+pub mod actor;
 /// Tick-driven tween/animation system (deterministic, no wall clock).
 pub mod anim;
 pub mod animation;

@@ -12,6 +12,8 @@ runtime model used by widgets, applications, renderers, and platform backends.
 ## Main Areas
 
 - widget tree and composition via `Widget` and `WidgetNode`
+- stable actor identities, declarative type descriptors, and bounded stage
+  ownership via `actor`
 - event dispatch and application integration via `event` and `application`
 - renderer-facing drawing abstractions in `renderer`
 - style, theme, animation, and font utilities
@@ -24,6 +26,10 @@ runtime model used by widgets, applications, renderers, and platform backends.
 are feature-gated, and image/QR decoding features are automatically kept off on
 `target_os = "none"` where those dependencies are not intended to be pulled
 into embedded binaries.
+
+The MPY actor registry is part of the always-on base runtime. It uses `alloc`,
+requires no Cargo feature, validates constructor input before publication, and
+accounts for actor, child, depth, and retained-text limits conservatively.
 
 ## Where It Is Used
 

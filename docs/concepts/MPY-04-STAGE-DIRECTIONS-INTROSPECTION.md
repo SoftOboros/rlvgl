@@ -4,8 +4,10 @@ MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md - Tree, property, action, layout, and s
 
 # MPY-04 — Stage Directions and Introspection
 
-**Status:** Draft 2026-08-09. Not ratified. The command names and snapshot
-shape are proposals pending the MPY-02/03 contracts.
+**Status:** Draft 2026-08-09; dependency gate satisfied 2026-08-15. Not
+ratified. MPY-02 protocol and MPY-03 registry/catalog implementations are now
+available; this phase's command names, member IDs, snapshot shape, three PCDNs,
+and §12 checklist remain proposals pending owner review.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -264,3 +266,19 @@ MicroPython can set the stage only if all durable UI intent lowers to generic
 validated commands while actors and rlvgl retain measurement, layout, native
 behavior, and computed state. A revisioned snapshot gives bindings and tests one
 authoritative view without transferring runtime ownership.
+
+### 0.1.1 — 2026-08-15 — Dependency gate satisfied
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** editorial
+
+**Touches:** §0, §14, §15
+
+**Commits:** pending
+
+**Summary:** Records the completed MPY-03 production registry, actor-local
+catalog, generic Create, stable lookup, and deletion substrate. MPY-04 may now
+reconcile its member IDs and directions against code and walk
+`PCDN-MPY-04-001` through `PCDN-MPY-04-003`; it remains Draft and authorizes no
+MPY-04 behavior before owner ratification.

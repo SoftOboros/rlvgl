@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.2.5"
+version = "0.2.6"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"
@@ -14,6 +14,7 @@ categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
+rlvgl-api = { version = "0.2.1", path = "../api", default-features = false }
 gif = { version = "0.13", optional = true }
 embedded-canvas = { version = "0.3.1", default-features = true, optional = true }
 embedded-graphics = { version = "0.8", optional = true }
