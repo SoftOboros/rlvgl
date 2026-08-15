@@ -280,15 +280,15 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
   - [MPY-01-INTROSPECTION-BASELINE.md](MPY-01-INTROSPECTION-BASELINE.md) —
     **Ratified 2026-08-09.** Pins the inherited LVGL reference, defines the
     MPY-I coverage-row schema, inventories the first surfaces, and selects the
-    fully qualified `rlvgl_widgets` proof actors. It is a prerequisite for
-    MPY-02's separate ratification gate, not authorization to implement
-    unratified later phases.
+    fully qualified `rlvgl_widgets` proof actors. It supplied MPY-02's baseline
+    without authorizing unratified later phases.
   - [ERRATA.md](ERRATA.md) — MPY family's living errata log. No accepted MPY
     errata entries are recorded yet.
   - [MPY-02-IDENTITY-VALUES-PROTOCOL.md](MPY-02-IDENTITY-VALUES-PROTOCOL.md) —
-    **Draft 2026-08-09; not ratified.** Proposes stable generation-checked IDs,
-    canonical tagged values and frames, atomic batches, correlation, errors,
-    and transport-neutral capacity behavior.
+    **Ratified 2026-08-15.** Freezes stable generation-checked IDs, canonical
+    tagged values and frames, atomic Batch Results, correlation, errors, and
+    capability-negotiated capacity floors. Golden protocol vectors remain the
+    evidence prerequisite for MPY-03's separate gate.
   - [MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md](MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md)
     — **Draft 2026-08-09; not ratified.** Proposes the Stage Registry,
     actor-local descriptor source, generic native actor creation, type erasure,

@@ -4,11 +4,13 @@ MPY-02-IDENTITY-VALUES-PROTOCOL.md - Stable IDs, values, envelopes, batches, and
 
 # MPY-02 — Identity, Values, and Protocol
 
-**Status:** Draft 2026-08-09. Not ratified. The proposed wire values and error
-set are review material, not an implemented ABI.
+**Status:** Ratified 2026-08-15. Normative for MPY IDs, tagged values, logical
+frames, atomic batches, errors, capability negotiation, and transport traits.
+MPY-03 behavior remains separately gated and requires committed golden protocol
+vectors before implementation begins.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
-MPY-01 must be ratified and committed before MPY-02 behavior implementation.
+MPY-01 was ratified and committed at `74dc28a` before this phase's ratification.
 
 ## 0. Authority Policy
 
@@ -47,6 +49,7 @@ part of an accidental ABI.
 | **Wire ID** | Fixed-width integer token with an explicitly serialized meaning; zero is reserved as invalid unless a field says otherwise. | Owned by MPY-02. |
 | **Batch Reference** | Temporary identifier for an actor created within the current batch and not yet assigned to the caller as a stable `ObjectId`. | Owned by MPY-02. |
 | **Completion Result** | Exactly one success or failure response correlated to a command or committed batch by `RequestId`. | Owned by MPY-02. |
+| **Endpoint Epoch** | One initialized lifetime of a protocol endpoint pair. Stage IDs are unique within it; a restart, reset, or reinitialization establishes a new epoch and invalidates prior handles. | Owned semantically by MPY-02; MPY-08 `Boot Epoch` is the board realization. |
 | **Protocol Capability** | Versioned declaration of supported opcodes, value tags, actor/schema version, and bounded capacities for one target profile. | Owned by MPY-02; populated by later phases. |
 | **Value Envelope** | Explicit tag, length where applicable, and payload encoding for one protocol value. | Owned by MPY-02. |
 | **Transport Endpoint** | Ordered send/receive boundary for command, result, and cue frames without runtime semantics of its own. | Owned jointly by MPY-02 traits and MPY-07/08 implementations. |
@@ -66,12 +69,12 @@ part of an accidental ABI.
 
 ## 5. Frozen Decisions — IDs and Versioning
 
-### 5.1 Proposed ID set
+### 5.1 ID set
 
-| ID | Serialized width | Proposed meaning |
+| ID | Serialized width | Meaning |
 |---|---:|---|
 | `ProtocolVersion` | 24 bits as three `u8` components | SemVer-like major/minor/patch capability contract; reuses the conceptual shape of `ApiVersion`. |
-| `StageId` | `u32` | Runtime stage/session namespace; zero invalid. A new stage receives a new value before an old value can be reused. |
+| `StageId` | `u32` | Monotonic stage/session namespace within one Endpoint Epoch; zero invalid and values are not reused within the epoch. |
 | `ObjectId` | `u64` | Upper `u32` generation, lower `u32` slot; zero invalid. Scoped by `StageId` in every operation. |
 | `RequestId` | `u32` | Monotonic per endpoint direction; zero reserved for unsolicited frames. |
 | `CallbackId` | `u32` | MicroPython-adapter callable token; zero invalid. |
@@ -82,9 +85,15 @@ part of an accidental ABI.
 | `EventId` | `u32` | Explicit descriptor-assigned event ID. |
 | `BatchRef` | `u16` | Batch-local create result, valid only inside one submitted batch. |
 
-The `ObjectId` proposal resolves PCDN-MPY-001 if this phase is ratified. A slot
-generation MUST advance before reuse. Generation exhaustion MUST retire the slot
-until stage teardown rather than wrap to a live historical value.
+The `u32` `StageId` resolves `PCDN-MPY-02-001`. Allocation is monotonic within
+an Endpoint Epoch and MUST NOT reuse a value after stage teardown. Exhaustion
+returns `Capacity` for new-stage creation until the endpoint restarts into a
+new epoch. An in-process endpoint establishes its epoch at runtime
+initialization; MPY-08's `Boot Epoch` supplies the corresponding board identity.
+
+The ID table and `ObjectId` layout close parent `PCDN-MPY-001`. An `ObjectId`
+slot generation MUST advance before reuse. Generation exhaustion MUST retire
+the slot until stage teardown rather than wrap to a live historical value.
 
 Schema IDs are explicit registered constants, not runtime hashes of names.
 Names remain discoverable through descriptors; numeric IDs provide compact and
@@ -126,6 +135,33 @@ Text/bytes are owned by the frame while decoding and copied or interned by the
 accepting command before the frame is released. No `Value` contains a borrowed
 pointer. Capabilities publish maximum frame size, text bytes, byte payload,
 fields per command, and values per result.
+
+### 6.1 Negotiated capacity floor
+
+MPY v1 fixes a conservative interoperability floor while allowing each target
+profile to advertise larger limits:
+
+| Capability | MPY v1 minimum |
+|---|---:|
+| `max_frame_bytes` | 256 bytes |
+| `max_text_bytes` | 128 UTF-8 bytes |
+
+`max_frame_bytes` counts one complete canonical logical frame after any
+transport-local reassembly; transport headers and fragment metadata do not
+consume that logical limit. `max_text_bytes` counts the encoded bytes of one
+`Text` value, not Unicode scalar values or display cells.
+
+Each endpoint advertises the maxima it can encode and receive. The active
+limit in each direction is the component-wise minimum of the two endpoints'
+advertised maxima. An endpoint advertising less than either MPY v1 minimum is
+not an MPY v1-compatible profile and MUST reject activation with a structured
+`Unsupported` result. A value or frame above the negotiated maximum MUST fail
+with `Capacity` before mutation and MUST NOT be silently truncated.
+
+MPY-07 MAY advertise larger host/same-core capacities. MPY-08 MUST measure and
+publish the board profile's actual capacities and prove that both minima are
+met; it does not redefine these protocol floors. A board transport MAY fragment
+a logical frame within the negotiated maximum.
 
 ## 7. Frozen Decisions — Frames and Correlation
 
@@ -172,6 +208,24 @@ batch. A forbidden/non-rollback action rejects validation before mutation.
 Deferred actions are queued only after the structural/property transaction
 commits.
 
+### 8.1 Batch Result shape
+
+One accepted Batch produces one Result. On success, its payload contains an
+ordered sequence of operation records only for operations whose protocol
+definition declares an output. Every record carries its zero-based operation
+index. Create records additionally map `BatchRef` to the allocated `ObjectId`;
+read and result-bearing action records carry their declared typed values. A
+successful operation with no declared output contributes no record, and an
+empty success sequence is valid.
+
+A rejected Batch returns one structured error naming the first failing
+operation index when the failure is operation-scoped. A malformed Batch header
+or envelope has no operation index. Rejection returns no per-operation success
+records because no operation from the rejected Batch is visible. The declared
+resource budget, `values_per_result`, and negotiated frame limit MUST reserve
+the complete success Result before mutation; insufficient Result capacity
+rejects the Batch before apply.
+
 ## 9. Frozen Decisions — Errors, Capabilities, and Invariants
 
 ### 9.1 Error classes
@@ -190,11 +244,11 @@ Python exception text is adapter policy; the stable class is authoritative.
 
 | Invariant | Normative statement | Verification surface |
 |---|---|---|
-| **INV-MPY-02-1** | An `ObjectId` MUST encode a nonzero slot and generation, and a retired generation MUST NOT resolve after slot reuse. | Model-based allocation/delete/reuse/wrap tests. |
+| **INV-MPY-02-1** | A `StageId` MUST be nonzero and MUST NOT be reused within an Endpoint Epoch. An `ObjectId` MUST encode a nonzero slot and generation, and a retired generation MUST NOT resolve after slot reuse. | Model-based stage allocation/epoch and object allocation/delete/reuse/wrap tests. |
 | **INV-MPY-02-2** | Protocol frames MUST use canonical explicit encoding and MUST NOT depend on Rust/C layout, pointer width, alignment, or host endianness. | Golden byte vectors on host plus C decoder round trips. |
 | **INV-MPY-02-3** | Every nonzero `RequestId` accepted by the runtime MUST produce exactly one correlated Result and MUST NOT execute twice. | Duplicate/retry/correlation property tests. |
-| **INV-MPY-02-4** | A rejected batch MUST expose no operation, while an accepted batch MUST become visible as one stage transition. | Fault-injection tests at every validation/reservation/apply boundary. |
-| **INV-MPY-02-5** | Variable-sized values and queues MUST reject or explicitly truncate at advertised bounds; silent truncation or loss is forbidden. | Boundary and overflow tests for every published capability limit. |
+| **INV-MPY-02-4** | A rejected Batch MUST expose no operation and identify its first failing operation when the failure is operation-scoped, while an accepted Batch MUST become visible as one stage transition and return ordered records only for operations declaring outputs. | Result-shape fixtures plus fault-injection tests at every validation/reservation/apply boundary. |
+| **INV-MPY-02-5** | Variable-sized values and queues MUST reject or explicitly truncate at advertised bounds; silent truncation or loss is forbidden. Every MPY v1 profile MUST support a 256-byte canonical logical frame and a 128-byte `Text` value. | Boundary, interoperability-floor, and overflow tests for every published capability limit. |
 | **INV-MPY-02-6** | In-process and shared-memory transports MUST pass identical logical trace vectors for supported capabilities. | MPY-07/08 shared trace corpus. |
 
 ## 10. Reconciliation Decisions
@@ -220,25 +274,32 @@ Python exception text is adapter policy; the stable class is authoritative.
    use a library internally only if golden vectors remain canonical and
    `no_std` constraints hold.
 
-- **PCDN-MPY-02-001:** Should `StageId` also be `u64` generation/slot, or is a
-  non-reused `u32` session namespace sufficient for v1? Recommendation: `u32`
-  with explicit exhaustion requiring runtime restart.
-- **PCDN-MPY-02-002:** What maximum inline text/frame sizes are mandatory for
-  the smallest supported target? MPY-01 target profiles and MPY-08 SRAM budget
-  must supply the number before ratification.
-- **PCDN-MPY-02-003:** Should Results return per-operation success records for
-  every Batch operation, or only values/IDs and the first failure? Recommendation:
-  return a compact ordered result for operations that declare a result.
+- **PCDN-MPY-02-001 — Resolved by owner direction 2026-08-15:** `StageId` is a
+  nonzero, non-reused `u32` within one Endpoint Epoch. Exhaustion returns
+  `Capacity` until an epoch restart; MPY-08 `Boot Epoch` invalidates stale board
+  identities across reset. See §3, §5.1, and `INV-MPY-02-1`.
+- **PCDN-MPY-02-002 — Resolved by owner direction 2026-08-15:** Capability
+  negotiation selects per-profile maxima, with MPY v1 interoperability floors
+  of a 256-byte canonical logical frame and a 128-byte UTF-8 `Text` value.
+  MPY-08 later proves and publishes the board profile's actual limits without
+  blocking MPY-02 ratification. See §6.1 and `INV-MPY-02-5`.
+- **PCDN-MPY-02-003 — Resolved by owner direction 2026-08-15:** A successful
+  Batch returns ordered records only for operations declaring outputs, keyed by
+  operation index; Create also maps `BatchRef` to `ObjectId`. A rejected Batch
+  returns one structured error and the first failing operation index when the
+  failure is operation-scoped. See §8.1 and `INV-MPY-02-4`.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-02-1` and the proposed `ObjectId` layout resolve PCDN-MPY-001.
-- [ ] `INV-MPY-02-2` canonical encoding and the v1 ValueTag set are accepted.
-- [ ] `INV-MPY-02-3` result correlation and retry behavior are accepted.
-- [ ] `INV-MPY-02-4` batch validation, reservation, and visibility rules are accepted.
-- [ ] `INV-MPY-02-5` capability limits and overflow behavior are accepted.
-- [ ] `INV-MPY-02-6` establishes the shared MPY-07/08 trace corpus.
-- [ ] PCDN-MPY-02-001 through PCDN-MPY-02-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-7`, or `INV-MPY-8`.
+- [x] `INV-MPY-02-1` and the ID table resolve parent `PCDN-MPY-001`.
+- [x] `INV-MPY-02-2` canonical encoding and the v1 ValueTag set are accepted.
+- [x] `INV-MPY-02-3` result correlation and retry behavior are accepted.
+- [x] `INV-MPY-02-4` batch validation, reservation, visibility, and Result shape are accepted.
+- [x] `INV-MPY-02-5` capability limits and overflow behavior are accepted.
+- [x] `INV-MPY-02-6` establishes the shared MPY-07/08 trace corpus.
+- [x] `PCDN-MPY-02-001` is resolved without weakening `INV-MPY-2`.
+- [x] `PCDN-MPY-02-002` adopts negotiated profile limits plus the §6.1 MPY v1 floors without weakening `INV-MPY-7` or `INV-MPY-8`.
+- [x] `PCDN-MPY-02-003` is resolved without weakening atomic batches or bounded Results.
 
 ## 13. Files Cited
 
@@ -251,9 +312,12 @@ Python exception text is adapter policy; the stable class is authoritative.
 
 ## 14. Unblocks
 
-After MPY-01 and MPY-02 ratification plus golden protocol vectors, MPY-02
-unblocks MPY-03 runtime registry implementation and permits MPY-07/08 transport
-prototypes to consume the same neutral frames.
+Ratification authorizes MPY-02 protocol implementation and golden-vector work.
+After the canonical encoder/decoder vectors are committed, MPY-02 unblocks
+MPY-03's separate ratification and implementation gate and permits MPY-07/08
+transport prototypes to consume the same neutral frames. It does not ratify
+MPY-03 or authorize registry behavior before that phase closes its own PCDNs
+and §12 gate.
 
 ## 15. Change Log
 
@@ -277,3 +341,88 @@ Object creation, reads, callbacks, and dual-core transport need one explicit
 contract before storage or binding code can choose convenient local layouts.
 Separating logical frames from Rust/C layout prevents pointers, padding, and
 adapter-specific errors from becoming accidental cross-core ABI.
+
+### 0.2.0 — 2026-08-15 — Amended: negotiated capacity floor adopted
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** PCDN-MPY-02-002, INV-MPY-02-5, §0, §6.1, §11, §12
+
+**Commits:** pending
+
+**Summary:** Resolves `PCDN-MPY-02-002` with capability-negotiated limits, a
+256-byte canonical-frame floor, and a 128-byte UTF-8 text floor. MPY-08 must
+prove and publish its measured board capacities later; MPY-02 no longer waits
+on a future transport phase to define protocol compatibility.
+
+#### Rationale
+
+The draft made MPY-02 ratification depend on an MPY-08 SRAM budget even though
+MPY-08 consumes the protocol only after the same-core phases are stable. That
+forward dependency could deadlock the phase order. A protocol-owned minimum
+and profile-owned measured maxima preserve one command meaning across
+transports while allowing constrained targets to expose honest limits.
+
+The selected floors are deliberately small powers of two: a 128-byte label or
+diagnostic leaves half of the 256-byte logical frame for canonical command and
+value metadata, while larger strings, batches, and snapshots remain available
+when both endpoints advertise more capacity. MPY-02 golden vectors must prove
+that a command carrying one maximum-floor `Text` value fits the frame floor.
+
+Considered and rejected: leaving all limits to MPY-08, which creates the phase
+cycle; freezing the current 1 KiB demonstration mailbox as the protocol
+capacity, which would turn unreviewed board placement into a language-neutral
+ABI; and allowing targets below the floor to claim MPY v1, which would remove
+the common interoperability baseline.
+
+What deliberately did not change: MPY-08 still owns shared-memory placement,
+slot geometry, fragmentation, cache policy, and measured board capacity;
+MPY-07 may advertise larger host limits; `PCDN-MPY-02-001` and
+`PCDN-MPY-02-003` remain open; and MPY-02 remains Draft with no behavior
+implementation authorized.
+
+### 0.3.0 — 2026-08-15 — Ratified
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** PCDN-MPY-001, PCDN-MPY-02-001, PCDN-MPY-02-003,
+INV-MPY-02-1, INV-MPY-02-4, §0, §3, §5.1, §8.1, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Owner ratified MPY-02 after resolving the remaining identity and
+Batch Result decisions. `StageId` is a non-reused `u32` within an Endpoint
+Epoch; successful Batch Results contain indexed records only for operations
+declaring outputs; rejected Batches identify the first failing operation when
+applicable and return no partial-success records. The ID table closes parent
+`PCDN-MPY-001`.
+
+#### Rationale
+
+Stage lifetime needs stale-handle protection without carrying an additional
+generation word in every protocol frame. The endpoint epoch already separates
+runtime lifetimes, while monotonic non-reuse makes a `u32` StageId sufficient
+inside one lifetime. Object reuse remains independently protected by the
+`ObjectId` generation.
+
+Batch completion needs to remain deterministic and bounded. Returning one
+record for every void operation spends capacity without adding information;
+returning only declared outputs preserves operation correlation through the
+explicit index. A rejected Batch cannot truthfully report partial successes
+because validation and reservation guarantee that none become visible.
+
+Considered and rejected: a `u64` generation/slot `StageId`, which duplicates
+epoch protection and enlarges every stage-scoped frame; StageId reuse within an
+epoch, which permits stale aliasing; success records for every void Batch
+operation, which consume bounded Result capacity; and reporting successes
+before the first Batch failure, which contradicts atomic rejection.
+
+What deliberately did not change: `ObjectId` remains a `u64` generation/slot
+identity; MPY-08 still owns the concrete Boot Epoch transport mechanism; the
+capacity floors adopted at 0.2.0 remain unchanged; golden protocol vectors are
+still required before MPY-03 implementation; and MPY-03 through MPY-09 remain
+separately gated Draft phases.

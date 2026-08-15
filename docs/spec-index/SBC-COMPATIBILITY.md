@@ -57,7 +57,7 @@ an empty or absent historical log is not evidence that no prior issue existed.
 | FONT / INPUT / REND / WID | Their respective `docs/concepts/*-00-CONCEPTS.md` roots | Current-shape family documents; create a family errata log before the next material amendment. |
 | KI2C | `docs/concepts/KI2C-00-CONCEPTS.md` | KI2C-07 is hardware-blocked. Its physical conformance work remains evidence-gated and must receive a current §15 bridge before resuming behavior work. |
 | LPAR | `docs/concepts/LPAR-00-CONCEPTS.md` | Later phases are current-shape; the three legacy change-log bridges below remain explicit migration work. |
-| MPY | `docs/concepts/MPY-00-CONCEPTS.md` | MPY-01 is ratified with its two phase PCDNs resolved; MPY-02 through MPY-09 remain separately gated Draft phases. |
+| MPY | `docs/concepts/MPY-00-CONCEPTS.md` | MPY-01 and MPY-02 are ratified with their phase PCDNs resolved; golden protocol vectors remain required before MPY-03, and MPY-03 through MPY-09 remain separately gated Draft phases. |
 | QT | `docs/qt-support/00-concepts.md` | Current-shape family; create family errata before the next material amendment. |
 | RATATUI / SCTD | Their respective `docs/concepts/*-00-CONCEPTS.md` roots | Current-shape family documents; create a family errata log before the next material amendment. |
 | CHIPS-* / DISCO-* | Their canonical `chipdb/` and `docs/disco-*/` roots | Existing local documentation remains a legacy baseline until each family activates its current-SBC errata and amendment workflow. |

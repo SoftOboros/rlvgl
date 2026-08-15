@@ -4,9 +4,9 @@ MPY-00-CONCEPTS.md - MicroPython stage-and-actors runtime concepts and phase map
 
 # MPY-00 — MicroPython Stage-and-Actors Runtime Concepts
 
-**Status:** Ratified 2026-08-09. Normative for the MPY initiative. Phase
-documents remain separately gated and MUST be ratified before their behavior
-implementation begins.
+**Status:** Ratified 2026-08-09; amended 2026-08-15. Normative for the MPY
+initiative. Phase documents remain separately gated and MUST be ratified before
+their behavior implementation begins.
 
 Requesting direction: MicroPython should be able to set up the UI, create
 objects, register callbacks, set layout, and orchestrate application behavior,
@@ -467,9 +467,11 @@ flowchart LR
 
 ### 11.2 Resolved and phase-assigned decisions
 
-- **PCDN-MPY-001 — Assigned to MPY-02:** MPY-02 selects serialized widths and
-  the slot/generation partition for `ObjectId` and other IDs across host,
-  32-bit MCU, and shared-memory transports.
+- **PCDN-MPY-001 — Closed 2026-08-15 by MPY-02 ratification:** `StageId` is a
+  non-reused `u32` within one Endpoint Epoch; `ObjectId` is a `u64` with upper
+  `u32` generation and lower `u32` slot; and the remaining serialized ID widths
+  are frozen by the MPY-02 §5.1 table across host, 32-bit MCU, and shared-memory
+  transports.
 - **PCDN-MPY-002 — Resolved by owner ratification:** The Python API uses
   `Stage` and `Actor` as its primary wrapper names over neutral protocol types.
 - **PCDN-MPY-003 — Resolved by owner ratification:** Host binding conformance
@@ -507,6 +509,7 @@ Owner ratification confirms:
 ## 13. Files Cited
 
 - `docs/concepts/MPY-01-INTROSPECTION-BASELINE.md`
+- `docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md`
 - `docs/concepts/LPAR-00-CONCEPTS.md`
 - `docs/concepts/LPAR-01-BASELINE.md`
 - `docs/concepts/LPAR-02-OBJECT-SUBSTRATE.md`
@@ -533,13 +536,11 @@ Owner ratification confirms:
 
 ## 14. Unblocks
 
-Owner ratification unblocked drafting and ratification of MPY-01: the
-introspection baseline and current/partial/missing matrix. MPY-01 is now
-ratified and supplies the inherited-LVGL-pin and representative-actor-set
-prerequisite for MPY-02's own planning and ratification gate. It does not
-ratify MPY-02: MPY-02's PCDNs and §12 acceptance gate remain open, and its
-behavior implementation MUST NOT begin until MPY-02 is separately ratified.
-MPY-03 through MPY-09 likewise remain separately gated Draft phases.
+MPY-01 and MPY-02 are ratified. MPY-02 authorizes protocol implementation and
+golden-vector work; committed canonical encoder/decoder vectors satisfy its
+final prerequisite for MPY-03's separate ratification and implementation gate.
+MPY-03 through MPY-09 remain separately gated Draft phases and MUST close their
+own PCDNs and §12 acceptance gates before behavior implementation.
 
 ## 15. Change Log
 
@@ -623,3 +624,35 @@ What deliberately did not change: `PCDN-MPY-001`, `PCDN-MPY-004`, and
 `PCDN-MPY-006` remain assigned to MPY-02, MPY-05, and MPY-03 respectively;
 MPY-02 through MPY-09 remain Draft; and this documentation amendment does not
 authorize behavior implementation in any later phase.
+
+### 0.2.2 — 2026-08-15 — Amended: PCDN-MPY-001 closed
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** PCDN-MPY-001, §0, §11.2, §13, §14
+
+**Commits:** pending
+
+**Summary:** Records the owner-ratified closure of `PCDN-MPY-001` by MPY-02,
+adopts the serialized ID widths and Endpoint Epoch boundary from MPY-02 §5.1,
+and advances the initiative gate to protocol implementation and golden-vector
+evidence while preserving MPY-03 through MPY-09 as separate Draft phases.
+
+#### Rationale
+
+MPY-00 delegated serialized ID widths and the `ObjectId` slot/generation split
+to MPY-02. MPY-02 now freezes those values, resolves all of its phase PCDNs,
+and is ratified, so leaving the parent decision assigned would make the parent
+source of truth stale.
+
+Considered and rejected: leaving the parent PCDN assigned until MPY-03, which
+would give a consumer phase apparent authority to reopen MPY-02's wire IDs; and
+closing it without citing the phase table, which would make the selected widths
+hard to audit.
+
+What deliberately did not change: `PCDN-MPY-004` and `PCDN-MPY-006` remain
+assigned to MPY-05 and MPY-03; golden protocol vectors remain required before
+MPY-03 implementation; MPY-03 through MPY-09 remain Draft; and this amendment
+does not resolve any later phase's PCDNs.
