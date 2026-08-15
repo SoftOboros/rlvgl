@@ -9,6 +9,9 @@
 //! - `cm4`
 //! - `sim`
 
+/// Canonical MPY logical-frame and value codec.
+pub mod protocol;
+
 /// Semantic version of the shared API.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,8 +27,8 @@ pub struct ApiVersion {
 /// Current API version following SemVer.
 pub const API_VERSION: ApiVersion = ApiVersion {
     major: 0,
-    minor: 1,
-    patch: 0,
+    minor: 2,
+    patch: 1,
 };
 
 /// Z-index for stacking nodes.

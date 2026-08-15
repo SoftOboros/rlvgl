@@ -4,8 +4,10 @@ MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md - Stage registry, descriptors, and gen
 
 # MPY-03 — Runtime Registry and Actor Creation
 
-**Status:** Draft 2026-08-09. Not ratified. Storage and descriptor mechanisms
-remain proposals until MPY-01 and MPY-02 are ratified.
+**Status:** Draft 2026-08-15. Not ratified. MPY-01 and MPY-02 dependencies,
+including the canonical MPY v1 codec and golden-vector prerequisite, are
+satisfied. Storage and descriptor mechanisms remain proposals until this
+phase's PCDNs and acceptance checklist close.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-01 baseline and MPY-02 protocol.

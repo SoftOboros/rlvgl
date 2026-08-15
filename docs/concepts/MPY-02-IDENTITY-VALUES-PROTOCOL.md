@@ -6,8 +6,9 @@ MPY-02-IDENTITY-VALUES-PROTOCOL.md - Stable IDs, values, envelopes, batches, and
 
 **Status:** Ratified 2026-08-15. Normative for MPY IDs, tagged values, logical
 frames, atomic batches, errors, capability negotiation, and transport traits.
-MPY-03 behavior remains separately gated and requires committed golden protocol
-vectors before implementation begins.
+MPY-03 behavior remains separately gated. Its golden-vector prerequisite is
+satisfied by `api/tests/fixtures/mpy_v1_vectors.txt` and the conformance tests
+in `api/tests/mpy_v1_golden.rs`.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-01 was ratified and committed at `74dc28a` before this phase's ratification.
@@ -189,6 +190,82 @@ the active request window.
 Framing integrity such as shared-memory slot sequence checks or stream checksums
 belongs to the transport profile. It cannot change the logical frame fields.
 
+### 7.1 Canonical MPY v1 byte layout
+
+Owner direction on 2026-08-15 resolved `PCDN-MPY-02-004` with a compact,
+allocation-free, fixed-order layout. One complete logical frame begins with this
+eight-byte header:
+
+| Offset | Field | Encoding |
+|---:|---|---|
+| 0 | frame class | `u8`: Hello `01`, Capabilities `02`, Command `03`, Batch `04`, Result `05`, Cue `06`, RuntimeNotice `07` |
+| 1 | protocol major | `u8`; zero invalid |
+| 2 | protocol minor | `u8` |
+| 3 | protocol patch | `u8` |
+| 4 | class payload length | `u32` little-endian; counts bytes after this header |
+
+There is no logical-frame magic, padding, native-layout image, checksum, or
+transport fragment metadata. A decoder receives exactly one reassembled logical
+frame. Fewer bytes than declared are `InvalidFrame`/truncated input; trailing
+bytes are noncanonical. Transport profiles own their separate integrity and
+resynchronization fields.
+
+All multibyte scalars are little-endian. Flags are `u32`; sequence counts and
+operation indexes are `u16`; byte lengths are `u32`. Variable bytes are encoded
+as `u32 byte_length` followed by exactly that many bytes. An optional `u16` or
+`u32` is a presence byte (`00` absent, `01` present) followed by the value when
+present; other presence bytes are invalid. IDs declared nonzero in §5.1 are
+rejected when zero. An `ObjectId` also requires nonzero generation and slot
+halves.
+
+### 7.2 Value discriminants
+
+One value is its `u8` tag followed immediately by the §6 payload:
+
+| ValueTag | Byte | ValueTag | Byte |
+|---|---:|---|---:|
+| `None` | `00` | `Bool` | `01` |
+| `I32` | `02` | `U32` | `03` |
+| `I64` | `04` | `U64` | `05` |
+| `Precise` | `06` | `Color` | `07` |
+| `Point` | `08` | `Size` | `09` |
+| `Rect` | `0a` | `Enum` | `0b` |
+| `Text` | `0c` | `Bytes` | `0d` |
+| `Object` | `0e` | `Resource` | `0f` |
+| `BatchObject` | `10` | | |
+
+`Bool` accepts only `00` and `01`. `Text` must be valid UTF-8. `Enum.domain`,
+`Resource.kind`, `Resource.id`, and `BatchObject` are nonzero. Unknown tags are
+`Unsupported`; malformed known tags are `InvalidFrame`.
+
+### 7.3 Class payloads
+
+Fields appear in the following order without alignment gaps:
+
+| Frame | Canonical payload order |
+|---|---|
+| `Hello` | schema version `3*u8`; five limits (`max_frame_bytes:u32`, `max_text_bytes:u32`, `max_byte_payload:u32`, `max_fields_per_command:u16`, `max_values_per_result:u16`); feature bits `u64` |
+| `Capabilities` | Hello fields; supported ValueTag bitset `u32` indexed by §7.2; opcode count `u16`; that many registered opcode IDs as `u32` |
+| `Command` | `StageId:u32`; `RequestId:u32`; opcode `u32`; flags `u32`; length-delimited opcode payload |
+| `Batch` | `StageId:u32`; `RequestId:u32`; flags `u32`; budget (`actors:u16`, `text_bytes:u32`, `resources:u16`, `result_bytes:u32`); length-delimited ordered operation records |
+| `Result` | `RequestId:u32`; status `u8`; optional operation index; optional field/descriptor ID; length-delimited UTF-8 diagnostic; length-delimited typed payload |
+| `Cue` | sequence `u32`; `StageId:u32`; `ObjectId:u64`; `SubscriptionId:u32`; `CallbackId:u32`; `EventId:u32`; flags `u32`; length-delimited typed payload |
+| `RuntimeNotice` | sequence `u32`; notice kind `u32`; length-delimited UTF-8 diagnostic; length-delimited notice payload |
+
+Opcode-owned command and batch-operation payload schemas ratify with their
+owning MPY phases; they cannot alter this envelope. A successful Result has
+status `00` and no error index, field ID, or diagnostic. Failure status bytes
+`01` through `12` map in §9.1 order from `InvalidFrame` through `Internal`.
+
+### 7.4 Canonical implementation and vectors
+
+`api/src/protocol.rs` is the allocation-free reference codec. It writes into a
+caller-provided buffer and decodes borrowed text, bytes, payloads, and opcode
+lists. `api/tests/fixtures/mpy_v1_vectors.txt` is the language-neutral canonical
+hex corpus; `api/tests/mpy_v1_golden.rs` proves encode equality, decode equality,
+and byte-identical re-encoding for every §7.2 value and §7.1 frame class. C and
+MicroPython consumers must pass the same corpus rather than copying Rust layout.
+
 ## 8. Frozen Decisions — Atomic Batches
 
 A Batch contains ordered operations plus a declared resource budget. The
@@ -288,6 +365,12 @@ Python exception text is adapter policy; the stable class is authoritative.
   operation index; Create also maps `BatchRef` to `ObjectId`. A rejected Batch
   returns one structured error and the first failing operation index when the
   failure is operation-scoped. See §8.1 and `INV-MPY-02-4`.
+- **PCDN-MPY-02-004 — Resolved by owner direction 2026-08-15:** MPY v1 uses the
+  compact, allocation-free fixed-order byte layout in §7.1 through §7.4. Frame,
+  value, and error discriminants are stable sequential `u8` values; scalars are
+  little-endian; flags are `u32`; counts/indexes are `u16`; lengths are `u32`;
+  and no serialization framework, magic, padding, or native layout is part of
+  the logical frame.
 
 ## 12. Acceptance Checklist
 
@@ -300,12 +383,16 @@ Python exception text is adapter policy; the stable class is authoritative.
 - [x] `PCDN-MPY-02-001` is resolved without weakening `INV-MPY-2`.
 - [x] `PCDN-MPY-02-002` adopts negotiated profile limits plus the §6.1 MPY v1 floors without weakening `INV-MPY-7` or `INV-MPY-8`.
 - [x] `PCDN-MPY-02-003` is resolved without weakening atomic batches or bounded Results.
+- [x] `PCDN-MPY-02-004` fixes an allocation-free canonical byte layout and committed golden corpus without weakening `INV-MPY-02-2` or the 256-byte floor.
 
 ## 13. Files Cited
 
 - `docs/concepts/MPY-00-CONCEPTS.md`
 - `docs/concepts/MPY-01-INTROSPECTION-BASELINE.md`
 - `api/src/lib.rs`
+- `api/src/protocol.rs`
+- `api/tests/mpy_v1_golden.rs`
+- `api/tests/fixtures/mpy_v1_vectors.txt`
 - `micropython/src/lib.rs`
 - `micropython/mp_module.c`
 - `core/src/object.rs`
@@ -318,6 +405,10 @@ MPY-03's separate ratification and implementation gate and permits MPY-07/08
 transport prototypes to consume the same neutral frames. It does not ratify
 MPY-03 or authorize registry behavior before that phase closes its own PCDNs
 and §12 gate.
+
+The canonical vectors and reference codec are now committed with this
+amendment, so the MPY-03 dependency is satisfied; MPY-03 remains Draft until its
+own PCDNs and acceptance checklist close.
 
 ## 15. Change Log
 
@@ -426,3 +517,27 @@ identity; MPY-08 still owns the concrete Boot Epoch transport mechanism; the
 capacity floors adopted at 0.2.0 remain unchanged; golden protocol vectors are
 still required before MPY-03 implementation; and MPY-03 through MPY-09 remain
 separately gated Draft phases.
+
+### 0.4.0 — 2026-08-15 — Amended: canonical byte layout and vectors
+
+**Author:** Ira Abbott with OpenAI Codex implementation
+
+**Change kind:** semantic and implementation
+
+**Touches:** PCDN-MPY-02-004, INV-MPY-02-2, INV-MPY-02-5, §0, §7, §11–§15
+
+**Commits:** pending
+
+**Summary:** Fixes the eight-byte frame header, stable discriminants, scalar
+widths, class payload ordering, and allocation-free codec; commits golden bytes
+for every MPY v1 tagged value and logical frame class.
+
+#### Rationale
+
+The ratified semantic field set was insufficient to produce canonical bytes:
+frame/value/error discriminants, optional-field representation, and exact field
+ordering were still undefined. A fixed-order caller-buffer codec is the
+smallest implementation that meets the 256-byte floor and remains practical on
+both MicroPython and shared-memory targets. TLV and general serialization
+frameworks were rejected for v1 because they add overhead and decoder surface
+without a demonstrated compatibility requirement.
