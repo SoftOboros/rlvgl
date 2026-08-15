@@ -503,6 +503,22 @@ mutually exclusive features:
 
 ## Spec-Before-Code Planning Discipline
 
+### Current SBC authority and rlvgl adoption
+
+The current normative form of this discipline is the Softoboros
+[SBC-00 concepts document](https://github.com/iraabbott/softoboros.com/blob/ddafeb3ffb20ab4ff924b925d88ca47577f2bafb/docs/spec-before-code/docs/SBC-00-CONCEPTS.md)
+and its Addenda B, C, and D at the same parent-repository revision. It governs
+all new or materially amended multi-phase rlvgl documentation. If the local
+historical guidance below conflicts with that source, the current SBC source
+wins.
+
+The local adoption boundary, legacy-structure bridge, and open migration gates
+are recorded in [`docs/spec-index/SBC-COMPATIBILITY.md`](docs/spec-index/SBC-COMPATIBILITY.md).
+The named prefix owners are in
+[`docs/spec-index/PREFIX-REGISTRY.md`](docs/spec-index/PREFIX-REGISTRY.md).
+Those files are operational mappings only; they do not restate or replace SBC
+vocabulary.
+
 Multi-phase initiatives in this repo — the STM32H747I-DISCO bring-up
 (`docs/disco-platform-guide/`, `docs/disco-tutorial/`,
 `docs/disco-freertos-guide/`, `docs/disco-zephyr-guide/`,

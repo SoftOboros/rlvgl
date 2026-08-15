@@ -1,5 +1,5 @@
 {
-  "edge_count": 7,
+  "edge_count": 10,
   "edges": [
     {
       "edge_type": "cites",
@@ -42,6 +42,27 @@
       "line": 636,
       "source": "docs/concepts/DCB-RETROSPECTIVE.md",
       "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 11,
+      "source": "docs/concepts/ERRATA.md",
+      "target": "SBC-INV-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 11,
+      "source": "docs/concepts/ERRATA.md",
+      "target": "SBC-INV-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 53,
+      "source": "docs/concepts/ERRATA.md",
+      "target": "SBC-INV-7"
     },
     {
       "edge_type": "cites",

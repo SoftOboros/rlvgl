@@ -278,9 +278,13 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
     levels, ten initiative invariants, and the MPY-01 through MPY-09 dependency
     map. Phase documents remain separately gated.
   - [MPY-01-INTROSPECTION-BASELINE.md](MPY-01-INTROSPECTION-BASELINE.md) —
-    **Draft 2026-08-09; not ratified.** Pins the inherited LVGL reference,
-    defines the MPY-I coverage-row schema, inventories the first surfaces, and
-    selects Container, Label, Button, Slider, and List as the proof actors.
+    **Ratified 2026-08-09.** Pins the inherited LVGL reference, defines the
+    MPY-I coverage-row schema, inventories the first surfaces, and selects the
+    fully qualified `rlvgl_widgets` proof actors. It is a prerequisite for
+    MPY-02's separate ratification gate, not authorization to implement
+    unratified later phases.
+  - [ERRATA.md](ERRATA.md) — MPY family's living errata log. No accepted MPY
+    errata entries are recorded yet.
   - [MPY-02-IDENTITY-VALUES-PROTOCOL.md](MPY-02-IDENTITY-VALUES-PROTOCOL.md) —
     **Draft 2026-08-09; not ratified.** Proposes stable generation-checked IDs,
     canonical tagged values and frames, atomic batches, correlation, errors,

@@ -1,5 +1,5 @@
 {
-  "edge_count": 343,
+  "edge_count": 383,
   "edges": [
     {
       "edge_type": "defines",
@@ -109,35 +109,21 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 483,
+      "line": 485,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 486,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 485,
-      "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 492,
-      "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 493,
+      "line": 488,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-3"
     },
@@ -146,460 +132,754 @@
       "kind_provenance": "inferred",
       "line": 494,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-4"
+      "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 495,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-5"
+      "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 496,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-6"
+      "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 497,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-7"
+      "target": "INV-MPY-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 498,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-8"
+      "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 499,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-9"
+      "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 500,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
-      "target": "INV-MPY-10"
+      "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 501,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 502,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 503,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "INV-MPY-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 501,
+      "line": 504,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 502,
+      "line": 505,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 502,
+      "line": 505,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 502,
+      "line": 505,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 502,
+      "line": 505,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 502,
+      "line": 505,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 546,
+      "line": 552,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 570,
+      "line": 576,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 576,
+      "line": 582,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 576,
+      "line": 582,
       "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "PCDN-MPY-003"
     },
     {
-      "edge_type": "defines",
+      "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 169,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 170,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-2"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 171,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-3"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 172,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-4"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 173,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-5"
+      "line": 592,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 196,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "PCDN-MPY-01-001"
+      "line": 598,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 200,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "PCDN-MPY-01-002"
+      "line": 602,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 206,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 207,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 208,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 209,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "line": 603,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
       "target": "INV-MPY-01-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 210,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-5"
+      "line": 609,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 211,
-      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
-      "target": "INV-MPY-01-4"
+      "line": 614,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 211,
+      "line": 615,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 615,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 617,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 622,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 622,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 623,
+      "source": "docs/concepts/MPY-00-CONCEPTS.md",
+      "target": "PCDN-MPY-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 125,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 211,
+      "line": 186,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 228,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 229,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 230,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 231,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 232,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 233,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 260,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "PCDN-MPY-01-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 211,
+      "line": 266,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 267,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "PCDN-MPY-01-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 270,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 276,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-01-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 277,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-01-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 278,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-01-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 279,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-01-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 280,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-01-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 281,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 282,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 322,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 329,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 329,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 330,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 341,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 341,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 361,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 361,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 361,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 361,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 361,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 362,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 362,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 362,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 368,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 384,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 385,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 388,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 388,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "PCDN-MPY-01-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 395,
+      "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 408,
       "source": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "target": "PCDN-MPY-005"
     },
@@ -2405,14 +2685,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 11,
-    "gate": 75,
-    "invariant": 64,
+    "amendment": 12,
+    "gate": 77,
+    "invariant": 65,
     "nongoal": 43,
-    "rationale": 11,
+    "rationale": 12,
     "term": 75
   },
-  "object_count": 279,
+  "object_count": 284,
   "objects": [
     {
       "attrs": {
@@ -2886,8 +3166,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 491,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:491",
+      "line": 494,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:494",
       "text": "`INV-MPY-1` ownership between the language-neutral runtime and the MicroPython adapter is accepted."
     },
     {
@@ -2900,8 +3180,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 492,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:492",
+      "line": 495,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:495",
       "text": "`INV-MPY-2` opaque generation-checked identity is accepted, with bit layout explicitly deferred to MPY-02."
     },
     {
@@ -2914,8 +3194,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 493,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:493",
+      "line": 496,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:496",
       "text": "`INV-MPY-3` establishes one descriptor catalog for creation and introspection."
     },
     {
@@ -2928,8 +3208,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 494,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:494",
+      "line": 497,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:497",
       "text": "`INV-MPY-4` accepts requested layout as director-owned and computed geometry as rlvgl-owned."
     },
     {
@@ -2942,8 +3222,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 495,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:495",
+      "line": 498,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:498",
       "text": "`INV-MPY-5` accepts queued VM-safe callbacks instead of synchronous Python event handlers."
     },
     {
@@ -2956,8 +3236,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 496,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:496",
+      "line": 499,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:499",
       "text": "`INV-MPY-6` accepts validated batches and post-dispatch callback mutations."
     },
     {
@@ -2970,8 +3250,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 497,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:497",
+      "line": 500,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:500",
       "text": "`INV-MPY-7` accepts one semantic protocol for in-process and dual-core profiles."
     },
     {
@@ -2984,8 +3264,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 498,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:498",
+      "line": 501,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:501",
       "text": "`INV-MPY-8` accepts explicit bounded-resource and ownership behavior."
     },
     {
@@ -2998,8 +3278,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 499,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:499",
+      "line": 502,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:502",
       "text": "`INV-MPY-9` accepts level-scoped introspection parity claims and the inherited LPAR pin."
     },
     {
@@ -3012,8 +3292,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 500,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:500",
+      "line": 503,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:503",
       "text": "`INV-MPY-10` accepts native-only actor execution for MPY v1."
     },
     {
@@ -3027,8 +3307,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 501,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:501",
+      "line": 504,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:504",
       "text": "The MPY-01 through MPY-09 phase map is accepted without weakening `INV-MPY-1` or `INV-MPY-7`."
     },
     {
@@ -3043,8 +3323,8 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 502,
-      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:502",
+      "line": 505,
+      "obj_id": "docs/concepts/MPY-00-CONCEPTS.md:gate:505",
       "text": "PCDN-MPY-001 through PCDN-MPY-006 are resolved or assigned to the named phase without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-5`."
     },
     {
@@ -3083,7 +3363,7 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 540,
+      "line": 546,
       "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.1.0",
       "text": "Defines the MicroPython stage-and-actors ownership model,"
     },
@@ -3106,7 +3386,7 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 540,
+      "line": 546,
       "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.1.0-rationale",
       "text": "The previous hardware-first sketch proved the binding and transport direction\nbut stopped at a fixed rectangle/text stack. MicroPython cannot orchestrate the\nfull UI from that surface. A discoverable, transport-independent runtime object\ncontract must precede additional Python wrappers so object identity, creation,\nproperties, layout, callbacks, and dual-core behavior do not diverge by widget\nor adapter."
     },
@@ -3152,7 +3432,7 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 564,
+      "line": 570,
       "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.2.0",
       "text": "Owner ratified the stage-and-actors ownership model, all ten"
     },
@@ -3181,9 +3461,9 @@
       "doc": "docs/concepts/MPY-00-CONCEPTS.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 564,
+      "line": 570,
       "obj_id": "docs/concepts/MPY-00-CONCEPTS.md#0.2.0-rationale",
-      "text": "The concepts now establish a coherent separation between MicroPython direction\nand native rlvgl performance while preserving a single protocol across\nsame-core and dual-core deployments. Phase-level detail can proceed without\nreopening the initiative's ownership, callback, layout, or parity boundaries."
+      "text": "The concepts now establish a coherent separation between MicroPython direction\nand native rlvgl performance while preserving a single protocol across\nsame-core and dual-core deployments. Phase-level detail can proceed without\nreopening the initiative's ownership, callback, layout, or parity boundaries.\n\n### 0.2.1 — 2026-08-09 — Amended: PCDN-MPY-005 closed\n\n**Author:** Ira Abbott\n\n**Change kind:** semantic\n\n**Touches:** PCDN-MPY-005, §11.2, §13, §14\n\n**Commits:** pending\n\n**Summary:** Records the owner-ratified closure of `PCDN-MPY-005` by MPY-01,\nfreezes the representative actor set as `INV-MPY-01-4` with fully qualified\n`rlvgl_widgets` module paths, and preserves MPY-02 through MPY-09 as\nseparately gated Draft phases.\n\n\nThis amendment changes `PCDN-MPY-005` from phase-assigned to resolved in the\nratified parent, so it is semantic rather than editorial. MPY-00 §11.2\ndelegates four decisions to named phases. A phase document answering one of\nthem does not close it here; without a back-amendment the parent reads as\nhaving four open decisions indefinitely. MPY-01 §14 now makes this amendment\nthe closure act, and names the same obligation for `PCDN-MPY-001` (MPY-02),\n`PCDN-MPY-006` (MPY-03), and `PCDN-MPY-004` (MPY-05).\n\nConsidered and rejected: leaving `PCDN-MPY-005` marked assigned after MPY-01\nresolved it, or treating the MPY-01 document alone as the parent closure. Both\nwould leave the parent source of truth stale and make the decision's binding\nstatus ambiguous.\n\nWhat deliberately did not change: `PCDN-MPY-001`, `PCDN-MPY-004`, and\n`PCDN-MPY-006` remain assigned to MPY-02, MPY-05, and MPY-03 respectively;\nMPY-02 through MPY-09 remain Draft; and this documentation amendment does not\nauthorize behavior implementation in any later phase."
     },
     {
       "attrs": {
@@ -3193,7 +3473,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 57,
       "obj_id": "mpy:term:mpy coverage row",
       "text": "One versioned claim about a named introspection surface, its source reference, rlvgl implementation status, target profiles, owning phase, and required evidence."
     },
@@ -3205,7 +3485,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 57,
+      "line": 58,
       "obj_id": "mpy:term:current coverage",
       "text": "Required behavior exists and has evidence, but it may still need adapter exposure in a later phase."
     },
@@ -3217,7 +3497,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 58,
+      "line": 59,
       "obj_id": "mpy:term:partial coverage",
       "text": "Some semantic substrate exists, but one or more required MPY behaviors or evidence surfaces are absent."
     },
@@ -3229,7 +3509,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 59,
+      "line": 60,
       "obj_id": "mpy:term:missing coverage",
       "text": "Required behavior has no adequate rlvgl implementation."
     },
@@ -3241,7 +3521,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 60,
+      "line": 61,
       "obj_id": "mpy:term:unsupported coverage",
       "text": "The feature is deliberately unavailable for a named target/profile and the capability response reports that fact."
     },
@@ -3253,7 +3533,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 61,
+      "line": 62,
       "obj_id": "mpy:term:deferred coverage",
       "text": "The row is valid scope but assigned beyond the current closure target with a named reopen trigger."
     },
@@ -3265,7 +3545,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 62,
+      "line": 63,
       "obj_id": "mpy:term:representative actor set",
       "text": "The minimum cross-section of native actors used to prove generic descriptors, creation, properties/actions, events, layout, and composition."
     },
@@ -3283,7 +3563,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 169,
+      "line": 228,
       "obj_id": "INV-MPY-01-1",
       "text": "MPY parity work MUST use the exact LPAR-01 source pin and config assumptions until LPAR-01 is amended."
     },
@@ -3301,7 +3581,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 170,
+      "line": 229,
       "obj_id": "INV-MPY-01-2",
       "text": "Every MPY coverage claim MUST be one versioned row with level, surface, target qualifier, owner, status, and evidence."
     },
@@ -3319,7 +3599,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 171,
+      "line": 230,
       "obj_id": "INV-MPY-01-3",
       "text": "Missing Coverage and Unsupported Coverage MUST remain distinct, and unsupported rows MUST name the rejecting capability/profile."
     },
@@ -3337,9 +3617,9 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 172,
+      "line": 231,
       "obj_id": "INV-MPY-01-4",
-      "text": "The first generic actor proof MUST include `Container`, `Label`, `Button`, `Slider`, and `List`."
+      "text": "The first generic actor proof MUST include `rlvgl_widgets::container::Container`, `rlvgl_widgets::label::Label`, `rlvgl_widgets::button::Button`, `rlvgl_widgets::slider::Slider`, and `rlvgl_widgets::list::List`."
     },
     {
       "attrs": {
@@ -3356,16 +3636,34 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 173,
+      "line": 232,
       "obj_id": "INV-MPY-01-5",
       "text": "A release MUST NOT claim generic full LVGL or introspection parity; it MUST cite closed MPY Coverage Rows."
+    },
+    {
+      "attrs": {
+        "def_shape": "table",
+        "doc_status": "",
+        "has_verification": true,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": "MPY-03 descriptor/matrix consistency test (§5.1)."
+      },
+      "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "family": "mpy",
+      "kind": "invariant",
+      "line": 233,
+      "obj_id": "INV-MPY-01-6",
+      "text": "The coverage matrix MUST remain a claim ledger: every surface it names MUST resolve in the MPY-03 descriptor catalog, and no runtime behavior may be derived from the matrix."
     },
     {
       "attrs": {},
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 188,
+      "line": 250,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:nongoal:1",
       "text": "No behavior implementation. MPY-01 produces a baseline and tests for its"
     },
@@ -3374,7 +3672,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 190,
+      "line": 252,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:nongoal:2",
       "text": "No complete widget catalog. The five proof actors exercise capability"
     },
@@ -3383,7 +3681,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 192,
+      "line": 254,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:nongoal:3",
       "text": "No new LVGL pin. Updating the submodule or config belongs to LPAR-01."
     },
@@ -3392,13 +3690,13 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 193,
+      "line": 255,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:nongoal:4",
       "text": "No C ABI mimicry. Reference symbols scope behavior; they do not dictate"
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-1"
         ]
@@ -3406,13 +3704,13 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 206,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:206",
+      "line": 276,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:276",
       "text": "`INV-MPY-01-1` pins all matrix rows to the inherited LPAR baseline."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-2"
         ]
@@ -3420,13 +3718,13 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 207,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:207",
+      "line": 277,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:277",
       "text": "`INV-MPY-01-2` matrix fields and target qualifiers are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-3"
         ]
@@ -3434,13 +3732,13 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 208,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:208",
+      "line": 278,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:278",
       "text": "`INV-MPY-01-3` missing-versus-unsupported semantics are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-4"
         ]
@@ -3448,13 +3746,13 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 209,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:209",
-      "text": "`INV-MPY-01-4` freezes the five representative actors."
+      "line": 279,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:279",
+      "text": "`INV-MPY-01-4` freezes the five representative actors by fully qualified path."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-5"
         ]
@@ -3462,13 +3760,27 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 210,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:210",
+      "line": 280,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:280",
       "text": "`INV-MPY-01-5` claim wording and audit ownership are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
+        "cited_ids": [
+          "INV-MPY-01-6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 281,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:281",
+      "text": "`INV-MPY-01-6` accepts the matrix as a claim ledger cross-checked against the MPY-03 catalog."
+    },
+    {
+      "attrs": {
+        "checked": true,
         "cited_ids": [
           "INV-MPY-01-4",
           "INV-MPY-3"
@@ -3477,9 +3789,21 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 211,
-      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:211",
+      "line": 282,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:282",
       "text": "PCDN-MPY-01-001 and PCDN-MPY-01-002 are resolved without weakening `INV-MPY-3` or `INV-MPY-01-4`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 283,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md:gate:283",
+      "text": "MPY-00 `PCDN-MPY-005` is closed by §7 and requires the back-amendment named in §14."
     },
     {
       "attrs": {
@@ -3515,7 +3839,7 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 244,
+      "line": 335,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md#0.1.0",
       "text": "Drafts the introspection coverage matrix, claim schema, target"
     },
@@ -3536,9 +3860,60 @@
       "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 244,
+      "line": 335,
       "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md#0.1.0-rationale",
       "text": "The initiative needs a bounded unit of parity and a cross-section of actors\nbefore it can select IDs, descriptors, or bindings. Separating Current,\nPartial, Missing, Unsupported, and Deferred coverage prevents existing native\nsubstrate from being mistaken for a complete scripting surface."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott",
+        "change_kind": "semantic",
+        "chronological_rank": 2,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-08-09",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "ratified",
+        "summary": "Owner ratified the introspection baseline, claim schema, coverage",
+        "touches": [
+          "INV-MPY-01-2",
+          "INV-MPY-01-4",
+          "INV-MPY-01-6",
+          "INV-MPY-3",
+          "INV-MPY-5"
+        ]
+      },
+      "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 355,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md#0.2.0",
+      "text": "Owner ratified the introspection baseline, claim schema, coverage"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-01-2",
+          "INV-MPY-01-4",
+          "INV-MPY-01-6",
+          "INV-MPY-3",
+          "INV-MPY-5"
+        ]
+      },
+      "doc": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 355,
+      "obj_id": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md#0.2.0-rationale",
+      "text": "Four defects were corrected at ratification rather than carried into execution.\n\n`PCDN-MPY-01-001`'s drafted recommendation — generate the matrix from the\ndescriptor source MPY-03 selects — made a Wave 0 artifact depend on Wave 1\noutput, contradicting MPY-00 §9.2 and §14. The matrix is instead authored at\nMPY-01 as a claim ledger and validated against the catalog by an MPY-03\nconsistency test, which preserves `INV-MPY-3`'s single-schema rule without\ninverting the wave order. `INV-MPY-01-6` states the ledger/schema boundary so a\nlater reader cannot mistake the committed JSON for a rival descriptor source.\n\n`INV-MPY-01-4` previously froze the bare name `List` while `PCDN-MPY-01-002`\nwas still deciding which `List` it meant. An invariant naming an unresolved\nsymbol is not enforceable, so the PCDN is resolved first and the invariant now\ncarries fully qualified module paths for all five actors. The resolution\nexcludes `rlvgl_ui::list::List` on substantive grounds rather than layering\npreference: it stores an `Option<Box<dyn FnMut(usize, &str)>>` selection\nhandler (`ui/src/list.rs:24`), so adopting it would place exactly the native\nclosure `INV-MPY-5` forbids inside the first descriptor.\n\n§7's capability column asserted that `List` exercises child composition. It\ndoes not: `widgets/src/list.rs:17` owns a `Vec<String>` item model, and\n`widgets/src/container.rs:9` holds only bounds and style. Children live in the\n`ObjectNode` tree in both cases. The column now records what the proof set\nactually exercises, and states that child policy is an object-layer property\ndescribing what the tree permits under an actor — not widget-held storage. An\nuncorrected capability claim would have become an MPY-03 fixture asserting\nbehavior no proof actor has.\n\nFinally, MPY-00 §11.2 delegates four decisions to phases, but no phase required\nthe back-amendment that closes them. §14 now makes the MPY-00 §15 amendment the\nclosure act for `PCDN-MPY-005` and names the same obligation for the three\ndecisions delegated to MPY-02, MPY-03, and MPY-05.\n\nConsidered and rejected: generating the Wave 0 matrix from the later MPY-03\ncatalog, choosing `rlvgl_ui::list::List` as the canonical actor, treating\nwidget-owned values as tree children, and silently closing the parent PCDN in\na child phase. Each alternative either reverses the ratified wave order,\nviolates the callback boundary, asserts an unsupported child policy, or leaves\nthe parent decision state stale.\n\nWhat deliberately did not change: MPY-01 makes no Current Coverage claim,\ndoes not implement handles, descriptors, actors, bindings, or transport, and\ndoes not ratify MPY-02 through MPY-09. The descriptor catalog remains owned by\nMPY-03, and every later phase remains responsible for its own PCDNs, acceptance\ngate, and evidence before behavior implementation."
     },
     {
       "attrs": {

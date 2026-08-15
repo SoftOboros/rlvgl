@@ -17,6 +17,13 @@ The current corpus is a baseline. Structural findings from
 conform to a newer document grammar. Existing documents are not rewritten as
 part of indexing work.
 
+rlvgl has adopted the current Softoboros SBC form for new and materially
+amended multi-phase documentation. The local migration boundary and explicit
+legacy bridges are in [SBC-COMPATIBILITY.md](SBC-COMPATIBILITY.md); named
+family-prefix ownership is in [PREFIX-REGISTRY.md](PREFIX-REGISTRY.md). Those
+operational records keep the committed local projection useful without
+silently promoting legacy documentation to a newer status.
+
 Commands:
 
 - `make spec-index` regenerates the committed JSON projection.

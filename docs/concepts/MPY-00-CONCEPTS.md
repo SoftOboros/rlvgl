@@ -478,8 +478,11 @@ flowchart LR
 - **PCDN-MPY-004 — Assigned to MPY-05:** MPY-05 classifies which events allow
   declarative prevent-default, stop-propagation, or coalescing policy. Python
   callbacks remain post-dispatch regardless of the selected policy.
-- **PCDN-MPY-005 — Assigned to MPY-01:** MPY-01 selects the representative actor
-  set used to close the first creation and introspection wave.
+- **PCDN-MPY-005 — Closed 2026-08-09 by MPY-01 ratification:** The
+  representative actor set is `rlvgl_widgets::container::Container`,
+  `rlvgl_widgets::label::Label`, `rlvgl_widgets::button::Button`,
+  `rlvgl_widgets::slider::Slider`, and `rlvgl_widgets::list::List`, frozen as
+  `INV-MPY-01-4`. See MPY-01 §7.
 - **PCDN-MPY-006 — Assigned to MPY-03:** MPY-03 chooses static widget-local
   tables, macro derivation, schema generation, or a documented combination.
   The result must preserve `INV-MPY-3` and `no_std + alloc` support.
@@ -503,6 +506,7 @@ Owner ratification confirms:
 
 ## 13. Files Cited
 
+- `docs/concepts/MPY-01-INTROSPECTION-BASELINE.md`
 - `docs/concepts/LPAR-00-CONCEPTS.md`
 - `docs/concepts/LPAR-01-BASELINE.md`
 - `docs/concepts/LPAR-02-OBJECT-SUBSTRATE.md`
@@ -529,11 +533,13 @@ Owner ratification confirms:
 
 ## 14. Unblocks
 
-Owner ratification unblocks drafting and ratification of MPY-01: the
-introspection baseline and current/partial/missing matrix. MPY-02 through
-MPY-09 MAY be drafted for dependency review, but no behavior implementation
-phase is unblocked until MPY-01 lands and confirms the inherited LVGL pin and
-priority actor set.
+Owner ratification unblocked drafting and ratification of MPY-01: the
+introspection baseline and current/partial/missing matrix. MPY-01 is now
+ratified and supplies the inherited-LVGL-pin and representative-actor-set
+prerequisite for MPY-02's own planning and ratification gate. It does not
+ratify MPY-02: MPY-02's PCDNs and §12 acceptance gate remain open, and its
+behavior implementation MUST NOT begin until MPY-02 is separately ratified.
+MPY-03 through MPY-09 likewise remain separately gated Draft phases.
 
 ## 15. Change Log
 
@@ -582,3 +588,38 @@ The concepts now establish a coherent separation between MicroPython direction
 and native rlvgl performance while preserving a single protocol across
 same-core and dual-core deployments. Phase-level detail can proceed without
 reopening the initiative's ownership, callback, layout, or parity boundaries.
+
+### 0.2.1 — 2026-08-09 — Amended: PCDN-MPY-005 closed
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** PCDN-MPY-005, §11.2, §13, §14
+
+**Commits:** pending
+
+**Summary:** Records the owner-ratified closure of `PCDN-MPY-005` by MPY-01,
+freezes the representative actor set as `INV-MPY-01-4` with fully qualified
+`rlvgl_widgets` module paths, and preserves MPY-02 through MPY-09 as
+separately gated Draft phases.
+
+#### Rationale
+
+This amendment changes `PCDN-MPY-005` from phase-assigned to resolved in the
+ratified parent, so it is semantic rather than editorial. MPY-00 §11.2
+delegates four decisions to named phases. A phase document answering one of
+them does not close it here; without a back-amendment the parent reads as
+having four open decisions indefinitely. MPY-01 §14 now makes this amendment
+the closure act, and names the same obligation for `PCDN-MPY-001` (MPY-02),
+`PCDN-MPY-006` (MPY-03), and `PCDN-MPY-004` (MPY-05).
+
+Considered and rejected: leaving `PCDN-MPY-005` marked assigned after MPY-01
+resolved it, or treating the MPY-01 document alone as the parent closure. Both
+would leave the parent source of truth stale and make the decision's binding
+status ambiguous.
+
+What deliberately did not change: `PCDN-MPY-001`, `PCDN-MPY-004`, and
+`PCDN-MPY-006` remain assigned to MPY-02, MPY-05, and MPY-03 respectively;
+MPY-02 through MPY-09 remain Draft; and this documentation amendment does not
+authorize behavior implementation in any later phase.
