@@ -1,10 +1,13 @@
 //! Vertical scrolling list of selectable strings.
 use alloc::{string::String, vec::Vec};
 use rlvgl_core::actor::{
-    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
-    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
-    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ActionDescriptor, ActionTransaction, ActorCapabilities, ActorFamily, ActorPreparation,
+    ChildPolicy, ConstructedActor, ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities,
+    MpyActor, MutationEffects, PropertyAccess, PropertyConstraint, PropertyDefault,
+    PropertyDescriptor, RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag,
+    construct_native_actor,
 };
+use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
@@ -62,6 +65,40 @@ impl List {
         self.selected
     }
 
+    /// Remove one item, maintaining a valid selection.
+    pub fn remove_item(&mut self, index: usize) -> bool {
+        if index >= self.items.len() {
+            return false;
+        }
+        self.items.remove(index);
+        self.selected = match self.selected {
+            Some(selected) if selected == index => None,
+            Some(selected) if selected > index => Some(selected - 1),
+            selected => selected,
+        };
+        true
+    }
+
+    /// Remove every item and clear selection.
+    pub fn clear_items(&mut self) {
+        self.items.clear();
+        self.selected = None;
+    }
+
+    /// Select one existing item.
+    pub fn select(&mut self, index: usize) -> bool {
+        if index >= self.items.len() {
+            return false;
+        }
+        self.selected = Some(index);
+        true
+    }
+
+    /// Clear the current selection.
+    pub fn clear_selection(&mut self) {
+        self.selected = None;
+    }
+
     /// Assign the font used to render this widget (FONT-00 §5); resolves to
     /// `FONT_6X10` when unset.
     pub fn set_font(&mut self, font: &'static dyn FontMetrics) {
@@ -88,6 +125,72 @@ impl List {
 }
 
 const MPY_BOUNDS_FIELD: u32 = 1;
+const MPY_ITEM_COUNT_PROPERTY: u32 = 1;
+const MPY_APPEND_ACTION: u32 = 1;
+const MPY_REMOVE_ACTION: u32 = 2;
+const MPY_CLEAR_ACTION: u32 = 3;
+const MPY_SELECT_ACTION: u32 = 4;
+const MPY_CLEAR_SELECTION_ACTION: u32 = 5;
+
+const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
+    id: MPY_ITEM_COUNT_PROPERTY,
+    name: "item_count",
+    value_tag: ValueTag::U32,
+    access: PropertyAccess::ReadOnly,
+    default: PropertyDefault::U32(0),
+    constraint: PropertyConstraint::None,
+    required_capabilities: ActorCapabilities::COLLECTION,
+    effects: MutationEffects::NONE,
+}];
+
+const LIST_EFFECTS: MutationEffects = MutationEffects::DRAW.union(MutationEffects::SNAPSHOT);
+const MPY_ACTIONS: [ActionDescriptor; 5] = [
+    ActionDescriptor {
+        id: MPY_APPEND_ACTION,
+        name: "append",
+        arguments: &[ValueTag::Text],
+        results: &[],
+        transaction: ActionTransaction::Transactional,
+        required_capabilities: ActorCapabilities::COLLECTION,
+        effects: LIST_EFFECTS,
+    },
+    ActionDescriptor {
+        id: MPY_REMOVE_ACTION,
+        name: "remove",
+        arguments: &[ValueTag::U32],
+        results: &[],
+        transaction: ActionTransaction::Transactional,
+        required_capabilities: ActorCapabilities::COLLECTION,
+        effects: LIST_EFFECTS,
+    },
+    ActionDescriptor {
+        id: MPY_CLEAR_ACTION,
+        name: "clear",
+        arguments: &[],
+        results: &[],
+        transaction: ActionTransaction::Transactional,
+        required_capabilities: ActorCapabilities::COLLECTION,
+        effects: LIST_EFFECTS,
+    },
+    ActionDescriptor {
+        id: MPY_SELECT_ACTION,
+        name: "select",
+        arguments: &[ValueTag::U32],
+        results: &[],
+        transaction: ActionTransaction::Transactional,
+        required_capabilities: ActorCapabilities::COLLECTION,
+        effects: LIST_EFFECTS,
+    },
+    ActionDescriptor {
+        id: MPY_CLEAR_SELECTION_ACTION,
+        name: "clear_selection",
+        arguments: &[],
+        results: &[],
+        transaction: ActionTransaction::Transactional,
+        required_capabilities: ActorCapabilities::COLLECTION,
+        effects: LIST_EFFECTS,
+    },
+];
 
 /// Stable MPY actor type identifier for [`List`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
@@ -108,8 +211,8 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
         value_tag: ValueTag::Rect,
         required: true,
     }],
-    properties: &[],
-    actions: &[],
+    properties: &MPY_PROPERTIES,
+    actions: &MPY_ACTIONS,
     events: &[],
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
@@ -170,6 +273,100 @@ impl Widget for List {
 
         self.selected = Some(idx);
         true
+    }
+}
+
+impl MpyActor for List {
+    type Prepared = (Vec<String>, Option<usize>);
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        match id {
+            MPY_ITEM_COUNT_PROPERTY => Ok(OwnedValue::U32(
+                u32::try_from(self.items.len()).map_err(|_| RegistryError::Internal)?,
+            )),
+            _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<Self::Prepared>, RegistryError> {
+        let mut items = self.items.clone();
+        let mut selected = self.selected;
+        for direction in directions {
+            match direction {
+                ActorDirection::SetProperty { id, .. } | ActorDirection::ResetProperty { id } => {
+                    return if *id == MPY_ITEM_COUNT_PROPERTY {
+                        Err(RegistryError::ReadOnly)
+                    } else {
+                        Err(RegistryError::UnknownProperty { property_id: *id })
+                    };
+                }
+                ActorDirection::InvokeAction { id, arguments } => match *id {
+                    MPY_APPEND_ACTION => {
+                        let [OwnedValue::Text(text)] = arguments.as_slice() else {
+                            return Err(RegistryError::BatchInvalid);
+                        };
+                        items.push(text.clone());
+                    }
+                    MPY_REMOVE_ACTION => {
+                        let [OwnedValue::U32(index)] = arguments.as_slice() else {
+                            return Err(RegistryError::BatchInvalid);
+                        };
+                        let index = *index as usize;
+                        if index >= items.len() {
+                            return Err(RegistryError::Range {
+                                field_id: MPY_REMOVE_ACTION,
+                            });
+                        }
+                        items.remove(index);
+                        selected = match selected {
+                            Some(current) if current == index => None,
+                            Some(current) if current > index => Some(current - 1),
+                            current => current,
+                        };
+                    }
+                    MPY_CLEAR_ACTION => {
+                        items.clear();
+                        selected = None;
+                    }
+                    MPY_SELECT_ACTION => {
+                        let [OwnedValue::U32(index)] = arguments.as_slice() else {
+                            return Err(RegistryError::BatchInvalid);
+                        };
+                        let index = *index as usize;
+                        if index >= items.len() {
+                            return Err(RegistryError::Range {
+                                field_id: MPY_SELECT_ACTION,
+                            });
+                        }
+                        selected = Some(index);
+                    }
+                    MPY_CLEAR_SELECTION_ACTION => selected = None,
+                    _ => return Err(RegistryError::UnknownAction { action_id: *id }),
+                },
+            }
+        }
+        let before = self.items.iter().try_fold(0i64, |total, item| {
+            total
+                .checked_add(i64::try_from(item.len()).map_err(|_| RegistryError::Internal)?)
+                .ok_or(RegistryError::Internal)
+        })?;
+        let after = items.iter().try_fold(0i64, |total, item| {
+            total
+                .checked_add(i64::try_from(item.len()).map_err(|_| RegistryError::Internal)?)
+                .ok_or(RegistryError::Internal)
+        })?;
+        Ok(ActorPreparation {
+            prepared: (items, selected),
+            text_delta: after - before,
+        })
+    }
+
+    fn commit(&mut self, (items, selected): Self::Prepared) {
+        self.items = items;
+        self.selected = selected;
     }
 }
 

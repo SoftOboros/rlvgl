@@ -11,7 +11,13 @@ use core::cell::RefCell;
 pub use rlvgl_api::protocol::{ErrorClass, ValueRef, ValueTag};
 
 use crate::{
-    object::ObjectNode,
+    direction::{
+        ActorDirection, GeometryResult, GeometryRole, OwnedValue, RequestedLayout, RuntimeFlag,
+        SnapshotError, SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken,
+        StageDirection, StageRevision,
+    },
+    layout::{GridTrack, LayoutRole},
+    object::{ObjectFlags, ObjectNode, ObjectStates},
     widget::{Rect, Widget},
 };
 
@@ -30,6 +36,401 @@ impl StageId {
     pub const fn get(self) -> u32 {
         self.0
     }
+}
+
+#[derive(Clone)]
+struct ShadowActor {
+    object_id: ObjectId,
+    parent: Option<ObjectId>,
+    children: Vec<ObjectId>,
+    alive: bool,
+}
+
+struct TreeShadow {
+    actors: Vec<ShadowActor>,
+    roots: Vec<(String, ObjectId)>,
+    initial_root_text: i64,
+    root_text_delta: i64,
+}
+
+impl TreeShadow {
+    fn capture(registry: &StageRegistry) -> Result<Self, RegistryError> {
+        let mut actors = Vec::with_capacity(registry.usage.actors);
+        for (index, slot) in registry.slots.iter().enumerate() {
+            let Some(record) = slot.record.as_ref() else {
+                continue;
+            };
+            let object_id = ObjectId::from_parts(slot.generation, index as u32);
+            actors.push(ShadowActor {
+                object_id,
+                parent: record.parent,
+                children: registry.children(object_id)?,
+                alive: true,
+            });
+        }
+        let mut roots = Vec::with_capacity(registry.roots.len());
+        for root in &registry.roots {
+            let object_id = root
+                .node
+                .actor_identity()
+                .ok_or(RegistryError::Internal)?
+                .object_id;
+            roots.push((root.name.clone(), object_id));
+        }
+        let initial_root_text = roots.iter().try_fold(0i64, |total, (name, _)| {
+            total
+                .checked_add(i64::try_from(name.len()).map_err(|_| RegistryError::Internal)?)
+                .ok_or(RegistryError::Internal)
+        })?;
+        Ok(Self {
+            actors,
+            roots,
+            initial_root_text,
+            root_text_delta: 0,
+        })
+    }
+
+    fn actor(&self, object_id: ObjectId) -> Result<&ShadowActor, RegistryError> {
+        self.actors
+            .iter()
+            .find(|actor| actor.object_id == object_id && actor.alive)
+            .ok_or(RegistryError::StaleObject { object_id })
+    }
+
+    fn actor_mut(&mut self, object_id: ObjectId) -> Result<&mut ShadowActor, RegistryError> {
+        self.actors
+            .iter_mut()
+            .find(|actor| actor.object_id == object_id && actor.alive)
+            .ok_or(RegistryError::StaleObject { object_id })
+    }
+
+    fn remove_from_owner(&mut self, object_id: ObjectId) -> Result<(), RegistryError> {
+        let parent = self.actor(object_id)?.parent;
+        if let Some(parent) = parent {
+            let children = &mut self.actor_mut(parent)?.children;
+            let index = children
+                .iter()
+                .position(|child| *child == object_id)
+                .ok_or(RegistryError::Internal)?;
+            children.remove(index);
+        } else {
+            let index = self
+                .roots
+                .iter()
+                .position(|(_, root)| *root == object_id)
+                .ok_or(RegistryError::Internal)?;
+            self.roots.remove(index);
+        }
+        Ok(())
+    }
+
+    fn apply(
+        &mut self,
+        registry: &StageRegistry,
+        direction: &StageDirection,
+    ) -> Result<(), RegistryError> {
+        match direction {
+            StageDirection::Reparent {
+                object_id,
+                new_parent,
+                index,
+            } => {
+                self.actor(*object_id)?;
+                self.actor(*new_parent)?;
+                if object_id == new_parent || self.is_descendant(*object_id, *new_parent)? {
+                    return Err(RegistryError::InvalidParent);
+                }
+                let child_descriptor = registry.record(*object_id)?.descriptor;
+                let parent_descriptor = registry.record(*new_parent)?.descriptor;
+                if !parent_descriptor.child_policy.allows(child_descriptor) {
+                    return Err(RegistryError::InvalidParent);
+                }
+                self.remove_from_owner(*object_id)?;
+                if *index > self.actor(*new_parent)?.children.len() {
+                    return Err(RegistryError::Range { field_id: 0 });
+                }
+                self.actor_mut(*new_parent)?
+                    .children
+                    .insert(*index, *object_id);
+                self.actor_mut(*object_id)?.parent = Some(*new_parent);
+            }
+            StageDirection::PromoteRoot {
+                object_id,
+                name,
+                index,
+            } => {
+                let descriptor = registry.record(*object_id)?.descriptor;
+                self.actor(*object_id)?;
+                if name.is_empty()
+                    || !descriptor
+                        .capabilities
+                        .contains(ActorCapabilities::STAGE_ROOT)
+                    || self
+                        .roots
+                        .iter()
+                        .any(|(candidate, root)| candidate == name && root != object_id)
+                {
+                    return Err(RegistryError::InvalidParent);
+                }
+                self.remove_from_owner(*object_id)?;
+                if *index > self.roots.len() {
+                    return Err(RegistryError::Range { field_id: 0 });
+                }
+                self.roots.insert(*index, (name.clone(), *object_id));
+                self.actor_mut(*object_id)?.parent = None;
+            }
+            StageDirection::Reorder { object_id, index } => {
+                let parent = self.actor(*object_id)?.parent;
+                if let Some(parent) = parent {
+                    let children = &mut self.actor_mut(parent)?.children;
+                    let old = children
+                        .iter()
+                        .position(|child| child == object_id)
+                        .ok_or(RegistryError::Internal)?;
+                    let child = children.remove(old);
+                    if *index > children.len() {
+                        return Err(RegistryError::Range { field_id: 0 });
+                    }
+                    children.insert(*index, child);
+                } else {
+                    let old = self
+                        .roots
+                        .iter()
+                        .position(|(_, root)| root == object_id)
+                        .ok_or(RegistryError::Internal)?;
+                    let root = self.roots.remove(old);
+                    if *index > self.roots.len() {
+                        return Err(RegistryError::Range { field_id: 0 });
+                    }
+                    self.roots.insert(*index, root);
+                }
+            }
+            StageDirection::Delete { object_id } => {
+                self.remove_from_owner(*object_id)?;
+                self.mark_deleted(*object_id)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn is_descendant(
+        &self,
+        ancestor: ObjectId,
+        candidate: ObjectId,
+    ) -> Result<bool, RegistryError> {
+        if self.actor(ancestor)?.children.contains(&candidate) {
+            return Ok(true);
+        }
+        for child in &self.actor(ancestor)?.children {
+            if self.is_descendant(*child, candidate)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn mark_deleted(&mut self, object_id: ObjectId) -> Result<(), RegistryError> {
+        let children = self.actor(object_id)?.children.clone();
+        for child in children {
+            self.mark_deleted(child)?;
+        }
+        self.actor_mut(object_id)?.alive = false;
+        Ok(())
+    }
+
+    fn validate_final(&mut self, registry: &StageRegistry) -> Result<(), RegistryError> {
+        if self.roots.len() > registry.limits.max_roots {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::Roots,
+            });
+        }
+        for (index, (name, root)) in self.roots.iter().enumerate() {
+            if self.roots[..index].iter().any(|(prior, _)| prior == name)
+                || self.actor(*root)?.parent.is_some()
+            {
+                return Err(RegistryError::InvalidParent);
+            }
+            self.validate_depth(registry, *root, 1)?;
+        }
+        for actor in self.actors.iter().filter(|actor| actor.alive) {
+            if actor.children.len() > registry.limits.max_children_per_actor {
+                return Err(RegistryError::Capacity {
+                    kind: CapacityKind::Children,
+                });
+            }
+        }
+        let final_root_text = self.roots.iter().try_fold(0i64, |total, (name, _)| {
+            total
+                .checked_add(i64::try_from(name.len()).map_err(|_| RegistryError::Internal)?)
+                .ok_or(RegistryError::Internal)
+        })?;
+        self.root_text_delta = final_root_text
+            .checked_sub(self.initial_root_text)
+            .ok_or(RegistryError::Internal)?;
+        for actor in self.actors.iter().filter(|actor| !actor.alive) {
+            let record = registry.record(actor.object_id)?;
+            let durable = record
+                .text_bytes
+                .checked_sub(record.root_name_bytes)
+                .ok_or(RegistryError::Internal)?;
+            self.root_text_delta = self
+                .root_text_delta
+                .checked_sub(i64::from(durable))
+                .ok_or(RegistryError::Internal)?;
+        }
+        Ok(())
+    }
+
+    fn validate_depth(
+        &self,
+        registry: &StageRegistry,
+        object_id: ObjectId,
+        depth: usize,
+    ) -> Result<(), RegistryError> {
+        if depth > registry.limits.max_tree_depth {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::TreeDepth,
+            });
+        }
+        for child in &self.actor(object_id)?.children {
+            self.validate_depth(registry, *child, depth + 1)?;
+        }
+        Ok(())
+    }
+}
+
+fn validate_actor_directions(
+    descriptor: &TypeDescriptor,
+    directions: &[ActorDirection],
+) -> Result<(), RegistryError> {
+    for direction in directions {
+        match direction {
+            ActorDirection::SetProperty { id, value } => {
+                let property = descriptor
+                    .properties
+                    .iter()
+                    .find(|property| property.id == *id)
+                    .ok_or(RegistryError::UnknownProperty { property_id: *id })?;
+                if property.access != PropertyAccess::ReadWrite {
+                    return Err(RegistryError::ReadOnly);
+                }
+                if value.tag() != property.value_tag {
+                    return Err(RegistryError::TypeMismatch {
+                        field_id: *id,
+                        expected: property.value_tag,
+                        actual: value.tag(),
+                    });
+                }
+                validate_property_constraint(property, value)?;
+            }
+            ActorDirection::ResetProperty { id } => {
+                let property = descriptor
+                    .properties
+                    .iter()
+                    .find(|property| property.id == *id)
+                    .ok_or(RegistryError::UnknownProperty { property_id: *id })?;
+                if property.access != PropertyAccess::ReadWrite {
+                    return Err(RegistryError::ReadOnly);
+                }
+                let _ = property.default.owned();
+            }
+            ActorDirection::InvokeAction { id, arguments } => {
+                let action = descriptor
+                    .actions
+                    .iter()
+                    .find(|action| action.id == *id)
+                    .ok_or(RegistryError::UnknownAction { action_id: *id })?;
+                if action.transaction == ActionTransaction::BatchForbidden {
+                    return Err(RegistryError::BatchInvalid);
+                }
+                if action.arguments.len() != arguments.len() {
+                    return Err(RegistryError::BatchInvalid);
+                }
+                for (argument, expected) in arguments.iter().zip(action.arguments) {
+                    if argument.tag() != *expected {
+                        return Err(RegistryError::TypeMismatch {
+                            field_id: *id,
+                            expected: *expected,
+                            actual: argument.tag(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn actor_direction_effects(
+    descriptor: &TypeDescriptor,
+    directions: &[ActorDirection],
+) -> Result<MutationEffects, RegistryError> {
+    let mut effects = MutationEffects::NONE;
+    for direction in directions {
+        let next = match direction {
+            ActorDirection::SetProperty { id, .. } | ActorDirection::ResetProperty { id } => {
+                descriptor
+                    .properties
+                    .iter()
+                    .find(|property| property.id == *id)
+                    .ok_or(RegistryError::UnknownProperty { property_id: *id })?
+                    .effects
+            }
+            ActorDirection::InvokeAction { id, .. } => {
+                descriptor
+                    .actions
+                    .iter()
+                    .find(|action| action.id == *id)
+                    .ok_or(RegistryError::UnknownAction { action_id: *id })?
+                    .effects
+            }
+        };
+        effects = effects.union(next);
+    }
+    Ok(effects)
+}
+
+fn push_unique(values: &mut Vec<ObjectId>, value: ObjectId) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn push_rect_unique(values: &mut Vec<Rect>, value: Rect) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn validate_property_constraint(
+    descriptor: &PropertyDescriptor,
+    value: &OwnedValue,
+) -> Result<(), RegistryError> {
+    match (descriptor.constraint, value) {
+        (PropertyConstraint::None, _) => Ok(()),
+        (PropertyConstraint::I32 { min, max }, OwnedValue::I32(value))
+            if *value >= min && *value <= max =>
+        {
+            Ok(())
+        }
+        (PropertyConstraint::TextBytes { max }, OwnedValue::Text(value))
+            if value.len() <= max as usize =>
+        {
+            Ok(())
+        }
+        _ => Err(RegistryError::Range {
+            field_id: descriptor.id,
+        }),
+    }
+}
+
+fn apply_text_delta(current: u32, delta: i64) -> Result<u32, RegistryError> {
+    let final_value = i64::from(current)
+        .checked_add(delta)
+        .filter(|value| *value >= 0 && *value <= i64::from(u32::MAX))
+        .ok_or(RegistryError::Internal)?;
+    u32::try_from(final_value).map_err(|_| RegistryError::Internal)
 }
 
 /// Stable actor type identifier assigned by the descriptor catalog.
@@ -252,6 +653,97 @@ pub enum PropertyAccess {
     ReadWrite,
 }
 
+/// Static default value that can be embedded in a property descriptor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PropertyDefault {
+    /// Reset removes the durable value.
+    Absent,
+    /// Boolean default.
+    Bool(bool),
+    /// Signed integer default.
+    I32(i32),
+    /// Unsigned integer default.
+    U32(u32),
+    /// Process-lifetime UTF-8 default.
+    Text(&'static str),
+}
+
+impl PropertyDefault {
+    fn owned(self) -> Option<OwnedValue> {
+        match self {
+            Self::Absent => None,
+            Self::Bool(value) => Some(OwnedValue::Bool(value)),
+            Self::I32(value) => Some(OwnedValue::I32(value)),
+            Self::U32(value) => Some(OwnedValue::U32(value)),
+            Self::Text(value) => Some(OwnedValue::Text(String::from(value))),
+        }
+    }
+
+    const fn tag(self) -> Option<ValueTag> {
+        match self {
+            Self::Absent => None,
+            Self::Bool(_) => Some(ValueTag::Bool),
+            Self::I32(_) => Some(ValueTag::I32),
+            Self::U32(_) => Some(ValueTag::U32),
+            Self::Text(_) => Some(ValueTag::Text),
+        }
+    }
+}
+
+/// Descriptor-level constraint applied before an actor-specific collective check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PropertyConstraint {
+    /// No additional scalar constraint.
+    None,
+    /// Inclusive signed integer range.
+    I32 {
+        /// Inclusive lower bound.
+        min: i32,
+        /// Inclusive upper bound.
+        max: i32,
+    },
+    /// Maximum UTF-8 byte length.
+    TextBytes {
+        /// Maximum encoded UTF-8 bytes.
+        max: u32,
+    },
+}
+
+/// Mutation side effects used to derive commit invalidation and revision work.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct MutationEffects(u16);
+
+impl MutationEffects {
+    /// No visible effect.
+    pub const NONE: Self = Self(0);
+    /// Drawing output may change.
+    pub const DRAW: Self = Self(1 << 0);
+    /// Requested or computed layout may change.
+    pub const LAYOUT: Self = Self(1 << 1);
+    /// Tree ownership or ordering may change.
+    pub const TREE: Self = Self(1 << 2);
+    /// Focus eligibility or state may change.
+    pub const FOCUS: Self = Self(1 << 3);
+    /// Snapshot-visible state changes.
+    pub const SNAPSHOT: Self = Self(1 << 4);
+
+    /// Union two effect sets.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    /// Return the stable bit representation.
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
+
+    /// Return whether every requested effect bit is present.
+    pub const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+}
+
 /// Discoverable property schema entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PropertyDescriptor {
@@ -263,6 +755,23 @@ pub struct PropertyDescriptor {
     pub value_tag: ValueTag,
     /// Property access mode.
     pub access: PropertyAccess,
+    /// Reset behavior.
+    pub default: PropertyDefault,
+    /// Scalar constraint checked before native preparation.
+    pub constraint: PropertyConstraint,
+    /// Capabilities required on the owning actor.
+    pub required_capabilities: ActorCapabilities,
+    /// Commit effects.
+    pub effects: MutationEffects,
+}
+
+/// Whether an action may participate in an atomic batch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActionTransaction {
+    /// Prepared and committed with the surrounding batch.
+    Transactional,
+    /// Explicitly unsupported in an atomic batch.
+    BatchForbidden,
 }
 
 /// Discoverable action schema entry.
@@ -276,6 +785,12 @@ pub struct ActionDescriptor {
     pub arguments: &'static [ValueTag],
     /// Ordered result value tags.
     pub results: &'static [ValueTag],
+    /// Batch participation class.
+    pub transaction: ActionTransaction,
+    /// Capabilities required on the owning actor.
+    pub required_capabilities: ActorCapabilities,
+    /// Commit effects.
+    pub effects: MutationEffects,
 }
 
 /// Cue-delivery classification reserved for MPY-05 event descriptors.
@@ -401,12 +916,56 @@ impl<'a> ConstructorArgs<'a> {
     }
 }
 
+/// Actor-local MPY preparation implemented beside each native widget.
+///
+/// `prepare` may validate and allocate. `commit` must only swap prepared state
+/// into the actor and therefore cannot fail.
+pub trait MpyActor: Widget {
+    /// Fully allocated actor-local state for one mutation group.
+    type Prepared: 'static;
+
+    /// Read a descriptor-owned durable property.
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError>;
+
+    /// Validate a collective property/action group without mutation.
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<Self::Prepared>, RegistryError>;
+
+    /// Infallibly publish state returned by [`prepare`](Self::prepare).
+    fn commit(&mut self, prepared: Self::Prepared);
+}
+
+/// Prepared actor-local state plus its exact change in stage-owned text bytes.
+pub struct ActorPreparation<T> {
+    /// Fully allocated state to publish.
+    pub prepared: T,
+    /// Signed delta relative to the actor's current durable text.
+    pub text_delta: i64,
+}
+
+/// Type-erased, fully prepared actor mutation used by [`StageRegistry`].
+pub trait PreparedActorMutation {
+    /// Exact change in stage-owned text bytes.
+    fn text_delta(&self) -> i64;
+    /// Infallibly publish the prepared native state.
+    fn commit(self: Box<Self>);
+}
+
 /// Type-erased operations retained beside an [`ObjectNode`].
 pub trait ActorOps {
     /// Return the descriptor-assigned actor type.
     fn type_id(&self) -> TypeId;
     /// Return the native widget's current intrinsic bounds.
-    fn bounds(&self) -> Rect;
+    fn bounds(&self) -> Result<Rect, RegistryError>;
+    /// Read one actor-owned property.
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError>;
+    /// Prepare an actor-local group without native mutation.
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<Box<dyn PreparedActorMutation>, RegistryError>;
 }
 
 struct TypedActorOps<T> {
@@ -414,13 +973,65 @@ struct TypedActorOps<T> {
     type_id: TypeId,
 }
 
-impl<T: Widget> ActorOps for TypedActorOps<T> {
+struct TypedPrepared<T: MpyActor> {
+    actor: Rc<RefCell<T>>,
+    prepared: Option<T::Prepared>,
+    text_delta: i64,
+}
+
+impl<T: MpyActor + 'static> PreparedActorMutation for TypedPrepared<T> {
+    fn text_delta(&self) -> i64 {
+        self.text_delta
+    }
+
+    fn commit(mut self: Box<Self>) {
+        let prepared = self
+            .prepared
+            .take()
+            .expect("prepared mutation consumed once");
+        self.actor
+            .try_borrow_mut()
+            .expect("atomic commit follows exclusive borrow preflight without callbacks")
+            .commit(prepared);
+    }
+}
+
+impl<T: MpyActor + 'static> ActorOps for TypedActorOps<T> {
     fn type_id(&self) -> TypeId {
         self.type_id
     }
 
-    fn bounds(&self) -> Rect {
-        self.actor.borrow().bounds()
+    fn bounds(&self) -> Result<Rect, RegistryError> {
+        self.actor
+            .try_borrow()
+            .map_err(|_| RegistryError::DispatchBusy)
+            .map(|actor| actor.bounds())
+    }
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        self.actor
+            .try_borrow()
+            .map_err(|_| RegistryError::DispatchBusy)?
+            .property(id)
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<Box<dyn PreparedActorMutation>, RegistryError> {
+        let actor = self
+            .actor
+            .try_borrow()
+            .map_err(|_| RegistryError::DispatchBusy)?;
+        let ActorPreparation {
+            prepared,
+            text_delta,
+        } = actor.prepare(directions)?;
+        Ok(Box::new(TypedPrepared {
+            actor: self.actor.clone(),
+            prepared: Some(prepared),
+            text_delta,
+        }))
     }
 }
 
@@ -443,14 +1054,16 @@ impl ConstructedActor {
 
     /// Read intrinsic bounds through the typed adapter.
     pub fn actor_bounds(&self) -> Rect {
-        self.ops.bounds()
+        self.ops
+            .bounds()
+            .expect("constructed actor has no externally retained widget borrow")
     }
 }
 
 /// Build one native actor while retaining typed and erased handles to the same state.
 pub fn construct_native_actor<T>(type_id: TypeId, actor: T) -> ConstructedActor
 where
-    T: Widget + 'static,
+    T: MpyActor + 'static,
 {
     let typed = Rc::new(RefCell::new(actor));
     let erased: Rc<RefCell<dyn Widget>> = typed.clone();
@@ -579,6 +1192,16 @@ pub enum RegistryError {
         /// Unrecognized field identifier.
         field_id: u32,
     },
+    /// Requested property is not declared by the actor.
+    UnknownProperty {
+        /// Unrecognized property identifier.
+        property_id: u32,
+    },
+    /// Requested action is not declared by the actor.
+    UnknownAction {
+        /// Unrecognized action identifier.
+        action_id: u32,
+    },
     /// Required constructor field is absent.
     MissingField {
         /// Missing field identifier.
@@ -603,6 +1226,14 @@ pub enum RegistryError {
         /// Field outside its range.
         field_id: u32,
     },
+    /// Attempted mutation targets read-only state.
+    ReadOnly,
+    /// A described direction is not implemented by this runtime profile.
+    Unsupported,
+    /// A command group is structurally valid but cannot be committed atomically.
+    BatchInvalid,
+    /// A public native widget borrow prevents entering an atomic director turn.
+    DispatchBusy,
     /// Root or parent policy rejects the requested relationship.
     InvalidParent,
     /// Named root already exists.
@@ -629,11 +1260,17 @@ impl RegistryError {
         match self {
             Self::InvalidStage | Self::InvalidCatalog | Self::Internal => ErrorClass::Internal,
             Self::UnknownType { .. } => ErrorClass::UnknownType,
+            Self::UnknownProperty { .. } => ErrorClass::UnknownProperty,
+            Self::UnknownAction { .. } => ErrorClass::UnknownAction,
             Self::UnknownField { .. } | Self::MissingField { .. } | Self::DuplicateField { .. } => {
                 ErrorClass::InvalidFrame
             }
             Self::TypeMismatch { .. } => ErrorClass::TypeMismatch,
             Self::Range { .. } => ErrorClass::Range,
+            Self::ReadOnly => ErrorClass::ReadOnly,
+            Self::Unsupported => ErrorClass::Unsupported,
+            Self::BatchInvalid => ErrorClass::BatchInvalid,
+            Self::DispatchBusy => ErrorClass::DispatchBusy,
             Self::InvalidParent | Self::DuplicateRoot => ErrorClass::InvalidParent,
             Self::StaleObject { .. } => ErrorClass::StaleObject,
             Self::Capacity { .. } => ErrorClass::Capacity,
@@ -660,8 +1297,28 @@ struct ActorRecord {
     parent: Option<ObjectId>,
     depth: usize,
     text_bytes: u32,
+    root_name_bytes: u32,
     resources: u16,
     ops: Box<dyn ActorOps>,
+}
+
+#[derive(Clone, Copy)]
+struct ActiveSnapshot {
+    token: SnapshotToken,
+    revision: StageRevision,
+    position: usize,
+    sequence: u32,
+}
+
+struct PreparedActorGroup {
+    object_id: ObjectId,
+    mutation: Box<dyn PreparedActorMutation>,
+}
+
+enum PendingLifecycle {
+    Detached(ObjectNode),
+    Attached(ObjectId),
+    ChildChanged(ObjectId),
 }
 
 struct ActorSlot {
@@ -691,6 +1348,12 @@ pub struct StageRegistry {
     roots: Vec<RootRecord>,
     slots: Vec<ActorSlot>,
     active: bool,
+    revision: StageRevision,
+    snapshot: Option<ActiveSnapshot>,
+    next_snapshot_token: u32,
+    pending_lifecycle: Vec<PendingLifecycle>,
+    last_effects: MutationEffects,
+    last_invalidations: Vec<Rect>,
 }
 
 impl StageRegistry {
@@ -717,6 +1380,12 @@ impl StageRegistry {
             roots: Vec::new(),
             slots: Vec::new(),
             active: true,
+            revision: StageRevision::default(),
+            snapshot: None,
+            next_snapshot_token: 1,
+            pending_lifecycle: Vec::new(),
+            last_effects: MutationEffects::NONE,
+            last_invalidations: Vec::new(),
         })
     }
 
@@ -738,6 +1407,21 @@ impl StageRegistry {
     /// Return current resource usage.
     pub const fn usage(&self) -> RegistryUsage {
         self.usage
+    }
+
+    /// Return the current director-visible Stage Revision.
+    pub const fn revision(&self) -> StageRevision {
+        self.revision
+    }
+
+    /// Return the union of declared effects from the most recent commit.
+    pub const fn last_commit_effects(&self) -> MutationEffects {
+        self.last_effects
+    }
+
+    /// Return deterministic dirty rectangles derived for the most recent commit.
+    pub fn last_invalidations(&self) -> &[Rect] {
+        &self.last_invalidations
     }
 
     /// Find an actor descriptor by its stable identifier.
@@ -778,7 +1462,306 @@ impl StageRegistry {
 
     /// Read native bounds through the parallel typed ActorOps adapter.
     pub fn actor_bounds(&self, object_id: ObjectId) -> Result<Rect, RegistryError> {
-        Ok(self.record(object_id)?.ops.bounds())
+        self.record(object_id)?.ops.bounds()
+    }
+
+    /// Read one descriptor-owned actor property.
+    pub fn property(
+        &self,
+        object_id: ObjectId,
+        property_id: u32,
+    ) -> Result<OwnedValue, RegistryError> {
+        let record = self.record(object_id)?;
+        let descriptor = record
+            .descriptor
+            .properties
+            .iter()
+            .find(|property| property.id == property_id)
+            .ok_or(RegistryError::UnknownProperty { property_id })?;
+        let value = record.ops.property(property_id)?;
+        if value.tag() != descriptor.value_tag {
+            return Err(RegistryError::Internal);
+        }
+        Ok(value)
+    }
+
+    /// Return requested layout independently of computed geometry.
+    pub fn requested_layout(&self, object_id: ObjectId) -> Result<RequestedLayout, RegistryError> {
+        Ok(RequestedLayout::from_role(
+            &self.node(object_id)?.requested_layout_role(),
+        ))
+    }
+
+    /// Return read-only intrinsic and computed geometry.
+    pub fn geometry(&self, object_id: ObjectId) -> Result<GeometryResult, RegistryError> {
+        let node = self.node(object_id)?;
+        let layout_role = match node.requested_layout_role() {
+            LayoutRole::None => GeometryRole::None,
+            LayoutRole::Container(_) => GeometryRole::Container,
+            LayoutRole::Item(_) => GeometryRole::Item,
+        };
+        Ok(GeometryResult {
+            intrinsic_bounds: self.actor_bounds(object_id)?,
+            effective_bounds: node.effective_bounds(),
+            revision: self.revision,
+            layout_role,
+        })
+    }
+
+    /// Return ordered direct child identifiers.
+    pub fn children(&self, object_id: ObjectId) -> Result<Vec<ObjectId>, RegistryError> {
+        self.node(object_id)?
+            .children()
+            .iter()
+            .map(|child| {
+                child
+                    .actor_identity()
+                    .map(|identity| identity.object_id)
+                    .ok_or(RegistryError::Internal)
+            })
+            .collect()
+    }
+
+    /// Return the actor's ordered position within its parent or the root list.
+    pub fn position(&self, object_id: ObjectId) -> Result<usize, RegistryError> {
+        let record = self.record(object_id)?;
+        if let Some(parent) = record.parent {
+            return self
+                .children(parent)?
+                .iter()
+                .position(|child| *child == object_id)
+                .ok_or(RegistryError::Internal);
+        }
+        self.roots
+            .iter()
+            .position(|root| {
+                root.node
+                    .actor_identity()
+                    .is_some_and(|identity| identity.object_id == object_id)
+            })
+            .ok_or(RegistryError::Internal)
+    }
+
+    /// Validate and publish an atomic group under one Stage Revision.
+    pub fn apply_batch(
+        &mut self,
+        directions: &[StageDirection],
+    ) -> Result<StageRevision, RegistryError> {
+        self.ensure_active()?;
+        if directions.is_empty() {
+            return Err(RegistryError::BatchInvalid);
+        }
+        let next_revision = self.next_revision()?;
+        let mut actor_groups: Vec<(ObjectId, Vec<ActorDirection>)> = Vec::new();
+        let mut tree_shadow = TreeShadow::capture(self)?;
+        let mut effects = MutationEffects::NONE;
+        let mut touched = Vec::new();
+
+        for direction in directions {
+            match direction {
+                StageDirection::MutateActor {
+                    object_id,
+                    directions,
+                } => {
+                    tree_shadow.actor(*object_id)?;
+                    if directions.is_empty() {
+                        return Err(RegistryError::BatchInvalid);
+                    }
+                    let record = self.record(*object_id)?;
+                    validate_actor_directions(record.descriptor, directions)?;
+                    effects =
+                        effects.union(actor_direction_effects(record.descriptor, directions)?);
+                    push_unique(&mut touched, *object_id);
+                    if let Some((_, group)) = actor_groups
+                        .iter_mut()
+                        .find(|(candidate, _)| candidate == object_id)
+                    {
+                        group.extend(directions.iter().cloned());
+                    } else {
+                        actor_groups.push((*object_id, directions.clone()));
+                    }
+                }
+                StageDirection::SetFlag {
+                    object_id, flag, ..
+                } => {
+                    tree_shadow.actor(*object_id)?;
+                    self.validate_runtime_flag(*object_id, *flag)?;
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::SNAPSHOT);
+                    if matches!(flag, RuntimeFlag::Enabled | RuntimeFlag::Focusable) {
+                        effects = effects.union(MutationEffects::FOCUS);
+                    }
+                    push_unique(&mut touched, *object_id);
+                }
+                StageDirection::SetRequestedLayout { object_id, layout } => {
+                    tree_shadow.actor(*object_id)?;
+                    self.validate_requested_layout(*object_id, layout)?;
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::LAYOUT)
+                        .union(MutationEffects::SNAPSHOT);
+                    push_unique(&mut touched, *object_id);
+                }
+                StageDirection::SetComputedGeometry { object_id, .. } => {
+                    tree_shadow.actor(*object_id)?;
+                    self.record(*object_id)?;
+                    return Err(RegistryError::ReadOnly);
+                }
+                StageDirection::SetLocalStyle { object_id, .. } => {
+                    tree_shadow.actor(*object_id)?;
+                    self.record(*object_id)?;
+                    return Err(RegistryError::Unsupported);
+                }
+                _ => {
+                    tree_shadow.apply(self, direction)?;
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::TREE)
+                        .union(MutationEffects::LAYOUT)
+                        .union(MutationEffects::SNAPSHOT);
+                }
+            }
+        }
+        tree_shadow.validate_final(self)?;
+
+        let mut prepared = Vec::with_capacity(actor_groups.len());
+        let mut total_text_delta = tree_shadow.root_text_delta;
+        for (object_id, group) in actor_groups {
+            let mutation = self.record(object_id)?.ops.prepare(&group)?;
+            total_text_delta = total_text_delta.checked_add(mutation.text_delta()).ok_or(
+                RegistryError::Capacity {
+                    kind: CapacityKind::TextBytes,
+                },
+            )?;
+            prepared.push(PreparedActorGroup {
+                object_id,
+                mutation,
+            });
+        }
+        let final_text = i64::from(self.usage.text_bytes)
+            .checked_add(total_text_delta)
+            .filter(|total| *total >= 0 && *total <= i64::from(self.limits.max_text_bytes))
+            .ok_or(RegistryError::Capacity {
+                kind: CapacityKind::TextBytes,
+            })?;
+        let before_geometry = self.capture_geometry()?;
+
+        for group in prepared {
+            let delta = group.mutation.text_delta();
+            group.mutation.commit();
+            let record = self.record_mut(group.object_id)?;
+            record.text_bytes = apply_text_delta(record.text_bytes, delta)?;
+            self.usage.text_bytes = apply_text_delta(self.usage.text_bytes, delta)?;
+        }
+        for direction in directions {
+            match direction {
+                StageDirection::SetFlag {
+                    object_id,
+                    flag,
+                    enabled,
+                } => self.commit_runtime_flag(*object_id, *flag, *enabled)?,
+                StageDirection::SetRequestedLayout { object_id, layout } => {
+                    self.commit_requested_layout(*object_id, layout.clone())?
+                }
+                StageDirection::Reparent { .. }
+                | StageDirection::PromoteRoot { .. }
+                | StageDirection::Reorder { .. }
+                | StageDirection::Delete { .. } => self.commit_tree_direction(direction)?,
+                _ => {}
+            }
+        }
+        debug_assert_eq!(u32::try_from(final_text).ok(), Some(self.usage.text_bytes));
+        self.revision = next_revision;
+        self.last_effects = effects;
+        self.last_invalidations = self.derive_invalidations(
+            &before_geometry,
+            &touched,
+            effects.contains(MutationEffects::TREE) || effects.contains(MutationEffects::LAYOUT),
+        )?;
+        self.publish_pending_lifecycle();
+        Ok(self.revision)
+    }
+
+    /// Begin the minimum-profile single snapshot cursor.
+    pub fn snapshot_begin(&mut self) -> Result<SnapshotToken, SnapshotError> {
+        self.ensure_active().map_err(SnapshotError::Registry)?;
+        if self.snapshot.is_some() {
+            return Err(SnapshotError::Busy);
+        }
+        let raw = self.next_snapshot_token.max(1);
+        self.next_snapshot_token = raw.wrapping_add(1).max(1);
+        let token = SnapshotToken(raw);
+        self.snapshot = Some(ActiveSnapshot {
+            token,
+            revision: self.revision,
+            position: 0,
+            sequence: 0,
+        });
+        Ok(token)
+    }
+
+    /// Read a bounded deterministic root-order/pre-order snapshot page.
+    pub fn snapshot_read(
+        &mut self,
+        token: SnapshotToken,
+        max_records: usize,
+        max_text_bytes_per_record: usize,
+    ) -> Result<SnapshotPage, SnapshotError> {
+        if max_records == 0 {
+            return Err(SnapshotError::InvalidLimit);
+        }
+        let cursor = self.snapshot.ok_or(SnapshotError::InvalidCursor)?;
+        if cursor.token != token {
+            return Err(SnapshotError::InvalidCursor);
+        }
+        if cursor.revision != self.revision {
+            self.snapshot = None;
+            return Err(SnapshotError::Stale {
+                starting: cursor.revision,
+                current: self.revision,
+            });
+        }
+        let mut traversal = Vec::with_capacity(self.usage.actors);
+        for root in &self.roots {
+            collect_preorder_ids(&root.node, &mut traversal).map_err(SnapshotError::Registry)?;
+        }
+        let end = cursor
+            .position
+            .saturating_add(max_records)
+            .min(traversal.len());
+        let mut records = Vec::with_capacity(end.saturating_sub(cursor.position));
+        for object_id in &traversal[cursor.position..end] {
+            records.push(
+                self.snapshot_record(*object_id, max_text_bytes_per_record)
+                    .map_err(SnapshotError::Registry)?,
+            );
+        }
+        let ended = end == traversal.len();
+        let page = SnapshotPage {
+            revision: cursor.revision,
+            sequence: cursor.sequence,
+            records,
+            ended,
+        };
+        if ended {
+            self.snapshot = None;
+        } else if let Some(active) = self.snapshot.as_mut() {
+            active.position = end;
+            active.sequence = active.sequence.saturating_add(1);
+        }
+        Ok(page)
+    }
+
+    /// End a live snapshot cursor without reading its remaining records.
+    pub fn snapshot_end(&mut self, token: SnapshotToken) -> Result<(), SnapshotError> {
+        match self.snapshot {
+            Some(cursor) if cursor.token == token => {
+                self.snapshot = None;
+                Ok(())
+            }
+            _ => Err(SnapshotError::InvalidCursor),
+        }
     }
 
     /// Validate, construct, attach, and publish one actor atomically.
@@ -789,6 +1772,7 @@ impl StageRegistry {
         inputs: &[ConstructorInput<'_>],
     ) -> Result<ObjectId, RegistryError> {
         self.ensure_active()?;
+        let next_revision = self.next_revision()?;
         let descriptor = self
             .descriptor(type_id)
             .ok_or(RegistryError::UnknownType { type_id })?;
@@ -816,9 +1800,9 @@ impl StageRegistry {
             }),
             CreateDestination::Child { parent } => {
                 let parent_node = self.node_mut(parent)?;
-                parent_node.append_child(constructed.node);
+                parent_node.append_child_quiet(constructed.node);
             }
-        }
+        };
 
         let text_bytes = required_text_bytes(descriptor, inputs, root_name_bytes)?;
         let record = ActorRecord {
@@ -826,6 +1810,11 @@ impl StageRegistry {
             parent,
             depth,
             text_bytes,
+            root_name_bytes: u32::try_from(root_name_bytes).map_err(|_| {
+                RegistryError::Capacity {
+                    kind: CapacityKind::TextBytes,
+                }
+            })?,
             resources: descriptor.resource_cost.resources,
             ops: constructed.ops,
         };
@@ -836,12 +1825,31 @@ impl StageRegistry {
         }
         self.usage.text_bytes += text_bytes;
         self.usage.resources += descriptor.resource_cost.resources;
+        self.revision = next_revision;
+        self.last_effects = MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::SNAPSHOT);
+        self.last_invalidations.clear();
+        self.last_invalidations.push(
+            self.node(object_id)?
+                .try_effective_bounds()
+                .ok_or(RegistryError::DispatchBusy)?,
+        );
+        if let CreateDestination::Child { parent } = destination {
+            self.node_mut(object_id)?.emit_attached();
+            self.node_mut(parent)?.emit_child_changed();
+        }
         Ok(object_id)
     }
 
     /// Delete an actor subtree and invalidate every generation in it.
     pub fn delete(&mut self, object_id: ObjectId) -> Result<usize, RegistryError> {
         self.ensure_active()?;
+        let next_revision = self.next_revision()?;
+        let old_bounds = self
+            .node(object_id)?
+            .try_effective_bounds()
+            .ok_or(RegistryError::DispatchBusy)?;
         let parent = self.record(object_id)?.parent;
         let mut removed = if let Some(parent_id) = parent {
             let parent_node = self.node_mut(parent_id)?;
@@ -855,7 +1863,7 @@ impl StageRegistry {
                 })
                 .ok_or(RegistryError::Internal)?;
             parent_node
-                .detach_child(index)
+                .detach_child_quiet(index)
                 .ok_or(RegistryError::Internal)?
         } else {
             let index = self
@@ -878,6 +1886,16 @@ impl StageRegistry {
         for id in &ids {
             self.retire_slot(*id)?;
         }
+        self.revision = next_revision;
+        self.last_effects = MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::SNAPSHOT);
+        self.last_invalidations.clear();
+        self.last_invalidations.push(old_bounds);
+        removed.emit_detached();
+        if let Some(parent) = parent {
+            self.node_mut(parent)?.emit_child_changed();
+        }
         Ok(ids.len())
     }
 
@@ -894,6 +1912,7 @@ impl StageRegistry {
             deleted += self.delete(object_id)?;
         }
         self.active = false;
+        self.snapshot = None;
         Ok(deleted)
     }
 
@@ -903,6 +1922,10 @@ impl StageRegistry {
         } else {
             Err(RegistryError::StageClosed)
         }
+    }
+
+    fn next_revision(&self) -> Result<StageRevision, RegistryError> {
+        self.revision.next().ok_or(RegistryError::Internal)
     }
 
     fn validate_destination(
@@ -1037,6 +2060,380 @@ impl StageRegistry {
             .ok_or(RegistryError::StaleObject { object_id })
     }
 
+    fn record_mut(&mut self, object_id: ObjectId) -> Result<&mut ActorRecord, RegistryError> {
+        self.ensure_active()?;
+        let Some(slot) = self.slots.get_mut(object_id.slot() as usize) else {
+            return Err(RegistryError::StaleObject { object_id });
+        };
+        if slot.generation != object_id.generation() {
+            return Err(RegistryError::StaleObject { object_id });
+        }
+        slot.record
+            .as_mut()
+            .ok_or(RegistryError::StaleObject { object_id })
+    }
+
+    fn validate_runtime_flag(
+        &self,
+        object_id: ObjectId,
+        flag: RuntimeFlag,
+    ) -> Result<(), RegistryError> {
+        let record = self.record(object_id)?;
+        match flag {
+            RuntimeFlag::Hidden | RuntimeFlag::Enabled => Ok(()),
+            RuntimeFlag::Clickable | RuntimeFlag::Focusable
+                if record
+                    .descriptor
+                    .capabilities
+                    .contains(ActorCapabilities::CONTROL) =>
+            {
+                Ok(())
+            }
+            RuntimeFlag::Clickable | RuntimeFlag::Focusable => Err(RegistryError::Unsupported),
+        }
+    }
+
+    fn commit_runtime_flag(
+        &mut self,
+        object_id: ObjectId,
+        flag: RuntimeFlag,
+        enabled: bool,
+    ) -> Result<(), RegistryError> {
+        let node = self.node_mut(object_id)?;
+        match flag {
+            RuntimeFlag::Hidden => node.set_flag(ObjectFlags::HIDDEN, enabled),
+            RuntimeFlag::Enabled => {
+                node.set_flag(ObjectFlags::DISABLED, !enabled);
+                node.set_state(ObjectStates::DISABLED, !enabled);
+                if !enabled {
+                    node.set_state(ObjectStates::FOCUSED, false);
+                    node.set_state(ObjectStates::PRESSED, false);
+                    node.set_state(ObjectStates::EDITED, false);
+                }
+            }
+            RuntimeFlag::Clickable => node.set_flag(ObjectFlags::CLICKABLE, enabled),
+            RuntimeFlag::Focusable => {
+                node.set_flag(ObjectFlags::FOCUSABLE, enabled);
+                if !enabled {
+                    node.set_state(ObjectStates::FOCUSED, false);
+                    node.set_state(ObjectStates::EDITED, false);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_requested_layout(
+        &self,
+        object_id: ObjectId,
+        layout: &RequestedLayout,
+    ) -> Result<(), RegistryError> {
+        let descriptor = self.record(object_id)?.descriptor;
+        let required = match layout {
+            RequestedLayout::None => return Ok(()),
+            RequestedLayout::Flex(_) => LayoutCapabilities::FLEX_CONTAINER,
+            RequestedLayout::Grid(_) => LayoutCapabilities::GRID_CONTAINER,
+            RequestedLayout::Item(_) => LayoutCapabilities::ITEM_HINTS,
+        };
+        if !descriptor.layout.contains(required) {
+            return Err(RegistryError::Unsupported);
+        }
+        if let RequestedLayout::Item(hints) = layout
+            && (hints.col_span == 0
+                || hints.row_span == 0
+                || hints
+                    .min_width
+                    .zip(hints.max_width)
+                    .is_some_and(|(min, max)| min > max)
+                || hints
+                    .min_height
+                    .zip(hints.max_height)
+                    .is_some_and(|(min, max)| min > max))
+        {
+            return Err(RegistryError::Range { field_id: 0 });
+        }
+        if let RequestedLayout::Grid(config) = layout
+            && (config.col_tracks.is_empty()
+                || config.row_tracks.is_empty()
+                || config
+                    .col_tracks
+                    .iter()
+                    .chain(config.row_tracks.iter())
+                    .any(|track| {
+                        matches!(track, GridTrack::Px(value) if *value < 0)
+                            || matches!(track, GridTrack::Fr(0))
+                    }))
+        {
+            return Err(RegistryError::Range { field_id: 0 });
+        }
+        Ok(())
+    }
+
+    fn commit_requested_layout(
+        &mut self,
+        object_id: ObjectId,
+        layout: RequestedLayout,
+    ) -> Result<(), RegistryError> {
+        let node = self.node_mut(object_id)?;
+        match layout {
+            RequestedLayout::None => node.clear_requested_layout(),
+            RequestedLayout::Flex(config) => node.set_layout_flex(config),
+            RequestedLayout::Grid(config) => node.set_layout_grid(config),
+            RequestedLayout::Item(hints) => node.set_item_hints(hints),
+        }
+        Ok(())
+    }
+
+    fn detach_for_tree(&mut self, object_id: ObjectId) -> Result<ObjectNode, RegistryError> {
+        let parent = self.record(object_id)?.parent;
+        if let Some(parent_id) = parent {
+            let parent_node = self.node_mut(parent_id)?;
+            let index = parent_node
+                .children()
+                .iter()
+                .position(|child| {
+                    child
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .ok_or(RegistryError::Internal)?;
+            let node = parent_node
+                .detach_child_quiet(index)
+                .ok_or(RegistryError::Internal)?;
+            self.pending_lifecycle
+                .push(PendingLifecycle::ChildChanged(parent_id));
+            Ok(node)
+        } else {
+            let index = self
+                .roots
+                .iter()
+                .position(|root| {
+                    root.node
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .ok_or(RegistryError::Internal)?;
+            let root = self.roots.remove(index);
+            self.usage.roots -= 1;
+            self.usage.text_bytes -= self.record(object_id)?.root_name_bytes;
+            let record = self.record_mut(object_id)?;
+            record.text_bytes -= record.root_name_bytes;
+            record.root_name_bytes = 0;
+            Ok(root.node)
+        }
+    }
+
+    fn commit_tree_direction(&mut self, direction: &StageDirection) -> Result<(), RegistryError> {
+        match direction {
+            StageDirection::Reparent {
+                object_id,
+                new_parent,
+                index,
+            } => {
+                let node = self.detach_for_tree(*object_id)?;
+                if !self.node_mut(*new_parent)?.insert_child_quiet(*index, node) {
+                    return Err(RegistryError::Internal);
+                }
+                self.record_mut(*object_id)?.parent = Some(*new_parent);
+                self.refresh_depths(*object_id, self.record(*new_parent)?.depth + 1)?;
+                self.pending_lifecycle
+                    .push(PendingLifecycle::Attached(*object_id));
+                self.pending_lifecycle
+                    .push(PendingLifecycle::ChildChanged(*new_parent));
+            }
+            StageDirection::PromoteRoot {
+                object_id,
+                name,
+                index,
+            } => {
+                let node = self.detach_for_tree(*object_id)?;
+                self.roots.insert(
+                    *index,
+                    RootRecord {
+                        name: name.clone(),
+                        node,
+                    },
+                );
+                let name_bytes = u32::try_from(name.len()).map_err(|_| RegistryError::Internal)?;
+                let record = self.record_mut(*object_id)?;
+                record.parent = None;
+                record.root_name_bytes = name_bytes;
+                record.text_bytes = record
+                    .text_bytes
+                    .checked_add(name_bytes)
+                    .ok_or(RegistryError::Internal)?;
+                self.usage.roots += 1;
+                self.usage.text_bytes = self
+                    .usage
+                    .text_bytes
+                    .checked_add(name_bytes)
+                    .ok_or(RegistryError::Internal)?;
+                self.refresh_depths(*object_id, 1)?;
+                self.pending_lifecycle
+                    .push(PendingLifecycle::Attached(*object_id));
+            }
+            StageDirection::Reorder { object_id, index } => {
+                let parent = self.record(*object_id)?.parent;
+                if let Some(parent) = parent {
+                    let parent_node = self.node_mut(parent)?;
+                    let old = parent_node
+                        .children()
+                        .iter()
+                        .position(|child| {
+                            child
+                                .actor_identity()
+                                .is_some_and(|identity| identity.object_id == *object_id)
+                        })
+                        .ok_or(RegistryError::Internal)?;
+                    let node = parent_node
+                        .detach_child_quiet(old)
+                        .ok_or(RegistryError::Internal)?;
+                    if !parent_node.insert_child_quiet(*index, node) {
+                        return Err(RegistryError::Internal);
+                    }
+                    self.pending_lifecycle
+                        .push(PendingLifecycle::ChildChanged(parent));
+                } else {
+                    let old = self.position(*object_id)?;
+                    let root = self.roots.remove(old);
+                    self.roots.insert(*index, root);
+                }
+            }
+            StageDirection::Delete { object_id } => {
+                let mut removed = self.detach_for_tree(*object_id)?;
+                let mut ids = Vec::new();
+                collect_postorder_ids(&removed, &mut ids)?;
+                for id in &ids {
+                    self.retire_slot(*id)?;
+                }
+                removed.set_detached_recursive(true);
+                self.pending_lifecycle
+                    .push(PendingLifecycle::Detached(removed));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn refresh_depths(&mut self, root: ObjectId, depth: usize) -> Result<(), RegistryError> {
+        self.record_mut(root)?.depth = depth;
+        let children = self.children(root)?;
+        for child in children {
+            self.refresh_depths(child, depth + 1)?;
+        }
+        Ok(())
+    }
+
+    fn publish_pending_lifecycle(&mut self) {
+        let pending = core::mem::take(&mut self.pending_lifecycle);
+        for event in pending {
+            match event {
+                PendingLifecycle::Detached(mut node) => node.emit_detached(),
+                PendingLifecycle::Attached(object_id) => {
+                    if let Ok(node) = self.node_mut(object_id) {
+                        node.emit_attached();
+                    }
+                }
+                PendingLifecycle::ChildChanged(object_id) => {
+                    if let Ok(node) = self.node_mut(object_id) {
+                        node.emit_child_changed();
+                    }
+                }
+            }
+        }
+    }
+
+    fn snapshot_record(
+        &self,
+        object_id: ObjectId,
+        max_text_bytes: usize,
+    ) -> Result<SnapshotRecord, RegistryError> {
+        let record = self.record(object_id)?;
+        let node = self.node(object_id)?;
+        let mut text_bytes = 0usize;
+        let mut truncated = false;
+        let mut properties = Vec::with_capacity(record.descriptor.properties.len());
+        for descriptor in record.descriptor.properties {
+            let value = record.ops.property(descriptor.id)?;
+            let next = text_bytes.saturating_add(value.text_bytes());
+            if next > max_text_bytes {
+                truncated = true;
+                properties.push(SnapshotProperty {
+                    id: descriptor.id,
+                    value: None,
+                    redacted: true,
+                });
+            } else {
+                text_bytes = next;
+                properties.push(SnapshotProperty {
+                    id: descriptor.id,
+                    value: Some(value),
+                    redacted: false,
+                });
+            }
+        }
+        Ok(SnapshotRecord {
+            object_id,
+            type_id: record.descriptor.type_id,
+            stable_type_name: record.descriptor.stable_name,
+            parent: record.parent,
+            position: self.position(object_id)?,
+            children: self.children(object_id)?,
+            properties,
+            flags: node.flags().bits(),
+            states: node.states().bits(),
+            requested_layout: RequestedLayout::from_role(&node.requested_layout_role()),
+            geometry: self.geometry(object_id)?,
+            truncated,
+        })
+    }
+
+    fn capture_geometry(&self) -> Result<Vec<(ObjectId, Rect)>, RegistryError> {
+        let mut geometry = Vec::with_capacity(self.usage.actors);
+        for (index, slot) in self.slots.iter().enumerate() {
+            if slot.record.is_none() {
+                continue;
+            }
+            let object_id = ObjectId::from_parts(slot.generation, index as u32);
+            let bounds = self
+                .node(object_id)?
+                .try_effective_bounds()
+                .ok_or(RegistryError::DispatchBusy)?;
+            geometry.push((object_id, bounds));
+        }
+        Ok(geometry)
+    }
+
+    fn derive_invalidations(
+        &self,
+        before: &[(ObjectId, Rect)],
+        touched: &[ObjectId],
+        whole_stage: bool,
+    ) -> Result<Vec<Rect>, RegistryError> {
+        let after = self.capture_geometry()?;
+        let mut invalidations = Vec::new();
+        for (object_id, old) in before {
+            let new = after
+                .iter()
+                .find(|(candidate, _)| candidate == object_id)
+                .map(|(_, bounds)| *bounds);
+            if whole_stage || touched.contains(object_id) || new.is_none() || new != Some(*old) {
+                push_rect_unique(
+                    &mut invalidations,
+                    new.map_or(*old, |new_bounds| old.union(new_bounds)),
+                );
+            }
+        }
+        for (object_id, bounds) in after {
+            if before.iter().all(|(candidate, _)| *candidate != object_id)
+                && (whole_stage || touched.contains(&object_id))
+            {
+                push_rect_unique(&mut invalidations, bounds);
+            }
+        }
+        Ok(invalidations)
+    }
+
     fn node_mut(&mut self, object_id: ObjectId) -> Result<&mut ObjectNode, RegistryError> {
         self.record(object_id)?;
         self.roots
@@ -1055,7 +2452,7 @@ impl StageRegistry {
         }
         let record = slot.record.take().ok_or(RegistryError::Internal)?;
         self.usage.actors -= 1;
-        if record.parent.is_none() {
+        if record.root_name_bytes > 0 {
             self.usage.roots -= 1;
         }
         self.usage.text_bytes -= record.text_bytes;
@@ -1088,6 +2485,43 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
                 || descriptor.constructor_fields[..field_index]
                     .iter()
                     .any(|prior| prior.id == field.id || prior.name == field.name)
+            {
+                return Err(RegistryError::InvalidCatalog);
+            }
+        }
+        for (property_index, property) in descriptor.properties.iter().enumerate() {
+            if property.id == 0
+                || property.name.is_empty()
+                || descriptor.properties[..property_index]
+                    .iter()
+                    .any(|prior| prior.id == property.id || prior.name == property.name)
+                || !descriptor
+                    .capabilities
+                    .contains(property.required_capabilities)
+                || property
+                    .default
+                    .tag()
+                    .is_some_and(|tag| tag != property.value_tag)
+                || match property.constraint {
+                    PropertyConstraint::None => false,
+                    PropertyConstraint::I32 { min, max } => {
+                        property.value_tag != ValueTag::I32 || min > max
+                    }
+                    PropertyConstraint::TextBytes { .. } => property.value_tag != ValueTag::Text,
+                }
+            {
+                return Err(RegistryError::InvalidCatalog);
+            }
+        }
+        for (action_index, action) in descriptor.actions.iter().enumerate() {
+            if action.id == 0
+                || action.name.is_empty()
+                || descriptor.actions[..action_index]
+                    .iter()
+                    .any(|prior| prior.id == action.id || prior.name == action.name)
+                || !descriptor
+                    .capabilities
+                    .contains(action.required_capabilities)
             {
                 return Err(RegistryError::InvalidCatalog);
             }
@@ -1209,5 +2643,14 @@ fn collect_postorder_ids(node: &ObjectNode, ids: &mut Vec<ObjectId>) -> Result<(
     }
     let identity = node.actor_identity().ok_or(RegistryError::Internal)?;
     ids.push(identity.object_id);
+    Ok(())
+}
+
+fn collect_preorder_ids(node: &ObjectNode, ids: &mut Vec<ObjectId>) -> Result<(), RegistryError> {
+    let identity = node.actor_identity().ok_or(RegistryError::Internal)?;
+    ids.push(identity.object_id);
+    for child in node.children() {
+        collect_preorder_ids(child, ids)?;
+    }
     Ok(())
 }

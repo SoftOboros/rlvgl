@@ -1,9 +1,10 @@
 //! Simple container grouping child widgets.
 use rlvgl_core::actor::{
-    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
-    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
-    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
+    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, RegistryError,
+    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
 };
+use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -80,4 +81,28 @@ impl Widget for Container {
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
     }
+}
+
+impl MpyActor for Container {
+    type Prepared = ();
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        Err(RegistryError::UnknownProperty { property_id: id })
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<()>, RegistryError> {
+        if directions.is_empty() {
+            Ok(ActorPreparation {
+                prepared: (),
+                text_delta: 0,
+            })
+        } else {
+            Err(RegistryError::BatchInvalid)
+        }
+    }
+
+    fn commit(&mut self, _prepared: ()) {}
 }

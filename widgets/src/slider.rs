@@ -1,9 +1,11 @@
 //! Horizontal slider widget.
 use rlvgl_core::actor::{
-    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
-    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
-    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
+    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, MutationEffects,
+    PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError,
+    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
 };
+use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
@@ -60,6 +62,52 @@ const MPY_BOUNDS_FIELD: u32 = 1;
 const MPY_MIN_FIELD: u32 = 2;
 const MPY_MAX_FIELD: u32 = 3;
 const MPY_VALUE_FIELD: u32 = 4;
+const MPY_MIN_PROPERTY: u32 = 1;
+const MPY_MAX_PROPERTY: u32 = 2;
+const MPY_VALUE_PROPERTY: u32 = 3;
+
+const SLIDER_EFFECTS: MutationEffects = MutationEffects::DRAW.union(MutationEffects::SNAPSHOT);
+const MPY_PROPERTIES: [PropertyDescriptor; 3] = [
+    PropertyDescriptor {
+        id: MPY_MIN_PROPERTY,
+        name: "min",
+        value_tag: ValueTag::I32,
+        access: PropertyAccess::ReadWrite,
+        default: PropertyDefault::I32(0),
+        constraint: PropertyConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        required_capabilities: ActorCapabilities::CONTROL,
+        effects: SLIDER_EFFECTS,
+    },
+    PropertyDescriptor {
+        id: MPY_MAX_PROPERTY,
+        name: "max",
+        value_tag: ValueTag::I32,
+        access: PropertyAccess::ReadWrite,
+        default: PropertyDefault::I32(100),
+        constraint: PropertyConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        required_capabilities: ActorCapabilities::CONTROL,
+        effects: SLIDER_EFFECTS,
+    },
+    PropertyDescriptor {
+        id: MPY_VALUE_PROPERTY,
+        name: "value",
+        value_tag: ValueTag::I32,
+        access: PropertyAccess::ReadWrite,
+        default: PropertyDefault::I32(0),
+        constraint: PropertyConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        required_capabilities: ActorCapabilities::CONTROL,
+        effects: SLIDER_EFFECTS,
+    },
+];
 
 /// Stable MPY actor type identifier for [`Slider`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0004);
@@ -98,7 +146,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
             required: false,
         },
     ],
-    properties: &[],
+    properties: &MPY_PROPERTIES,
     actions: &[],
     events: &[],
     child_policy: ChildPolicy::None,
@@ -184,5 +232,73 @@ impl Widget for Slider {
         let new_value = self.min + ((self.max - self.min) as f32 * ratio) as i32;
         self.set_value(new_value);
         true
+    }
+}
+
+impl MpyActor for Slider {
+    type Prepared = (i32, i32, i32);
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        match id {
+            MPY_MIN_PROPERTY => Ok(OwnedValue::I32(self.min)),
+            MPY_MAX_PROPERTY => Ok(OwnedValue::I32(self.max)),
+            MPY_VALUE_PROPERTY => Ok(OwnedValue::I32(self.value)),
+            _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<Self::Prepared>, RegistryError> {
+        let (mut min, mut max, mut value) = (self.min, self.max, self.value);
+        for direction in directions {
+            match direction {
+                ActorDirection::SetProperty { id, value: next } => {
+                    let OwnedValue::I32(next) = next else {
+                        return Err(RegistryError::TypeMismatch {
+                            field_id: *id,
+                            expected: ValueTag::I32,
+                            actual: next.tag(),
+                        });
+                    };
+                    match *id {
+                        MPY_MIN_PROPERTY => min = *next,
+                        MPY_MAX_PROPERTY => max = *next,
+                        MPY_VALUE_PROPERTY => value = *next,
+                        _ => return Err(RegistryError::UnknownProperty { property_id: *id }),
+                    }
+                }
+                ActorDirection::ResetProperty { id } => match *id {
+                    MPY_MIN_PROPERTY => min = 0,
+                    MPY_MAX_PROPERTY => max = 100,
+                    MPY_VALUE_PROPERTY => value = 0,
+                    _ => return Err(RegistryError::UnknownProperty { property_id: *id }),
+                },
+                ActorDirection::InvokeAction { id, .. } => {
+                    return Err(RegistryError::UnknownAction { action_id: *id });
+                }
+            }
+        }
+        if min > max {
+            return Err(RegistryError::Range {
+                field_id: MPY_MAX_PROPERTY,
+            });
+        }
+        if value < min || value > max {
+            return Err(RegistryError::Range {
+                field_id: MPY_VALUE_PROPERTY,
+            });
+        }
+        Ok(ActorPreparation {
+            prepared: (min, max, value),
+            text_delta: 0,
+        })
+    }
+
+    fn commit(&mut self, (min, max, value): Self::Prepared) {
+        self.min = min;
+        self.max = max;
+        self.value = value;
     }
 }

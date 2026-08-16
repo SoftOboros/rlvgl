@@ -28,7 +28,7 @@ use core::cell::RefCell;
 
 use crate::WidgetNode;
 use crate::event::{Event, Key};
-use crate::layout::LayoutState;
+use crate::layout::{LayoutRole, LayoutState};
 use crate::renderer::{ClipRenderer, Renderer};
 use crate::widget::{Rect, Widget};
 
@@ -52,6 +52,69 @@ pub enum GestureDir {
     Left,
     /// Swipe toward the right edge of the screen.
     Right,
+}
+
+#[cfg(test)]
+mod mpy_quiet_commit_tests {
+    use alloc::rc::Rc;
+    use core::cell::{Cell, RefCell};
+
+    use super::ObjectNode;
+    use crate::{
+        event::Event,
+        renderer::Renderer,
+        widget::{Rect, Widget},
+    };
+
+    struct QuietWidget;
+
+    impl Widget for QuietWidget {
+        fn bounds(&self) -> Rect {
+            Rect {
+                x: 0,
+                y: 0,
+                width: 1,
+                height: 1,
+            }
+        }
+
+        fn draw(&self, _renderer: &mut dyn Renderer) {}
+
+        fn handle_event(&mut self, _event: &Event) -> bool {
+            false
+        }
+    }
+
+    fn node() -> ObjectNode {
+        ObjectNode::new(Rc::new(RefCell::new(QuietWidget)))
+    }
+
+    #[test]
+    fn quiet_tree_change_has_no_intermediate_lifecycle_delivery() {
+        let attached = Rc::new(Cell::new(0));
+        let child_changed = Rc::new(Cell::new(0));
+        let mut child = node();
+        let attached_count = attached.clone();
+        child.add_target_handler(move |_, _| {
+            attached_count.set(attached_count.get() + 1);
+            false
+        });
+        let mut parent = node();
+        let changed_count = child_changed.clone();
+        parent.add_target_handler(move |_, _| {
+            changed_count.set(changed_count.get() + 1);
+            false
+        });
+
+        let index = parent.append_child_quiet(child);
+        assert_eq!(attached.get(), 0);
+        assert_eq!(child_changed.get(), 0);
+
+        parent.children_mut()[index].emit_attached();
+        parent.emit_child_changed();
+        assert_eq!(attached.get(), 1);
+        assert_eq!(child_changed.get(), 1);
+    }
 }
 
 /// Object-semantic event vocabulary for the LPAR-04 dispatch model.
@@ -898,6 +961,29 @@ impl ObjectNode {
         self.widget.borrow().bounds()
     }
 
+    /// Try to read effective bounds without panicking on a retained public widget borrow.
+    pub(crate) fn try_effective_bounds(&self) -> Option<Rect> {
+        if let Some(state) = self.layout.as_deref()
+            && let Some(computed) = state.computed
+        {
+            return Some(computed);
+        }
+        self.widget.try_borrow().ok().map(|widget| widget.bounds())
+    }
+
+    /// Return the requested layout role, excluding computed geometry.
+    pub fn requested_layout_role(&self) -> LayoutRole {
+        self.layout
+            .as_deref()
+            .map(|state| state.role.clone())
+            .unwrap_or(LayoutRole::None)
+    }
+
+    /// Clear director-requested layout and computed overrides.
+    pub fn clear_requested_layout(&mut self) {
+        self.layout = None;
+    }
+
     /// Configure this node as a flex layout container.
     ///
     /// Lazily allocates the `LayoutState` slot, sets the role to
@@ -1014,15 +1100,21 @@ impl ObjectNode {
     ///
     /// This method MUST NOT be called from inside an active
     /// [`dispatch_object_event`] traversal (LPAR-02 §7.4 / LPAR-04 §6.6).
-    pub fn append_child(&mut self, mut child: ObjectNode) -> usize {
-        child.set_detached_recursive(false);
-        self.children.push(child);
-        let idx = self.children.len() - 1;
+    pub fn append_child(&mut self, child: ObjectNode) -> usize {
+        let idx = self.append_child_quiet(child);
         // Lifecycle: Attached → subtree root.
         self.children[idx].invoke_handlers_for(&ObjectEvent::Attached);
         // Lifecycle: ChildChanged → parent.
         self.invoke_handlers_for(&ObjectEvent::ChildChanged);
         idx
+    }
+
+    /// Attach without lifecycle delivery so a higher-level transaction can
+    /// publish all structural changes before notifying observers.
+    pub(crate) fn append_child_quiet(&mut self, mut child: ObjectNode) -> usize {
+        child.set_detached_recursive(false);
+        self.children.push(child);
+        self.children.len() - 1
     }
 
     /// Insert a child node at `index`.
@@ -1037,16 +1129,24 @@ impl ObjectNode {
     ///
     /// This method MUST NOT be called from inside an active
     /// [`dispatch_object_event`] traversal (LPAR-02 §7.4 / LPAR-04 §6.6).
-    pub fn insert_child(&mut self, index: usize, mut child: ObjectNode) -> bool {
+    pub fn insert_child(&mut self, index: usize, child: ObjectNode) -> bool {
+        if !self.insert_child_quiet(index, child) {
+            return false;
+        }
+        // Lifecycle: Attached → subtree root.
+        self.children[index].invoke_handlers_for(&ObjectEvent::Attached);
+        // Lifecycle: ChildChanged → parent.
+        self.invoke_handlers_for(&ObjectEvent::ChildChanged);
+        true
+    }
+
+    /// Insert without lifecycle delivery for an enclosing atomic commit.
+    pub(crate) fn insert_child_quiet(&mut self, index: usize, mut child: ObjectNode) -> bool {
         if index > self.children.len() {
             return false;
         }
         child.set_detached_recursive(false);
         self.children.insert(index, child);
-        // Lifecycle: Attached → subtree root.
-        self.children[index].invoke_handlers_for(&ObjectEvent::Attached);
-        // Lifecycle: ChildChanged → parent.
-        self.invoke_handlers_for(&ObjectEvent::ChildChanged);
         true
     }
 
@@ -1062,16 +1162,37 @@ impl ObjectNode {
     /// This method MUST NOT be called from inside an active
     /// [`dispatch_object_event`] traversal (LPAR-02 §7.4 / LPAR-04 §6.6).
     pub fn detach_child(&mut self, index: usize) -> Option<ObjectNode> {
-        if index >= self.children.len() {
-            return None;
-        }
-        let mut child = self.children.remove(index);
-        child.set_detached_recursive(true);
+        let mut child = self.detach_child_quiet(index)?;
         // Lifecycle: Detached → detached subtree root.
         child.invoke_handlers_for(&ObjectEvent::Detached);
         // Lifecycle: ChildChanged → parent.
         self.invoke_handlers_for(&ObjectEvent::ChildChanged);
         Some(child)
+    }
+
+    /// Detach without lifecycle delivery for an enclosing atomic commit.
+    pub(crate) fn detach_child_quiet(&mut self, index: usize) -> Option<ObjectNode> {
+        if index >= self.children.len() {
+            return None;
+        }
+        let mut child = self.children.remove(index);
+        child.set_detached_recursive(true);
+        Some(child)
+    }
+
+    /// Deliver the lifecycle notification for a previously quiet attach.
+    pub(crate) fn emit_attached(&mut self) {
+        self.invoke_handlers_for(&ObjectEvent::Attached);
+    }
+
+    /// Deliver the lifecycle notification for a previously quiet detach.
+    pub(crate) fn emit_detached(&mut self) {
+        self.invoke_handlers_for(&ObjectEvent::Detached);
+    }
+
+    /// Deliver the lifecycle notification for a previously quiet child-list change.
+    pub(crate) fn emit_child_changed(&mut self) {
+        self.invoke_handlers_for(&ObjectEvent::ChildChanged);
     }
 
     // -----------------------------------------------------------------------

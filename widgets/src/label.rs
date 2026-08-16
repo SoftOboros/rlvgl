@@ -1,10 +1,12 @@
 //! Basic text label.
 use alloc::string::String;
 use rlvgl_core::actor::{
-    ActorCapabilities, ActorFamily, ChildPolicy, ConstructedActor, ConstructorArgs,
-    ConstructorFieldDescriptor, LayoutCapabilities, RegistryError, ResourceCost, TargetSet,
-    TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
+    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, MutationEffects,
+    PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError,
+    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
 };
+use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
@@ -107,6 +109,20 @@ impl Label {
 
 const MPY_BOUNDS_FIELD: u32 = 1;
 const MPY_TEXT_FIELD: u32 = 2;
+const MPY_TEXT_PROPERTY: u32 = 1;
+
+const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
+    id: MPY_TEXT_PROPERTY,
+    name: "text",
+    value_tag: ValueTag::Text,
+    access: PropertyAccess::ReadWrite,
+    default: PropertyDefault::Text(""),
+    constraint: PropertyConstraint::TextBytes { max: 4096 },
+    required_capabilities: ActorCapabilities::TEXT,
+    effects: MutationEffects::DRAW
+        .union(MutationEffects::LAYOUT)
+        .union(MutationEffects::SNAPSHOT),
+}];
 
 /// Stable MPY actor type identifier for [`Label`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0002);
@@ -133,7 +149,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
             required: true,
         },
     ],
-    properties: &[],
+    properties: &MPY_PROPERTIES,
     actions: &[],
     events: &[],
     child_policy: ChildPolicy::None,
@@ -170,5 +186,50 @@ impl Widget for Label {
 
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+impl MpyActor for Label {
+    type Prepared = String;
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        match id {
+            MPY_TEXT_PROPERTY => Ok(OwnedValue::Text(String::from(self.text()))),
+            _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<String>, RegistryError> {
+        let mut text = String::from(self.text());
+        for direction in directions {
+            match direction {
+                ActorDirection::SetProperty {
+                    id: MPY_TEXT_PROPERTY,
+                    value: OwnedValue::Text(value),
+                } => text = value.clone(),
+                ActorDirection::ResetProperty {
+                    id: MPY_TEXT_PROPERTY,
+                } => text.clear(),
+                ActorDirection::SetProperty { id, .. } | ActorDirection::ResetProperty { id } => {
+                    return Err(RegistryError::UnknownProperty { property_id: *id });
+                }
+                ActorDirection::InvokeAction { id, .. } => {
+                    return Err(RegistryError::UnknownAction { action_id: *id });
+                }
+            }
+        }
+        let text_delta = i64::try_from(text.len()).map_err(|_| RegistryError::Internal)?
+            - i64::try_from(self.text().len()).map_err(|_| RegistryError::Internal)?;
+        Ok(ActorPreparation {
+            prepared: text,
+            text_delta,
+        })
+    }
+
+    fn commit(&mut self, prepared: String) {
+        self.set_text(prepared);
     }
 }

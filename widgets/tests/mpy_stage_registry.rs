@@ -100,9 +100,15 @@ fn catalog_enumerates_five_actor_local_schemas() {
                 .targets
                 .contains(rlvgl_core::actor::TargetSet::ALL)
         );
-        // MPY-04 and MPY-05 own the still-empty member-ID slices.
-        assert!(descriptor.properties.is_empty());
-        assert!(descriptor.actions.is_empty());
+        let expected = match descriptor.stable_name.rsplit("::").next().unwrap() {
+            "Container" => (0, 0),
+            "Label" | "Button" => (1, 0),
+            "Slider" => (3, 0),
+            "List" => (1, 5),
+            _ => unreachable!(),
+        };
+        assert_eq!(descriptor.properties.len(), expected.0);
+        assert_eq!(descriptor.actions.len(), expected.1);
         assert!(descriptor.events.is_empty());
     }
 }

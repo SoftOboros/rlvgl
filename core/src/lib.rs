@@ -43,6 +43,10 @@ pub mod asset;
 pub mod bitmap_font;
 /// Graphics-language layer: structured drawing commands as data.
 pub mod cmd;
+/// MPY endpoint-owned cue queue, admission, coalescing, and bounded draining.
+pub mod cue;
+/// MPY descriptor-driven stage directions, transactions, and snapshots.
+pub mod direction;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
 /// Shared edit-state machine (buffer, caret, mutation gates) promoted from
