@@ -6,9 +6,10 @@ MPY-06-MICROPYTHON-DIRECTOR-BINDING.md - MicroPython Stage/Actor API and callbac
 
 **Status:** Owner-accepted 2026-08-16; not yet ratified. MPY-04 and MPY-05
 freeze the consumed direction and cue semantics, and §11–§12 record the
-accepted MPY-06 policy. Ratification remains gated on the missing MPY-04/05
-runtime implementations and a compile-tested host MicroPython binding. The
-current module remains a placeholder.
+accepted MPY-06 policy. The exact MicroPython v1.28.0 Unix-standard module now
+compile-proves the canonical alias and contained exception-hook boundary.
+Ratification remains gated on subscription/Safe Turn integration and the
+generic Stage/Actor binding; those surfaces remain placeholders.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-04 stage directions and MPY-05 cue runtime.
@@ -269,10 +270,11 @@ shim owns MicroPython C API calls; core/runtime Rust owns no `mp_obj_t`.
 - **PCDN-MPY-06-002 — Closed 2026-08-16:** §8.2 forbids synchronous runtime
   reads and transparent snapshot-cache substitution during Callback Drain
   Mode while preserving immutable event, identity, and descriptor data.
-- **PCDN-MPY-06-003 — Policy closed 2026-08-16; evidence open:** §8.2 uses a
-  configurable binding hook plus `mp_obj_print_exception` on
-  `MICROPY_ERROR_PRINTER` as the portable default. Host MicroPython compile and
-  exception-injection proof remain required before ratification.
+- **PCDN-MPY-06-003 — Closed with evidence 2026-08-16:** §8.2 uses a
+  configurable VM-rooted binding hook plus `mp_obj_print_exception` on
+  `MICROPY_ERROR_PRINTER` as the portable default. The pinned v1.28.0
+  Unix-standard host build and exception-injection fixture prove independent
+  callback/hook containment and continued later delivery.
 - **PCDN-MPY-06-004 — Closed 2026-08-16:** §5 requires the complete generic
   Stage/Actor API, prohibits runtime class synthesis and handwritten widget
   wrappers, and permits descriptor-generated static conveniences by profile.
@@ -368,3 +370,31 @@ The accepted surface prevents Python ergonomics from becoming a second actor
 schema or queue authority. Endpoint-wide polling preserves the ordering
 guaranteed by MPY-05, while explicit callback restrictions and a C-level
 exception fallback keep VM behavior bounded and portable across targets.
+
+### 0.2.1 — 2026-08-16 — Host module boundary proved
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** evidence
+
+**Touches:** INV-MPY-06-3, INV-MPY-06-4, PCDN-MPY-06-001, PCDN-MPY-06-003, §0, §5, §8.2, §11, §15
+
+**Commits:** `893c8a6`, `f8d5680`, `42bb7cb`
+
+**Summary:** Records a reproducible actual-MicroPython host build in which
+`rlvgl` and `mp_rlvgl` resolve to one canonical module object and callback
+exceptions cannot unwind through the C/Rust boundary.
+
+#### Evidence
+
+`make mpy-host-test` verifies the exact v1.28.0 source pin, Unix standard
+variant, compiler and Rust target provenance, one linked Rust archive, module
+identity, VM-rooted callable retention, soft-reset-safe alias initialization,
+default exception printing, hook-failure containment, and later callback
+delivery. A red control that bypassed containment terminated before the later
+callback; the restored implementation passes.
+
+What deliberately did not change: `_dispatch_callback` is a temporary
+conformance seam, not the endpoint poll implementation; callable teardown,
+cue context, binding statistics, structured error mapping, and the generic
+Stage/Actor/Subscription/Transaction surface remain open.

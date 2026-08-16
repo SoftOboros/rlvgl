@@ -6,8 +6,10 @@ MPY-05-CUES-SAFE-SCHEDULING.md - Event descriptors, subscriptions, cue queues, a
 
 **Status:** Ratified 2026-08-16. Normative for event descriptors,
 subscriptions, predeclared propagation policy, safe turns, endpoint-owned cue
-queues, observable overflow, and teardown. Implementation and conformance
-evidence remain separately gated.
+queues, observable overflow, and teardown. The endpoint queue, causality
+envelope, bounded drain, reserve, coalescing, and explicit loss/fault substrate
+has focused implementation evidence. Subscription, native-emission, Safe Turn,
+and teardown integration remain open.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 actor registry and LPAR-04/05/06 native event semantics.
@@ -365,3 +367,30 @@ Stages, while pre-dispatch rejection guarantees that an unreported actor
 mutation cannot occur when a required non-coalescible cue lacks capacity.
 Implementation and conformance evidence remain required before MPY-05 coverage
 becomes Current or MPY-06 consumes the cue surface.
+
+### 0.2.1 — 2026-08-16 — Endpoint queue substrate implemented
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** evidence
+
+**Touches:** INV-MPY-05-3, INV-MPY-05-5, §0, §8–§9, §15
+
+**Commits:** `0199a80`
+
+**Summary:** Records the bounded endpoint-owned Cue queue, canonical causality
+metadata envelope, Critical Reserve, per-Stage ordinary quota, sequence-ordered
+drain, explicit loss barrier, and descriptor-keyed latest-value coalescing.
+
+#### Evidence
+
+Eleven focused queue tests cover ordinary/critical isolation, cross-Stage
+ordering, exact-key tail coalescing, protocol-envelope round trips,
+Stage/native-event causality regression, byte/cue drain bounds, explicit loss
+notices, endpoint faults, and allocation/capacity failures. Strict Clippy and
+the complete core library suite pass.
+
+What deliberately did not change: the queue does not select raw delivery
+policy for callers, install subscriptions, observe native dispatch, reserve a
+worst-case input emission set, remove Stage-owned pending records, or invoke a
+VM. Those remain the next MPY-05/06 integration slices.

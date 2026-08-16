@@ -1,5 +1,5 @@
 {
-  "edge_count": 490,
+  "edge_count": 504,
   "edges": [
     {
       "edge_type": "defines",
@@ -1754,1220 +1754,1318 @@
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 230,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 231,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
       "line": 232,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
+      "target": "INV-MPY-04-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 233,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
+      "target": "INV-MPY-04-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 234,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
+      "target": "INV-MPY-04-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 235,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
+      "target": "INV-MPY-04-4"
     },
     {
-      "edge_type": "cites",
+      "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 259,
+      "line": 236,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-001"
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 237,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 261,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-002"
+      "target": "PCDN-MPY-04-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 263,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 265,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 270,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 271,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 272,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
+      "target": "INV-MPY-04-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 273,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
+      "target": "INV-MPY-04-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 274,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
+      "target": "INV-MPY-04-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 275,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 307,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 307,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 307,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 307,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 307,
+      "line": 276,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 307,
+      "line": 277,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 307,
+      "line": 278,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 307,
+      "line": 278,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 307,
+      "line": 278,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 335,
+      "line": 278,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 335,
+      "line": 278,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 309,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 309,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 309,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 337,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 337,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 344,
+      "line": 346,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 143,
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 145,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 234,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 235,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 236,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
+      "target": "INV-MPY-05-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 237,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
+      "target": "INV-MPY-05-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 238,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
+      "target": "INV-MPY-05-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 239,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 240,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 241,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 262,
+      "line": 264,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 267,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 268,
+      "line": 270,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 274,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 275,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 275,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
       "line": 276,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
+      "target": "INV-MPY-05-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 277,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
+      "target": "INV-MPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 277,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 278,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
+      "target": "INV-MPY-05-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 279,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 313,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 313,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 313,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 313,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
+      "line": 280,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
+      "line": 281,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
+      "line": 282,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
+      "line": 282,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
+      "line": 282,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 313,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 340,
+      "line": 282,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 340,
+      "line": 282,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 315,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 342,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 342,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 349,
+      "line": 351,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 356,
+      "line": 358,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-004"
     },
     {
-      "edge_type": "defines",
+      "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 237,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-1"
+      "line": 377,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 377,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 238,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-2"
+      "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 239,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-3"
+      "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 240,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-4"
+      "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 241,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-5"
+      "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 242,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 243,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 267,
+      "line": 268,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 269,
+      "line": 270,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 272,
+      "line": 273,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 276,
+      "line": 278,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 279,
+      "line": 281,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-005"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 285,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 286,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 287,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-3"
+      "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 288,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-4"
+      "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 289,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-5"
+      "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 290,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 291,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 291,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-10"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 291,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 291,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "PCDN-MPY-06-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 291,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "PCDN-MPY-06-005"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 318,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 318,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 318,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "INV-MPY-06-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 318,
-      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 292,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 293,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 293,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 293,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 293,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 293,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 320,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 318,
+      "line": 320,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 357,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 20,
-      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "PCDN-MPY-003"
+      "line": 380,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-3"
     },
     {
-      "edge_type": "defines",
+      "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 170,
+      "line": 380,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 21,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-1"
+      "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 171,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-2"
+      "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 172,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-3"
+      "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 173,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-4"
+      "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 174,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-5"
+      "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 175,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 176,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 208,
+      "line": 209,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 212,
+      "line": 213,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 215,
+      "line": 216,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 222,
-      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 223,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-2"
+      "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 224,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-3"
+      "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 225,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-4"
+      "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 226,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-5"
+      "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 227,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
-      "target": "INV-MPY-07-6"
+      "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 228,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 229,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 228,
+      "line": 229,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 228,
+      "line": 229,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 228,
+      "line": 229,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 256,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 276,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 299,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-07-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 305,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "defines",
@@ -3434,14 +3532,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 30,
+    "amendment": 34,
     "gate": 80,
     "invariant": 65,
     "nongoal": 43,
     "rationale": 25,
     "term": 76
   },
-  "object_count": 319,
+  "object_count": 323,
   "objects": [
     {
       "attrs": {
@@ -5987,7 +6085,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 47,
+      "line": 49,
       "obj_id": "mpy:term:mutation effect",
       "text": "Descriptor bitset declaring whether a property/action may affect draw, layout, tree, focus, asset state, or snapshot revision."
     },
@@ -5999,7 +6097,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 48,
+      "line": 50,
       "obj_id": "mpy:term:layout direction",
       "text": "Neutral value representation of LPAR-10 container configuration and item hints authored by the director."
     },
@@ -6011,7 +6109,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 49,
+      "line": 51,
       "obj_id": "mpy:term:geometry result",
       "text": "Read-only computed bounds and optional measurement/layout diagnostics for one actor."
     },
@@ -6023,7 +6121,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 50,
+      "line": 52,
       "obj_id": "mpy:term:stage revision",
       "text": "Monotonic counter advanced once for each committed visible stage mutation."
     },
@@ -6035,7 +6133,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 51,
+      "line": 53,
       "obj_id": "mpy:term:consistent snapshot",
       "text": "Snapshot page set tied to one Stage Revision, with explicit restart if the revision becomes unavailable."
     },
@@ -6053,7 +6151,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 230,
+      "line": 232,
       "obj_id": "INV-MPY-04-1",
       "text": "Every property/action command MUST validate descriptor ID, applicability, value schema, access, and capacity before native mutation."
     },
@@ -6071,7 +6169,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 231,
+      "line": 233,
       "obj_id": "INV-MPY-04-2",
       "text": "Requested layout MUST be writable and separately readable while computed geometry MUST remain read-only."
     },
@@ -6089,7 +6187,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 232,
+      "line": 234,
       "obj_id": "INV-MPY-04-3",
       "text": "One accepted mutation batch MUST advance Stage Revision once and MUST expose no intermediate tree, property, or geometry state."
     },
@@ -6107,7 +6205,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 233,
+      "line": 235,
       "obj_id": "INV-MPY-04-4",
       "text": "Mutation Effects and actual geometry changes MUST produce deterministic invalidation covering old and new visual extents."
     },
@@ -6125,7 +6223,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 234,
+      "line": 236,
       "obj_id": "INV-MPY-04-5",
       "text": "A snapshot MUST be deterministic at one Stage Revision and MUST explicitly fail or mark truncation rather than mix revisions or omit data silently."
     },
@@ -6143,7 +6241,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 235,
+      "line": 237,
       "obj_id": "INV-MPY-04-6",
       "text": "Tree commands MUST preserve one-parent/root ownership, cycle rejection, child policy, and unaffected actor identities."
     },
@@ -6152,7 +6250,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 251,
+      "line": 253,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:1",
       "text": "No callback delivery. MPY-04 records subscriptions in snapshots only"
     },
@@ -6161,7 +6259,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 253,
+      "line": 255,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:2",
       "text": "No arbitrary theme authoring. Local actor style is in scope; theme graph"
     },
@@ -6170,7 +6268,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 255,
+      "line": 257,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:3",
       "text": "No snapshot restore. Rebuilds use validated create/mutation batches."
     },
@@ -6179,7 +6277,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 256,
+      "line": 258,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:4",
       "text": "No writable computed geometry. Absolute positioning, if supported, is a"
     },
@@ -6193,8 +6291,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 270,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:270",
+      "line": 272,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:272",
       "text": "`INV-MPY-04-1` generic property/action validation is accepted."
     },
     {
@@ -6207,8 +6305,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 271,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:271",
+      "line": 273,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:273",
       "text": "`INV-MPY-04-2` freezes requested layout versus computed geometry."
     },
     {
@@ -6221,8 +6319,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 272,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:272",
+      "line": 274,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:274",
       "text": "`INV-MPY-04-3` Stage Revision and atomic visibility are accepted."
     },
     {
@@ -6235,8 +6333,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 273,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:273",
+      "line": 275,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:275",
       "text": "`INV-MPY-04-4` invalidation ownership is accepted."
     },
     {
@@ -6249,8 +6347,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 274,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:274",
+      "line": 276,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:276",
       "text": "`INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted."
     },
     {
@@ -6263,8 +6361,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 275,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:275",
+      "line": 277,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:277",
       "text": "`INV-MPY-04-6` tree-command integrity is accepted."
     },
     {
@@ -6279,8 +6377,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 276,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:276",
+      "line": 278,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:278",
       "text": "PCDN-MPY-04-001 through PCDN-MPY-04-003 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`."
     },
     {
@@ -6318,7 +6416,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 301,
+      "line": 303,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.0",
       "text": "Drafts generic tree/property/action/style/state/layout directions,"
     },
@@ -6340,7 +6438,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 301,
+      "line": 303,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.0-rationale",
       "text": "MicroPython can set the stage only if all durable UI intent lowers to generic\nvalidated commands while actors and rlvgl retain measurement, layout, native\nbehavior, and computed state. A revisioned snapshot gives bindings and tests one\nauthoritative view without transferring runtime ownership."
     },
@@ -6372,7 +6470,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 322,
+      "line": 324,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.1",
       "text": "Records the completed MPY-03 production registry, actor-local"
     },
@@ -6414,7 +6512,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 338,
+      "line": 340,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.0",
       "text": "Ratifies the MPY-04 command, transaction, layout, geometry, and"
     },
@@ -6439,9 +6537,46 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 338,
+      "line": 340,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.0-rationale",
       "text": "The accepted boundary preserves rlvgl ownership of runtime states, native\nscroll/focus machinery, style selectors, computed geometry, and invalidation.\nIt still gives the director complete durable intent through descriptor-checked\ncommands and deterministic snapshots. Implementation and conformance evidence\nremain required before MPY-04 coverage becomes Current or MPY-06 consumes the\nsurface."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "evidence",
+        "chronological_rank": 4,
+        "commits": [
+          "`0199a80`"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.2.1",
+        "shape": "block",
+        "status": "in-process substrate implemented",
+        "summary": "Records the descriptor-driven Stage direction, transaction,",
+        "touches": [
+          "INV-MPY-04-1",
+          "INV-MPY-04-2",
+          "INV-MPY-04-3",
+          "INV-MPY-04-4",
+          "INV-MPY-04-5",
+          "INV-MPY-04-6",
+          "§0",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 365,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.1",
+      "text": "Records the descriptor-driven Stage direction, transaction,"
     },
     {
       "attrs": {
@@ -6451,7 +6586,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 54,
       "obj_id": "mpy:term:runtime event",
       "text": "Native event processed synchronously by rlvgl through its existing object/widget semantics."
     },
@@ -6463,7 +6598,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 53,
+      "line": 55,
       "obj_id": "mpy:term:cue record",
       "text": "Immutable typed notification derived from a completed Runtime Event and addressed to one subscription/callback token."
     },
@@ -6475,7 +6610,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 56,
       "obj_id": "mpy:term:subscription policy",
       "text": "Predeclared phase/filter/propagation/delivery/coalescing configuration enforced natively before the Python callback runs."
     },
@@ -6487,7 +6622,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 55,
+      "line": 57,
       "obj_id": "mpy:term:critical cue",
       "text": "Cue that cannot be coalesced or silently lost, including lifecycle, subscription teardown, and overflow/recovery notices."
     },
@@ -6499,7 +6634,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 58,
       "obj_id": "mpy:term:coalescible cue",
       "text": "Descriptor-authorized high-rate cue for which multiple pending records may be replaced by one record carrying explicit coalescing metadata."
     },
@@ -6511,7 +6646,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 57,
+      "line": 59,
       "obj_id": "mpy:term:cue drain",
       "text": "VM-side retrieval of an ordered bounded set of queued cues; invocation belongs to MPY-06."
     },
@@ -6523,7 +6658,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 58,
+      "line": 60,
       "obj_id": "mpy:term:safe turn",
       "text": "Runtime boundary at which validated commands may mutate the stage outside active native dispatch."
     },
@@ -6541,7 +6676,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 234,
+      "line": 236,
       "obj_id": "INV-MPY-05-1",
       "text": "Native event routing MUST complete without invoking Python, and each Python callback MUST run only after its immutable cue is dequeued in a VM-safe context."
     },
@@ -6560,7 +6695,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 235,
+      "line": 237,
       "obj_id": "INV-MPY-05-2",
       "text": "Callback return values MUST NOT retroactively change native propagation; any consume/stop policy MUST be validated and installed before the Runtime Event."
     },
@@ -6578,7 +6713,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 236,
+      "line": 238,
       "obj_id": "INV-MPY-05-3",
       "text": "Cue ordering MUST be deterministic by native phase, emission, subscription registration, and monotonic CueSequence."
     },
@@ -6596,7 +6731,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 237,
+      "line": 239,
       "obj_id": "INV-MPY-05-4",
       "text": "Structural/property commands requested by a callback MUST NOT apply until the callback returns and the next Safe Turn admits them."
     },
@@ -6614,7 +6749,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 238,
+      "line": 240,
       "obj_id": "INV-MPY-05-5",
       "text": "Coalescing or loss MUST follow descriptor policy and MUST be observable through sequence/merge/loss metadata; silent cue loss is forbidden."
     },
@@ -6632,7 +6767,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 239,
+      "line": 241,
       "obj_id": "INV-MPY-05-6",
       "text": "Actor or Stage teardown MUST remove subscriptions and release callback tokens exactly once without calling the VM from teardown context."
     },
@@ -6641,7 +6776,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 254,
+      "line": 256,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:1",
       "text": "No VM invocation. MPY-05 produces cues; MPY-06 invokes callables."
     },
@@ -6650,7 +6785,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 255,
+      "line": 257,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:2",
       "text": "No Python-defined native handlers. Python cannot execute inside"
     },
@@ -6659,7 +6794,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 257,
+      "line": 259,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:3",
       "text": "No universal prevent-default. Initial descriptors do not promise a hook"
     },
@@ -6668,7 +6803,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 259,
+      "line": 261,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:4",
       "text": "No silent best-effort queue. Footprint limits may cause explicit loss or"
     },
@@ -6682,8 +6817,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 274,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:274",
+      "line": 276,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:276",
       "text": "`INV-MPY-05-1` queued VM-safe callback boundary is accepted."
     },
     {
@@ -6696,8 +6831,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 275,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:275",
+      "line": 277,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:277",
       "text": "`INV-MPY-05-2` predeclared propagation policy resolves PCDN-MPY-004 direction."
     },
     {
@@ -6710,8 +6845,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 276,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:276",
+      "line": 278,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:278",
       "text": "`INV-MPY-05-3` phase/subscription/sequence ordering is accepted."
     },
     {
@@ -6724,8 +6859,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 277,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:277",
+      "line": 279,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:279",
       "text": "`INV-MPY-05-4` callback mutation deferral is accepted."
     },
     {
@@ -6738,8 +6873,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 278,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:278",
+      "line": 280,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:280",
       "text": "`INV-MPY-05-5` queue classes and explicit overflow/coalescing are accepted."
     },
     {
@@ -6752,8 +6887,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 279,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:279",
+      "line": 281,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:281",
       "text": "`INV-MPY-05-6` subscription/token teardown is accepted."
     },
     {
@@ -6768,8 +6903,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 280,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:280",
+      "line": 282,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:282",
       "text": "PCDN-MPY-05-001 through PCDN-MPY-05-003 are resolved without weakening `INV-MPY-5`, `INV-MPY-6`, or `INV-MPY-8`."
     },
     {
@@ -6808,7 +6943,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 307,
+      "line": 309,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.0",
       "text": "Drafts event descriptors, tokenized subscriptions, predeclared"
     },
@@ -6831,7 +6966,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 307,
+      "line": 309,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.0-rationale",
       "text": "MicroPython callbacks must orchestrate later UI behavior without entering the\nnative real-time path. Tokenized immutable cues preserve event semantics across\nsame-core and dual-core deployments while explicit queue classes make embedded\ncapacity failures observable and testable."
     },
@@ -6863,7 +6998,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 328,
+      "line": 330,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.1",
       "text": "Records the completed MPY-03 production registry, actor lifecycle,"
     },
@@ -6909,7 +7044,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 343,
+      "line": 345,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.0",
       "text": "Ratifies descriptor-declared consumable events, endpoint-owned"
     },
@@ -6938,9 +7073,43 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 343,
+      "line": 345,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.0-rationale",
       "text": "The accepted policy preserves native synchronous event semantics and keeps\nPython invocation outside dispatch and interrupt contexts. Endpoint-wide\ncapacity makes Critical Reserve and overflow accounting coherent across\nStages, while pre-dispatch rejection guarantees that an unreported actor\nmutation cannot occur when a required non-coalescible cue lacks capacity.\nImplementation and conformance evidence remain required before MPY-05 coverage\nbecomes Current or MPY-06 consumes the cue surface."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "evidence",
+        "chronological_rank": 4,
+        "commits": [
+          "`0199a80`"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.2.1",
+        "shape": "block",
+        "status": "endpoint queue substrate implemented",
+        "summary": "Records the bounded endpoint-owned Cue queue, canonical causality",
+        "touches": [
+          "INV-MPY-05-3",
+          "INV-MPY-05-5",
+          "§0",
+          "§8–§9",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 371,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.1",
+      "text": "Records the bounded endpoint-owned Cue queue, canonical causality"
     },
     {
       "attrs": {
@@ -6950,7 +7119,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 53,
       "obj_id": "mpy:term:python stage",
       "text": "MicroPython wrapper holding an endpoint/session reference and `StageId`; primary director entry point."
     },
@@ -6962,7 +7131,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 53,
+      "line": 54,
       "obj_id": "mpy:term:python actor",
       "text": "Lightweight wrapper holding Python Stage plus `ObjectId`; every operation revalidates runtime identity."
     },
@@ -6974,7 +7143,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 55,
       "obj_id": "mpy:term:python subscription",
       "text": "Closeable wrapper holding Stage, `SubscriptionId`, and `CallbackId`; adapter retains the callable while active."
     },
@@ -6986,7 +7155,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 55,
+      "line": 56,
       "obj_id": "mpy:term:python transaction",
       "text": "Context manager collecting neutral operations and batch-local actor wrappers before one atomic commit."
     },
@@ -6998,7 +7167,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 57,
       "obj_id": "mpy:term:callback drain mode",
       "text": "Period while `Stage.poll()` invokes queued callables and defers their mutations until each callback returns."
     },
@@ -7010,7 +7179,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 57,
+      "line": 58,
       "obj_id": "mpy:term:binding error",
       "text": "Python exception carrying the stable protocol error class, request/operation context, and optional diagnostic text."
     },
@@ -7029,7 +7198,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 237,
+      "line": 238,
       "obj_id": "INV-MPY-06-1",
       "text": "The Python API MUST derive actor names, constructors, properties, actions, and events from the canonical descriptor catalog and MUST NOT maintain an independent widget schema."
     },
@@ -7047,7 +7216,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 238,
+      "line": 239,
       "obj_id": "INV-MPY-06-2",
       "text": "Python Stage/Actor wrappers MUST contain only neutral identity/session state and MUST revalidate every runtime operation."
     },
@@ -7065,7 +7234,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 239,
+      "line": 240,
       "obj_id": "INV-MPY-06-3",
       "text": "The adapter MUST retain each callable exactly while its subscription is active and MUST release it exactly once at a VM-safe point."
     },
@@ -7084,7 +7253,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 240,
+      "line": 241,
       "obj_id": "INV-MPY-06-4",
       "text": "Python callbacks MUST run only through `Stage.poll()` or an equivalent VM-scheduled poll and MUST NOT unwind or call through the Rust/C ABI boundary."
     },
@@ -7102,7 +7271,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 241,
+      "line": 242,
       "obj_id": "INV-MPY-06-5",
       "text": "Mutations requested during a callback MUST be submitted only after that callback returns; synchronous runtime reads in Callback Drain Mode MUST fail explicitly in v1."
     },
@@ -7120,7 +7289,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 242,
+      "line": 243,
       "obj_id": "INV-MPY-06-6",
       "text": "Every protocol error MUST map to a stable Python exception carrying the original error code/context without collapsing all failures to `ValueError`."
     },
@@ -7129,7 +7298,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 261,
+      "line": 262,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:1",
       "text": "No Python draw/measure handlers. Native actor execution remains required."
     },
@@ -7138,7 +7307,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 262,
+      "line": 263,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:2",
       "text": "No required CPython API. PyO3 is optional convenience."
     },
@@ -7147,7 +7316,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 263,
+      "line": 264,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:3",
       "text": "No implicit actor deletion by GC. Stage lifetime is explicit."
     },
@@ -7156,7 +7325,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 264,
+      "line": 265,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:4",
       "text": "No hidden event loop dependency. Explicit `Stage.poll()` remains"
     },
@@ -7170,8 +7339,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 285,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:285",
+      "line": 287,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:287",
       "text": "`INV-MPY-06-1` descriptor-derived Python API is accepted."
     },
     {
@@ -7184,8 +7353,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 286,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:286",
+      "line": 288,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:288",
       "text": "`INV-MPY-06-2` wrapper identity and explicit native lifetime are accepted."
     },
     {
@@ -7198,8 +7367,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 287,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:287",
+      "line": 289,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:289",
       "text": "`INV-MPY-06-3` callable retention/release behavior is accepted."
     },
     {
@@ -7212,8 +7381,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 288,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:288",
+      "line": 290,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:290",
       "text": "`INV-MPY-06-4` explicit endpoint-wide poll and exception containment are accepted."
     },
     {
@@ -7226,8 +7395,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 289,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:289",
+      "line": 291,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:291",
       "text": "`INV-MPY-06-5` Callback Drain Mode restrictions are accepted."
     },
     {
@@ -7240,8 +7409,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 290,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:290",
+      "line": 292,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:292",
       "text": "`INV-MPY-06-6` exception hierarchy and code preservation are accepted."
     },
     {
@@ -7256,8 +7425,8 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 291,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:291",
+      "line": 293,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:293",
       "text": "PCDN-MPY-06-001 through PCDN-MPY-06-005 are resolved without weakening `INV-MPY-1`, `INV-MPY-5`, or `INV-MPY-10`."
     },
     {
@@ -7298,7 +7467,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 312,
+      "line": 314,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.0",
       "text": "Drafts the primary `rlvgl` MicroPython module, Stage/Actor/"
     },
@@ -7323,7 +7492,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 312,
+      "line": 314,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.0-rationale",
       "text": "The director API must feel native to Python while remaining a projection of the\nneutral runtime. Explicit wrapper and callback lifetimes prevent garbage\ncollection, VM scheduling, or C ABI details from changing actor behavior across\nsame-core and dual-core targets."
     },
@@ -7355,7 +7524,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 334,
+      "line": 336,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.1",
       "text": "Records ratification of the MPY-04/05 policy dependencies and"
     },
@@ -7399,7 +7568,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 349,
+      "line": 351,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.2.0",
       "text": "Records owner acceptance of the complete MPY-06 policy, including"
     },
@@ -7426,9 +7595,49 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 349,
+      "line": 351,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.2.0-rationale",
       "text": "The accepted surface prevents Python ergonomics from becoming a second actor\nschema or queue authority. Endpoint-wide polling preserves the ordering\nguaranteed by MPY-05, while explicit callback restrictions and a C-level\nexception fallback keep VM behavior bounded and portable across targets."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "evidence",
+        "chronological_rank": 4,
+        "commits": [
+          "`893c8a6`",
+          "`f8d5680`",
+          "`42bb7cb`"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.2.1",
+        "shape": "block",
+        "status": "host module boundary proved",
+        "summary": "Records a reproducible actual-MicroPython host build in which",
+        "touches": [
+          "INV-MPY-06-3",
+          "INV-MPY-06-4",
+          "PCDN-MPY-06-001",
+          "PCDN-MPY-06-003",
+          "§0",
+          "§5",
+          "§8.2",
+          "§11",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 374,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.2.1",
+      "text": "Records a reproducible actual-MicroPython host build in which"
     },
     {
       "attrs": {
@@ -7438,7 +7647,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 49,
+      "line": 50,
       "obj_id": "mpy:term:canonical scenario",
       "text": "Versioned declarative inputs plus expected semantic checkpoints runnable through direct runtime and MicroPython paths."
     },
@@ -7450,7 +7659,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 50,
+      "line": 51,
       "obj_id": "mpy:term:direct driver",
       "text": "Host adapter that submits neutral frames directly to the in-process runtime without Python conversion."
     },
@@ -7462,7 +7671,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 51,
+      "line": 52,
       "obj_id": "mpy:term:micropython driver",
       "text": "Host-build MicroPython VM/module path that runs the public Python script and captures neutral frames/results/cues."
     },
@@ -7474,7 +7683,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 53,
       "obj_id": "mpy:term:trace equivalence",
       "text": "Equality after removing explicitly nondeterministic transport timing while retaining IDs, revisions, results, cue order, errors, and payloads."
     },
@@ -7486,7 +7695,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 53,
+      "line": 54,
       "obj_id": "mpy:term:semantic checkpoint",
       "text": "Named point containing expected snapshot, cue/result suffix, geometry, and optional frame evidence."
     },
@@ -7498,7 +7707,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 55,
       "obj_id": "mpy:term:golden update record",
       "text": "Reviewed artifact explaining why an expected trace/snapshot/image changed and which invariant or descriptor revision authorizes it."
     },
@@ -7516,7 +7725,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 170,
+      "line": 171,
       "obj_id": "INV-MPY-07-1",
       "text": "Every required Canonical Scenario MUST run through Direct Driver and actual MicroPython Driver with equivalent logical traces."
     },
@@ -7534,7 +7743,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 171,
+      "line": 172,
       "obj_id": "INV-MPY-07-2",
       "text": "Scenario execution MUST use deterministic logical time, reset allocation state, and contain no pointer, wall-clock, or host-path-dependent expected values."
     },
@@ -7553,7 +7762,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 172,
+      "line": 173,
       "obj_id": "INV-MPY-07-3",
       "text": "A binding divergence MUST fail at the first differing Result, Cue, revision, snapshot field, geometry value, or frame artifact and MUST NOT be hidden by broad tolerance."
     },
@@ -7571,7 +7780,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 173,
+      "line": 174,
       "obj_id": "INV-MPY-07-4",
       "text": "Golden artifacts MUST change only with a Golden Update Record citing the authorizing descriptor/spec revision and affected MPY rows."
     },
@@ -7589,7 +7798,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 174,
+      "line": 175,
       "obj_id": "INV-MPY-07-5",
       "text": "Simulator evidence MUST prove requested layout is performed natively and callback mutations appear only after the callback and next Safe Turn."
     },
@@ -7607,7 +7816,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 175,
+      "line": 176,
       "obj_id": "INV-MPY-07-6",
       "text": "Performance characterization MUST measure 50-, 250-, and 1,000-actor lookup before MPY-03 storage optimization or MPY-08 admission."
     },
@@ -7616,7 +7825,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 202,
+      "line": 203,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:1",
       "text": "No board transport. MPY-07 is in-process/same-core."
     },
@@ -7625,7 +7834,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 203,
+      "line": 204,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:2",
       "text": "No wall-clock UI loop. Logical ticks and synthetic input are mandatory."
     },
@@ -7634,7 +7843,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 204,
+      "line": 205,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:3",
       "text": "No performance target invention. Measure first; MPY-09 gates later."
     },
@@ -7643,7 +7852,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 205,
+      "line": 206,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:4",
       "text": "No CPython equivalence requirement. It may be added without changing the"
     },
@@ -7657,8 +7866,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 222,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:222",
+      "line": 223,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:223",
       "text": "`INV-MPY-07-1` requires actual MicroPython/direct trace equivalence."
     },
     {
@@ -7671,8 +7880,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 223,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:223",
+      "line": 224,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:224",
       "text": "`INV-MPY-07-2` deterministic scenario inputs and expected artifacts are accepted."
     },
     {
@@ -7685,8 +7894,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 224,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:224",
+      "line": 225,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:225",
       "text": "`INV-MPY-07-3` first-divergence comparison policy is accepted."
     },
     {
@@ -7699,8 +7908,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 225,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:225",
+      "line": 226,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:226",
       "text": "`INV-MPY-07-4` golden update metadata is accepted."
     },
     {
@@ -7713,8 +7922,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 226,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:226",
+      "line": 227,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:227",
       "text": "`INV-MPY-07-5` layout/callback ordering checkpoints are accepted."
     },
     {
@@ -7727,8 +7936,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 227,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:227",
+      "line": 228,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:228",
       "text": "`INV-MPY-07-6` benchmark sizes resolve the MPY-03 storage trigger."
     },
     {
@@ -7741,8 +7950,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 228,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:228",
+      "line": 229,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:229",
       "text": "PCDN-MPY-07-001 through PCDN-MPY-07-003 are resolved without weakening `INV-MPY-7` or resolved PCDN-MPY-003."
     },
     {
@@ -7780,7 +7989,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 249,
+      "line": 250,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.1.0",
       "text": "Drafts the direct-runtime versus actual-MicroPython scenario"
     },
@@ -7802,7 +8011,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 249,
+      "line": 250,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.1.0-rationale",
       "text": "Separating semantic proof from board transport makes failures attributable and\nprevents a CPython convenience layer from defining device behavior. Shared\nscenarios become the transport-independent oracle replayed by MPY-08."
     },
@@ -7845,7 +8054,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 269,
+      "line": 270,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.2.0",
       "text": "Records owner acceptance of the complete MPY-07 policy, pins the"
     },
@@ -7871,9 +8080,44 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 269,
+      "line": 270,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.2.0-rationale",
       "text": "An auditable upstream pin prevents VM drift from masquerading as binding\nbehavior. A raw software framebuffer keeps pixel evidence deterministic, and\nexplicit Git/CI limits preserve reviewability without making regenerated\nbinary payloads permanent repository weight."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "evidence",
+        "chronological_rank": 3,
+        "commits": [
+          "`893c8a6`",
+          "`f8d5680`",
+          "`42bb7cb`"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.2.1",
+        "shape": "block",
+        "status": "pinned host toolchain proved",
+        "summary": "Records a clean, reproducible build of the canonical module",
+        "touches": [
+          "PCDN-MPY-07-001",
+          "§0",
+          "§5",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 293,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.2.1",
+      "text": "Records a clean, reproducible build of the canonical module"
     },
     {
       "attrs": {

@@ -6,8 +6,10 @@ MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md - Tree, property, action, layout, and s
 
 **Status:** Ratified 2026-08-16. Normative for tree, property, action, object
 metadata, local-style, requested-layout, computed-geometry, atomic-commit, and
-snapshot semantics. Implementation and conformance evidence remain separately
-gated.
+snapshot semantics. The in-process direction, revision, tree, requested-layout,
+geometry, invalidation, and snapshot substrate has focused implementation
+evidence. Local-style projection, subscription metadata in snapshots, and the
+complete cross-driver conformance gate remain open.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -359,3 +361,30 @@ It still gives the director complete durable intent through descriptor-checked
 commands and deterministic snapshots. Implementation and conformance evidence
 remain required before MPY-04 coverage becomes Current or MPY-06 consumes the
 surface.
+
+### 0.2.1 — 2026-08-16 — In-process substrate implemented
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** evidence
+
+**Touches:** INV-MPY-04-1, INV-MPY-04-2, INV-MPY-04-3, INV-MPY-04-4, INV-MPY-04-5, INV-MPY-04-6, §0, §15
+
+**Commits:** `0199a80`
+
+**Summary:** Records the descriptor-driven Stage direction, transaction,
+revision, tree, requested-layout, geometry, invalidation, and deterministic
+snapshot substrate for the five proof actors.
+
+#### Evidence
+
+Focused tests cover collective actor mutation, pre-commit failure without
+state or revision change, external-borrow rejection, read-only computed
+geometry, reparent/reorder/root/delete integrity, capacity and cycle checks,
+quiet lifecycle publication, and bounded Busy/Stale/truncated snapshots. The
+implementation also passes the complete `rlvgl-core` and `rlvgl-widgets`
+library suites and strict Clippy for the affected targets.
+
+What deliberately did not change: local-style directions still return
+structured `Unsupported`; snapshots do not yet project MPY-05 subscription
+metadata; and this evidence does not claim the MPY-07 byte-equivalence corpus.

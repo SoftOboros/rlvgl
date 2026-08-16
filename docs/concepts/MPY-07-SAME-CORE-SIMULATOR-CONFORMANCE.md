@@ -6,8 +6,9 @@ MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md - Host MicroPython, direct-runtime, an
 
 **Status:** Owner-accepted 2026-08-16; not yet ratified. The MicroPython pin,
 canonical software renderer, evidence-retention policy, invariants, and
-acceptance checklist are frozen. Harness implementation and a green required
-scenario corpus remain evidence gates.
+acceptance checklist are frozen. The exact v1.28.0 Unix-standard source and
+USER_C_MODULES toolchain path have a reproducible host build proof. Harness
+implementation and a green required scenario corpus remain evidence gates.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-06 must expose the real MicroPython API before binding equivalence can
@@ -288,3 +289,30 @@ An auditable upstream pin prevents VM drift from masquerading as binding
 behavior. A raw software framebuffer keeps pixel evidence deterministic, and
 explicit Git/CI limits preserve reviewability without making regenerated
 binary payloads permanent repository weight.
+
+### 0.2.1 — 2026-08-16 — Pinned host toolchain proved
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** evidence
+
+**Touches:** PCDN-MPY-07-001, §0, §5, §15
+
+**Commits:** `893c8a6`, `f8d5680`, `42bb7cb`
+
+**Summary:** Records a clean, reproducible build of the canonical module
+through the exact MicroPython v1.28.0 Unix standard port and `USER_C_MODULES`
+discovery path selected by PCDN-MPY-07-001.
+
+#### Evidence
+
+The proof checks the pinned nested source commit and cleanliness, reports the
+C compiler and Rust host target, rebuilds an isolated Unix-port directory,
+links the target-qualified Rust static archive once, runs import/alias and
+exception-containment fixtures, and publishes the resulting executable
+SHA-256.
+
+What deliberately did not change: this is toolchain/module-boundary evidence,
+not the required direct-runtime versus MicroPython scenario corpus, snapshot
+comparison, pixel oracle, or benchmark artifact set. MPY-07 remains
+unratified.
