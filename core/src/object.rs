@@ -635,6 +635,110 @@ pub enum Disposition {
     NoTarget,
 }
 
+/// Native propagation phase reported to an allocation-free event observer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DispatchPhase {
+    /// Ancestor preprocessing from root toward the target.
+    Trickle,
+    /// Target handlers followed by the target widget's semantic adapter.
+    Target,
+    /// Post-target propagation from the target toward the root.
+    Bubble,
+}
+
+/// Copy-only view of an object node at one native dispatch observation point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeNodeView {
+    /// MPY actor identity when the node belongs to a Stage Registry.
+    pub actor_identity: Option<crate::actor::ActorIdentity>,
+    /// Process-lifetime diagnostic tag, when assigned.
+    pub tag: Option<&'static str>,
+    /// Native object flags after the completed phase work.
+    pub flags: ObjectFlags,
+    /// Native object states after the completed phase work.
+    pub states: ObjectStates,
+    /// Canonical computed or intrinsic bounds at observation time.
+    pub effective_bounds: Rect,
+}
+
+impl NativeNodeView {
+    fn capture(node: &ObjectNode) -> Self {
+        Self {
+            actor_identity: node.actor_identity(),
+            tag: node.tag(),
+            flags: node.flags(),
+            states: node.states(),
+            effective_bounds: node.effective_bounds(),
+        }
+    }
+}
+
+/// One synchronous, allocation-free view of a completed native event phase.
+pub struct NativeEventObservation<'a> {
+    /// Native propagation phase that just completed.
+    pub phase: DispatchPhase,
+    /// Copy-only identity and object metadata view.
+    pub node: NativeNodeView,
+    /// Object-semantic event delivered in this dispatch.
+    pub event: &'a ObjectEvent,
+    /// Stable target/current-node dispatch context.
+    pub context: EventContext,
+    /// Whether the target widget's native semantic adapter consumed the event.
+    ///
+    /// This is observable at target phase even though consumption terminates
+    /// dispatch immediately after the observer returns.
+    pub native_consumed: bool,
+    /// Whether [`Widget::handle_event`] was invoked for this observation.
+    ///
+    /// This is true only at target phase for translated stream input. A
+    /// `PointerObject`, focused object event, container event, or direct
+    /// lifecycle delivery does not masquerade as post-widget completion.
+    pub widget_invoked: bool,
+}
+
+/// Control returned by a native observer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeObserverControl {
+    /// Continue normal native propagation.
+    Continue,
+    /// Consume according to policy registered before dispatch began.
+    ///
+    /// Implementations MUST return this only from native subscription policy
+    /// already committed before the current dispatch. It is not a hook for a
+    /// VM callback result or any other synchronous director decision.
+    ConsumePredeclared,
+}
+
+/// Allocation-free observer for native event phase completion.
+///
+/// Observers are passed into a dispatch call and are never stored in
+/// [`ObjectNode`]. Implementations may record native cue tokens, but must not
+/// call a VM or retain references from [`NativeEventObservation`].
+pub trait NativeEventObserver {
+    /// Return whether observation is active for this dispatch.
+    ///
+    /// The default is `true`; the compatibility dispatch uses a disabled
+    /// observer so it does not construct node views or add widget borrows.
+    fn enabled(&self) -> bool {
+        true
+    }
+
+    /// Observe one completed phase and apply only predeclared native consume policy.
+    fn observe(&mut self, observation: NativeEventObservation<'_>) -> NativeObserverControl;
+}
+
+struct NoopNativeObserver;
+
+impl NativeEventObserver for NoopNativeObserver {
+    fn enabled(&self) -> bool {
+        false
+    }
+
+    fn observe(&mut self, _observation: NativeEventObservation<'_>) -> NativeObserverControl {
+        NativeObserverControl::Continue
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ObjectNode
 // ---------------------------------------------------------------------------
@@ -1074,6 +1178,21 @@ impl ObjectNode {
     ///
     /// Returns `true` if any handler consumed the event.
     pub fn invoke_handlers_for(&mut self, event: &ObjectEvent) -> bool {
+        let mut observer = NoopNativeObserver;
+        self.invoke_handlers_for_observed(event, &mut observer)
+    }
+
+    /// Invoke target handlers and observe successful direct lifecycle delivery.
+    ///
+    /// If a target handler consumes the event, the observer is not called.
+    /// Otherwise it receives one target-phase observation. This helper does
+    /// not invoke [`Widget::handle_event`]; it is intended for native
+    /// lifecycle/layout events emitted outside routed dispatch.
+    pub fn invoke_handlers_for_observed<O: NativeEventObserver + ?Sized>(
+        &mut self,
+        event: &ObjectEvent,
+        observer: &mut O,
+    ) -> bool {
         let ctx = EventContext {
             target_tag: self.tag,
             current_tag: self.tag,
@@ -1083,7 +1202,15 @@ impl ObjectNode {
                 return true;
             }
         }
-        false
+        observer.enabled()
+            && observer.observe(NativeEventObservation {
+                phase: DispatchPhase::Target,
+                node: NativeNodeView::capture(self),
+                event,
+                context: ctx,
+                native_consumed: false,
+                widget_invoked: false,
+            }) == NativeObserverControl::ConsumePredeclared
     }
 
     // -----------------------------------------------------------------------
@@ -1434,14 +1561,34 @@ impl ObjectNode {
 /// 3. **Bubble** — target→root, bubble handlers; continues past the target
 ///    only when [`ObjectFlags::EVENT_BUBBLE`] is set on the target.
 ///
-/// Any handler (or `Widget::handle_event` returning `true`) that consumes the
-/// event terminates all remaining phases.
+/// Any handler that consumes the event terminates all remaining phases. A
+/// consuming `Widget::handle_event` completes target observation first when
+/// using [`dispatch_object_event_observed`], then terminates dispatch.
 ///
 /// # Dispatch constraint
 ///
 /// Mutation helpers ([`ObjectNode::append_child`] etc.) MUST NOT be called
 /// from inside a handler during an active dispatch (LPAR-02 §7.4).
 pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Disposition {
+    dispatch_object_event_observed(root, input, &mut NoopNativeObserver)
+}
+
+/// Dispatch while synchronously observing each completed native phase.
+///
+/// This is the MPY-05-compatible observation seam. It preserves
+/// [`dispatch_object_event`] routing and handler order without storing an
+/// observer, closure, or VM pointer in the object tree. At target phase the
+/// widget semantic adapter runs before observation. A consuming widget is
+/// therefore still observed with `native_consumed = true`, after which
+/// dispatch returns [`Disposition::Consumed`]. A consuming handler ends its
+/// phase immediately and is not observed. The observation layer itself does
+/// not allocate; target resolution retains the dispatcher's existing
+/// structural-path allocation.
+pub fn dispatch_object_event_observed<O: NativeEventObserver + ?Sized>(
+    root: &mut ObjectNode,
+    input: DispatchInput,
+    observer: &mut O,
+) -> Disposition {
     // ----- 1. Resolve target path -----
     let (target_path, object_event, raw_stream_event) = match resolve_target(root, &input) {
         None => return Disposition::NoTarget,
@@ -1463,6 +1610,20 @@ pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Dis
         if consumed {
             return Disposition::Consumed;
         }
+        if observe_phase(
+            root,
+            node_path,
+            PhaseCompletion {
+                phase: DispatchPhase::Trickle,
+                event: &object_event,
+                context: ctx,
+                native_consumed: false,
+                widget_invoked: false,
+            },
+            observer,
+        ) {
+            return Disposition::Consumed;
+        }
     }
 
     // ----- 3. Target phase -----
@@ -1471,17 +1632,34 @@ pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Dis
             target_tag,
             current_tag: target_tag,
         };
-        let target_node = node_at_path_mut(root, &target_path);
-        // Run target handlers.
-        for handler in &mut target_node.target_handlers {
-            if handler(&object_event, ctx) {
-                return Disposition::Consumed;
+        let widget_invoked = raw_stream_event.is_some();
+        let native_consumed = {
+            let target_node = node_at_path_mut(root, &target_path);
+            // Run target handlers.
+            for handler in &mut target_node.target_handlers {
+                if handler(&object_event, ctx) {
+                    return Disposition::Consumed;
+                }
             }
-        }
-        // For pointer stream inputs, also invoke Widget::handle_event.
-        if let Some(ref ev) = raw_stream_event
-            && target_node.widget.borrow_mut().handle_event(ev)
-        {
+            // For pointer stream inputs, invoke Widget::handle_event before
+            // observation so semantic adapters expose their committed state.
+            raw_stream_event
+                .as_ref()
+                .is_some_and(|event| target_node.widget.borrow_mut().handle_event(event))
+        };
+        let observer_consumed = observe_phase(
+            root,
+            &target_path,
+            PhaseCompletion {
+                phase: DispatchPhase::Target,
+                event: &object_event,
+                context: ctx,
+                native_consumed,
+                widget_invoked,
+            },
+            observer,
+        );
+        if native_consumed || observer_consumed {
             return Disposition::Consumed;
         }
     }
@@ -1502,6 +1680,20 @@ pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Dis
         if invoke_bubble(root, node_path, &object_event, ctx) {
             return Disposition::Consumed;
         }
+        if observe_phase(
+            root,
+            node_path,
+            PhaseCompletion {
+                phase: DispatchPhase::Bubble,
+                event: &object_event,
+                context: ctx,
+                native_consumed: false,
+                widget_invoked: false,
+            },
+            observer,
+        ) {
+            return Disposition::Consumed;
+        }
         if depth == 0 {
             break;
         }
@@ -1516,6 +1708,33 @@ pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Dis
     }
 
     Disposition::Unconsumed
+}
+
+struct PhaseCompletion<'a> {
+    phase: DispatchPhase,
+    event: &'a ObjectEvent,
+    context: EventContext,
+    native_consumed: bool,
+    widget_invoked: bool,
+}
+
+fn observe_phase<O: NativeEventObserver + ?Sized>(
+    root: &ObjectNode,
+    node_path: &[usize],
+    completion: PhaseCompletion<'_>,
+    observer: &mut O,
+) -> bool {
+    if !observer.enabled() {
+        return false;
+    }
+    observer.observe(NativeEventObservation {
+        phase: completion.phase,
+        node: NativeNodeView::capture(node_at_path(root, node_path)),
+        event: completion.event,
+        context: completion.context,
+        native_consumed: completion.native_consumed,
+        widget_invoked: completion.widget_invoked,
+    }) == NativeObserverControl::ConsumePredeclared
 }
 
 // ---------------------------------------------------------------------------
@@ -2434,6 +2653,283 @@ mod tests {
             },
         );
         assert_eq!(result, Disposition::Consumed);
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct ObservedPhase {
+        phase: DispatchPhase,
+        tag: Option<&'static str>,
+        actor_identity: Option<crate::actor::ActorIdentity>,
+        native_consumed: bool,
+        widget_invoked: bool,
+        event: ObjectEvent,
+    }
+
+    #[derive(Default)]
+    struct RecordingObserver {
+        phases: Vec<ObservedPhase>,
+        consume_at: Option<DispatchPhase>,
+    }
+
+    impl NativeEventObserver for RecordingObserver {
+        fn observe(&mut self, observation: NativeEventObservation<'_>) -> NativeObserverControl {
+            self.phases.push(ObservedPhase {
+                phase: observation.phase,
+                tag: observation.node.tag,
+                actor_identity: observation.node.actor_identity,
+                native_consumed: observation.native_consumed,
+                widget_invoked: observation.widget_invoked,
+                event: observation.event.clone(),
+            });
+            if self.consume_at == Some(observation.phase) {
+                NativeObserverControl::ConsumePredeclared
+            } else {
+                NativeObserverControl::Continue
+            }
+        }
+    }
+
+    #[test]
+    fn observed_dispatch_reports_golden_phase_order_and_identity_view() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut target = clickable("target", 0, 0);
+        target.set_flag(ObjectFlags::EVENT_BUBBLE, true);
+        let identity = crate::actor::ActorIdentity {
+            object_id: crate::actor::ObjectId::new((1u64 << 32) | 7).unwrap(),
+            type_id: crate::actor::TypeId::registered(9),
+        };
+        target.meta_mut().set_actor_identity(identity);
+        root.append_child(target);
+        let mut observer = RecordingObserver::default();
+
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::PointerObject {
+                x: 5,
+                y: 5,
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+            &mut observer,
+        );
+
+        assert_eq!(disposition, Disposition::Unconsumed);
+        assert_eq!(
+            observer
+                .phases
+                .iter()
+                .map(|record| {
+                    (
+                        record.phase,
+                        record.tag,
+                        record.native_consumed,
+                        record.widget_invoked,
+                    )
+                })
+                .collect::<Vec<_>>(),
+            [
+                (DispatchPhase::Trickle, Some("root"), false, false),
+                (DispatchPhase::Target, Some("target"), false, false),
+                (DispatchPhase::Bubble, Some("target"), false, false),
+                (DispatchPhase::Bubble, Some("root"), false, false),
+            ]
+        );
+        assert_eq!(observer.phases[1].actor_identity, Some(identity));
+    }
+
+    struct SemanticWidget {
+        bounds: Rect,
+        value: u32,
+        consume: bool,
+    }
+
+    impl Widget for SemanticWidget {
+        fn bounds(&self) -> Rect {
+            self.bounds
+        }
+
+        fn draw(&self, _renderer: &mut dyn Renderer) {}
+
+        fn handle_event(&mut self, event: &Event) -> bool {
+            if matches!(event, Event::PressRelease { .. }) {
+                self.value += 1;
+                self.consume
+            } else {
+                false
+            }
+        }
+    }
+
+    struct SemanticObserver {
+        widget: Rc<RefCell<SemanticWidget>>,
+        target_values: Vec<(u32, bool, bool)>,
+    }
+
+    impl NativeEventObserver for SemanticObserver {
+        fn observe(&mut self, observation: NativeEventObservation<'_>) -> NativeObserverControl {
+            if observation.phase == DispatchPhase::Target {
+                self.target_values.push((
+                    self.widget.borrow().value,
+                    observation.native_consumed,
+                    observation.widget_invoked,
+                ));
+            }
+            NativeObserverControl::Continue
+        }
+    }
+
+    #[test]
+    fn target_observation_runs_after_consuming_widget_semantic_mutation() {
+        let widget = Rc::new(RefCell::new(SemanticWidget {
+            bounds: rect(0, 0, 10, 10),
+            value: 0,
+            consume: true,
+        }));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut target = ObjectNode::new(widget.clone()).with_tag("semantic");
+        target.set_flag(ObjectFlags::CLICKABLE, true);
+        target.set_flag(ObjectFlags::EVENT_BUBBLE, true);
+        root.append_child(target);
+        let mut observer = SemanticObserver {
+            widget,
+            target_values: Vec::new(),
+        };
+
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::Pointer {
+                x: 5,
+                y: 5,
+                event: Event::PressRelease { x: 5, y: 5 },
+            },
+            &mut observer,
+        );
+
+        assert_eq!(disposition, Disposition::Consumed);
+        assert_eq!(observer.target_values, [(1, true, true)]);
+        assert!(
+            observer
+                .target_values
+                .iter()
+                .all(|(_, native_consumed, widget_invoked)| {
+                    *native_consumed && *widget_invoked
+                })
+        );
+    }
+
+    #[test]
+    fn pointer_object_target_is_not_reported_as_post_widget_completion() {
+        let widget = Rc::new(RefCell::new(SemanticWidget {
+            bounds: rect(0, 0, 10, 10),
+            value: 0,
+            consume: false,
+        }));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut target = ObjectNode::new(widget.clone()).with_tag("semantic");
+        target.set_flag(ObjectFlags::CLICKABLE, true);
+        root.append_child(target);
+        let mut observer = RecordingObserver::default();
+
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::PointerObject {
+                x: 5,
+                y: 5,
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+            &mut observer,
+        );
+
+        assert_eq!(disposition, Disposition::Unconsumed);
+        assert_eq!(widget.borrow().value, 0);
+        let target = observer
+            .phases
+            .iter()
+            .find(|record| record.phase == DispatchPhase::Target)
+            .expect("target phase is observed");
+        assert!(!target.widget_invoked);
+        assert!(!target.native_consumed);
+    }
+
+    #[test]
+    fn consuming_target_handler_prevents_widget_and_target_observation() {
+        let widget = Rc::new(RefCell::new(SemanticWidget {
+            bounds: rect(0, 0, 10, 10),
+            value: 0,
+            consume: false,
+        }));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut target = ObjectNode::new(widget.clone()).with_tag("semantic");
+        target.set_flag(ObjectFlags::CLICKABLE, true);
+        target.add_target_handler(|_, _| true);
+        root.append_child(target);
+        let mut observer = RecordingObserver::default();
+
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::Pointer {
+                x: 5,
+                y: 5,
+                event: Event::PressRelease { x: 5, y: 5 },
+            },
+            &mut observer,
+        );
+
+        assert_eq!(disposition, Disposition::Consumed);
+        assert_eq!(widget.borrow().value, 0);
+        assert_eq!(
+            observer
+                .phases
+                .iter()
+                .map(|record| record.phase)
+                .collect::<Vec<_>>(),
+            [DispatchPhase::Trickle]
+        );
+    }
+
+    #[test]
+    fn predeclared_observer_consumption_stops_after_observed_target() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut target = clickable("target", 0, 0);
+        target.set_flag(ObjectFlags::EVENT_BUBBLE, true);
+        root.append_child(target);
+        let mut observer = RecordingObserver {
+            phases: Vec::new(),
+            consume_at: Some(DispatchPhase::Target),
+        };
+
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::PointerObject {
+                x: 5,
+                y: 5,
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+            &mut observer,
+        );
+
+        assert_eq!(disposition, Disposition::Consumed);
+        assert_eq!(
+            observer
+                .phases
+                .iter()
+                .map(|record| record.phase)
+                .collect::<Vec<_>>(),
+            [DispatchPhase::Trickle, DispatchPhase::Target]
+        );
+    }
+
+    #[test]
+    fn direct_lifecycle_observation_runs_only_after_nonconsuming_handlers() {
+        let mut node = TestWidget::node("node", rect(0, 0, 10, 10));
+        let mut observer = RecordingObserver::default();
+        assert!(!node.invoke_handlers_for_observed(&ObjectEvent::Attached, &mut observer));
+        assert_eq!(observer.phases.len(), 1);
+        assert_eq!(observer.phases[0].phase, DispatchPhase::Target);
+        assert!(!observer.phases[0].widget_invoked);
+
+        node.add_target_handler(|_, _| true);
+        assert!(node.invoke_handlers_for_observed(&ObjectEvent::Detached, &mut observer));
+        assert_eq!(observer.phases.len(), 1);
     }
 
     // -----------------------------------------------------------------------
