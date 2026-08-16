@@ -635,6 +635,31 @@ pub enum Disposition {
     NoTarget,
 }
 
+/// Pre-dispatch object-route resolution or freshness failure.
+///
+/// Every variant is reported before trickle handlers, target handlers, widget
+/// semantics, or native observations run. The compatibility dispatch APIs map
+/// these failures to [`Disposition::NoTarget`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObjectDispatchError {
+    /// The input event has no object-semantic translation.
+    InvalidEvent,
+    /// No pointer or focused target exists below the selected root.
+    NoTarget,
+    /// A caller-supplied direct structural path is outside the selected root.
+    InvalidPath,
+    /// The selected root or resolved route is detached.
+    Detached,
+    /// The selected root or resolved route is hidden.
+    Hidden,
+    /// Tree identity or target-relevant state changed after resolution.
+    StaleRoute,
+    /// A route view or target widget is already borrowed incompatibly.
+    DispatchBusy,
+    /// Route or freshness storage could not be reserved.
+    AllocationFailed,
+}
+
 /// Native propagation phase reported to an allocation-free event observer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DispatchPhase {
@@ -669,6 +694,30 @@ impl NativeNodeView {
             flags: node.flags(),
             states: node.states(),
             effective_bounds: node.effective_bounds(),
+        }
+    }
+
+    fn try_capture(node: &ObjectNode) -> Result<Self, ObjectDispatchError> {
+        Ok(Self {
+            actor_identity: node.actor_identity(),
+            tag: node.tag(),
+            flags: node.flags(),
+            states: node.states(),
+            effective_bounds: node
+                .try_effective_bounds()
+                .ok_or(ObjectDispatchError::DispatchBusy)?,
+        })
+    }
+
+    fn capture_with_fallback(node: &ObjectNode, fallback: Self) -> Self {
+        Self {
+            actor_identity: node.actor_identity(),
+            tag: node.tag(),
+            flags: node.flags(),
+            states: node.states(),
+            effective_bounds: node
+                .try_effective_bounds()
+                .unwrap_or(fallback.effective_bounds),
         }
     }
 }
@@ -713,7 +762,8 @@ pub enum NativeObserverControl {
 ///
 /// Observers are passed into a dispatch call and are never stored in
 /// [`ObjectNode`]. Implementations may record native cue tokens, but must not
-/// call a VM or retain references from [`NativeEventObservation`].
+/// call a VM, mutate the object/widget tree, create retained widget borrows, or
+/// retain references from [`NativeEventObservation`].
 pub trait NativeEventObserver {
     /// Return whether observation is active for this dispatch.
     ///
@@ -737,6 +787,227 @@ impl NativeEventObserver for NoopNativeObserver {
     fn observe(&mut self, _observation: NativeEventObservation<'_>) -> NativeObserverControl {
         NativeObserverControl::Continue
     }
+}
+
+struct ResolvedRouteNode {
+    address: *const ObjectNode,
+    widget: Rc<RefCell<dyn Widget>>,
+    view: NativeNodeView,
+    storage: RouteStorageView,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RouteStorageView {
+    children: (*const ObjectNode, usize),
+    trickle_handlers: (*const ObjectHandler, usize),
+    target_handlers: (*const ObjectHandler, usize),
+    bubble_handlers: (*const ObjectHandler, usize),
+}
+
+impl RouteStorageView {
+    fn capture(node: &ObjectNode) -> Self {
+        Self {
+            children: (node.children.as_ptr(), node.children.len()),
+            trickle_handlers: (node.trickle_handlers.as_ptr(), node.trickle_handlers.len()),
+            target_handlers: (node.target_handlers.as_ptr(), node.target_handlers.len()),
+            bubble_handlers: (node.bubble_handlers.as_ptr(), node.bubble_handlers.len()),
+        }
+    }
+}
+
+/// One possible native phase/node observation reserved before dispatch.
+///
+/// The plan is conservative: a consuming handler, consuming widget, observer
+/// policy, or a missing `EVENT_BUBBLE` flag can stop before a later entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObjectDispatchObservationPlan {
+    /// Native phase that could complete.
+    pub phase: DispatchPhase,
+    /// Pre-dispatch copy-only view of the node at that phase.
+    pub node: NativeNodeView,
+}
+
+/// Allocation-free iterator over possible observations in native order.
+pub struct ObjectDispatchObservationPlans<'a> {
+    route: &'a [ResolvedRouteNode],
+    position: usize,
+}
+
+impl Iterator for ObjectDispatchObservationPlans<'_> {
+    type Item = ObjectDispatchObservationPlan;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let route_len = self.route.len();
+        let total = route_len.checked_mul(2)?;
+        if self.position >= total || route_len == 0 {
+            return None;
+        }
+        let position = self.position;
+        self.position += 1;
+        if position < route_len - 1 {
+            Some(ObjectDispatchObservationPlan {
+                phase: DispatchPhase::Trickle,
+                node: self.route[position].view,
+            })
+        } else if position == route_len - 1 {
+            Some(ObjectDispatchObservationPlan {
+                phase: DispatchPhase::Target,
+                node: self.route[route_len - 1].view,
+            })
+        } else {
+            let route_index = total - position - 1;
+            Some(ObjectDispatchObservationPlan {
+                phase: DispatchPhase::Bubble,
+                node: self.route[route_index].view,
+            })
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self
+            .route
+            .len()
+            .saturating_mul(2)
+            .saturating_sub(self.position);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for ObjectDispatchObservationPlans<'_> {}
+
+/// Owned, pre-resolved object route and all storage needed for native dispatch.
+///
+/// Resolution is the only allocation-bearing step. Callers may inspect the
+/// possible phase/node plan and reserve subscription/cue work before consuming
+/// this value through [`Self::prepare`].
+pub struct ResolvedObjectDispatch {
+    target_path: Vec<usize>,
+    event: ObjectEvent,
+    raw_stream_event: Option<Event>,
+    route: Vec<ResolvedRouteNode>,
+}
+
+impl core::fmt::Debug for ResolvedObjectDispatch {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("ResolvedObjectDispatch")
+            .field("target_path", &self.target_path)
+            .field("event", &self.event)
+            .field("widget_invocation", &self.raw_stream_event.is_some())
+            .field("route_nodes", &self.route.len())
+            .finish()
+    }
+}
+
+impl ResolvedObjectDispatch {
+    /// Borrow the object-semantic event that will be dispatched.
+    pub const fn event(&self) -> &ObjectEvent {
+        &self.event
+    }
+
+    /// Borrow the structural path from the caller-selected root to the target.
+    ///
+    /// An empty path explicitly identifies the selected root itself.
+    pub fn target_path(&self) -> &[usize] {
+        &self.target_path
+    }
+
+    /// Return the pre-dispatch target view.
+    pub const fn target_view(&self) -> NativeNodeView {
+        self.route
+            .as_slice()
+            .last()
+            .expect("resolved routes contain a target")
+            .view
+    }
+
+    /// Return whether target-phase widget semantics will be invoked.
+    pub const fn will_invoke_widget(&self) -> bool {
+        self.raw_stream_event.is_some()
+    }
+
+    /// Iterate the conservative trickle/target/bubble reservation plan.
+    pub fn possible_observations(&self) -> ObjectDispatchObservationPlans<'_> {
+        ObjectDispatchObservationPlans {
+            route: &self.route,
+            position: 0,
+        }
+    }
+
+    /// Acquire one allocation-free final freshness guard over the selected root.
+    ///
+    /// Success exclusively borrows the root until dispatch completes. Failure
+    /// occurs before any handler, widget semantic adapter, or observer runs.
+    pub fn prepare(
+        self,
+        root: &mut ObjectNode,
+    ) -> Result<PreparedObjectDispatch<'_>, ObjectDispatchError> {
+        validate_resolved_dispatch(root, &self)?;
+        if self.raw_stream_event.is_some()
+            && node_at_path_checked(root, &self.target_path)?
+                .widget
+                .try_borrow_mut()
+                .is_err()
+        {
+            return Err(ObjectDispatchError::DispatchBusy);
+        }
+        Ok(PreparedObjectDispatch {
+            root,
+            resolved: self,
+        })
+    }
+}
+
+/// Exclusively guarded object dispatch ready for infallible native traversal.
+///
+/// The dispatch implementation itself allocates and deallocates no route
+/// storage. Handlers and observers remain responsible for their own behavior
+/// and must not retain an incompatible public borrow of the target widget.
+pub struct PreparedObjectDispatch<'a> {
+    root: &'a mut ObjectNode,
+    resolved: ResolvedObjectDispatch,
+}
+
+impl PreparedObjectDispatch<'_> {
+    /// Dispatch without native observation and retain preparation storage.
+    pub fn dispatch(self) -> CompletedObjectDispatch {
+        self.dispatch_observed(&mut NoopNativeObserver)
+    }
+
+    /// Dispatch through the pre-resolved route with a native observer.
+    pub fn dispatch_observed<O: NativeEventObserver + ?Sized>(
+        self,
+        observer: &mut O,
+    ) -> CompletedObjectDispatch {
+        let Self { root, resolved } = self;
+        let disposition = dispatch_resolved_object_event(root, &resolved, observer);
+        CompletedObjectDispatch {
+            disposition,
+            resolved,
+        }
+    }
+}
+
+/// Completed native dispatch retaining all route storage until explicit release.
+#[must_use = "completed dispatch storage should be released after endpoint publication"]
+pub struct CompletedObjectDispatch {
+    disposition: Disposition,
+    resolved: ResolvedObjectDispatch,
+}
+
+impl CompletedObjectDispatch {
+    /// Return the native dispatch disposition.
+    pub const fn disposition(&self) -> Disposition {
+        self.disposition
+    }
+
+    /// Borrow the route and event facts retained through dispatch.
+    pub const fn resolved(&self) -> &ResolvedObjectDispatch {
+        &self.resolved
+    }
+
+    /// Release preparation storage after native publication completes.
+    pub fn release(self) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -1057,9 +1328,7 @@ impl ObjectNode {
     /// Code that needs layout-aware placement MUST call this rather than
     /// `widget.borrow().bounds()` directly.
     pub fn effective_bounds(&self) -> Rect {
-        if let Some(ls) = self.layout.as_deref()
-            && let Some(computed) = ls.computed
-        {
+        if let Some(computed) = self.layout.as_deref().and_then(|state| state.computed) {
             return computed;
         }
         self.widget.borrow().bounds()
@@ -1067,9 +1336,7 @@ impl ObjectNode {
 
     /// Try to read effective bounds without panicking on a retained public widget borrow.
     pub(crate) fn try_effective_bounds(&self) -> Option<Rect> {
-        if let Some(state) = self.layout.as_deref()
-            && let Some(computed) = state.computed
-        {
+        if let Some(computed) = self.layout.as_deref().and_then(|state| state.computed) {
             return Some(computed);
         }
         self.widget.try_borrow().ok().map(|widget| widget.bounds())
@@ -1581,21 +1848,138 @@ pub fn dispatch_object_event(root: &mut ObjectNode, input: DispatchInput) -> Dis
 /// widget semantic adapter runs before observation. A consuming widget is
 /// therefore still observed with `native_consumed = true`, after which
 /// dispatch returns [`Disposition::Consumed`]. A consuming handler ends its
-/// phase immediately and is not observed. The observation layer itself does
-/// not allocate; target resolution retains the dispatcher's existing
-/// structural-path allocation.
+/// phase immediately and is not observed.
+///
+/// This compatibility entry point allocates during route resolution and
+/// releases that route after dispatch. Endpoints that must reserve all work
+/// before native traversal should use [`resolve_object_dispatch`], reserve
+/// against [`ResolvedObjectDispatch::possible_observations`], then call
+/// [`ResolvedObjectDispatch::prepare`]. The prepared dispatch step retains its
+/// route allocation through [`CompletedObjectDispatch::release`].
 pub fn dispatch_object_event_observed<O: NativeEventObserver + ?Sized>(
     root: &mut ObjectNode,
     input: DispatchInput,
     observer: &mut O,
 ) -> Disposition {
-    // ----- 1. Resolve target path -----
-    let (target_path, object_event, raw_stream_event) = match resolve_target(root, &input) {
-        None => return Disposition::NoTarget,
-        Some(t) => t,
+    let resolved = match resolve_object_dispatch(root, input) {
+        Ok(resolved) => resolved,
+        Err(_) => return Disposition::NoTarget,
+    };
+    let prepared = match resolved.prepare(root) {
+        Ok(prepared) => prepared,
+        Err(_) => return Disposition::NoTarget,
+    };
+    let completed = prepared.dispatch_observed(observer);
+    let disposition = completed.disposition();
+    completed.release();
+    disposition
+}
+
+/// Resolve and own every path and view required by one later native dispatch.
+///
+/// `root` is one caller-selected Stage root. Pointer and focused resolution do
+/// not cross into sibling Stage roots. [`DispatchInput::Container`] supplies a
+/// direct structural path below this root; its empty path explicitly selects
+/// the root itself and bypasses pointer/focus targetability.
+pub fn resolve_object_dispatch(
+    root: &ObjectNode,
+    input: DispatchInput,
+) -> Result<ResolvedObjectDispatch, ObjectDispatchError> {
+    validate_selected_root(root)?;
+
+    enum TargetSelection {
+        Pointer { x: i32, y: i32 },
+        Focused,
+        Direct(Vec<usize>),
+    }
+
+    let (event, raw_stream_event, selection) = match input {
+        DispatchInput::Pointer { x, y, event } => {
+            let object_event =
+                stream_event_to_object_event(&event).ok_or(ObjectDispatchError::InvalidEvent)?;
+            (object_event, Some(event), TargetSelection::Pointer { x, y })
+        }
+        DispatchInput::PointerObject { x, y, event } => {
+            (event, None, TargetSelection::Pointer { x, y })
+        }
+        DispatchInput::Focused { event } => (event, None, TargetSelection::Focused),
+        DispatchInput::Container { path, event } => {
+            node_at_path_checked(root, &path)?;
+            (event, None, TargetSelection::Direct(path))
+        }
     };
 
-    let target_tag = node_at_path(root, &target_path).tag();
+    let target_path = match selection {
+        TargetSelection::Direct(path) => path,
+        TargetSelection::Pointer { x, y } => {
+            let max_route_nodes = object_tree_max_depth(root)?;
+            let mut path = Vec::new();
+            path.try_reserve_exact(max_route_nodes.saturating_sub(1))
+                .map_err(|_| ObjectDispatchError::AllocationFailed)?;
+            if !find_hit_path_into(root, x, y, &mut path)? {
+                return Err(ObjectDispatchError::NoTarget);
+            }
+            path
+        }
+        TargetSelection::Focused => {
+            let max_route_nodes = object_tree_max_depth(root)?;
+            let mut path = Vec::new();
+            path.try_reserve_exact(max_route_nodes.saturating_sub(1))
+                .map_err(|_| ObjectDispatchError::AllocationFailed)?;
+            if !find_focused_path_into(root, &mut path)? {
+                return Err(ObjectDispatchError::NoTarget);
+            }
+            path
+        }
+    };
+
+    validate_route_visibility(root, &target_path)?;
+
+    let route_len = target_path
+        .len()
+        .checked_add(1)
+        .ok_or(ObjectDispatchError::AllocationFailed)?;
+    let mut route = Vec::new();
+    route
+        .try_reserve_exact(route_len)
+        .map_err(|_| ObjectDispatchError::AllocationFailed)?;
+    let mut node = root;
+    route.push(ResolvedRouteNode {
+        address: node,
+        widget: node.widget.clone(),
+        view: NativeNodeView::try_capture(node)?,
+        storage: RouteStorageView::capture(node),
+    });
+    for &index in &target_path {
+        node = node
+            .children
+            .get(index)
+            .ok_or(ObjectDispatchError::InvalidPath)?;
+        route.push(ResolvedRouteNode {
+            address: node,
+            widget: node.widget.clone(),
+            view: NativeNodeView::try_capture(node)?,
+            storage: RouteStorageView::capture(node),
+        });
+    }
+
+    Ok(ResolvedObjectDispatch {
+        target_path,
+        event,
+        raw_stream_event,
+        route,
+    })
+}
+
+fn dispatch_resolved_object_event<O: NativeEventObserver + ?Sized>(
+    root: &mut ObjectNode,
+    resolved: &ResolvedObjectDispatch,
+    observer: &mut O,
+) -> Disposition {
+    let target_path = &resolved.target_path;
+    let object_event = &resolved.event;
+    let raw_stream_event = &resolved.raw_stream_event;
+    let target_tag = resolved.target_view().tag;
 
     // ----- 2. Trickle phase: root → target -----
     // Visit nodes [0..len] where path[0..i] is the prefix of the target path.
@@ -1604,18 +1988,19 @@ pub fn dispatch_object_event_observed<O: NativeEventObserver + ?Sized>(
         let node_path = &target_path[..depth];
         let ctx = EventContext {
             target_tag,
-            current_tag: node_at_path(root, node_path).tag(),
+            current_tag: resolved.route[depth].view.tag,
         };
-        let consumed = invoke_trickle(root, node_path, &object_event, ctx);
+        let consumed = invoke_trickle(root, node_path, object_event, ctx);
         if consumed {
             return Disposition::Consumed;
         }
         if observe_phase(
             root,
             node_path,
+            resolved.route[depth].view,
             PhaseCompletion {
                 phase: DispatchPhase::Trickle,
-                event: &object_event,
+                event: object_event,
                 context: ctx,
                 native_consumed: false,
                 widget_invoked: false,
@@ -1634,25 +2019,34 @@ pub fn dispatch_object_event_observed<O: NativeEventObserver + ?Sized>(
         };
         let widget_invoked = raw_stream_event.is_some();
         let native_consumed = {
-            let target_node = node_at_path_mut(root, &target_path);
+            let target_node = node_at_path_mut(root, target_path);
             // Run target handlers.
             for handler in &mut target_node.target_handlers {
-                if handler(&object_event, ctx) {
+                if handler(object_event, ctx) {
                     return Disposition::Consumed;
                 }
             }
             // For pointer stream inputs, invoke Widget::handle_event before
             // observation so semantic adapters expose their committed state.
-            raw_stream_event
-                .as_ref()
-                .is_some_and(|event| target_node.widget.borrow_mut().handle_event(event))
+            raw_stream_event.as_ref().is_some_and(|event| {
+                target_node
+                    .widget
+                    .try_borrow_mut()
+                    .expect("prepared dispatch preflighted the target widget borrow")
+                    .handle_event(event)
+            })
         };
         let observer_consumed = observe_phase(
             root,
-            &target_path,
+            target_path,
+            resolved
+                .route
+                .last()
+                .expect("resolved route contains its target")
+                .view,
             PhaseCompletion {
                 phase: DispatchPhase::Target,
-                event: &object_event,
+                event: object_event,
                 context: ctx,
                 native_consumed,
                 widget_invoked,
@@ -1675,17 +2069,18 @@ pub fn dispatch_object_event_observed<O: NativeEventObserver + ?Sized>(
         let node_path = &target_path[..depth];
         let ctx = EventContext {
             target_tag,
-            current_tag: node_at_path(root, node_path).tag(),
+            current_tag: resolved.route[depth].view.tag,
         };
-        if invoke_bubble(root, node_path, &object_event, ctx) {
+        if invoke_bubble(root, node_path, object_event, ctx) {
             return Disposition::Consumed;
         }
         if observe_phase(
             root,
             node_path,
+            resolved.route[depth].view,
             PhaseCompletion {
                 phase: DispatchPhase::Bubble,
-                event: &object_event,
+                event: object_event,
                 context: ctx,
                 native_consumed: false,
                 widget_invoked: false,
@@ -1721,6 +2116,7 @@ struct PhaseCompletion<'a> {
 fn observe_phase<O: NativeEventObserver + ?Sized>(
     root: &ObjectNode,
     node_path: &[usize],
+    fallback_view: NativeNodeView,
     completion: PhaseCompletion<'_>,
     observer: &mut O,
 ) -> bool {
@@ -1729,7 +2125,7 @@ fn observe_phase<O: NativeEventObserver + ?Sized>(
     }
     observer.observe(NativeEventObservation {
         phase: completion.phase,
-        node: NativeNodeView::capture(node_at_path(root, node_path)),
+        node: NativeNodeView::capture_with_fallback(node_at_path(root, node_path), fallback_view),
         event: completion.event,
         context: completion.context,
         native_consumed: completion.native_consumed,
@@ -1740,29 +2136,6 @@ fn observe_phase<O: NativeEventObserver + ?Sized>(
 // ---------------------------------------------------------------------------
 // dispatch_object_event internals
 // ---------------------------------------------------------------------------
-
-/// Resolve target path, object event, and optional raw stream event.
-fn resolve_target(
-    root: &ObjectNode,
-    input: &DispatchInput,
-) -> Option<(Vec<usize>, ObjectEvent, Option<Event>)> {
-    match input {
-        DispatchInput::Pointer { x, y, event } => {
-            let obj_ev = stream_event_to_object_event(event)?;
-            let path = hit_test_path(root, *x, *y)?;
-            Some((path, obj_ev, Some(event.clone())))
-        }
-        DispatchInput::PointerObject { x, y, event } => {
-            let path = hit_test_path(root, *x, *y)?;
-            Some((path, event.clone(), None))
-        }
-        DispatchInput::Focused { event } => {
-            let path = find_focused_path_ro(root)?;
-            Some((path, event.clone(), None))
-        }
-        DispatchInput::Container { path, event } => Some((path.clone(), event.clone(), None)),
-    }
-}
 
 /// Map a stream [`Event`] to an [`ObjectEvent`] (pointer events only).
 ///
@@ -1780,52 +2153,153 @@ fn stream_event_to_object_event(ev: &Event) -> Option<ObjectEvent> {
     }
 }
 
-/// Hit-test and return the path to the topmost targetable node, as a sequence
-/// of child indices from the root.
-fn hit_test_path(root: &ObjectNode, x: i32, y: i32) -> Option<Vec<usize>> {
-    hit_test_path_recursive(root, x, y, &mut Vec::new())
+fn validate_selected_root(root: &ObjectNode) -> Result<(), ObjectDispatchError> {
+    if root.is_detached() {
+        Err(ObjectDispatchError::Detached)
+    } else if root.flags().contains(ObjectFlags::HIDDEN) {
+        Err(ObjectDispatchError::Hidden)
+    } else {
+        Ok(())
+    }
 }
 
-fn hit_test_path_recursive(
+fn node_at_path_checked<'a>(
+    root: &'a ObjectNode,
+    path: &[usize],
+) -> Result<&'a ObjectNode, ObjectDispatchError> {
+    let mut current = root;
+    for &index in path {
+        current = current
+            .children
+            .get(index)
+            .ok_or(ObjectDispatchError::InvalidPath)?;
+    }
+    Ok(current)
+}
+
+fn object_tree_max_depth(root: &ObjectNode) -> Result<usize, ObjectDispatchError> {
+    let mut child_depth = 0usize;
+    for child in &root.children {
+        child_depth = child_depth.max(object_tree_max_depth(child)?);
+    }
+    child_depth
+        .checked_add(1)
+        .ok_or(ObjectDispatchError::AllocationFailed)
+}
+
+/// Hit-test into caller-reserved path storage without allocating.
+fn find_hit_path_into(
     node: &ObjectNode,
     x: i32,
     y: i32,
     path: &mut Vec<usize>,
-) -> Option<Vec<usize>> {
+) -> Result<bool, ObjectDispatchError> {
     if node.is_hidden_or_detached() {
-        return None;
+        return Ok(false);
     }
     for (i, child) in node.children.iter().enumerate().rev() {
+        if path.len() == path.capacity() {
+            return Err(ObjectDispatchError::AllocationFailed);
+        }
         path.push(i);
-        if let Some(p) = hit_test_path_recursive(child, x, y, path) {
-            return Some(p);
+        if find_hit_path_into(child, x, y, path)? {
+            return Ok(true);
         }
         path.pop();
     }
-    if node.is_targetable_at(x, y) {
-        Some(path.clone())
-    } else {
-        None
+    let flags = node.flags();
+    if flags.contains(ObjectFlags::CLICKABLE) && !flags.contains(ObjectFlags::DISABLED) {
+        let bounds = node
+            .try_effective_bounds()
+            .ok_or(ObjectDispatchError::DispatchBusy)?;
+        if rect_contains(bounds, x, y) {
+            return Ok(true);
+        }
     }
+    Ok(false)
 }
 
-/// Find the path to the focused node (read-only).
-fn find_focused_path_ro(root: &ObjectNode) -> Option<Vec<usize>> {
-    find_focused_ro_recursive(root, &mut Vec::new())
-}
-
-fn find_focused_ro_recursive(node: &ObjectNode, path: &mut Vec<usize>) -> Option<Vec<usize>> {
+/// Find the focused route into caller-reserved path storage without allocating.
+fn find_focused_path_into(
+    node: &ObjectNode,
+    path: &mut Vec<usize>,
+) -> Result<bool, ObjectDispatchError> {
     if node.states().contains(ObjectStates::FOCUSED) {
-        return Some(path.clone());
+        return Ok(true);
     }
     for (i, child) in node.children.iter().enumerate() {
+        if path.len() == path.capacity() {
+            return Err(ObjectDispatchError::AllocationFailed);
+        }
         path.push(i);
-        if let Some(p) = find_focused_ro_recursive(child, path) {
-            return Some(p);
+        if find_focused_path_into(child, path)? {
+            return Ok(true);
         }
         path.pop();
     }
-    None
+    Ok(false)
+}
+
+fn validate_route_visibility(
+    root: &ObjectNode,
+    target_path: &[usize],
+) -> Result<(), ObjectDispatchError> {
+    let mut node = root;
+    for depth in 0..=target_path.len() {
+        if node.is_detached() {
+            return Err(ObjectDispatchError::Detached);
+        }
+        if node.flags().contains(ObjectFlags::HIDDEN) {
+            return Err(ObjectDispatchError::Hidden);
+        }
+        if let Some(&index) = target_path.get(depth) {
+            node = node
+                .children
+                .get(index)
+                .ok_or(ObjectDispatchError::InvalidPath)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_resolved_dispatch(
+    root: &ObjectNode,
+    resolved: &ResolvedObjectDispatch,
+) -> Result<(), ObjectDispatchError> {
+    validate_selected_root(root)?;
+    let expected_route_len = resolved
+        .target_path
+        .len()
+        .checked_add(1)
+        .ok_or(ObjectDispatchError::StaleRoute)?;
+    if resolved.route.len() != expected_route_len {
+        return Err(ObjectDispatchError::StaleRoute);
+    }
+
+    let mut node = root;
+    for depth in 0..expected_route_len {
+        if node.is_detached() {
+            return Err(ObjectDispatchError::Detached);
+        }
+        if node.flags().contains(ObjectFlags::HIDDEN) {
+            return Err(ObjectDispatchError::Hidden);
+        }
+        let snapshot = &resolved.route[depth];
+        if !core::ptr::eq(node, snapshot.address)
+            || !Rc::ptr_eq(&node.widget, &snapshot.widget)
+            || NativeNodeView::try_capture(node)? != snapshot.view
+            || RouteStorageView::capture(node) != snapshot.storage
+        {
+            return Err(ObjectDispatchError::StaleRoute);
+        }
+        if let Some(&index) = resolved.target_path.get(depth) {
+            node = node
+                .children
+                .get(index)
+                .ok_or(ObjectDispatchError::StaleRoute)?;
+        }
+    }
+    Ok(())
 }
 
 /// Navigate to a node by structural path (immutable).
@@ -3076,6 +3550,406 @@ mod tests {
         let ok = fg.focus_path(&mut root, &[0usize]);
         assert!(ok);
         assert!(root.children()[0].states().contains(ObjectStates::FOCUSED));
+    }
+
+    #[test]
+    fn prepared_dispatch_reports_pre_traversal_resolution_failures() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        root.append_child(clickable("target", 0, 0));
+
+        assert!(matches!(
+            resolve_object_dispatch(
+                &root,
+                DispatchInput::Pointer {
+                    x: 5,
+                    y: 5,
+                    event: Event::Tick,
+                },
+            ),
+            Err(ObjectDispatchError::InvalidEvent)
+        ));
+        assert!(matches!(
+            resolve_object_dispatch(
+                &root,
+                DispatchInput::PointerObject {
+                    x: 90,
+                    y: 90,
+                    event: ObjectEvent::Clicked { x: 90, y: 90 },
+                },
+            ),
+            Err(ObjectDispatchError::NoTarget)
+        ));
+        assert!(matches!(
+            resolve_object_dispatch(
+                &root,
+                DispatchInput::Container {
+                    path: vec![4],
+                    event: ObjectEvent::Clicked { x: 5, y: 5 },
+                },
+            ),
+            Err(ObjectDispatchError::InvalidPath)
+        ));
+
+        root.set_flag(ObjectFlags::HIDDEN, true);
+        assert!(matches!(
+            resolve_object_dispatch(
+                &root,
+                DispatchInput::Container {
+                    path: Vec::new(),
+                    event: ObjectEvent::Clicked { x: 5, y: 5 },
+                },
+            ),
+            Err(ObjectDispatchError::Hidden)
+        ));
+    }
+
+    #[test]
+    fn selected_root_and_focused_route_visibility_are_explicit() {
+        let mut stage_root = TestWidget::node("stage", rect(0, 0, 100, 100));
+        stage_root.append_child(TestWidget::node("detached", rect(0, 0, 10, 10)));
+        let detached_root = stage_root.detach_child(0).expect("child exists");
+        assert!(matches!(
+            resolve_object_dispatch(
+                &detached_root,
+                DispatchInput::Container {
+                    path: Vec::new(),
+                    event: ObjectEvent::Clicked { x: 1, y: 1 },
+                },
+            ),
+            Err(ObjectDispatchError::Detached)
+        ));
+
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut focused = TestWidget::node("focused", rect(0, 0, 10, 10));
+        focused.set_state(ObjectStates::FOCUSED, true);
+        focused.set_flag(ObjectFlags::HIDDEN, true);
+        root.append_child(focused);
+        assert!(matches!(
+            resolve_object_dispatch(
+                &root,
+                DispatchInput::Focused {
+                    event: ObjectEvent::Key(Key::Enter),
+                },
+            ),
+            Err(ObjectDispatchError::Hidden)
+        ));
+    }
+
+    #[test]
+    fn direct_empty_path_explicitly_targets_selected_root() {
+        let calls = Rc::new(RefCell::new(Vec::new()));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        {
+            let calls = calls.clone();
+            root.add_target_handler(move |_, _| {
+                calls.borrow_mut().push("target");
+                false
+            });
+        }
+        {
+            let calls = calls.clone();
+            root.add_bubble_handler(move |_, _| {
+                calls.borrow_mut().push("bubble");
+                false
+            });
+        }
+
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: Vec::new(),
+                event: ObjectEvent::Clicked { x: 1, y: 1 },
+            },
+        )
+        .expect("selected root is a valid explicit target");
+        assert!(resolved.target_path().is_empty());
+        assert_eq!(resolved.target_view().tag, Some("root"));
+        assert_eq!(
+            resolved
+                .possible_observations()
+                .map(|entry| (entry.phase, entry.node.tag))
+                .collect::<Vec<_>>(),
+            [
+                (DispatchPhase::Target, Some("root")),
+                (DispatchPhase::Bubble, Some("root")),
+            ]
+        );
+
+        let completed = resolved
+            .prepare(&mut root)
+            .expect("unchanged route prepares")
+            .dispatch();
+        assert_eq!(completed.disposition(), Disposition::Unconsumed);
+        completed.release();
+        assert_eq!(*calls.borrow(), ["target", "bubble"]);
+    }
+
+    #[test]
+    fn prepared_dispatch_rejects_stale_route_before_handlers_run() {
+        let target_calls = Rc::new(RefCell::new(0));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let first = clickable("first", 0, 0);
+        root.append_child(first);
+        root.append_child(clickable("second", 20, 0));
+        {
+            let target_calls = target_calls.clone();
+            root.children_mut()[0].add_target_handler(move |_, _| {
+                *target_calls.borrow_mut() += 1;
+                false
+            });
+        }
+
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+        )
+        .expect("initial route resolves");
+        root.children_mut().swap(0, 1);
+
+        assert!(matches!(
+            resolved.prepare(&mut root),
+            Err(ObjectDispatchError::StaleRoute)
+        ));
+        assert_eq!(*target_calls.borrow(), 0);
+    }
+
+    #[test]
+    fn prepare_rechecks_hidden_and_detached_route_before_handlers_run() {
+        let target_calls = Rc::new(RefCell::new(0));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        root.append_child(clickable("target", 0, 0));
+        {
+            let target_calls = target_calls.clone();
+            root.children_mut()[0].add_target_handler(move |_, _| {
+                *target_calls.borrow_mut() += 1;
+                false
+            });
+        }
+
+        let hidden = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+        )
+        .expect("initial route resolves");
+        root.children_mut()[0].set_flag(ObjectFlags::HIDDEN, true);
+        assert!(matches!(
+            hidden.prepare(&mut root),
+            Err(ObjectDispatchError::Hidden)
+        ));
+        root.children_mut()[0].set_flag(ObjectFlags::HIDDEN, false);
+
+        let detached = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+        )
+        .expect("restored route resolves");
+        root.set_detached_recursive(true);
+        assert!(matches!(
+            detached.prepare(&mut root),
+            Err(ObjectDispatchError::Detached)
+        ));
+        assert_eq!(*target_calls.borrow(), 0);
+    }
+
+    #[test]
+    fn prepare_rejects_changed_route_handler_storage() {
+        let target_calls = Rc::new(RefCell::new(0));
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        root.append_child(clickable("target", 0, 0));
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 5, y: 5 },
+            },
+        )
+        .expect("initial route resolves");
+        {
+            let target_calls = target_calls.clone();
+            root.children_mut()[0].add_target_handler(move |_, _| {
+                *target_calls.borrow_mut() += 1;
+                false
+            });
+        }
+
+        assert!(matches!(
+            resolved.prepare(&mut root),
+            Err(ObjectDispatchError::StaleRoute)
+        ));
+        assert_eq!(*target_calls.borrow(), 0);
+    }
+
+    #[test]
+    fn prepare_rejects_retained_target_widget_borrow_before_dispatch() {
+        let target_calls = Rc::new(RefCell::new(0));
+        let widget = Rc::new(RefCell::new(SemanticWidget {
+            bounds: rect(0, 0, 10, 10),
+            value: 0,
+            consume: false,
+        }));
+        let mut target = ObjectNode::new(widget.clone()).with_tag("target");
+        target.set_flag(ObjectFlags::CLICKABLE, true);
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        root.append_child(target);
+        {
+            let target_calls = target_calls.clone();
+            root.children_mut()[0].add_target_handler(move |_, _| {
+                *target_calls.borrow_mut() += 1;
+                false
+            });
+        }
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Pointer {
+                x: 5,
+                y: 5,
+                event: Event::PressRelease { x: 5, y: 5 },
+            },
+        )
+        .expect("unborrowed target resolves");
+
+        let retained_borrow = widget.borrow();
+        assert!(matches!(
+            resolved.prepare(&mut root),
+            Err(ObjectDispatchError::DispatchBusy)
+        ));
+        assert_eq!(*target_calls.borrow(), 0);
+        assert_eq!(retained_borrow.value, 0);
+    }
+
+    struct FixedObserver {
+        records: [Option<(DispatchPhase, Option<&'static str>, bool)>; 8],
+        len: usize,
+    }
+
+    impl FixedObserver {
+        const fn new() -> Self {
+            Self {
+                records: [None; 8],
+                len: 0,
+            }
+        }
+    }
+
+    impl NativeEventObserver for FixedObserver {
+        fn observe(&mut self, observation: NativeEventObservation<'_>) -> NativeObserverControl {
+            self.records[self.len] = Some((
+                observation.phase,
+                observation.node.tag,
+                observation.widget_invoked,
+            ));
+            self.len += 1;
+            NativeObserverControl::Continue
+        }
+    }
+
+    #[test]
+    fn prepared_observation_order_and_storage_are_stable_through_completion() {
+        let target_widget = Rc::new(RefCell::new(SemanticWidget {
+            bounds: rect(0, 0, 10, 10),
+            value: 0,
+            consume: false,
+        }));
+        let mut target = ObjectNode::new(target_widget.clone()).with_tag("target");
+        target.set_flag(ObjectFlags::CLICKABLE, true);
+        target.set_flag(ObjectFlags::EVENT_BUBBLE, true);
+        let mut middle = TestWidget::node("middle", rect(0, 0, 20, 20));
+        middle.set_flag(ObjectFlags::EVENT_BUBBLE, true);
+        middle.append_child(target);
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        root.append_child(middle);
+
+        let base_target_refs = Rc::strong_count(&target_widget);
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Pointer {
+                x: 5,
+                y: 5,
+                event: Event::PressRelease { x: 5, y: 5 },
+            },
+        )
+        .expect("pointer route resolves");
+        let path_storage = (
+            resolved.target_path.as_ptr(),
+            resolved.target_path.capacity(),
+        );
+        let route_storage = (resolved.route.as_ptr(), resolved.route.capacity());
+        assert_eq!(Rc::strong_count(&target_widget), base_target_refs + 1);
+        assert_eq!(
+            resolved
+                .possible_observations()
+                .map(|entry| (entry.phase, entry.node.tag))
+                .collect::<Vec<_>>(),
+            [
+                (DispatchPhase::Trickle, Some("root")),
+                (DispatchPhase::Trickle, Some("middle")),
+                (DispatchPhase::Target, Some("target")),
+                (DispatchPhase::Bubble, Some("target")),
+                (DispatchPhase::Bubble, Some("middle")),
+                (DispatchPhase::Bubble, Some("root")),
+            ]
+        );
+
+        let mut observer = FixedObserver::new();
+        let completed = resolved
+            .prepare(&mut root)
+            .expect("unchanged route prepares")
+            .dispatch_observed(&mut observer);
+        assert_eq!(completed.disposition(), Disposition::Unconsumed);
+        assert_eq!(
+            (
+                completed.resolved.target_path.as_ptr(),
+                completed.resolved.target_path.capacity(),
+            ),
+            path_storage
+        );
+        assert_eq!(
+            (
+                completed.resolved.route.as_ptr(),
+                completed.resolved.route.capacity(),
+            ),
+            route_storage
+        );
+        assert_eq!(
+            &observer.records[..observer.len],
+            &[
+                Some((DispatchPhase::Trickle, Some("root"), false)),
+                Some((DispatchPhase::Trickle, Some("middle"), false)),
+                Some((DispatchPhase::Target, Some("target"), true)),
+                Some((DispatchPhase::Bubble, Some("target"), false)),
+                Some((DispatchPhase::Bubble, Some("middle"), false)),
+                Some((DispatchPhase::Bubble, Some("root"), false)),
+            ]
+        );
+        assert_eq!(target_widget.borrow().value, 1);
+        assert_eq!(Rc::strong_count(&target_widget), base_target_refs + 1);
+        completed.release();
+        assert_eq!(Rc::strong_count(&target_widget), base_target_refs);
+    }
+
+    #[test]
+    fn legacy_observed_dispatch_does_not_observe_invalid_direct_path() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut observer = FixedObserver::new();
+        let disposition = dispatch_object_event_observed(
+            &mut root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 1, y: 1 },
+            },
+            &mut observer,
+        );
+        assert_eq!(disposition, Disposition::NoTarget);
+        assert_eq!(observer.len, 0);
     }
 
     fn child_tags(root: &ObjectNode) -> Vec<&'static str> {
