@@ -53,6 +53,8 @@ pub mod draw;
 /// `rlvgl-ui` so that `rlvgl-widgets` can depend on it without a crate cycle
 /// (LPAR-14 §5.C).
 pub mod edit;
+/// MPY endpoint-owned Safe Turn batching, completions, and global drains.
+pub mod endpoint;
 pub mod event;
 /// Focus traversal and group policy for the LPAR-04 event/focus runtime.
 pub mod focus;
