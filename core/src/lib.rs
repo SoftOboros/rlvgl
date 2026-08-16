@@ -91,6 +91,8 @@ pub mod scroll;
 pub mod style;
 /// LPAR-07 style cascade substrate: `Part`, `Selector`, `StylePatch`, `StyleState`, and resolution.
 pub mod style_cascade;
+/// MPY bounded native-event subscriptions and descriptor-derived cue inputs.
+pub mod subscription;
 pub mod theme;
 /// Tick-driven timer registry; see [`timer::Timers`].
 pub mod timer;

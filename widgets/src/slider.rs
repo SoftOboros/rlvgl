@@ -1,13 +1,16 @@
 //! Horizontal slider widget.
 use rlvgl_core::actor::{
     ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
-    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, MutationEffects,
-    PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError,
-    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ConstructorArgs, ConstructorFieldDescriptor, EventDelivery, EventDescriptor, EventFilterSet,
+    EventPhaseSet, LayoutCapabilities, MpyActor, MutationEffects, NativeEventKind, PropertyAccess,
+    PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError, ResourceCost,
+    TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag, construct_native_actor,
+    encode_event_values,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
 use rlvgl_core::event::Event;
+use rlvgl_core::object::ObjectEvent;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -22,6 +25,7 @@ pub struct Slider {
     min: i32,
     max: i32,
     value: i32,
+    last_native_value_changed: bool,
 }
 
 impl Slider {
@@ -34,6 +38,7 @@ impl Slider {
             min,
             max,
             value: min,
+            last_native_value_changed: false,
         }
     }
 
@@ -65,6 +70,9 @@ const MPY_VALUE_FIELD: u32 = 4;
 const MPY_MIN_PROPERTY: u32 = 1;
 const MPY_MAX_PROPERTY: u32 = 2;
 const MPY_VALUE_PROPERTY: u32 = 3;
+
+/// Stable MPY event identifier for a completed native slider update.
+pub const MPY_VALUE_CHANGED_EVENT_ID: u32 = 0x0001_0002;
 
 const SLIDER_EFFECTS: MutationEffects = MutationEffects::DRAW.union(MutationEffects::SNAPSHOT);
 const MPY_PROPERTIES: [PropertyDescriptor; 3] = [
@@ -109,6 +117,23 @@ const MPY_PROPERTIES: [PropertyDescriptor; 3] = [
     },
 ];
 
+const MPY_EVENTS: [EventDescriptor; 1] = [EventDescriptor {
+    id: MPY_VALUE_CHANGED_EVENT_ID,
+    name: "value_changed",
+    payload: &[ValueTag::I32],
+    max_payload_bytes: 5,
+    native_event: NativeEventKind::Clicked,
+    phases: EventPhaseSet::TARGET,
+    filters: EventFilterSet::ANY,
+    requires_widget_invocation: true,
+    requires_native_consumed: true,
+    allow_consume_at_target: true,
+    allow_stop_after_phase: false,
+    native_effects: MutationEffects::DRAW.union(MutationEffects::SNAPSHOT),
+    delivery: EventDelivery::Ordered,
+    coalescing_key: None,
+}];
+
 /// Stable MPY actor type identifier for [`Slider`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0004);
 
@@ -116,7 +141,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0004);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::slider::Slider",
-    schema_revision: 1,
+    schema_revision: 2,
     family: ActorFamily::Control,
     capabilities: ActorCapabilities::CONTROL,
     targets: TargetSet::ALL,
@@ -148,7 +173,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     ],
     properties: &MPY_PROPERTIES,
     actions: &[],
-    events: &[],
+    events: &MPY_EVENTS,
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS,
     resource_cost: ResourceCost {
@@ -230,7 +255,9 @@ impl Widget for Slider {
         let relative = *x - self.bounds.x;
         let ratio = relative as f32 / self.bounds.width as f32;
         let new_value = self.min + ((self.max - self.min) as f32 * ratio) as i32;
+        let previous = self.value;
         self.set_value(new_value);
+        self.last_native_value_changed = self.value != previous;
         true
     }
 }
@@ -244,6 +271,25 @@ impl MpyActor for Slider {
             MPY_MAX_PROPERTY => Ok(OwnedValue::I32(self.max)),
             MPY_VALUE_PROPERTY => Ok(OwnedValue::I32(self.value)),
             _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn event_payload(
+        &self,
+        event_id: u32,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        match (event_id, event) {
+            (MPY_VALUE_CHANGED_EVENT_ID, ObjectEvent::Clicked { .. }) => {
+                if self.last_native_value_changed {
+                    encode_event_values(&[ValueRef::I32(self.value())], output).map(Some)
+                } else {
+                    Ok(None)
+                }
+            }
+            (MPY_VALUE_CHANGED_EVENT_ID, _) => Err(RegistryError::Internal),
+            _ => Err(RegistryError::UnknownEvent { event_id }),
         }
     }
 

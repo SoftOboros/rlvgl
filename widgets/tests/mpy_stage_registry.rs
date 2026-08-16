@@ -93,7 +93,6 @@ fn catalog_enumerates_five_actor_local_schemas() {
     );
     for descriptor in registry.catalog() {
         assert_ne!(descriptor.type_id.get(), 0);
-        assert_eq!(descriptor.schema_revision, 1);
         assert!(!descriptor.constructor_fields.is_empty());
         assert!(
             descriptor
@@ -101,15 +100,17 @@ fn catalog_enumerates_five_actor_local_schemas() {
                 .contains(rlvgl_core::actor::TargetSet::ALL)
         );
         let expected = match descriptor.stable_name.rsplit("::").next().unwrap() {
-            "Container" => (0, 0),
-            "Label" | "Button" => (1, 0),
-            "Slider" => (3, 0),
-            "List" => (1, 5),
+            "Container" => (1, 0, 0, 0),
+            "Label" => (1, 1, 0, 0),
+            "Button" => (2, 1, 0, 1),
+            "Slider" => (2, 3, 0, 1),
+            "List" => (2, 1, 5, 1),
             _ => unreachable!(),
         };
-        assert_eq!(descriptor.properties.len(), expected.0);
-        assert_eq!(descriptor.actions.len(), expected.1);
-        assert!(descriptor.events.is_empty());
+        assert_eq!(descriptor.schema_revision, expected.0);
+        assert_eq!(descriptor.properties.len(), expected.1);
+        assert_eq!(descriptor.actions.len(), expected.2);
+        assert_eq!(descriptor.events.len(), expected.3);
     }
 }
 

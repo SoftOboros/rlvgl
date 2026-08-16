@@ -8,6 +8,7 @@
 use alloc::{boxed::Box, rc::Rc, string::String, vec::Vec};
 use core::cell::RefCell;
 
+use rlvgl_api::protocol::{CodecError, decode_value, encode_value};
 pub use rlvgl_api::protocol::{ErrorClass, ValueRef, ValueTag};
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
         StageDirection, StageRevision,
     },
     layout::{GridTrack, LayoutRole},
-    object::{ObjectFlags, ObjectNode, ObjectStates},
+    object::{DispatchPhase, ObjectEvent, ObjectFlags, ObjectNode, ObjectStates},
     widget::{Rect, Widget},
 };
 
@@ -465,14 +466,21 @@ impl TypeId {
 pub struct ObjectId(u64);
 
 impl ObjectId {
-    fn from_parts(generation: u32, slot: u32) -> Self {
+    fn from_parts(generation: u32, slot_index: u32) -> Self {
         debug_assert!(generation != 0);
+        let slot = slot_index
+            .checked_add(1)
+            .expect("live ObjectId slot index is bounded below u32::MAX");
         Self((u64::from(generation) << 32) | u64::from(slot))
     }
 
-    /// Convert a nonzero serialized value into an Object identifier.
+    /// Convert a serialized value with nonzero generation and slot words.
     pub const fn new(raw: u64) -> Option<Self> {
-        if raw == 0 { None } else { Some(Self(raw)) }
+        if raw >> 32 == 0 || raw as u32 == 0 {
+            None
+        } else {
+            Some(Self(raw))
+        }
     }
 
     /// Return the serialized `u64` representation.
@@ -488,6 +496,10 @@ impl ObjectId {
     /// Return the lower slot word.
     pub const fn slot(self) -> u32 {
         self.0 as u32
+    }
+
+    const fn slot_index(self) -> usize {
+        (self.slot() - 1) as usize
     }
 }
 
@@ -796,10 +808,93 @@ pub struct ActionDescriptor {
 /// Cue-delivery classification reserved for MPY-05 event descriptors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventDelivery {
+    /// Required cue that may not be coalesced or silently lost.
+    Critical,
     /// Every queued cue must be preserved in order.
     Ordered,
-    /// Runtime may coalesce superseded cues according to the event policy.
-    Coalescible,
+    /// Exact-key queue-tail replacement retains the latest event payload.
+    LatestValueCoalescible,
+}
+
+/// Native object-event source matched by an MPY event descriptor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeEventKind {
+    /// [`ObjectEvent::Clicked`] pointer semantic event.
+    Clicked,
+}
+
+impl NativeEventKind {
+    /// Return whether a native object event has this stable source kind.
+    pub fn matches(self, event: &ObjectEvent) -> bool {
+        match self {
+            Self::Clicked => matches!(event, ObjectEvent::Clicked { .. }),
+        }
+    }
+}
+
+/// Allowed native propagation phases for one event descriptor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct EventPhaseSet(u8);
+
+impl EventPhaseSet {
+    /// No phase is allowed.
+    pub const NONE: Self = Self(0);
+    /// Ancestor trickle observation is allowed.
+    pub const TRICKLE: Self = Self(1 << 0);
+    /// Target observation is allowed.
+    pub const TARGET: Self = Self(1 << 1);
+    /// Bubble observation is allowed.
+    pub const BUBBLE: Self = Self(1 << 2);
+    /// Every native propagation phase is allowed.
+    pub const ALL: Self = Self(Self::TRICKLE.0 | Self::TARGET.0 | Self::BUBBLE.0);
+
+    /// Return the union of two allowed phase sets.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    /// Return whether a native dispatch phase is allowed.
+    pub const fn allows(self, phase: DispatchPhase) -> bool {
+        let required = match phase {
+            DispatchPhase::Trickle => Self::TRICKLE.0,
+            DispatchPhase::Target => Self::TARGET.0,
+            DispatchPhase::Bubble => Self::BUBBLE.0,
+        };
+        self.0 & required != 0
+    }
+
+    /// Return whether no phase is allowed.
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
+/// Filter forms a subscription may request for one event descriptor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct EventFilterSet(u8);
+
+impl EventFilterSet {
+    /// Only unfiltered observation is allowed.
+    pub const ANY: Self = Self(1 << 0);
+    /// Pointer coordinates may be constrained to a logical rectangle.
+    pub const POINTER_REGION: Self = Self(1 << 1);
+
+    /// Return the union of two filter sets.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    /// Return whether every bit in `other` is supported.
+    pub const fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+
+    /// Return whether no filter form is supported.
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
 }
 
 /// Discoverable event schema entry.
@@ -811,8 +906,79 @@ pub struct EventDescriptor {
     pub name: &'static str,
     /// Ordered payload value tags.
     pub payload: &'static [ValueTag],
+    /// Maximum encoded event-payload bytes before the MPY-05 metadata envelope.
+    pub max_payload_bytes: u32,
+    /// Native object-semantic source event.
+    pub native_event: NativeEventKind,
+    /// Native propagation phases eligible for subscription.
+    pub phases: EventPhaseSet,
+    /// Supported predeclared filter forms.
+    pub filters: EventFilterSet,
+    /// Whether the target widget semantic adapter must have run.
+    pub requires_widget_invocation: bool,
+    /// Whether the target widget semantic adapter must have consumed the event.
+    pub requires_native_consumed: bool,
+    /// Whether `ConsumeAtTarget` may be installed before dispatch.
+    pub allow_consume_at_target: bool,
+    /// Whether `StopAfterPhase` may be installed before dispatch.
+    pub allow_stop_after_phase: bool,
+    /// Director-visible effects applied once for an actual native emission.
+    pub native_effects: MutationEffects,
     /// Cue-delivery classification.
     pub delivery: EventDelivery,
+    /// Descriptor-owned key for latest-value queue-tail replacement.
+    pub coalescing_key: Option<u64>,
+}
+
+/// One descriptor-first native semantic publication prepared during dispatch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeMutationPublication {
+    /// Actor whose native semantic adapter emitted.
+    pub object_id: ObjectId,
+    /// Descriptor-declared director-visible effects.
+    pub effects: MutationEffects,
+}
+
+/// Encode a descriptor-owned event value sequence into caller-owned storage.
+///
+/// Widget adapters use this helper so every event payload has the canonical
+/// MPY tagged-value representation without allocating.
+pub fn encode_event_values(
+    values: &[ValueRef<'_>],
+    output: &mut [u8],
+) -> Result<usize, RegistryError> {
+    let mut position = 0usize;
+    for value in values {
+        let encoded =
+            encode_value(*value, &mut output[position..]).map_err(|error| match error {
+                CodecError::BufferTooSmall => RegistryError::Capacity {
+                    kind: CapacityKind::EventPayloadBytes,
+                },
+                _ => RegistryError::Internal,
+            })?;
+        position = position
+            .checked_add(encoded)
+            .ok_or(RegistryError::Capacity {
+                kind: CapacityKind::EventPayloadBytes,
+            })?;
+    }
+    Ok(position)
+}
+
+impl EventDescriptor {
+    /// Return whether this descriptor applies to one completed native phase.
+    pub fn matches_native(
+        self,
+        phase: DispatchPhase,
+        event: &ObjectEvent,
+        widget_invoked: bool,
+        native_consumed: bool,
+    ) -> bool {
+        self.phases.allows(phase)
+            && self.native_event.matches(event)
+            && (!self.requires_widget_invocation || widget_invoked)
+            && (!self.requires_native_consumed || native_consumed)
+    }
 }
 
 /// Conservative fixed resource cost advertised by a descriptor.
@@ -927,6 +1093,19 @@ pub trait MpyActor: Widget {
     /// Read a descriptor-owned durable property.
     fn property(&self, id: u32) -> Result<OwnedValue, RegistryError>;
 
+    /// Encode one descriptor-owned post-widget event payload when emitted.
+    ///
+    /// Implementations write tagged MPY values into caller-owned storage and
+    /// must not allocate or invoke a language runtime.
+    fn event_payload(
+        &self,
+        event_id: u32,
+        _event: &ObjectEvent,
+        _output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        Err(RegistryError::UnknownEvent { event_id })
+    }
+
     /// Validate a collective property/action group without mutation.
     fn prepare(
         &self,
@@ -961,11 +1140,58 @@ pub trait ActorOps {
     fn bounds(&self) -> Result<Rect, RegistryError>;
     /// Read one actor-owned property.
     fn property(&self, id: u32) -> Result<OwnedValue, RegistryError>;
+    /// Encode one post-widget event payload into caller-owned storage.
+    ///
+    /// `None` means the semantic source ran but did not change the durable
+    /// value represented by a transition event.
+    fn event_payload(
+        &self,
+        event_id: u32,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError>;
     /// Prepare an actor-local group without native mutation.
     fn prepare(
         &self,
         directions: &[ActorDirection],
     ) -> Result<Box<dyn PreparedActorMutation>, RegistryError>;
+}
+
+/// Cloneable event adapter usable while the Stage's object tree is borrowed.
+#[derive(Clone)]
+pub struct ActorEventHandle {
+    object_id: ObjectId,
+    type_id: TypeId,
+    ops: Rc<dyn ActorOps>,
+}
+
+impl ActorEventHandle {
+    /// Return the exact actor identity captured before native dispatch.
+    pub const fn actor_identity(&self) -> ActorIdentity {
+        ActorIdentity {
+            object_id: self.object_id,
+            type_id: self.type_id,
+        }
+    }
+
+    /// Run one actor adapter into caller-reserved storage.
+    pub fn event_payload(
+        &self,
+        descriptor: &EventDescriptor,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        let Some(length) = self.ops.event_payload(descriptor.id, event, output)? else {
+            return Ok(None);
+        };
+        if length > output.len() || length > descriptor.max_payload_bytes as usize {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::EventPayloadBytes,
+            });
+        }
+        validate_event_payload(descriptor, &output[..length])?;
+        Ok(Some(length))
+    }
 }
 
 struct TypedActorOps<T> {
@@ -1015,6 +1241,18 @@ impl<T: MpyActor + 'static> ActorOps for TypedActorOps<T> {
             .property(id)
     }
 
+    fn event_payload(
+        &self,
+        event_id: u32,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        self.actor
+            .try_borrow()
+            .map_err(|_| RegistryError::DispatchBusy)?
+            .event_payload(event_id, event, output)
+    }
+
     fn prepare(
         &self,
         directions: &[ActorDirection],
@@ -1038,7 +1276,7 @@ impl<T: MpyActor + 'static> ActorOps for TypedActorOps<T> {
 /// Native node and parallel typed adapter returned by an actor constructor.
 pub struct ConstructedActor {
     node: ObjectNode,
-    ops: Box<dyn ActorOps>,
+    ops: Rc<dyn ActorOps>,
 }
 
 impl ConstructedActor {
@@ -1069,7 +1307,7 @@ where
     let erased: Rc<RefCell<dyn Widget>> = typed.clone();
     ConstructedActor {
         node: ObjectNode::new(erased),
-        ops: Box::new(TypedActorOps {
+        ops: Rc::new(TypedActorOps {
             actor: typed,
             type_id,
         }),
@@ -1173,6 +1411,10 @@ pub enum CapacityKind {
     TextBytes,
     /// Stage non-text resource budget.
     Resources,
+    /// Encoded native event payload budget.
+    EventPayloadBytes,
+    /// Pre-dispatch native publication invalidation reservation.
+    NativeEventPublications,
 }
 
 /// Stage Registry or actor-construction failure.
@@ -1201,6 +1443,11 @@ pub enum RegistryError {
     UnknownAction {
         /// Unrecognized action identifier.
         action_id: u32,
+    },
+    /// Requested event is not declared by the actor.
+    UnknownEvent {
+        /// Unrecognized event identifier.
+        event_id: u32,
     },
     /// Required constructor field is absent.
     MissingField {
@@ -1262,6 +1509,7 @@ impl RegistryError {
             Self::UnknownType { .. } => ErrorClass::UnknownType,
             Self::UnknownProperty { .. } => ErrorClass::UnknownProperty,
             Self::UnknownAction { .. } => ErrorClass::UnknownAction,
+            Self::UnknownEvent { .. } => ErrorClass::UnknownEvent,
             Self::UnknownField { .. } | Self::MissingField { .. } | Self::DuplicateField { .. } => {
                 ErrorClass::InvalidFrame
             }
@@ -1299,7 +1547,7 @@ struct ActorRecord {
     text_bytes: u32,
     root_name_bytes: u32,
     resources: u16,
-    ops: Box<dyn ActorOps>,
+    ops: Rc<dyn ActorOps>,
 }
 
 #[derive(Clone, Copy)]
@@ -1451,6 +1699,84 @@ impl StageRegistry {
         })
     }
 
+    /// Clone an event adapter before borrowing the Stage object tree for dispatch.
+    pub fn actor_event_handle(
+        &self,
+        object_id: ObjectId,
+    ) -> Result<ActorEventHandle, RegistryError> {
+        let record = self.record(object_id)?;
+        Ok(ActorEventHandle {
+            object_id,
+            type_id: record.descriptor.type_id,
+            ops: record.ops.clone(),
+        })
+    }
+
+    /// Reserve invalidation storage for post-dispatch native publications.
+    pub fn reserve_native_event_publications(
+        &mut self,
+        maximum: usize,
+    ) -> Result<(), RegistryError> {
+        self.ensure_active()?;
+        self.last_invalidations
+            .try_reserve_exact(maximum)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::NativeEventPublications,
+            })
+    }
+
+    /// Publish descriptor-first native mutations without allocating.
+    ///
+    /// The endpoint calls this after object-tree dispatch releases its mutable
+    /// root borrow. One Stage Revision is committed for the traversal's
+    /// aggregate nonempty native effects, snapshots are invalidated, and current actor bounds become draw
+    /// invalidations for descriptors that declare [`MutationEffects::DRAW`].
+    pub fn publish_native_mutations(
+        &mut self,
+        starting_revision: StageRevision,
+        publications: &[NativeMutationPublication],
+    ) -> Result<StageRevision, RegistryError> {
+        self.ensure_active()?;
+        if self.revision != starting_revision {
+            return Err(RegistryError::Internal);
+        }
+        let required_invalidations = publications
+            .iter()
+            .filter(|publication| publication.effects.contains(MutationEffects::DRAW))
+            .count();
+        if required_invalidations > self.last_invalidations.capacity() {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::NativeEventPublications,
+            });
+        }
+        for publication in publications {
+            self.record(publication.object_id)?;
+        }
+
+        let effects = publications
+            .iter()
+            .fold(MutationEffects::NONE, |effects, publication| {
+                effects.union(publication.effects)
+            });
+        if effects == MutationEffects::NONE {
+            return Ok(self.revision);
+        }
+
+        self.snapshot = None;
+        self.last_effects = effects;
+        self.last_invalidations.clear();
+        for publication in publications {
+            if publication.effects.contains(MutationEffects::DRAW) {
+                let bounds = self.record(publication.object_id)?.ops.bounds()?;
+                if !self.last_invalidations.contains(&bounds) {
+                    self.last_invalidations.push(bounds);
+                }
+            }
+        }
+        self.revision = self.revision.next().ok_or(RegistryError::Internal)?;
+        Ok(self.revision)
+    }
+
     /// Resolve the compatible native node by traversing stage roots.
     pub fn node(&self, object_id: ObjectId) -> Result<&ObjectNode, RegistryError> {
         self.record(object_id)?;
@@ -1483,6 +1809,20 @@ impl StageRegistry {
             return Err(RegistryError::Internal);
         }
         Ok(value)
+    }
+
+    /// Find one event descriptor declared by a live actor.
+    pub fn event_descriptor(
+        &self,
+        object_id: ObjectId,
+        event_id: u32,
+    ) -> Result<&'static EventDescriptor, RegistryError> {
+        self.record(object_id)?
+            .descriptor
+            .events
+            .iter()
+            .find(|event| event.id == event_id)
+            .ok_or(RegistryError::UnknownEvent { event_id })
     }
 
     /// Return requested layout independently of computed geometry.
@@ -2049,7 +2389,7 @@ impl StageRegistry {
 
     fn record(&self, object_id: ObjectId) -> Result<&ActorRecord, RegistryError> {
         self.ensure_active()?;
-        let Some(slot) = self.slots.get(object_id.slot() as usize) else {
+        let Some(slot) = self.slots.get(object_id.slot_index()) else {
             return Err(RegistryError::StaleObject { object_id });
         };
         if slot.generation != object_id.generation() {
@@ -2062,7 +2402,7 @@ impl StageRegistry {
 
     fn record_mut(&mut self, object_id: ObjectId) -> Result<&mut ActorRecord, RegistryError> {
         self.ensure_active()?;
-        let Some(slot) = self.slots.get_mut(object_id.slot() as usize) else {
+        let Some(slot) = self.slots.get_mut(object_id.slot_index()) else {
             return Err(RegistryError::StaleObject { object_id });
         };
         if slot.generation != object_id.generation() {
@@ -2445,7 +2785,7 @@ impl StageRegistry {
     fn retire_slot(&mut self, object_id: ObjectId) -> Result<(), RegistryError> {
         let slot = self
             .slots
-            .get_mut(object_id.slot() as usize)
+            .get_mut(object_id.slot_index())
             .ok_or(RegistryError::Internal)?;
         if slot.generation != object_id.generation() {
             return Err(RegistryError::Internal);
@@ -2526,6 +2866,71 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
                 return Err(RegistryError::InvalidCatalog);
             }
         }
+        for (event_index, event) in descriptor.events.iter().enumerate() {
+            let coalescing_is_valid = match event.delivery {
+                EventDelivery::Critical | EventDelivery::Ordered => event.coalescing_key.is_none(),
+                EventDelivery::LatestValueCoalescible => event.coalescing_key.is_some(),
+            };
+            if event.id == 0
+                || event.name.is_empty()
+                || event.phases.is_empty()
+                || event.filters.is_empty()
+                || !event.filters.contains(EventFilterSet::ANY)
+                || (event.requires_native_consumed && !event.requires_widget_invocation)
+                || (event.allow_consume_at_target && !event.phases.allows(DispatchPhase::Target))
+                || !coalescing_is_valid
+                || minimum_event_payload_bytes(event.payload)
+                    .is_none_or(|minimum| minimum > event.max_payload_bytes)
+                || descriptor.events[..event_index]
+                    .iter()
+                    .any(|prior| prior.id == event.id || prior.name == event.name)
+                || catalog[..index]
+                    .iter()
+                    .flat_map(|prior| prior.events)
+                    .any(|prior| prior.id == event.id)
+            {
+                return Err(RegistryError::InvalidCatalog);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn minimum_event_payload_bytes(tags: &[ValueTag]) -> Option<u32> {
+    tags.iter().try_fold(0u32, |total, tag| {
+        let bytes = match tag {
+            ValueTag::None => 1,
+            ValueTag::Bool => 2,
+            ValueTag::I32 | ValueTag::U32 | ValueTag::Precise | ValueTag::Color => 5,
+            ValueTag::I64 | ValueTag::U64 => 9,
+            ValueTag::Point | ValueTag::Size | ValueTag::Enum => 9,
+            ValueTag::Rect => 17,
+            ValueTag::Text | ValueTag::Bytes => 5,
+            ValueTag::Object => 9,
+            ValueTag::Resource => 13,
+            ValueTag::BatchObject => 3,
+        };
+        total.checked_add(bytes)
+    })
+}
+
+fn validate_event_payload(
+    descriptor: &EventDescriptor,
+    payload: &[u8],
+) -> Result<(), RegistryError> {
+    let mut position = 0usize;
+    for expected in descriptor.payload {
+        let (value, consumed) =
+            decode_value(&payload[position..]).map_err(|_| RegistryError::Internal)?;
+        if value_tag(value) != *expected {
+            return Err(RegistryError::Internal);
+        }
+        position = position
+            .checked_add(consumed)
+            .ok_or(RegistryError::Internal)?;
+    }
+    if position != payload.len() {
+        return Err(RegistryError::Internal);
     }
     Ok(())
 }

@@ -2,12 +2,15 @@
 use alloc::{boxed::Box, string::String};
 use rlvgl_core::actor::{
     ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
-    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, MutationEffects,
-    PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError,
-    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ConstructorArgs, ConstructorFieldDescriptor, EventDelivery, EventDescriptor, EventFilterSet,
+    EventPhaseSet, LayoutCapabilities, MpyActor, MutationEffects, NativeEventKind, PropertyAccess,
+    PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError, ResourceCost,
+    TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag, construct_native_actor,
+    encode_event_values,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::event::Event;
+use rlvgl_core::object::ObjectEvent;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Rect, Widget};
 
@@ -70,6 +73,9 @@ const MPY_BOUNDS_FIELD: u32 = 1;
 const MPY_TEXT_FIELD: u32 = 2;
 const MPY_TEXT_PROPERTY: u32 = 1;
 
+/// Stable MPY event identifier for a completed native button click.
+pub const MPY_CLICKED_EVENT_ID: u32 = 0x0001_0001;
+
 const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
     id: MPY_TEXT_PROPERTY,
     name: "text",
@@ -83,6 +89,23 @@ const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
         .union(MutationEffects::SNAPSHOT),
 }];
 
+const MPY_EVENTS: [EventDescriptor; 1] = [EventDescriptor {
+    id: MPY_CLICKED_EVENT_ID,
+    name: "clicked",
+    payload: &[ValueTag::I32, ValueTag::I32],
+    max_payload_bytes: 10,
+    native_event: NativeEventKind::Clicked,
+    phases: EventPhaseSet::TARGET,
+    filters: EventFilterSet::ANY.union(EventFilterSet::POINTER_REGION),
+    requires_widget_invocation: true,
+    requires_native_consumed: true,
+    allow_consume_at_target: true,
+    allow_stop_after_phase: false,
+    native_effects: MutationEffects::NONE,
+    delivery: EventDelivery::Ordered,
+    coalescing_key: None,
+}];
+
 /// Stable MPY actor type identifier for [`Button`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0003);
 
@@ -90,7 +113,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0003);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::button::Button",
-    schema_revision: 1,
+    schema_revision: 2,
     family: ActorFamily::Control,
     capabilities: ActorCapabilities::TEXT.union(ActorCapabilities::CONTROL),
     targets: TargetSet::ALL,
@@ -110,7 +133,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     ],
     properties: &MPY_PROPERTIES,
     actions: &[],
-    events: &[],
+    events: &MPY_EVENTS,
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
     resource_cost: ResourceCost {
@@ -162,6 +185,21 @@ impl MpyActor for Button {
         match id {
             MPY_TEXT_PROPERTY => Ok(OwnedValue::Text(String::from(self.text()))),
             _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn event_payload(
+        &self,
+        event_id: u32,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        match (event_id, event) {
+            (MPY_CLICKED_EVENT_ID, ObjectEvent::Clicked { x, y }) => {
+                encode_event_values(&[ValueRef::I32(*x), ValueRef::I32(*y)], output).map(Some)
+            }
+            (MPY_CLICKED_EVENT_ID, _) => Err(RegistryError::Internal),
+            _ => Err(RegistryError::UnknownEvent { event_id }),
         }
     }
 

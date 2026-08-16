@@ -2,15 +2,17 @@
 use alloc::{string::String, vec::Vec};
 use rlvgl_core::actor::{
     ActionDescriptor, ActionTransaction, ActorCapabilities, ActorFamily, ActorPreparation,
-    ChildPolicy, ConstructedActor, ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities,
-    MpyActor, MutationEffects, PropertyAccess, PropertyConstraint, PropertyDefault,
-    PropertyDescriptor, RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag,
-    construct_native_actor,
+    ChildPolicy, ConstructedActor, ConstructorArgs, ConstructorFieldDescriptor, EventDelivery,
+    EventDescriptor, EventFilterSet, EventPhaseSet, LayoutCapabilities, MpyActor, MutationEffects,
+    NativeEventKind, PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor,
+    RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag,
+    construct_native_actor, encode_event_values,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
+use rlvgl_core::object::ObjectEvent;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::style::Style;
 use rlvgl_core::widget::{Color, Rect, Widget};
@@ -24,6 +26,7 @@ pub struct List {
     pub text_color: Color,
     items: Vec<String>,
     selected: Option<usize>,
+    last_native_selection_changed: bool,
     /// Font assignment for this widget (FONT-00 §5); resolves to `FONT_6X10`
     /// when unset.
     font: WidgetFont,
@@ -38,6 +41,7 @@ impl List {
             text_color: Color(0, 0, 0, 255),
             items: Vec::new(),
             selected: None,
+            last_native_selection_changed: false,
             font: WidgetFont::new(),
         }
     }
@@ -132,6 +136,9 @@ const MPY_CLEAR_ACTION: u32 = 3;
 const MPY_SELECT_ACTION: u32 = 4;
 const MPY_CLEAR_SELECTION_ACTION: u32 = 5;
 
+/// Stable MPY event identifier for a completed native list selection.
+pub const MPY_SELECTION_CHANGED_EVENT_ID: u32 = 0x0001_0003;
+
 const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
     id: MPY_ITEM_COUNT_PROPERTY,
     name: "item_count",
@@ -192,6 +199,23 @@ const MPY_ACTIONS: [ActionDescriptor; 5] = [
     },
 ];
 
+const MPY_EVENTS: [EventDescriptor; 1] = [EventDescriptor {
+    id: MPY_SELECTION_CHANGED_EVENT_ID,
+    name: "selection_changed",
+    payload: &[ValueTag::U32],
+    max_payload_bytes: 5,
+    native_event: NativeEventKind::Clicked,
+    phases: EventPhaseSet::TARGET,
+    filters: EventFilterSet::ANY,
+    requires_widget_invocation: true,
+    requires_native_consumed: true,
+    allow_consume_at_target: true,
+    allow_stop_after_phase: false,
+    native_effects: MutationEffects::DRAW.union(MutationEffects::SNAPSHOT),
+    delivery: EventDelivery::Ordered,
+    coalescing_key: None,
+}];
+
 /// Stable MPY actor type identifier for [`List`].
 pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
 
@@ -199,7 +223,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::list::List",
-    schema_revision: 1,
+    schema_revision: 2,
     family: ActorFamily::Composite,
     capabilities: ActorCapabilities::TEXT
         .union(ActorCapabilities::CONTROL)
@@ -213,7 +237,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     }],
     properties: &MPY_PROPERTIES,
     actions: &MPY_ACTIONS,
-    events: &[],
+    events: &MPY_EVENTS,
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
     resource_cost: ResourceCost {
@@ -271,7 +295,9 @@ impl Widget for List {
             return false;
         };
 
+        let previous = self.selected;
         self.selected = Some(idx);
+        self.last_native_selection_changed = self.selected != previous;
         true
     }
 }
@@ -285,6 +311,28 @@ impl MpyActor for List {
                 u32::try_from(self.items.len()).map_err(|_| RegistryError::Internal)?,
             )),
             _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn event_payload(
+        &self,
+        event_id: u32,
+        event: &ObjectEvent,
+        output: &mut [u8],
+    ) -> Result<Option<usize>, RegistryError> {
+        match (event_id, event) {
+            (MPY_SELECTION_CHANGED_EVENT_ID, ObjectEvent::Clicked { .. }) => {
+                if !self.last_native_selection_changed {
+                    return Ok(None);
+                }
+                let selected = self.selected().ok_or(RegistryError::Internal)?;
+                let selected = u32::try_from(selected).map_err(|_| RegistryError::Capacity {
+                    kind: rlvgl_core::actor::CapacityKind::EventPayloadBytes,
+                })?;
+                encode_event_values(&[ValueRef::U32(selected)], output).map(Some)
+            }
+            (MPY_SELECTION_CHANGED_EVENT_ID, _) => Err(RegistryError::Internal),
+            _ => Err(RegistryError::UnknownEvent { event_id }),
         }
     }
 
