@@ -1,17 +1,86 @@
 //! Focused conformance tests for the MPY-05 endpoint cue queue substrate.
 
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    cell::Cell,
+};
+
 use rlvgl_api::protocol::{FrameRef, MPY_V1, decode_frame, encode_frame};
 use rlvgl_core::{
     actor::{ObjectId, StageId},
     cue::{
-        CUE_FLAG_LATEST_VALUE_MERGED, CUE_FLAG_MPY05_METADATA, CUE_FRAME_OVERHEAD_BYTES,
-        CUE_METADATA_ENVELOPE_BYTES, CallbackId, CoalescingKey, CueDelivery, CueEndpointState,
-        CueIdentity, CueInput, CueLimits, CueLimitsError, CuePayloadRef, CueQueue, CueQueueError,
-        CueSequence, DrainBudget, EmergencyFault, EnqueueOutcome, EventId, NativeEventSequence,
+        CUE_FLAG_LATEST_VALUE_MERGED, CUE_FLAG_MPY05_METADATA, CUE_FLAG_SUBSCRIPTION_RELEASE,
+        CUE_FRAME_OVERHEAD_BYTES, CUE_METADATA_ENVELOPE_BYTES, CallbackId, CoalescingKey,
+        CueAdmission, CueDelivery, CueEndpointState, CueIdentity, CueInput, CueLimits,
+        CueLimitsError, CuePayloadRef, CueQueue, CueQueueError, CueSequence, DrainBudget,
+        EmergencyFault, EndpointRecord, EnqueueOutcome, EventId, INPUT_OVERFLOW_METADATA_BYTES,
+        InputClass, InputSequence, NativeEventSequence, RUNTIME_NOTICE_INPUT_OVERFLOW,
         SubscriptionId,
     },
     direction::StageRevision,
 };
+
+struct TrackingAllocator;
+
+thread_local! {
+    static TRACK_ALLOCATIONS: Cell<bool> = const { Cell::new(false) };
+    static ALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
+}
+
+// SAFETY: every operation delegates unchanged layouts and pointers to the
+// process System allocator; thread-local bookkeeping observes allocation only.
+unsafe impl GlobalAlloc for TrackingAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+            let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+        }
+        // SAFETY: `layout` is forwarded unchanged to the System allocator.
+        unsafe { System.alloc(layout) }
+    }
+
+    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+        // SAFETY: both values came from the matching System allocation.
+        unsafe { System.dealloc(pointer, layout) }
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+            let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+        }
+        // SAFETY: `layout` is forwarded unchanged to the System allocator.
+        unsafe { System.alloc_zeroed(layout) }
+    }
+
+    unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+        if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+            let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+        }
+        // SAFETY: the allocation and layout belong to System; `size` is the
+        // requested replacement size under GlobalAlloc's contract.
+        unsafe { System.realloc(pointer, layout, size) }
+    }
+}
+
+#[global_allocator]
+static GLOBAL_ALLOCATOR: TrackingAllocator = TrackingAllocator;
+
+fn count_allocations<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    struct TrackingGuard;
+
+    impl Drop for TrackingGuard {
+        fn drop(&mut self) {
+            TRACK_ALLOCATIONS.with(|tracking| tracking.set(false));
+        }
+    }
+
+    ALLOCATION_COUNT.with(|count| count.set(0));
+    TRACK_ALLOCATIONS.with(|tracking| tracking.set(true));
+    let guard = TrackingGuard;
+    let result = operation();
+    drop(guard);
+    let count = ALLOCATION_COUNT.with(Cell::get);
+    (result, count)
+}
 
 fn limits(total: usize, reserve: usize, quota: usize) -> CueLimits {
     CueLimits::new(total, reserve, quota, 64, CUE_FRAME_OVERHEAD_BYTES + 64).unwrap()
@@ -534,6 +603,456 @@ fn critical_exhaustion_faults_endpoint_and_publishes_emergency_notice() {
             sequence: sequence(1),
         })
     );
+}
+
+#[test]
+fn logical_reservation_prevents_slot_theft_and_releases_unused_counts() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(5, 1, 3)).unwrap();
+
+    {
+        let mut reservation = queue
+            .reserve(CueAdmission {
+                stage_id: stage,
+                ordinary_slots: 2,
+                critical_slots: 0,
+            })
+            .unwrap();
+        assert_eq!(reservation.remaining_ordinary(), 2);
+        reservation
+            .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+            .unwrap();
+        assert_eq!(reservation.remaining_ordinary(), 1);
+        reservation.finish();
+    }
+
+    // The unused count above was logical only and is released on finish.
+    let mut reservation = queue
+        .reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 2,
+            critical_slots: 1,
+        })
+        .unwrap();
+    assert_eq!(reservation.remaining_critical(), 1);
+    assert_eq!(
+        reservation.enqueue(cue(2, 2, CueDelivery::Ordered, &[2])),
+        Err(CueQueueError::ReservationStageMismatch)
+    );
+    assert_eq!(reservation.remaining_ordinary(), 2);
+    reservation
+        .enqueue(cue(1, 2, CueDelivery::Ordered, &[2]))
+        .unwrap();
+    reservation
+        .enqueue(cue(1, 3, CueDelivery::Ordered, &[3]))
+        .unwrap();
+    assert_eq!(
+        reservation.enqueue(cue(1, 4, CueDelivery::Ordered, &[4])),
+        Err(CueQueueError::ReservationClassExhausted)
+    );
+    reservation.finish();
+
+    assert_eq!(queue.ordinary_len(), 3);
+    assert!(matches!(
+        queue.reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 1,
+            critical_slots: 0,
+        }),
+        Err(CueQueueError::AdmissionStageQuota { stage_id }) if stage_id == stage
+    ));
+}
+
+#[test]
+fn reserved_enqueue_moves_preallocated_payload_without_allocating() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    let mut payload = Vec::with_capacity(16);
+    payload.extend_from_slice(&[1, 2, 3, 4]);
+    let payload_pointer = payload.as_ptr();
+    let input = CueInput::new(
+        CueIdentity::new(
+            stage,
+            ObjectId::new((1u64 << 32) | 1).unwrap(),
+            SubscriptionId::new(1).unwrap(),
+            CallbackId::new(1).unwrap(),
+            EventId::new(1).unwrap(),
+        ),
+        StageRevision::new(1),
+        NativeEventSequence::new(1).unwrap(),
+        CueDelivery::Ordered,
+        payload,
+    );
+    let mut reservation = queue
+        .reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 1,
+            critical_slots: 0,
+        })
+        .unwrap();
+
+    let (outcome, allocations) = count_allocations(|| reservation.enqueue(input));
+    assert_eq!(
+        outcome,
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(1),
+        })
+    );
+    assert_eq!(allocations, 0);
+    reservation.finish();
+
+    let drained = queue.drain(DrainBudget::new(1, usize::MAX)).unwrap();
+    assert_eq!(drained.cues[0].payload().as_ptr(), payload_pointer);
+}
+
+#[test]
+fn input_overflow_notice_gates_and_shares_global_record_order() {
+    let stage = StageId::new(1).unwrap();
+    let input_class = InputClass::new(7).unwrap();
+    let mut queue = CueQueue::new(limits(6, 2, 4)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+
+    let first_loss = queue
+        .record_input_overflow(stage, input_class, InputSequence::new(10).unwrap())
+        .unwrap();
+    assert_eq!(first_loss.lost_count(), 1);
+    let loss = queue
+        .record_input_overflow(stage, input_class, InputSequence::new(11).unwrap())
+        .unwrap();
+    assert_eq!(loss.first_sequence(), InputSequence::new(10).unwrap());
+    assert_eq!(loss.last_sequence(), InputSequence::new(11).unwrap());
+    assert_eq!(loss.lost_count(), 2);
+    assert_eq!(
+        queue.record_input_overflow(stage, input_class, InputSequence::new(11).unwrap()),
+        Err(CueQueueError::InputSequenceRegressed {
+            previous: InputSequence::new(11).unwrap(),
+            offered: InputSequence::new(11).unwrap(),
+        })
+    );
+    assert_eq!(queue.state(), CueEndpointState::Backpressured);
+    assert_eq!(queue.pending_input_loss(), Some(loss));
+    assert_eq!(
+        queue.drain_endpoint(DrainBudget::new(8, usize::MAX)),
+        Err(CueQueueError::DrainBackpressured)
+    );
+    assert!(matches!(
+        queue.reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 1,
+            critical_slots: 0,
+        }),
+        Err(CueQueueError::AdmissionBackpressured)
+    ));
+    assert_eq!(
+        queue.record_input_overflow(
+            StageId::new(2).unwrap(),
+            input_class,
+            InputSequence::new(12).unwrap(),
+        ),
+        Err(CueQueueError::InputBackpressured)
+    );
+    assert_eq!(
+        queue.enqueue_pending_input_overflow_notice(vec![0; 65]),
+        Err(CueQueueError::PayloadTooLarge {
+            actual: 65,
+            maximum: 64,
+        })
+    );
+    assert_eq!(queue.pending_input_loss(), Some(loss));
+
+    let mut detail = Vec::with_capacity(16);
+    detail.extend_from_slice(&[0xaa, 0xbb]);
+    let detail_pointer = detail.as_ptr();
+    let (notice, allocations) =
+        count_allocations(|| queue.enqueue_pending_input_overflow_notice(detail));
+    assert_eq!(allocations, 0);
+    let notice = notice.unwrap();
+    assert_eq!(notice.loss, loss);
+    assert_eq!(notice.notice_sequence, sequence(2));
+    assert_eq!(queue.state(), CueEndpointState::Ready);
+
+    queue
+        .enqueue(cue(2, 2, CueDelivery::Critical, &[2]))
+        .unwrap();
+    let drained = queue
+        .drain_endpoint(DrainBudget::new(8, usize::MAX))
+        .unwrap();
+    assert_eq!(drained.records.len(), 3);
+    assert_eq!(drained.records[0].sequence(), sequence(1));
+    assert_eq!(drained.records[1].sequence(), sequence(2));
+    assert_eq!(drained.records[2].sequence(), sequence(3));
+
+    let EndpointRecord::RuntimeNotice(record) = &drained.records[1] else {
+        panic!("expected InputOverflow RuntimeNotice");
+    };
+    assert_eq!(record.kind(), RUNTIME_NOTICE_INPUT_OVERFLOW);
+    assert_eq!(record.input_loss(), loss);
+    assert_eq!(record.payload(), [0xaa, 0xbb]);
+    assert_eq!(record.payload().as_ptr(), detail_pointer);
+
+    let mut notice_payload = [0u8; INPUT_OVERFLOW_METADATA_BYTES + 2];
+    let frame = record.protocol_frame(&mut notice_payload).unwrap();
+    let mut encoded = [0u8; 96];
+    let encoded_len = encode_frame(MPY_V1, frame, &mut encoded).unwrap();
+    assert_eq!(encoded_len, record.frame_bytes());
+    let decoded = decode_frame(&encoded[..encoded_len]).unwrap();
+    let FrameRef::RuntimeNotice(decoded_notice) = decoded.frame else {
+        panic!("expected RuntimeNotice frame");
+    };
+    assert_eq!(decoded_notice.sequence, 2);
+    assert_eq!(decoded_notice.kind, RUNTIME_NOTICE_INPUT_OVERFLOW);
+    assert_eq!(decoded_notice.payload, notice_payload);
+    let expected_payload = [
+        1, 0, 0, 0, // StageId
+        7, 0, 0, 0, // input class
+        10, 0, 0, 0, 0, 0, 0, 0, // first InputSequence
+        11, 0, 0, 0, 0, 0, 0, 0, // last InputSequence
+        2, 0, 0, 0, // loss count
+        0xaa, 0xbb, // caller-owned detail
+    ];
+    assert_eq!(decoded_notice.payload, expected_payload);
+}
+
+#[test]
+fn input_overflow_notice_capacity_exhaustion_faults_without_clearing_loss() {
+    let mut queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    queue
+        .enqueue(cue(1, 2, CueDelivery::Ordered, &[2]))
+        .unwrap();
+    queue
+        .enqueue(cue(2, 3, CueDelivery::Critical, &[3]))
+        .unwrap();
+    let loss = queue
+        .record_input_overflow(
+            StageId::new(1).unwrap(),
+            InputClass::new(1).unwrap(),
+            InputSequence::new(1).unwrap(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        queue.enqueue_pending_input_overflow_notice(vec![9]),
+        Err(CueQueueError::CriticalNoticeCapacityExhausted {
+            sequence: sequence(4),
+            kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
+        })
+    );
+    assert_eq!(queue.state(), CueEndpointState::Faulted);
+    assert_eq!(queue.pending_input_loss(), Some(loss));
+    assert_eq!(
+        queue.emergency_fault(),
+        Some(&EmergencyFault::CriticalNoticeCapacityExhausted {
+            sequence: sequence(4),
+            kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
+        })
+    );
+}
+
+#[test]
+fn stage_purge_preserves_critical_release_records_and_global_order() {
+    let mut queue = CueQueue::new(limits(6, 2, 3)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    queue
+        .enqueue(cue(2, 2, CueDelivery::Ordered, &[2]))
+        .unwrap();
+    queue
+        .enqueue(cue(1, 3, CueDelivery::Critical, &[3]).with_subscription_release())
+        .unwrap();
+    queue
+        .enqueue(cue(1, 4, CueDelivery::Ordered, &[4]))
+        .unwrap();
+    queue
+        .enqueue(cue(2, 5, CueDelivery::Critical, &[5]))
+        .unwrap();
+
+    let removed = queue.remove_stage_ordinary(StageId::new(1).unwrap());
+    assert_eq!(removed.count, 2);
+    assert_eq!(removed.first_sequence, Some(sequence(1)));
+    assert_eq!(removed.last_sequence, Some(sequence(4)));
+    assert_eq!(queue.ordinary_len(), 1);
+    assert_eq!(queue.critical_len(), 2);
+
+    let drained = queue
+        .drain_endpoint(DrainBudget::new(8, usize::MAX))
+        .unwrap();
+    let sequences: Vec<_> = drained
+        .records
+        .iter()
+        .map(|record| record.sequence().get())
+        .collect();
+    assert_eq!(sequences, [2, 3, 5]);
+    let EndpointRecord::Cue(release) = &drained.records[1] else {
+        panic!("expected retained Critical release cue");
+    };
+    assert!(release.is_subscription_release());
+    let mut payload = [0u8; CUE_METADATA_ENVELOPE_BYTES + 1];
+    let FrameRef::Cue(protocol_cue) = release.protocol_frame(&mut payload).unwrap() else {
+        panic!("expected Cue frame");
+    };
+    assert_eq!(
+        protocol_cue.flags,
+        CUE_FLAG_MPY05_METADATA | CUE_FLAG_SUBSCRIPTION_RELEASE
+    );
+
+    assert_eq!(
+        queue.enqueue(cue(1, 6, CueDelivery::Ordered, &[6]).with_subscription_release()),
+        Err(CueQueueError::SubscriptionReleaseMustBeCritical)
+    );
+}
+
+#[test]
+fn compatibility_cue_drain_never_bypasses_a_runtime_notice() {
+    let mut queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    queue
+        .record_input_overflow(
+            StageId::new(1).unwrap(),
+            InputClass::new(1).unwrap(),
+            InputSequence::new(1).unwrap(),
+        )
+        .unwrap();
+    queue
+        .enqueue_pending_input_overflow_notice(Vec::new())
+        .unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+
+    let cue_only = queue.drain(DrainBudget::new(8, usize::MAX)).unwrap();
+    assert!(cue_only.cues.is_empty());
+    assert_eq!(queue.len(), 2);
+
+    let global = queue
+        .drain_endpoint(DrainBudget::new(8, usize::MAX))
+        .unwrap();
+    assert!(matches!(
+        global.records.as_slice(),
+        [EndpointRecord::RuntimeNotice(_), EndpointRecord::Cue(_)]
+    ));
+}
+
+#[test]
+fn finalized_stages_release_bounded_causality_capacity() {
+    let mut queue = CueQueue::new(limits(2, 1, 1)).unwrap();
+
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    assert_eq!(
+        queue.remove_stage_ordinary(StageId::new(1).unwrap()).count,
+        1
+    );
+    assert_eq!(queue.finalize_stage(StageId::new(1).unwrap()), Ok(true));
+    assert_eq!(queue.finalize_stage(StageId::new(1).unwrap()), Ok(false));
+
+    queue
+        .enqueue(cue(2, 2, CueDelivery::Ordered, &[2]))
+        .unwrap();
+    assert_eq!(
+        queue.remove_stage_ordinary(StageId::new(2).unwrap()).count,
+        1
+    );
+    assert_eq!(queue.finalize_stage(StageId::new(2).unwrap()), Ok(true));
+
+    // This third Stage would exceed the two-entry causality history without
+    // explicit finalization of the retired Stages above.
+    assert_eq!(
+        queue.enqueue(cue(3, 3, CueDelivery::Ordered, &[3])),
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(3),
+        })
+    );
+}
+
+#[test]
+fn stage_finalization_waits_for_queued_and_pending_teardown_outputs() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(4, 1, 2)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Critical, &[1]).with_subscription_release())
+        .unwrap();
+
+    assert_eq!(
+        queue.finalize_stage(stage),
+        Err(CueQueueError::StageFinalizeBusy { stage_id: stage })
+    );
+    assert_eq!(queue.len(), 1);
+    let drained = queue
+        .drain_endpoint(DrainBudget::new(1, usize::MAX))
+        .unwrap();
+    assert!(matches!(
+        drained.records.as_slice(),
+        [EndpointRecord::Cue(record)] if record.is_subscription_release()
+    ));
+    // The endpoint calls finalize only after the returned release record has
+    // been handled at the VM-safe boundary.
+    assert_eq!(queue.finalize_stage(stage), Ok(true));
+
+    let input_stage = StageId::new(2).unwrap();
+    queue
+        .record_input_overflow(
+            input_stage,
+            InputClass::new(1).unwrap(),
+            InputSequence::new(1).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(
+        queue.finalize_stage(input_stage),
+        Err(CueQueueError::StageFinalizeBusy {
+            stage_id: input_stage,
+        })
+    );
+    queue
+        .enqueue_pending_input_overflow_notice(Vec::new())
+        .unwrap();
+    assert_eq!(
+        queue.finalize_stage(input_stage),
+        Err(CueQueueError::StageFinalizeBusy {
+            stage_id: input_stage,
+        })
+    );
+    queue
+        .drain_endpoint(DrainBudget::new(1, usize::MAX))
+        .unwrap();
+    assert_eq!(queue.finalize_stage(input_stage), Ok(false));
+
+    let loss_stage = StageId::new(3).unwrap();
+    queue
+        .enqueue(cue(3, 2, CueDelivery::Ordered, &[2]))
+        .unwrap();
+    queue
+        .enqueue(cue(3, 3, CueDelivery::Ordered, &[3]))
+        .unwrap();
+    assert!(matches!(
+        queue.enqueue(cue(3, 4, CueDelivery::Ordered, &[4])),
+        Err(CueQueueError::StageQuotaExhausted { .. })
+    ));
+    assert_eq!(queue.remove_stage_ordinary(loss_stage).count, 2);
+    assert_eq!(
+        queue.finalize_stage(loss_stage),
+        Err(CueQueueError::StageFinalizeBusy {
+            stage_id: loss_stage,
+        })
+    );
+    queue
+        .enqueue_pending_loss_notice(cue(3, 5, CueDelivery::Critical, &[4]))
+        .unwrap();
+    assert_eq!(
+        queue.finalize_stage(loss_stage),
+        Err(CueQueueError::StageFinalizeBusy {
+            stage_id: loss_stage,
+        })
+    );
+    queue
+        .drain_endpoint(DrainBudget::new(1, usize::MAX))
+        .unwrap();
+    assert_eq!(queue.finalize_stage(loss_stage), Ok(true));
 }
 
 fn sequence(raw: u32) -> rlvgl_core::cue::CueSequence {

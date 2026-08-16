@@ -37,6 +37,19 @@ pub const CUE_FLAG_MPY05_METADATA: u32 = 1 << 0;
 /// Cue flag indicating latest-value coalescing represented multiple emissions.
 pub const CUE_FLAG_LATEST_VALUE_MERGED: u32 = 1 << 1;
 
+/// Cue flag indicating that MPY-06 must release, rather than invoke, the
+/// addressed subscription callback token.
+pub const CUE_FLAG_SUBSCRIPTION_RELEASE: u32 = 1 << 2;
+
+/// Registered RuntimeNotice kind for a raw input rejected before dispatch.
+pub const RUNTIME_NOTICE_INPUT_OVERFLOW: u32 = 1;
+
+/// Fixed typed metadata bytes preceding an InputOverflow notice payload.
+pub const INPUT_OVERFLOW_METADATA_BYTES: usize = 28;
+
+/// Fixed canonical RuntimeNotice frame bytes before its typed payload.
+pub const RUNTIME_NOTICE_FRAME_FIXED_BYTES: usize = 24;
+
 /// Opaque callback token owned by the language adapter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
@@ -118,6 +131,40 @@ impl NativeEventSequence {
 
     /// Return the runtime representation.
     pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+/// Endpoint-wide raw-input admission sequence within one endpoint epoch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct InputSequence(u64);
+
+impl InputSequence {
+    /// Construct an InputSequence, rejecting the reserved zero value.
+    pub const fn new(raw: u64) -> Option<Self> {
+        if raw == 0 { None } else { Some(Self(raw)) }
+    }
+
+    /// Return the runtime representation.
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+/// Stable nonzero input-class identifier carried by overflow notices.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct InputClass(u32);
+
+impl InputClass {
+    /// Construct an input-class identifier, rejecting the reserved zero value.
+    pub const fn new(raw: u32) -> Option<Self> {
+        if raw == 0 { None } else { Some(Self(raw)) }
+    }
+
+    /// Return the serialized representation.
+    pub const fn get(self) -> u32 {
         self.0
     }
 }
@@ -464,6 +511,7 @@ pub struct CueInput {
     event_id: EventId,
     delivery: CueDelivery,
     coalescing_key: Option<CoalescingKey>,
+    flags: u32,
     payload: Vec<u8>,
 }
 
@@ -486,6 +534,7 @@ impl CueInput {
             event_id: identity.event_id,
             delivery,
             coalescing_key: None,
+            flags: 0,
             payload,
         }
     }
@@ -493,6 +542,14 @@ impl CueInput {
     /// Attach the descriptor-supplied discriminator required for coalescing.
     pub fn with_coalescing_key(mut self, key: CoalescingKey) -> Self {
         self.coalescing_key = Some(key);
+        self
+    }
+
+    /// Mark this Critical cue as a subscription callback-token release.
+    ///
+    /// MPY-06 must release the addressed callback instead of invoking it.
+    pub fn with_subscription_release(mut self) -> Self {
+        self.flags |= CUE_FLAG_SUBSCRIPTION_RELEASE;
         self
     }
 
@@ -541,6 +598,11 @@ impl CueInput {
         self.coalescing_key
     }
 
+    /// Return queue-owned cue flags requested by this input.
+    pub const fn flags(&self) -> u32 {
+        self.flags
+    }
+
     /// Borrow the owned event payload.
     pub fn payload(&self) -> &[u8] {
         &self.payload
@@ -560,6 +622,7 @@ pub struct CueRecord {
     event_id: EventId,
     delivery: CueDelivery,
     coalescing_key: Option<CoalescingKey>,
+    flags: u32,
     first_sequence: CueSequence,
     last_sequence: CueSequence,
     merge_count: u32,
@@ -579,6 +642,7 @@ impl CueRecord {
             event_id: input.event_id,
             delivery: input.delivery,
             coalescing_key: input.coalescing_key,
+            flags: input.flags,
             first_sequence: sequence,
             last_sequence: sequence,
             merge_count: 0,
@@ -596,6 +660,7 @@ impl CueRecord {
             && self.callback_id == input.callback_id
             && self.event_id == input.event_id
             && self.coalescing_key == input.coalescing_key
+            && self.flags == input.flags
     }
 
     fn replace_with(&mut self, input: CueInput, sequence: CueSequence) {
@@ -656,6 +721,16 @@ impl CueRecord {
         self.coalescing_key
     }
 
+    /// Return queue-owned cue flags excluding derived metadata flags.
+    pub const fn flags(&self) -> u32 {
+        self.flags
+    }
+
+    /// Return whether this record releases its callback token.
+    pub const fn is_subscription_release(&self) -> bool {
+        self.flags & CUE_FLAG_SUBSCRIPTION_RELEASE != 0
+    }
+
     /// Return the first endpoint sequence represented by this record.
     pub const fn first_sequence(&self) -> CueSequence {
         self.first_sequence
@@ -708,7 +783,7 @@ impl CueRecord {
         payload_output: &'a mut [u8],
     ) -> Result<protocol::Cue<'a>, CuePayloadError> {
         let payload_bytes = self.encode_payload_envelope(payload_output)?;
-        let mut flags = CUE_FLAG_MPY05_METADATA;
+        let mut flags = self.flags | CUE_FLAG_MPY05_METADATA;
         if self.merge_count != 0 {
             flags |= CUE_FLAG_LATEST_VALUE_MERGED;
         }
@@ -736,6 +811,197 @@ impl CueRecord {
     /// Return the accounted canonical Cue frame size.
     pub fn frame_bytes(&self) -> usize {
         CUE_FRAME_OVERHEAD_BYTES + self.payload.len()
+    }
+}
+
+/// Raw-input range rejected before native dispatch and actor mutation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PendingInputLoss {
+    stage_id: StageId,
+    input_class: InputClass,
+    first_sequence: InputSequence,
+    last_sequence: InputSequence,
+    lost_count: u32,
+}
+
+impl PendingInputLoss {
+    fn first(stage_id: StageId, input_class: InputClass, sequence: InputSequence) -> Self {
+        Self {
+            stage_id,
+            input_class,
+            first_sequence: sequence,
+            last_sequence: sequence,
+            lost_count: 1,
+        }
+    }
+
+    fn extend(&mut self, sequence: InputSequence) -> Result<(), CueQueueError> {
+        debug_assert!(sequence > self.last_sequence);
+        let lost_count = self
+            .lost_count
+            .checked_add(1)
+            .ok_or(CueQueueError::InputLossCountExhausted)?;
+        self.last_sequence = sequence;
+        self.lost_count = lost_count;
+        Ok(())
+    }
+
+    /// Return the Stage whose raw input was rejected.
+    pub const fn stage_id(self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the endpoint-defined raw-input class.
+    pub const fn input_class(self) -> InputClass {
+        self.input_class
+    }
+
+    /// Return the first rejected raw-input sequence.
+    pub const fn first_sequence(self) -> InputSequence {
+        self.first_sequence
+    }
+
+    /// Return the last rejected raw-input sequence.
+    pub const fn last_sequence(self) -> InputSequence {
+        self.last_sequence
+    }
+
+    /// Return the number of rejected raw inputs represented by the notice.
+    pub const fn lost_count(self) -> u32 {
+        self.lost_count
+    }
+
+    fn encode(self, output: &mut [u8]) -> Result<usize, CuePayloadError> {
+        if output.len() < INPUT_OVERFLOW_METADATA_BYTES {
+            return Err(CuePayloadError::BufferTooSmall);
+        }
+        output[0..4].copy_from_slice(&self.stage_id.get().to_le_bytes());
+        output[4..8].copy_from_slice(&self.input_class.get().to_le_bytes());
+        output[8..16].copy_from_slice(&self.first_sequence.get().to_le_bytes());
+        output[16..24].copy_from_slice(&self.last_sequence.get().to_le_bytes());
+        output[24..28].copy_from_slice(&self.lost_count.to_le_bytes());
+        Ok(INPUT_OVERFLOW_METADATA_BYTES)
+    }
+}
+
+/// Immutable queued RuntimeNotice sharing endpoint order with callback cues.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RuntimeNoticeRecord {
+    sequence: CueSequence,
+    kind: u32,
+    input_loss: PendingInputLoss,
+    payload: Vec<u8>,
+}
+
+impl RuntimeNoticeRecord {
+    fn input_overflow(
+        sequence: CueSequence,
+        input_loss: PendingInputLoss,
+        payload: Vec<u8>,
+    ) -> Self {
+        Self {
+            sequence,
+            kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
+            input_loss,
+            payload,
+        }
+    }
+
+    /// Return the shared endpoint output sequence.
+    pub const fn sequence(&self) -> CueSequence {
+        self.sequence
+    }
+
+    /// Return the registered RuntimeNotice kind.
+    pub const fn kind(&self) -> u32 {
+        self.kind
+    }
+
+    /// Return the represented raw-input loss range.
+    pub const fn input_loss(&self) -> PendingInputLoss {
+        self.input_loss
+    }
+
+    /// Borrow caller-supplied notice detail bytes following typed metadata.
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+
+    /// Encode typed InputOverflow metadata followed by caller-owned detail.
+    pub fn encode_payload(&self, output: &mut [u8]) -> Result<usize, CuePayloadError> {
+        let length = INPUT_OVERFLOW_METADATA_BYTES
+            .checked_add(self.payload.len())
+            .ok_or(CuePayloadError::BufferTooSmall)?;
+        if output.len() < length {
+            return Err(CuePayloadError::BufferTooSmall);
+        }
+        self.input_loss.encode(output)?;
+        output[INPUT_OVERFLOW_METADATA_BYTES..length].copy_from_slice(&self.payload);
+        Ok(length)
+    }
+
+    /// Encode and borrow this notice through the canonical MPY RuntimeNotice.
+    pub fn protocol_frame<'a>(
+        &self,
+        payload_output: &'a mut [u8],
+    ) -> Result<FrameRef<'a>, CuePayloadError> {
+        let payload_len = self.encode_payload(payload_output)?;
+        Ok(FrameRef::RuntimeNotice(protocol::RuntimeNotice {
+            sequence: self.sequence.get(),
+            kind: self.kind,
+            diagnostic: "",
+            payload: &payload_output[..payload_len],
+        }))
+    }
+
+    /// Return the accounted canonical RuntimeNotice frame size.
+    pub fn frame_bytes(&self) -> usize {
+        RUNTIME_NOTICE_FRAME_FIXED_BYTES + INPUT_OVERFLOW_METADATA_BYTES + self.payload.len()
+    }
+}
+
+/// One globally ordered endpoint output record.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum EndpointRecord {
+    /// Descriptor-derived callback cue.
+    Cue(CueRecord),
+    /// Critical runtime notice that does not address a callback.
+    RuntimeNotice(RuntimeNoticeRecord),
+}
+
+impl EndpointRecord {
+    /// Return the shared endpoint sequence used for drain ordering.
+    pub const fn sequence(&self) -> CueSequence {
+        match self {
+            Self::Cue(record) => record.last_sequence(),
+            Self::RuntimeNotice(record) => record.sequence(),
+        }
+    }
+
+    /// Return the accounted canonical frame size.
+    pub fn frame_bytes(&self) -> usize {
+        match self {
+            Self::Cue(record) => record.frame_bytes(),
+            Self::RuntimeNotice(record) => record.frame_bytes(),
+        }
+    }
+
+    fn is_ordinary(&self) -> bool {
+        matches!(self, Self::Cue(record) if record.delivery.is_ordinary())
+    }
+
+    fn as_cue(&self) -> Option<&CueRecord> {
+        match self {
+            Self::Cue(record) => Some(record),
+            Self::RuntimeNotice(_) => None,
+        }
+    }
+
+    fn as_cue_mut(&mut self) -> Option<&mut CueRecord> {
+        match self {
+            Self::Cue(record) => Some(record),
+            Self::RuntimeNotice(_) => None,
+        }
     }
 }
 
@@ -806,6 +1072,37 @@ pub struct OverflowNoticeOutcome {
     pub notice_sequence: CueSequence,
 }
 
+/// Successful Critical InputOverflow notice admission.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InputOverflowNoticeOutcome {
+    /// Raw-input loss range reported by the notice.
+    pub loss: PendingInputLoss,
+    /// Shared endpoint sequence assigned to the RuntimeNotice.
+    pub notice_sequence: CueSequence,
+}
+
+/// Counts and sequence bounds removed during Stage teardown.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RemovedStageOrdinary {
+    /// Number of queued ordinary records removed for the Stage.
+    pub count: usize,
+    /// First removed endpoint sequence, when any record was removed.
+    pub first_sequence: Option<CueSequence>,
+    /// Last removed endpoint sequence, when any record was removed.
+    pub last_sequence: Option<CueSequence>,
+}
+
+/// Logical worst-case queue admission reserved before native dispatch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CueAdmission {
+    /// Stage that will own every cue admitted through this reservation.
+    pub stage_id: StageId,
+    /// Worst-case number of Ordered or coalescible cue inputs.
+    pub ordinary_slots: usize,
+    /// Worst-case number of Critical cue inputs.
+    pub critical_slots: usize,
+}
+
 /// Cue admission failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CueQueueError {
@@ -813,6 +1110,24 @@ pub enum CueQueueError {
     AllocationFailed,
     /// The endpoint is faulted and requires an epoch reset or recovery action.
     Faulted,
+    /// A logical pre-dispatch reservation was attempted behind a loss barrier.
+    AdmissionBackpressured,
+    /// The endpoint cannot reserve the requested record count.
+    AdmissionCapacity,
+    /// The Stage cannot reserve the requested ordinary record count.
+    AdmissionStageQuota {
+        /// Stage whose ordinary quota would be exceeded.
+        stage_id: StageId,
+    },
+    /// Stage causality cannot be retired while its endpoint work is pending.
+    StageFinalizeBusy {
+        /// Stage whose records, release cues, or loss notice remain pending.
+        stage_id: StageId,
+    },
+    /// A cue offered through a reservation belongs to a different Stage.
+    ReservationStageMismatch,
+    /// A reservation has no remaining slot for the offered delivery class.
+    ReservationClassExhausted,
     /// A latest-value coalescible cue omitted its exact-key discriminator.
     MissingCoalescingKey,
     /// A Critical or Ordered cue supplied a coalescing discriminator.
@@ -854,10 +1169,32 @@ pub enum CueQueueError {
     NoPendingCueLoss,
     /// The explicit overflow-notice API requires a Critical cue input.
     OverflowNoticeMustBeCritical,
+    /// A callback-token release marker was attached to an ordinary cue.
+    SubscriptionReleaseMustBeCritical,
+    /// No raw input loss is awaiting an InputOverflow notice.
+    NoPendingInputLoss,
+    /// A different loss barrier already gates raw-input admission.
+    InputBackpressured,
+    /// Raw-input sequence did not advance monotonically.
+    InputSequenceRegressed {
+        /// Last raw-input sequence already recorded by the queue.
+        previous: InputSequence,
+        /// Non-advancing raw-input sequence offered by the endpoint.
+        offered: InputSequence,
+    },
+    /// The bounded raw-input loss counter exhausted its wire representation.
+    InputLossCountExhausted,
     /// A Critical record could not be admitted and faulted the endpoint.
     CriticalCapacityExhausted {
         /// Sequence allocated to the failed Critical emission.
         sequence: CueSequence,
+    },
+    /// A Critical RuntimeNotice could not be admitted and faulted the endpoint.
+    CriticalNoticeCapacityExhausted {
+        /// Shared endpoint sequence allocated to the failed notice.
+        sequence: CueSequence,
+        /// Registered RuntimeNotice kind that could not be queued.
+        kind: u32,
     },
     /// The endpoint-wide `u32` sequence space was exhausted.
     SequenceExhausted,
@@ -911,6 +1248,13 @@ pub enum EmergencyFault {
         stage_id: StageId,
         /// Critical event that could not be admitted safely.
         event_id: EventId,
+    },
+    /// A Critical RuntimeNotice could not be admitted.
+    CriticalNoticeCapacityExhausted {
+        /// Shared endpoint sequence allocated to the failed notice.
+        sequence: CueSequence,
+        /// Registered RuntimeNotice kind that could not be queued.
+        kind: u32,
     },
 }
 
@@ -969,17 +1313,79 @@ pub struct DrainedCues {
     pub frame_bytes: usize,
 }
 
+/// Endpoint records and byte accounting produced by one bounded global drain.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DrainedEndpointRecords {
+    /// Globally ordered cue and RuntimeNotice records removed from the queue.
+    pub records: Vec<EndpointRecord>,
+    /// Sum of [`EndpointRecord::frame_bytes`] for returned records.
+    pub frame_bytes: usize,
+}
+
 /// One endpoint-owned sequence-ordered cue queue.
 pub struct CueQueue {
     limits: CueLimits,
-    records: VecDeque<CueRecord>,
+    records: VecDeque<EndpointRecord>,
     stage_causality: Vec<StageCausality>,
     last_native_event_sequence: Option<NativeEventSequence>,
+    last_input_sequence: Option<InputSequence>,
     ordinary_records: usize,
     next_sequence: u32,
     state: CueEndpointState,
     pending_loss: Option<PendingCueLoss>,
+    pending_input_loss: Option<PendingInputLoss>,
     emergency_fault: Option<EmergencyFault>,
+}
+
+/// Exclusive logical queue admission reserved before one native dispatch.
+///
+/// Holding this value mutably borrows the endpoint queue, so no other producer
+/// can steal the preflighted slots. Dropping it releases any unused counts.
+pub struct CueReservation<'a> {
+    queue: &'a mut CueQueue,
+    stage_id: StageId,
+    remaining_ordinary: usize,
+    remaining_critical: usize,
+}
+
+impl CueReservation<'_> {
+    /// Return the Stage whose dispatch owns this reservation.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the unused ordinary admission count.
+    pub const fn remaining_ordinary(&self) -> usize {
+        self.remaining_ordinary
+    }
+
+    /// Return the unused Critical admission count.
+    pub const fn remaining_critical(&self) -> usize {
+        self.remaining_critical
+    }
+
+    /// Admit one preflighted cue without any queue-storage allocation.
+    pub fn enqueue(&mut self, input: CueInput) -> Result<EnqueueOutcome, CueQueueError> {
+        if input.stage_id != self.stage_id {
+            return Err(CueQueueError::ReservationStageMismatch);
+        }
+
+        let remaining = if input.delivery.is_ordinary() {
+            &mut self.remaining_ordinary
+        } else {
+            &mut self.remaining_critical
+        };
+        if *remaining == 0 {
+            return Err(CueQueueError::ReservationClassExhausted);
+        }
+
+        let outcome = self.queue.enqueue(input)?;
+        *remaining -= 1;
+        Ok(outcome)
+    }
+
+    /// Explicitly finish this reservation, releasing unused counts.
+    pub fn finish(self) {}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1005,10 +1411,12 @@ impl CueQueue {
             records,
             stage_causality,
             last_native_event_sequence: None,
+            last_input_sequence: None,
             ordinary_records: 0,
             next_sequence: 1,
             state: CueEndpointState::Ready,
             pending_loss: None,
+            pending_input_loss: None,
             emergency_fault: None,
         })
     }
@@ -1033,6 +1441,11 @@ impl CueQueue {
         self.pending_loss
     }
 
+    /// Return the raw-input loss range awaiting a Critical RuntimeNotice.
+    pub const fn pending_input_loss(&self) -> Option<PendingInputLoss> {
+        self.pending_input_loss
+    }
+
     /// Return the number of pending records of all classes.
     pub fn len(&self) -> usize {
         self.records.len()
@@ -1053,6 +1466,69 @@ impl CueQueue {
         self.records.len() - self.ordinary_records
     }
 
+    /// Preflight worst-case cue admission for one native dispatch.
+    ///
+    /// Queue storage is physically reserved by [`Self::new`]. This method
+    /// reserves bounded logical counts and returns an exclusive queue borrow,
+    /// preventing another producer from consuming those counts before the
+    /// dispatch completes.
+    pub fn reserve(
+        &mut self,
+        admission: CueAdmission,
+    ) -> Result<CueReservation<'_>, CueQueueError> {
+        match self.state {
+            CueEndpointState::Faulted => return Err(CueQueueError::Faulted),
+            CueEndpointState::Backpressured => {
+                return Err(CueQueueError::AdmissionBackpressured);
+            }
+            CueEndpointState::Ready => {}
+        }
+
+        let total = admission
+            .ordinary_slots
+            .checked_add(admission.critical_slots)
+            .ok_or(CueQueueError::AdmissionCapacity)?;
+        if self
+            .records
+            .len()
+            .checked_add(total)
+            .is_none_or(|needed| needed > self.limits.total_slots)
+            || self
+                .ordinary_records
+                .checked_add(admission.ordinary_slots)
+                .is_none_or(|needed| needed > self.limits.ordinary_capacity())
+        {
+            return Err(CueQueueError::AdmissionCapacity);
+        }
+        if self
+            .ordinary_for_stage(admission.stage_id)
+            .checked_add(admission.ordinary_slots)
+            .is_none_or(|needed| needed > self.limits.per_stage_ordinary_quota)
+        {
+            return Err(CueQueueError::AdmissionStageQuota {
+                stage_id: admission.stage_id,
+            });
+        }
+        if !self
+            .stage_causality
+            .iter()
+            .any(|stage| stage.stage_id == admission.stage_id)
+            && self.stage_causality.len() >= self.limits.total_slots
+        {
+            return Err(CueQueueError::StageCausalityCapacityExhausted {
+                stage_id: admission.stage_id,
+            });
+        }
+        self.preflight_sequence_capacity(total)?;
+
+        Ok(CueReservation {
+            queue: self,
+            stage_id: admission.stage_id,
+            remaining_ordinary: admission.ordinary_slots,
+            remaining_critical: admission.critical_slots,
+        })
+    }
+
     /// Admit one cue or merge it into an exact matching tail record.
     ///
     /// Every structurally valid emission receives an endpoint-wide sequence,
@@ -1069,9 +1545,14 @@ impl CueQueue {
             && self
                 .records
                 .back()
+                .and_then(EndpointRecord::as_cue)
                 .is_some_and(|tail| tail.exact_coalescing_key_matches(&input));
         if exact_tail_match {
-            let tail = self.records.back().expect("tail checked above");
+            let tail = self
+                .records
+                .back()
+                .and_then(EndpointRecord::as_cue)
+                .expect("cue tail checked above");
             if input.native_event_sequence <= tail.last_native_event_sequence {
                 return Err(CueQueueError::NonMonotonicCoalescingEventSequence {
                     previous: tail.last_native_event_sequence,
@@ -1089,7 +1570,11 @@ impl CueQueue {
         }
 
         if exact_tail_match {
-            let tail = self.records.back_mut().expect("tail checked above");
+            let tail = self
+                .records
+                .back_mut()
+                .and_then(EndpointRecord::as_cue_mut)
+                .expect("cue tail checked above");
             tail.replace_with(input, sequence);
             return Ok(EnqueueOutcome::Coalesced {
                 first_sequence: tail.first_sequence,
@@ -1119,7 +1604,7 @@ impl CueQueue {
         }
 
         self.records
-            .push_back(CueRecord::from_input(input, sequence));
+            .push_back(EndpointRecord::Cue(CueRecord::from_input(input, sequence)));
         Ok(EnqueueOutcome::Queued { sequence })
     }
 
@@ -1153,33 +1638,184 @@ impl CueQueue {
         }
 
         self.records
-            .push_back(CueRecord::from_input(input, notice_sequence));
+            .push_back(EndpointRecord::Cue(CueRecord::from_input(
+                input,
+                notice_sequence,
+            )));
         self.pending_loss = None;
-        self.state = CueEndpointState::Ready;
+        if self.pending_input_loss.is_none() {
+            self.state = CueEndpointState::Ready;
+        }
         Ok(OverflowNoticeOutcome {
             loss,
             notice_sequence,
         })
     }
 
-    /// Remove a globally ordered prefix bounded by cue count and frame bytes.
+    /// Record one raw input rejected before native dispatch.
+    ///
+    /// The endpoint must stop dispatching while this barrier is pending. A
+    /// subsequent sequence for the same Stage and input class extends the
+    /// bounded range; a different range is rejected so loss is never merged
+    /// ambiguously.
+    pub fn record_input_overflow(
+        &mut self,
+        stage_id: StageId,
+        input_class: InputClass,
+        sequence: InputSequence,
+    ) -> Result<PendingInputLoss, CueQueueError> {
+        if self.state == CueEndpointState::Faulted {
+            return Err(CueQueueError::Faulted);
+        }
+        if let Some(previous) = self
+            .last_input_sequence
+            .filter(|previous| sequence <= *previous)
+        {
+            return Err(CueQueueError::InputSequenceRegressed {
+                previous,
+                offered: sequence,
+            });
+        }
+
+        match &mut self.pending_input_loss {
+            Some(loss) if loss.stage_id == stage_id && loss.input_class == input_class => {
+                loss.extend(sequence)?;
+            }
+            Some(_) => return Err(CueQueueError::InputBackpressured),
+            None => {
+                self.pending_input_loss =
+                    Some(PendingInputLoss::first(stage_id, input_class, sequence));
+            }
+        }
+        self.last_input_sequence = Some(sequence);
+        self.state = CueEndpointState::Backpressured;
+        Ok(self
+            .pending_input_loss
+            .expect("input loss was inserted or extended"))
+    }
+
+    /// Queue the Critical RuntimeNotice that resolves a raw-input loss barrier.
+    ///
+    /// `payload` is caller-owned, preallocated detail storage. It is moved into
+    /// queue-owned storage without copying or allocating, while the fixed typed
+    /// loss metadata is encoded only when the record is serialized.
+    pub fn enqueue_pending_input_overflow_notice(
+        &mut self,
+        payload: Vec<u8>,
+    ) -> Result<InputOverflowNoticeOutcome, CueQueueError> {
+        if self.state == CueEndpointState::Faulted {
+            return Err(CueQueueError::Faulted);
+        }
+        let loss = self
+            .pending_input_loss
+            .ok_or(CueQueueError::NoPendingInputLoss)?;
+        self.validate_runtime_notice_payload(payload.len())?;
+
+        let notice_sequence = self.allocate_sequence()?;
+        if self.records.len() >= self.limits.total_slots {
+            self.state = CueEndpointState::Faulted;
+            self.emergency_fault = Some(EmergencyFault::CriticalNoticeCapacityExhausted {
+                sequence: notice_sequence,
+                kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
+            });
+            return Err(CueQueueError::CriticalNoticeCapacityExhausted {
+                sequence: notice_sequence,
+                kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
+            });
+        }
+
+        self.records.push_back(EndpointRecord::RuntimeNotice(
+            RuntimeNoticeRecord::input_overflow(notice_sequence, loss, payload),
+        ));
+        self.pending_input_loss = None;
+        if self.pending_loss.is_none() {
+            self.state = CueEndpointState::Ready;
+        }
+        Ok(InputOverflowNoticeOutcome {
+            loss,
+            notice_sequence,
+        })
+    }
+
+    /// Remove ordinary records for a Stage while preserving every Critical
+    /// cue, RuntimeNotice, and surviving record's relative order.
+    pub fn remove_stage_ordinary(&mut self, stage_id: StageId) -> RemovedStageOrdinary {
+        let mut removed = RemovedStageOrdinary::default();
+        self.records.retain(|record| {
+            let remove = matches!(
+                record,
+                EndpointRecord::Cue(cue)
+                    if cue.stage_id == stage_id && cue.delivery.is_ordinary()
+            );
+            if remove {
+                let sequence = record.sequence();
+                removed.count += 1;
+                removed.first_sequence.get_or_insert(sequence);
+                removed.last_sequence = Some(sequence);
+            }
+            !remove
+        });
+        self.ordinary_records -= removed.count;
+        removed
+    }
+
+    /// Retire one Stage from the bounded causality history after teardown.
+    ///
+    /// The call is idempotent for an already-retired Stage. It returns Busy
+    /// while the Stage owns any queued cue or RuntimeNotice, while its raw-input
+    /// loss notice is pending, or while an unqualified ordinary loss barrier
+    /// could still belong to it. The endpoint must also call this only after
+    /// records already returned by a drain, especially subscription releases,
+    /// have been handled at the VM-safe boundary. Stage identity reuse within
+    /// an endpoint epoch remains forbidden by the actor registry.
+    pub fn finalize_stage(&mut self, stage_id: StageId) -> Result<bool, CueQueueError> {
+        if self.state == CueEndpointState::Faulted {
+            return Err(CueQueueError::Faulted);
+        }
+        let has_queued_record = self.records.iter().any(|record| match record {
+            EndpointRecord::Cue(cue) => cue.stage_id == stage_id,
+            EndpointRecord::RuntimeNotice(notice) => notice.input_loss.stage_id == stage_id,
+        });
+        let has_pending_input_loss = self
+            .pending_input_loss
+            .is_some_and(|loss| loss.stage_id == stage_id);
+        if has_queued_record || has_pending_input_loss || self.pending_loss.is_some() {
+            return Err(CueQueueError::StageFinalizeBusy { stage_id });
+        }
+
+        let Some(position) = self
+            .stage_causality
+            .iter()
+            .position(|stage| stage.stage_id == stage_id)
+        else {
+            return Ok(false);
+        };
+        self.stage_causality.remove(position);
+        Ok(true)
+    }
+
+    /// Remove a cue-only prefix bounded by cue count and frame bytes.
     ///
     /// If the head record alone exceeds the byte budget, no later record may
-    /// bypass it; the drain returns empty and preserves queue order. Output
-    /// storage is reserved before the first pop, so an allocation failure
-    /// leaves queue contents, counters, and endpoint state unchanged.
+    /// bypass it. A RuntimeNotice at the head also stops this compatibility
+    /// drain so it cannot reorder cues around the notice; new endpoint code
+    /// should use [`Self::drain_endpoint`]. Output storage is reserved before
+    /// the first pop, so an allocation failure leaves queue state unchanged.
     pub fn drain(&mut self, budget: DrainBudget) -> Result<DrainedCues, CueQueueError> {
         if self.state == CueEndpointState::Backpressured {
             return Err(CueQueueError::DrainBackpressured);
         }
-        let (drain_count, drain_bytes) = self.drain_extent(budget);
+        let (drain_count, drain_bytes) = self.cue_drain_extent(budget);
         let mut cues = Vec::new();
         cues.try_reserve_exact(drain_count)
             .map_err(|_| CueQueueError::AllocationFailed)?;
         let mut frame_bytes = 0usize;
 
         while cues.len() < drain_count {
-            let cue = self.records.pop_front().expect("front checked above");
+            let EndpointRecord::Cue(cue) = self.records.pop_front().expect("front checked above")
+            else {
+                unreachable!("cue drain extent stops before RuntimeNotice records");
+            };
             if cue.delivery.is_ordinary() {
                 self.ordinary_records -= 1;
             }
@@ -1191,6 +1827,41 @@ impl CueQueue {
         Ok(DrainedCues { cues, frame_bytes })
     }
 
+    /// Remove one globally ordered endpoint prefix of cues and RuntimeNotices.
+    ///
+    /// Output storage is reserved before the first pop. Queue-owned records and
+    /// their caller-preallocated payload buffers are then moved without further
+    /// allocation.
+    pub fn drain_endpoint(
+        &mut self,
+        budget: DrainBudget,
+    ) -> Result<DrainedEndpointRecords, CueQueueError> {
+        if self.state == CueEndpointState::Backpressured {
+            return Err(CueQueueError::DrainBackpressured);
+        }
+        let (drain_count, drain_bytes) = self.endpoint_drain_extent(budget);
+        let mut records = Vec::new();
+        records
+            .try_reserve_exact(drain_count)
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let mut frame_bytes = 0usize;
+
+        while records.len() < drain_count {
+            let record = self.records.pop_front().expect("front checked above");
+            if record.is_ordinary() {
+                self.ordinary_records -= 1;
+            }
+            frame_bytes += record.frame_bytes();
+            records.push(record);
+        }
+
+        debug_assert_eq!(frame_bytes, drain_bytes);
+        Ok(DrainedEndpointRecords {
+            records,
+            frame_bytes,
+        })
+    }
+
     /// Reset queue state for a newly established endpoint epoch.
     ///
     /// All pending cues, sequence history, and emergency state are invalidated
@@ -1199,10 +1870,12 @@ impl CueQueue {
         self.records.clear();
         self.stage_causality.clear();
         self.last_native_event_sequence = None;
+        self.last_input_sequence = None;
         self.ordinary_records = 0;
         self.next_sequence = 1;
         self.state = CueEndpointState::Ready;
         self.pending_loss = None;
+        self.pending_input_loss = None;
         self.emergency_fault = None;
     }
 
@@ -1215,6 +1888,11 @@ impl CueQueue {
                 return Err(CueQueueError::UnexpectedCoalescingKey);
             }
             _ => {}
+        }
+        if input.flags & CUE_FLAG_SUBSCRIPTION_RELEASE != 0
+            && input.delivery != CueDelivery::Critical
+        {
+            return Err(CueQueueError::SubscriptionReleaseMustBeCritical);
         }
 
         let payload_bytes = input.payload.len();
@@ -1230,6 +1908,47 @@ impl CueQueue {
                 actual: frame_bytes,
                 maximum: self.limits.max_frame_bytes,
             });
+        }
+        Ok(())
+    }
+
+    fn validate_runtime_notice_payload(&self, payload_bytes: usize) -> Result<(), CueQueueError> {
+        if payload_bytes > self.limits.max_payload_bytes {
+            return Err(CueQueueError::PayloadTooLarge {
+                actual: payload_bytes,
+                maximum: self.limits.max_payload_bytes,
+            });
+        }
+        let frame_bytes = RUNTIME_NOTICE_FRAME_FIXED_BYTES
+            .checked_add(INPUT_OVERFLOW_METADATA_BYTES)
+            .and_then(|overhead| overhead.checked_add(payload_bytes))
+            .ok_or(CueQueueError::FrameTooLarge {
+                actual: usize::MAX,
+                maximum: self.limits.max_frame_bytes,
+            })?;
+        if frame_bytes > self.limits.max_frame_bytes {
+            return Err(CueQueueError::FrameTooLarge {
+                actual: frame_bytes,
+                maximum: self.limits.max_frame_bytes,
+            });
+        }
+        Ok(())
+    }
+
+    fn preflight_sequence_capacity(&mut self, requested: usize) -> Result<(), CueQueueError> {
+        if requested == 0 {
+            return Ok(());
+        }
+        let available = if self.next_sequence == 0 {
+            0
+        } else {
+            u64::from(u32::MAX - self.next_sequence) + 1
+        };
+        let requested = u64::try_from(requested).unwrap_or(u64::MAX);
+        if requested > available {
+            self.state = CueEndpointState::Faulted;
+            self.emergency_fault = Some(EmergencyFault::SequenceExhausted);
+            return Err(CueQueueError::SequenceExhausted);
         }
         Ok(())
     }
@@ -1281,8 +2000,9 @@ impl CueQueue {
             });
         }
 
-        if let Some(previous) = self.last_native_event_sequence
-            && input.native_event_sequence < previous
+        if let Some(previous) = self
+            .last_native_event_sequence
+            .filter(|previous| input.native_event_sequence < *previous)
         {
             return Err(CueQueueError::NativeEventSequenceRegressed {
                 previous,
@@ -1331,7 +2051,7 @@ impl CueQueue {
         });
     }
 
-    fn drain_extent(&self, budget: DrainBudget) -> (usize, usize) {
+    fn endpoint_drain_extent(&self, budget: DrainBudget) -> (usize, usize) {
         let mut count = 0usize;
         let mut bytes = 0usize;
         for record in &self.records {
@@ -1350,10 +2070,105 @@ impl CueQueue {
         (count, bytes)
     }
 
+    fn cue_drain_extent(&self, budget: DrainBudget) -> (usize, usize) {
+        let mut count = 0usize;
+        let mut bytes = 0usize;
+        for record in &self.records {
+            let Some(cue) = record.as_cue() else {
+                break;
+            };
+            if count >= budget.max_cues {
+                break;
+            }
+            let Some(next_bytes) = bytes.checked_add(cue.frame_bytes()) else {
+                break;
+            };
+            if next_bytes > budget.max_bytes {
+                break;
+            }
+            count += 1;
+            bytes = next_bytes;
+        }
+        (count, bytes)
+    }
+
     fn ordinary_for_stage(&self, stage_id: StageId) -> usize {
         self.records
             .iter()
-            .filter(|record| record.delivery.is_ordinary() && record.stage_id == stage_id)
+            .filter(|record| {
+                record
+                    .as_cue()
+                    .is_some_and(|cue| cue.delivery.is_ordinary() && cue.stage_id == stage_id)
+            })
             .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reservation_preflights_sequence_exhaustion_before_admission() {
+        let limits = CueLimits::new(4, 1, 3, 0, CUE_FRAME_OVERHEAD_BYTES).unwrap();
+        let stage_id = StageId::new(1).unwrap();
+        let mut queue = CueQueue::new(limits).unwrap();
+        queue.next_sequence = u32::MAX;
+
+        assert!(matches!(
+            queue.reserve(CueAdmission {
+                stage_id,
+                ordinary_slots: 1,
+                critical_slots: 1,
+            }),
+            Err(CueQueueError::SequenceExhausted)
+        ));
+        assert!(queue.is_empty());
+        assert_eq!(queue.state(), CueEndpointState::Faulted);
+        assert_eq!(
+            queue.emergency_fault(),
+            Some(&EmergencyFault::SequenceExhausted)
+        );
+
+        queue.reset_epoch();
+        queue.next_sequence = u32::MAX;
+        let input = CueInput::new(
+            CueIdentity::new(
+                stage_id,
+                ObjectId::new((1u64 << 32) | 1).unwrap(),
+                SubscriptionId::new(1).unwrap(),
+                CallbackId::new(1).unwrap(),
+                EventId::new(1).unwrap(),
+            ),
+            StageRevision::new(1),
+            NativeEventSequence::new(1).unwrap(),
+            CueDelivery::Critical,
+            Vec::new(),
+        );
+        let mut reservation = queue
+            .reserve(CueAdmission {
+                stage_id,
+                ordinary_slots: 0,
+                critical_slots: 1,
+            })
+            .unwrap();
+        assert_eq!(
+            reservation.enqueue(input),
+            Ok(EnqueueOutcome::Queued {
+                sequence: CueSequence::new(u32::MAX).unwrap(),
+            })
+        );
+        reservation.finish();
+
+        assert!(matches!(
+            queue.reserve(CueAdmission {
+                stage_id,
+                ordinary_slots: 0,
+                critical_slots: 1,
+            }),
+            Err(CueQueueError::SequenceExhausted)
+        ));
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue.state(), CueEndpointState::Faulted);
     }
 }
