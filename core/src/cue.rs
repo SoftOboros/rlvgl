@@ -1120,6 +1120,47 @@ pub struct CueAdmission {
     pub critical_slots: usize,
 }
 
+/// Dispatch-wide native cue maxima reserved before widget mutation.
+///
+/// The counts are exact worst-case admissions derived from the matching
+/// descriptor and subscription set. `maximum_payload_bytes` is the largest
+/// descriptor-declared event payload that any represented admission can
+/// produce. Every actual cue must belong to `stage_id`, fit one matching class
+/// count, and fit that payload bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeCueAdmission {
+    /// Stage traversed by the native event.
+    pub stage_id: StageId,
+    /// Maximum number of Critical cues the traversal can emit.
+    pub critical_slots: usize,
+    /// Maximum number of Ordered cues the traversal can emit.
+    pub ordered_slots: usize,
+    /// Maximum number of latest-value coalescible cues the traversal can emit.
+    pub latest_value_coalescible_slots: usize,
+    /// Largest event payload any possible cue can own.
+    pub maximum_payload_bytes: usize,
+}
+
+impl NativeCueAdmission {
+    /// Return the maximum number of ordinary cue emissions.
+    pub fn ordinary_slots(self) -> Option<usize> {
+        self.ordered_slots
+            .checked_add(self.latest_value_coalescible_slots)
+    }
+
+    /// Return the maximum number of cue emissions of all classes.
+    pub fn total_slots(self) -> Option<usize> {
+        self.ordinary_slots()?.checked_add(self.critical_slots)
+    }
+
+    /// Return whether the traversal can produce no queue records.
+    pub fn is_empty(self) -> bool {
+        self.critical_slots == 0
+            && self.ordered_slots == 0
+            && self.latest_value_coalescible_slots == 0
+    }
+}
+
 /// Cue admission failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CueQueueError {
@@ -1145,6 +1186,22 @@ pub enum CueQueueError {
     ReservationStageMismatch,
     /// A reservation has no remaining slot for the offered delivery class.
     ReservationClassExhausted,
+    /// Native inputs were already accepted or rejected for this preparation.
+    NativeInputsAlreadyAccepted,
+    /// One native input did not carry the traversal's committed Stage Revision.
+    NativeStageRevisionMismatch {
+        /// Revision published once for the completed native traversal.
+        expected: StageRevision,
+        /// Revision carried by the mismatched cue input.
+        offered: StageRevision,
+    },
+    /// One native input did not carry the traversal's native event sequence.
+    NativeEventSequenceMismatch {
+        /// Sequence consumed once when native traversal began.
+        expected: NativeEventSequence,
+        /// Sequence carried by the mismatched cue input.
+        offered: NativeEventSequence,
+    },
     /// Queue state changed after exact-input preparation.
     StalePreparedInputs,
     /// The exact-input transaction was already committed.
@@ -1388,6 +1445,14 @@ enum PreparedInputsState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreparedNativeCueState {
+    Prepared,
+    Ready,
+    Rejected,
+    Committed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PreparedCueAction {
     Queue { sequence: CueSequence },
     Coalesce { sequence: CueSequence },
@@ -1414,6 +1479,43 @@ pub struct PreparedCueInputs {
 pub struct ExactCueCommit<'a> {
     queue: &'a mut CueQueue,
     prepared: &'a mut PreparedCueInputs,
+}
+
+/// Pre-dispatch native cue preparation retaining all commit scratch.
+///
+/// Preparation reserves the exact dispatch-wide maxima without changing queue
+/// state. The endpoint acquires an exclusive [`NativeCueReservation`] before
+/// widget dispatch, then supplies the actual already-owned inputs afterward.
+/// Rejected or rolled-back inputs remain owned here until
+/// [`CueQueue::release_native_cues`] is called outside the guarded turn.
+pub struct PreparedNativeCues {
+    admission: NativeCueAdmission,
+    exact: PreparedCueInputs,
+    virtual_causality: Vec<StageCausality>,
+    stage_revision: Option<StageRevision>,
+    native_event_sequence: Option<NativeEventSequence>,
+    state: PreparedNativeCueState,
+}
+
+/// Exclusive native-dispatch cue reservation acquired before widget mutation.
+///
+/// Holding this value prevents any queue producer or drain from invalidating
+/// the preflight. [`Self::accept`] performs only allocation-free validation and
+/// returns an infallible commit capability when the actual inputs honor their
+/// pre-dispatch contract.
+pub struct NativeCueReservation<'a> {
+    queue: &'a mut CueQueue,
+    prepared: &'a mut PreparedNativeCues,
+}
+
+/// Exclusive validated native cue commit capability.
+///
+/// No queue validation remains after this type is constructed. Consuming it
+/// preserves actual input order and commits without allocation, deallocation,
+/// or a recoverable failure.
+pub struct NativeCueCommit<'a> {
+    queue: &'a mut CueQueue,
+    prepared: &'a mut PreparedNativeCues,
 }
 
 /// Purge-aware exact cue transaction for one full-Stage teardown.
@@ -1460,6 +1562,58 @@ impl ExactCueCommit<'_> {
     pub fn rollback(self) {}
 }
 
+impl NativeCueCommit<'_> {
+    /// Commit every accepted native cue in caller-provided deterministic order.
+    pub fn commit(self) {
+        self.queue
+            .commit_exact_inputs_infallible(&mut self.prepared.exact);
+        self.prepared.state = PreparedNativeCueState::Committed;
+    }
+
+    /// Release the exclusive guard without changing queue state.
+    pub fn rollback(self) {}
+}
+
+impl<'a> NativeCueReservation<'a> {
+    /// Accept actual dispatch emissions under one revision and event sequence.
+    ///
+    /// `inputs` must retain the descriptor-then-registration order established
+    /// by observation. The vector and every owned payload are moved into the
+    /// preparation, including on validation failure, so this method neither
+    /// allocates nor deallocates. A failure is a violated producer contract;
+    /// queue state remains unchanged and the caller must release the retained
+    /// preparation after leaving the atomic dispatch path.
+    pub fn accept(
+        self,
+        stage_revision: StageRevision,
+        native_event_sequence: NativeEventSequence,
+        inputs: Vec<CueInput>,
+    ) -> Result<NativeCueCommit<'a>, CueQueueError> {
+        debug_assert_eq!(self.prepared.state, PreparedNativeCueState::Prepared);
+        debug_assert_eq!(self.prepared.exact.input_count, 0);
+        debug_assert!(self.prepared.exact.inputs.is_empty());
+
+        self.prepared.stage_revision = Some(stage_revision);
+        self.prepared.native_event_sequence = Some(native_event_sequence);
+        self.prepared.exact.input_count = inputs.len();
+        self.prepared.exact.inputs = inputs;
+
+        if let Err(error) = self.queue.plan_native_inputs(self.prepared) {
+            self.prepared.state = PreparedNativeCueState::Rejected;
+            return Err(error);
+        }
+
+        self.prepared.state = PreparedNativeCueState::Ready;
+        Ok(NativeCueCommit {
+            queue: self.queue,
+            prepared: self.prepared,
+        })
+    }
+
+    /// Release the exclusive reservation without changing queue state.
+    pub fn rollback(self) {}
+}
+
 impl PreparedCueInputs {
     /// Return the exact number of validated inputs in this transaction.
     pub const fn input_count(&self) -> usize {
@@ -1474,6 +1628,33 @@ impl PreparedCueInputs {
     /// Return whether no cue input is represented by this transaction.
     pub const fn is_empty(&self) -> bool {
         self.input_count == 0
+    }
+}
+
+impl PreparedNativeCues {
+    /// Return the dispatch-wide admission contract validated before mutation.
+    pub const fn admission(&self) -> NativeCueAdmission {
+        self.admission
+    }
+
+    /// Return the number of actual inputs retained after acceptance.
+    pub const fn input_count(&self) -> usize {
+        self.exact.input_count
+    }
+
+    /// Borrow actual inputs retained before commit moves them into the queue.
+    pub fn inputs(&self) -> &[CueInput] {
+        &self.exact.inputs
+    }
+
+    /// Return the common committed revision supplied after dispatch.
+    pub const fn stage_revision(&self) -> Option<StageRevision> {
+        self.stage_revision
+    }
+
+    /// Return the common event sequence supplied after dispatch.
+    pub const fn native_event_sequence(&self) -> Option<NativeEventSequence> {
+        self.native_event_sequence
     }
 }
 
@@ -1737,6 +1918,149 @@ impl CueQueue {
             stage_id: admission.stage_id,
             remaining_ordinary: admission.ordinary_slots,
             remaining_critical: admission.critical_slots,
+        })
+    }
+
+    /// Prepare exact worst-case cue admission before one native traversal.
+    ///
+    /// This validates the dispatch-wide class counts, Stage quota, payload and
+    /// frame bounds, causality storage, and CueSequence capacity, then
+    /// fallibly allocates every queue-owned planning/retirement buffer. Queue
+    /// state is unchanged on success or failure. An empty admission performs
+    /// no allocation and later commits no queue or sequence change; an
+    /// endpoint must skip this API entirely when no native traversal begins.
+    pub fn prepare_native_cues(
+        &self,
+        admission: NativeCueAdmission,
+    ) -> Result<PreparedNativeCues, CueQueueError> {
+        match self.state {
+            CueEndpointState::Faulted => return Err(CueQueueError::Faulted),
+            CueEndpointState::Backpressured
+                if admission.ordinary_slots().unwrap_or(usize::MAX) != 0 =>
+            {
+                return Err(CueQueueError::AdmissionBackpressured);
+            }
+            CueEndpointState::Backpressured | CueEndpointState::Ready => {}
+        }
+
+        let ordinary_slots = admission
+            .ordinary_slots()
+            .ok_or(CueQueueError::AdmissionCapacity)?;
+        let total_slots = admission
+            .total_slots()
+            .ok_or(CueQueueError::AdmissionCapacity)?;
+
+        if admission.maximum_payload_bytes > self.limits.max_payload_bytes {
+            return Err(CueQueueError::PayloadTooLarge {
+                actual: admission.maximum_payload_bytes,
+                maximum: self.limits.max_payload_bytes,
+            });
+        }
+        let maximum_frame_bytes = CUE_FRAME_OVERHEAD_BYTES
+            .checked_add(admission.maximum_payload_bytes)
+            .ok_or(CueQueueError::FrameTooLarge {
+                actual: usize::MAX,
+                maximum: self.limits.max_frame_bytes,
+            })?;
+        if maximum_frame_bytes > self.limits.max_frame_bytes {
+            return Err(CueQueueError::FrameTooLarge {
+                actual: maximum_frame_bytes,
+                maximum: self.limits.max_frame_bytes,
+            });
+        }
+
+        if self
+            .records
+            .len()
+            .checked_add(total_slots)
+            .is_none_or(|needed| needed > self.limits.total_slots)
+            || self
+                .ordinary_records
+                .checked_add(ordinary_slots)
+                .is_none_or(|needed| needed > self.limits.ordinary_capacity())
+        {
+            return Err(CueQueueError::AdmissionCapacity);
+        }
+        if self
+            .ordinary_for_stage(admission.stage_id)
+            .checked_add(ordinary_slots)
+            .is_none_or(|needed| needed > self.limits.per_stage_ordinary_quota)
+        {
+            return Err(CueQueueError::AdmissionStageQuota {
+                stage_id: admission.stage_id,
+            });
+        }
+        if total_slots != 0
+            && !self
+                .stage_causality
+                .iter()
+                .any(|stage| stage.stage_id == admission.stage_id)
+            && self.stage_causality.len() >= self.limits.total_slots
+        {
+            return Err(CueQueueError::StageCausalityCapacityExhausted {
+                stage_id: admission.stage_id,
+            });
+        }
+        if total_slots != 0 && self.mutation_revision == u64::MAX {
+            return Err(CueQueueError::MutationRevisionExhausted);
+        }
+        self.validate_sequence_capacity(total_slots)?;
+
+        let mut actions = Vec::new();
+        actions
+            .try_reserve_exact(total_slots)
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let mut retired_payloads = Vec::new();
+        retired_payloads
+            .try_reserve_exact(total_slots)
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let mut virtual_causality = Vec::new();
+        if total_slots != 0 {
+            virtual_causality
+                .try_reserve_exact(self.limits.total_slots)
+                .map_err(|_| CueQueueError::AllocationFailed)?;
+            virtual_causality.extend_from_slice(&self.stage_causality);
+        }
+
+        Ok(PreparedNativeCues {
+            admission,
+            exact: PreparedCueInputs {
+                queue_revision: self.mutation_revision,
+                input_count: 0,
+                inputs: Vec::new(),
+                actions,
+                retired_payloads,
+                state: PreparedInputsState::Prepared,
+            },
+            virtual_causality,
+            stage_revision: None,
+            native_event_sequence: None,
+            state: PreparedNativeCueState::Prepared,
+        })
+    }
+
+    /// Acquire the native cue reservation immediately before widget dispatch.
+    ///
+    /// This is the final fallible queue freshness check. The returned exclusive
+    /// borrow prevents any producer or drain from consuming the preflighted
+    /// capacity until actual cues are accepted and committed or the guard is
+    /// rolled back.
+    pub fn acquire_native_cue_reservation<'a>(
+        &'a mut self,
+        prepared: &'a mut PreparedNativeCues,
+    ) -> Result<NativeCueReservation<'a>, CueQueueError> {
+        if prepared.state != PreparedNativeCueState::Prepared {
+            return Err(CueQueueError::NativeInputsAlreadyAccepted);
+        }
+        if prepared.exact.queue_revision != self.mutation_revision {
+            return Err(CueQueueError::StalePreparedInputs);
+        }
+        if !prepared.admission.is_empty() && self.mutation_revision == u64::MAX {
+            return Err(CueQueueError::MutationRevisionExhausted);
+        }
+        Ok(NativeCueReservation {
+            queue: self,
+            prepared,
         })
     }
 
@@ -2062,6 +2386,15 @@ impl CueQueue {
     /// Releasing an uncommitted transaction is the rollback path and leaves
     /// queue state unchanged.
     pub fn release_exact_inputs(&self, prepared: PreparedCueInputs) {
+        drop(prepared);
+    }
+
+    /// Release native preparation scratch and retained actual cue ownership.
+    ///
+    /// Releasing a prepared, rejected, or rolled-back transaction leaves queue
+    /// state unchanged. Releasing a committed transaction drops only retained
+    /// scratch and displaced coalescing payloads.
+    pub fn release_native_cues(&self, prepared: PreparedNativeCues) {
         drop(prepared);
     }
 
@@ -2459,6 +2792,125 @@ impl CueQueue {
         self.pending_input_loss = None;
         self.emergency_fault = None;
         self.bump_mutation_revision();
+    }
+
+    fn plan_native_inputs(&self, prepared: &mut PreparedNativeCues) -> Result<(), CueQueueError> {
+        debug_assert_eq!(prepared.exact.state, PreparedInputsState::Prepared);
+        debug_assert!(prepared.exact.actions.is_empty());
+
+        let expected_revision = prepared
+            .stage_revision
+            .expect("native reservation records a common Stage Revision");
+        let expected_native_sequence = prepared
+            .native_event_sequence
+            .expect("native reservation records a common native sequence");
+        let maximum_inputs = prepared
+            .admission
+            .total_slots()
+            .expect("native admission counts validated during preparation");
+        if prepared.exact.input_count > maximum_inputs {
+            return Err(CueQueueError::ReservationClassExhausted);
+        }
+
+        let mut remaining_critical = prepared.admission.critical_slots;
+        let mut remaining_ordered = prepared.admission.ordered_slots;
+        let mut remaining_coalescible = prepared.admission.latest_value_coalescible_slots;
+        let mut virtual_records = self.records.len();
+        let mut virtual_ordinary = self.ordinary_records;
+        let mut virtual_last_native_sequence = self.last_native_event_sequence;
+        let mut virtual_tail = self
+            .records
+            .back()
+            .and_then(EndpointRecord::as_cue)
+            .map(VirtualCueTail::from_record);
+        let mut planned_ordinary_for_stage = 0usize;
+
+        for (index, input) in prepared.exact.inputs.iter().enumerate() {
+            if input.stage_id != prepared.admission.stage_id {
+                return Err(CueQueueError::ReservationStageMismatch);
+            }
+            if input.stage_revision != expected_revision {
+                return Err(CueQueueError::NativeStageRevisionMismatch {
+                    expected: expected_revision,
+                    offered: input.stage_revision,
+                });
+            }
+            if input.native_event_sequence != expected_native_sequence {
+                return Err(CueQueueError::NativeEventSequenceMismatch {
+                    expected: expected_native_sequence,
+                    offered: input.native_event_sequence,
+                });
+            }
+            if input.payload.len() > prepared.admission.maximum_payload_bytes {
+                return Err(CueQueueError::PayloadTooLarge {
+                    actual: input.payload.len(),
+                    maximum: prepared.admission.maximum_payload_bytes,
+                });
+            }
+            let remaining = match input.delivery {
+                CueDelivery::Critical => &mut remaining_critical,
+                CueDelivery::Ordered => &mut remaining_ordered,
+                CueDelivery::LatestValueCoalescible => &mut remaining_coalescible,
+            };
+            if *remaining == 0 {
+                return Err(CueQueueError::ReservationClassExhausted);
+            }
+            *remaining -= 1;
+
+            self.validate_input(input)?;
+            validate_virtual_causality(
+                &prepared.virtual_causality,
+                virtual_last_native_sequence,
+                self.limits.total_slots,
+                input,
+            )?;
+
+            let exact_tail_match =
+                virtual_tail.is_some_and(|tail| tail.exact_coalescing_key_matches(input));
+            if exact_tail_match {
+                let tail = virtual_tail.expect("exact virtual tail checked above");
+                if input.native_event_sequence <= tail.native_event_sequence {
+                    return Err(CueQueueError::NonMonotonicCoalescingEventSequence {
+                        previous: tail.native_event_sequence,
+                        offered: input.native_event_sequence,
+                    });
+                }
+            }
+
+            let sequence = self.sequence_at_offset(index);
+            let action = if exact_tail_match {
+                PreparedCueAction::Coalesce { sequence }
+            } else {
+                if input.delivery.is_ordinary() {
+                    if virtual_ordinary >= self.limits.ordinary_capacity()
+                        || virtual_records >= self.limits.total_slots
+                    {
+                        return Err(CueQueueError::AdmissionCapacity);
+                    }
+                    if self
+                        .ordinary_for_stage(input.stage_id)
+                        .checked_add(planned_ordinary_for_stage)
+                        .is_none_or(|count| count >= self.limits.per_stage_ordinary_quota)
+                    {
+                        return Err(CueQueueError::AdmissionStageQuota {
+                            stage_id: input.stage_id,
+                        });
+                    }
+                    virtual_ordinary += 1;
+                    planned_ordinary_for_stage += 1;
+                } else if virtual_records >= self.limits.total_slots {
+                    return Err(CueQueueError::AdmissionCapacity);
+                }
+                virtual_records += 1;
+                PreparedCueAction::Queue { sequence }
+            };
+
+            record_virtual_causality(&mut prepared.virtual_causality, input);
+            virtual_last_native_sequence = Some(input.native_event_sequence);
+            virtual_tail = Some(VirtualCueTail::from_input(input));
+            prepared.exact.actions.push(action);
+        }
+        Ok(())
     }
 
     fn validate_input(&self, input: &CueInput) -> Result<(), CueQueueError> {

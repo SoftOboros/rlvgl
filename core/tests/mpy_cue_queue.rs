@@ -14,8 +14,8 @@ use rlvgl_core::{
         CueAdmission, CueDelivery, CueEndpointState, CueIdentity, CueInput, CueLimits,
         CueLimitsError, CuePayloadRef, CueQueue, CueQueueError, CueSequence, DrainBudget,
         EmergencyFault, EndpointRecord, EnqueueOutcome, EventId, INPUT_OVERFLOW_METADATA_BYTES,
-        InputClass, InputSequence, NativeEventSequence, RUNTIME_NOTICE_INPUT_OVERFLOW,
-        SubscriptionId,
+        InputClass, InputSequence, NativeCueAdmission, NativeEventSequence,
+        RUNTIME_NOTICE_INPUT_OVERFLOW, SubscriptionId,
     },
     direction::StageRevision,
 };
@@ -1460,6 +1460,495 @@ fn stage_finalization_waits_for_queued_and_pending_teardown_outputs() {
         .drain_endpoint(DrainBudget::new(1, usize::MAX))
         .unwrap();
     assert_eq!(queue.finalize_stage(loss_stage), Ok(true));
+}
+
+#[test]
+fn native_cue_guard_commits_in_input_order_without_allocator_activity() {
+    let stage = StageId::new(1).unwrap();
+    let revision = StageRevision::new(10);
+    let native_sequence = NativeEventSequence::new(7).unwrap();
+    let mut queue = CueQueue::new(limits(6, 2, 4)).unwrap();
+    let mut prepared = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 1,
+            ordered_slots: 1,
+            latest_value_coalescible_slots: 1,
+            maximum_payload_bytes: 2,
+        })
+        .unwrap();
+    assert_eq!(prepared.input_count(), 0);
+
+    let mut inputs = Vec::with_capacity(3);
+    inputs.extend([
+        cue_with_causality(
+            1,
+            revision.get(),
+            native_sequence.get(),
+            1,
+            1,
+            CueDelivery::Ordered,
+            &[1],
+        ),
+        cue_with_causality(
+            1,
+            revision.get(),
+            native_sequence.get(),
+            2,
+            2,
+            CueDelivery::Critical,
+            &[2],
+        ),
+        cue_with_causality(
+            1,
+            revision.get(),
+            native_sequence.get(),
+            3,
+            3,
+            CueDelivery::LatestValueCoalescible,
+            &[3],
+        )
+        .with_coalescing_key(CoalescingKey::new(9)),
+    ]);
+
+    let (reservation, allocations, deallocations) =
+        count_allocator_operations(|| queue.acquire_native_cue_reservation(&mut prepared));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let (commit, allocations, deallocations) = count_allocator_operations(|| {
+        reservation
+            .unwrap()
+            .accept(revision, native_sequence, inputs)
+    });
+    assert_eq!((allocations, deallocations), (0, 0));
+
+    let ((), allocations, deallocations) = count_allocator_operations(|| commit.unwrap().commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(prepared.input_count(), 3);
+    assert_eq!(prepared.stage_revision(), Some(revision));
+    assert_eq!(prepared.native_event_sequence(), Some(native_sequence));
+    let drained = queue
+        .drain_endpoint(DrainBudget::new(3, usize::MAX))
+        .unwrap();
+    let identities: Vec<_> = drained
+        .records
+        .iter()
+        .map(|record| {
+            let EndpointRecord::Cue(cue) = record else {
+                panic!("expected Cue");
+            };
+            (
+                cue.first_sequence().get(),
+                cue.event_id().get(),
+                cue.stage_revision(),
+                cue.first_native_event_sequence(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        identities,
+        [
+            (1, 1, revision, native_sequence),
+            (2, 2, revision, native_sequence),
+            (3, 3, revision, native_sequence),
+        ]
+    );
+
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_native_cues(prepared));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 3);
+}
+
+#[test]
+fn native_cue_acceptance_retains_rejected_inputs_and_rolls_back_exactly() {
+    let stage = StageId::new(1).unwrap();
+    let revision = StageRevision::new(4);
+    let native_sequence = NativeEventSequence::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    let mut prepared = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 2,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        })
+        .unwrap();
+    let inputs = vec![
+        cue_with_causality(1, 4, 1, 1, 1, CueDelivery::Ordered, &[1]),
+        cue_with_causality(1, 5, 1, 2, 2, CueDelivery::Ordered, &[2]),
+    ];
+    let reservation = queue.acquire_native_cue_reservation(&mut prepared).unwrap();
+    let (accepted, allocations, deallocations) =
+        count_allocator_operations(|| reservation.accept(revision, native_sequence, inputs));
+    assert!(matches!(
+        accepted,
+        Err(CueQueueError::NativeStageRevisionMismatch {
+            expected,
+            offered,
+        }) if expected == revision && offered == StageRevision::new(5)
+    ));
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(prepared.input_count(), 2);
+    assert_eq!(queue.len(), 0);
+
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_native_cues(prepared));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 3);
+    assert_eq!(
+        queue.enqueue(cue_with_causality(
+            1,
+            4,
+            1,
+            3,
+            3,
+            CueDelivery::Ordered,
+            &[3],
+        )),
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(1),
+        })
+    );
+}
+
+#[test]
+fn native_cue_preparation_is_stale_safe_and_rejects_before_mutation() {
+    let stage = StageId::new(1).unwrap();
+    let admission = NativeCueAdmission {
+        stage_id: stage,
+        critical_slots: 0,
+        ordered_slots: 1,
+        latest_value_coalescible_slots: 0,
+        maximum_payload_bytes: 1,
+    };
+    let mut queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    let mut stale = queue.prepare_native_cues(admission).unwrap();
+    queue
+        .enqueue(cue_with_causality(
+            1,
+            1,
+            1,
+            1,
+            1,
+            CueDelivery::Critical,
+            &[1],
+        ))
+        .unwrap();
+    let (guard, allocations, deallocations) =
+        count_allocator_operations(|| queue.acquire_native_cue_reservation(&mut stale));
+    assert!(matches!(guard, Err(CueQueueError::StalePreparedInputs)));
+    assert_eq!((allocations, deallocations), (0, 0));
+    queue.release_native_cues(stale);
+
+    assert!(matches!(
+        queue.prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 3,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        }),
+        Err(CueQueueError::AdmissionCapacity)
+    ));
+    assert_eq!(queue.len(), 1);
+
+    let mut rollback = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 1,
+            ordered_slots: 0,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        })
+        .unwrap();
+    let rollback_guard = queue.acquire_native_cue_reservation(&mut rollback).unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| rollback_guard.rollback());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(queue.len(), 1);
+    queue.release_native_cues(rollback);
+    assert_eq!(
+        queue.enqueue(cue_with_causality(
+            1,
+            1,
+            2,
+            2,
+            2,
+            CueDelivery::Critical,
+            &[2],
+        )),
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(2),
+        })
+    );
+}
+
+#[test]
+fn native_cue_contract_enforces_class_payload_and_common_sequence() {
+    let stage = StageId::new(1).unwrap();
+    let revision = StageRevision::new(3);
+    let native_sequence = NativeEventSequence::new(2).unwrap();
+    let admission = NativeCueAdmission {
+        stage_id: stage,
+        critical_slots: 0,
+        ordered_slots: 1,
+        latest_value_coalescible_slots: 0,
+        maximum_payload_bytes: 1,
+    };
+
+    let preflight_queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    assert!(matches!(
+        preflight_queue.prepare_native_cues(NativeCueAdmission {
+            maximum_payload_bytes: 65,
+            ..admission
+        }),
+        Err(CueQueueError::PayloadTooLarge {
+            actual: 65,
+            maximum: 64,
+        })
+    ));
+    assert!(preflight_queue.is_empty());
+
+    let mut class_queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    let mut class_prepared = class_queue.prepare_native_cues(admission).unwrap();
+    let class_guard = class_queue
+        .acquire_native_cue_reservation(&mut class_prepared)
+        .unwrap();
+    assert!(matches!(
+        class_guard.accept(
+            revision,
+            native_sequence,
+            vec![cue_with_causality(
+                1,
+                3,
+                2,
+                1,
+                1,
+                CueDelivery::Critical,
+                &[1],
+            )],
+        ),
+        Err(CueQueueError::ReservationClassExhausted)
+    ));
+    assert!(class_queue.is_empty());
+    class_queue.release_native_cues(class_prepared);
+
+    let mut payload_queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    let mut payload_prepared = payload_queue.prepare_native_cues(admission).unwrap();
+    let payload_guard = payload_queue
+        .acquire_native_cue_reservation(&mut payload_prepared)
+        .unwrap();
+    assert!(matches!(
+        payload_guard.accept(
+            revision,
+            native_sequence,
+            vec![cue_with_causality(
+                1,
+                3,
+                2,
+                1,
+                1,
+                CueDelivery::Ordered,
+                &[1, 2],
+            )],
+        ),
+        Err(CueQueueError::PayloadTooLarge {
+            actual: 2,
+            maximum: 1,
+        })
+    ));
+    assert!(payload_queue.is_empty());
+    payload_queue.release_native_cues(payload_prepared);
+
+    let mut sequence_queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    let mut sequence_prepared = sequence_queue.prepare_native_cues(admission).unwrap();
+    let sequence_guard = sequence_queue
+        .acquire_native_cue_reservation(&mut sequence_prepared)
+        .unwrap();
+    assert!(matches!(
+        sequence_guard.accept(
+            revision,
+            native_sequence,
+            vec![cue_with_causality(
+                1,
+                3,
+                3,
+                1,
+                1,
+                CueDelivery::Ordered,
+                &[1],
+            )],
+        ),
+        Err(CueQueueError::NativeEventSequenceMismatch { expected, offered })
+            if expected == native_sequence
+                && offered == NativeEventSequence::new(3).unwrap()
+    ));
+    assert!(sequence_queue.is_empty());
+    sequence_queue.release_native_cues(sequence_prepared);
+}
+
+#[test]
+fn native_cue_guard_preserves_tail_only_coalescing_and_backpressure() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(5, 2, 3)).unwrap();
+    queue.enqueue(coalescible(1, 1, 1, 9, &[1])).unwrap();
+    let mut prepared = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 0,
+            latest_value_coalescible_slots: 1,
+            maximum_payload_bytes: 1,
+        })
+        .unwrap();
+    let guard = queue.acquire_native_cue_reservation(&mut prepared).unwrap();
+    let commit = guard
+        .accept(
+            StageRevision::new(9),
+            NativeEventSequence::new(2).unwrap(),
+            vec![coalescible(1, 1, 2, 9, &[2])],
+        )
+        .unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| commit.commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(queue.len(), 1);
+    queue.release_native_cues(prepared);
+    let drained = queue.drain(DrainBudget::new(1, usize::MAX)).unwrap();
+    assert_eq!(drained.cues[0].first_sequence(), sequence(1));
+    assert_eq!(drained.cues[0].last_sequence(), sequence(2));
+    assert_eq!(drained.cues[0].payload(), &[2]);
+
+    for event in 3..=5 {
+        queue
+            .enqueue(cue_with_causality(
+                1,
+                9,
+                u64::from(event),
+                event,
+                event,
+                CueDelivery::Ordered,
+                &[event as u8],
+            ))
+            .unwrap();
+    }
+    assert!(matches!(
+        queue.enqueue(cue_with_causality(
+            1,
+            9,
+            6,
+            6,
+            6,
+            CueDelivery::Ordered,
+            &[6],
+        )),
+        Err(CueQueueError::OrdinaryCapacityExhausted { .. })
+            | Err(CueQueueError::StageQuotaExhausted { .. })
+    ));
+    assert_eq!(queue.state(), CueEndpointState::Backpressured);
+    assert!(matches!(
+        queue.prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 1,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        }),
+        Err(CueQueueError::AdmissionBackpressured)
+    ));
+
+    let mut critical = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 1,
+            ordered_slots: 0,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        })
+        .unwrap();
+    let guard = queue.acquire_native_cue_reservation(&mut critical).unwrap();
+    guard
+        .accept(
+            StageRevision::new(9),
+            NativeEventSequence::new(7).unwrap(),
+            vec![cue_with_causality(
+                1,
+                9,
+                7,
+                7,
+                7,
+                CueDelivery::Critical,
+                &[7],
+            )],
+        )
+        .unwrap()
+        .commit();
+    assert_eq!(queue.state(), CueEndpointState::Backpressured);
+    queue.release_native_cues(critical);
+}
+
+#[test]
+fn empty_native_admission_consumes_no_queue_or_causality_sequence() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    let mut prepared = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 0,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 0,
+        })
+        .unwrap();
+    let guard = queue.acquire_native_cue_reservation(&mut prepared).unwrap();
+    guard
+        .accept(
+            StageRevision::new(99),
+            NativeEventSequence::new(99).unwrap(),
+            Vec::new(),
+        )
+        .unwrap()
+        .commit();
+    queue.release_native_cues(prepared);
+    assert!(queue.is_empty());
+
+    // A traversal with possible descriptors but no actual emission likewise
+    // consumes no CueSequence. The Endpoint, not CueQueue, consumes the one
+    // native event sequence assigned when that traversal began.
+    let mut suppressed = queue
+        .prepare_native_cues(NativeCueAdmission {
+            stage_id: stage,
+            critical_slots: 0,
+            ordered_slots: 1,
+            latest_value_coalescible_slots: 0,
+            maximum_payload_bytes: 1,
+        })
+        .unwrap();
+    queue
+        .acquire_native_cue_reservation(&mut suppressed)
+        .unwrap()
+        .accept(
+            StageRevision::new(100),
+            NativeEventSequence::new(100).unwrap(),
+            Vec::new(),
+        )
+        .unwrap()
+        .commit();
+    queue.release_native_cues(suppressed);
+    assert!(queue.is_empty());
+    assert_eq!(
+        queue.enqueue(cue_with_causality(
+            1,
+            101,
+            101,
+            1,
+            1,
+            CueDelivery::Ordered,
+            &[1],
+        )),
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(1),
+        })
+    );
 }
 
 fn sequence(raw: u32) -> rlvgl_core::cue::CueSequence {
