@@ -4,7 +4,7 @@ MPY-00-CONCEPTS.md - MicroPython stage-and-actors runtime concepts and phase map
 
 # MPY-00 — MicroPython Stage-and-Actors Runtime Concepts
 
-**Status:** Ratified 2026-08-09; amended 2026-08-15. Normative for the MPY
+**Status:** Ratified 2026-08-09; amended 2026-08-16. Normative for the MPY
 initiative. Phase documents remain separately gated and MUST be ratified before
 their behavior implementation begins.
 
@@ -444,7 +444,7 @@ flowchart LR
 | Qt/QML ingestion | Remains a compile-time authoring route. It MAY emit the same language-neutral stage directions or consume descriptors later, but MPY does not require that integration for v1. |
 | CPython/PyO3 mirror | Optional host convenience after the canonical protocol and MicroPython behavior are proven. It is not the on-device binding and cannot define semantics independently. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -477,9 +477,12 @@ flowchart LR
 - **PCDN-MPY-003 — Resolved by owner ratification:** Host binding conformance
   proves actual MicroPython behavior first. A CPython/PyO3 mirror remains an
   optional convenience and does not define semantics.
-- **PCDN-MPY-004 — Assigned to MPY-05:** MPY-05 classifies which events allow
-  declarative prevent-default, stop-propagation, or coalescing policy. Python
-  callbacks remain post-dispatch regardless of the selected policy.
+- **PCDN-MPY-004 — Closed 2026-08-16 by MPY-05 ratification:** Python callback
+  return values never affect completed native dispatch. Subscribe-time
+  descriptor policy permits Observe universally, limits `ConsumeAtTarget` to
+  the accepted click, filtered-key, selection, and value-activation matrix,
+  restricts `StopAfterPhase` to custom/application events, and defers
+  `PreventDefault` until native widgets expose a separate pre-default hook.
 - **PCDN-MPY-005 — Closed 2026-08-09 by MPY-01 ratification:** The
   representative actor set is `rlvgl_widgets::container::Container`,
   `rlvgl_widgets::label::Label`, `rlvgl_widgets::button::Button`,
@@ -539,15 +542,16 @@ Owner ratification confirms:
 
 ## 14. Unblocks
 
-MPY-01, MPY-02, and MPY-03 are ratified. MPY-02's canonical codec and vectors
+MPY-01 through MPY-05 are ratified. MPY-02's canonical codec and vectors
 satisfy the protocol prerequisite, and MPY-03's five-actor adapter experiment
 satisfies its ratification evidence gate. The production Stage Registry,
 actor-local descriptor catalog, generic five-actor Create fixture, bounded
 preflight, stable lookup, and subtree deletion now satisfy MPY-03's
-implementation exit gate. MPY-04 and MPY-05 drafts are dependency-unblocked for
-PCDN review and separate ratification. MPY-04 through MPY-09 remain separately
-gated Draft phases and MUST close their own PCDNs and §12 acceptance gates
-before behavior implementation.
+implementation exit gate. MPY-04 and MPY-05 have closed their PCDNs and
+acceptance checklists, freezing Stage-direction, snapshot, subscription, cue,
+and safe-turn policy. Their implementation and conformance evidence remain
+open, so MPY-06 through MPY-09 remain separately gated Draft phases and MUST
+close their own PCDNs and §12 acceptance gates before ratification.
 
 ## 15. Change Log
 
@@ -597,7 +601,7 @@ and native rlvgl performance while preserving a single protocol across
 same-core and dual-core deployments. Phase-level detail can proceed without
 reopening the initiative's ownership, callback, layout, or parity boundaries.
 
-### 0.2.1 — 2026-08-09 — Amended: PCDN-MPY-005 closed
+### 0.2.1 — 2026-08-09 — Amended
 
 **Author:** Ira Abbott
 
@@ -632,7 +636,7 @@ What deliberately did not change: `PCDN-MPY-001`, `PCDN-MPY-004`, and
 MPY-02 through MPY-09 remain Draft; and this documentation amendment does not
 authorize behavior implementation in any later phase.
 
-### 0.2.2 — 2026-08-15 — Amended: PCDN-MPY-001 closed
+### 0.2.2 — 2026-08-15 — Amended
 
 **Author:** Ira Abbott
 
@@ -664,7 +668,7 @@ assigned to MPY-05 and MPY-03; golden protocol vectors remain required before
 MPY-03 implementation; MPY-03 through MPY-09 remain Draft; and this amendment
 does not resolve any later phase's PCDNs.
 
-### 0.2.3 — 2026-08-15 — Amended: PCDN-MPY-006 closed
+### 0.2.3 — 2026-08-15 — Amended
 
 **Author:** Ira Abbott
 
@@ -696,7 +700,7 @@ the Stage Registry, descriptor catalog, generic Create behavior, and coverage
 claims remain implementation work; and MPY-04 through MPY-09 remain separately
 gated Draft phases.
 
-### 0.2.4 — 2026-08-15 — Amended: MPY-03 implementation exit gate satisfied
+### 0.2.4 — 2026-08-15 — Amended
 
 **Author:** OpenAI Codex with owner direction
 
@@ -725,3 +729,32 @@ What deliberately did not change: MPY-04 and MPY-05 remain Draft; direction,
 introspection, cue, and scheduling semantics are not authorized by MPY-03;
 and incomplete coverage rows remain marked `partial` until their owning phases
 provide implementation evidence.
+
+### 0.2.5 — 2026-08-16 — Amended
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-4, INV-MPY-5, INV-MPY-6, INV-MPY-8, PCDN-MPY-004, §11.2, §14, §15
+
+**Commits:** pending
+
+**Summary:** Records owner ratification of MPY-04 Stage directions and MPY-05
+cue scheduling after closure of their six phase-local PCDNs. It closes parent
+`PCDN-MPY-004` with predeclared native propagation policy and preserves the
+implementation and conformance gates before later phases consume these
+surfaces.
+
+#### Rationale
+
+The accepted decisions retain native ownership of runtime state, selectors,
+computed geometry, dispatch, and input while supplying bounded director
+commands, deterministic snapshot failure, tokenized cues, endpoint-owned queue
+capacity, and observable saturation. MPY-08 remains responsible for proving
+any ready-and-enable pause or raw-input retention enhancement on the board.
+
+What deliberately did not change: MPY-04 and MPY-05 coverage remains partial
+until implementation evidence exists; MPY-06 is not dependency-unblocked by
+policy ratification alone; and the requested implementation roadmap remains a
+separate follow-on artifact.

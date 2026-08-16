@@ -4,10 +4,10 @@ MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md - Tree, property, action, layout, and s
 
 # MPY-04 — Stage Directions and Introspection
 
-**Status:** Draft 2026-08-09; dependency gate satisfied 2026-08-15. Not
-ratified. MPY-02 protocol and MPY-03 registry/catalog implementations are now
-available; this phase's command names, member IDs, snapshot shape, three PCDNs,
-and §12 checklist remain proposals pending owner review.
+**Status:** Ratified 2026-08-16. Normative for tree, property, action, object
+metadata, local-style, requested-layout, computed-geometry, atomic-commit, and
+snapshot semantics. Implementation and conformance evidence remain separately
+gated.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -20,7 +20,7 @@ MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
 | IDs, values, batches, results, and errors | MPY-02 | MPY-04 defines payload semantics only. |
 | Stage registry, actors, descriptors, and child policy | MPY-03 | MPY-04 mutates resolved actors; it does not create a second registry. |
 | Native flags/states/styles/layout/property behavior | LPAR-02, LPAR-07, LPAR-10, LPAR-15 | Semantic source. |
-| Tree/property/action/style/state/layout commands and deterministic snapshots | This document after ratification | MPY-04 is canonical. |
+| Tree/property/action/style/state/layout commands and deterministic snapshots | This document | MPY-04 is canonical. |
 | Event subscriptions and callback cues | MPY-05 | MPY-04 may cause events but does not define cue delivery. |
 
 ## 1. Purpose
@@ -74,7 +74,7 @@ to the MPY-02 registry.
 | Tree | get parent/children/index; reparent; reorder; promote to root; delete subtree | IDs, ordered lists, or empty success |
 | Properties | describe; get one/many; set one/many; reset to descriptor default | typed values or per-field result |
 | Actions | describe; invoke with typed arguments | descriptor-defined typed result |
-| Object metadata | get/set allowed flags and states | resulting bitsets |
+| Object metadata | get flags/states; set descriptor-allowed flags | resulting bitsets |
 | Style | describe supported style properties/parts; set/remove local values | resulting revision/effect summary |
 | Layout | get/set container config and item hints; clear requested layout | requested layout echo plus new revision |
 | Geometry | get effective/computed bounds and layout diagnostics | read-only Geometry Result |
@@ -112,6 +112,46 @@ durable scalar state. Each action descriptor declares:
 Examples include focus, scroll-to, animation start/stop, list insertion/removal,
 and selection commands. Long-running actions return acceptance plus a later
 native event/cue when completion is observable.
+
+### 6.3 Object metadata authority
+
+Object metadata commands address declared flag IDs rather than unrestricted
+raw bitmasks. Unknown IDs and unknown bits are rejected, never truncated. Raw
+`ObjectStates` mutation is not exposed because those bits represent runtime- or
+actor-owned facts that can otherwise diverge from native widget state.
+
+| Native bit | MPY v1 access | Required behavior |
+|---|---|---|
+| `ObjectFlags::HIDDEN` | Writable for every actor | Mutation effect includes visibility, targeting, focus eligibility, and invalidation. |
+| `ObjectFlags::DISABLED` | Writable through the runtime-owned enabled/disabled property | The mutation atomically synchronizes `ObjectStates::DISABLED` and clears incompatible focused, pressed, and edited state. |
+| `ObjectFlags::CLICKABLE` | Descriptor-gated writable | Unsupported actor types reject the mutation before commit. |
+| `ObjectFlags::FOCUSABLE` | Descriptor-gated writable | Clearing it performs validated defocus and editing cleanup. |
+| `ObjectFlags::SCROLLABLE` | Read-only/derived | Scroll configuration or a typed action installs the required native scroll state. |
+| `ObjectFlags::EVENT_BUBBLE` | Read-only/descriptor-controlled | MPY-05 subscription policy owns propagation behavior. |
+| `ObjectStates::DEFAULT` | Read-only sentinel | Zero means no state bits and is not independently set. |
+| `ObjectStates::DISABLED` | Read-only mirror | Updated only by the atomic enabled/disabled path. |
+| `ObjectStates::FOCUSED` | Read-only | Focus actions own transitions and single-focus cleanup. |
+| `ObjectStates::PRESSED` | Read-only | Native input routing owns the contact lifetime. |
+| `ObjectStates::CHECKED` | Read-only as raw metadata | A descriptor-owned actor property or action changes checked state. |
+| `ObjectStates::EDITED` | Read-only | Focus/edit actions own transitions. |
+
+Every writable entry remains descriptor-validated, batch-atomic, and included
+in the committed Stage Revision.
+
+### 6.4 Local style addressing
+
+Style commands address
+`(ObjectId, PartId, StateMask, StylePropertyId)`. `StylePropertyId` has one
+stable semantic meaning across actors and parts; `PartId` and `StateMask` are
+independent selector context and are never fused into the property ID.
+`StateMask::DEFAULT` is zero and preserves the native match-any-state rule.
+
+Actor descriptors enumerate supported parts, properties, selector masks, value
+types, and Mutation Effects. Unknown IDs, unknown state bits, and unsupported
+part/property/state combinations fail before mutation. `set` and `remove`
+affect local style entries only; removing a value reveals the existing cascade
+rather than writing an inferred default. Custom parts remain descriptor-scoped
+so equal numeric custom part IDs on different actor types do not collide.
 
 ## 7. Frozen Decisions — Layout Directions
 
@@ -170,6 +210,19 @@ Snapshot paging is tied to the starting Stage Revision. If the runtime cannot
 retain that revision until paging completes, a later page returns SnapshotStale
 and the caller restarts. It MUST NOT splice records from multiple revisions.
 
+The minimum profile retains one active cursor per Stage, its starting
+`StageRevision`, traversal position, page sequence, and one bounded encoding
+workspace. It retains no historical tree, revision, or previously returned
+page. A second cursor for the same Stage returns `SnapshotBusy`. A Stage
+mutation remains allowed, but a subsequent read returns `SnapshotStale` with
+the starting and current revisions and closes the cursor.
+
+Page size is bounded by the negotiated MPY-02 frame limit. An actor record that
+cannot fit reports explicit truncation or redaction metadata while advancing
+the traversal. `SnapshotEnd`, staleness, Stage teardown, or Endpoint Epoch
+replacement releases the cursor. Larger profiles may retain immutable snapshot
+material, but they MUST preserve the same ordering and visible semantics.
+
 ## 9. Frozen Decisions — Invariants
 
 | Invariant | Normative statement | Verification surface |
@@ -186,14 +239,14 @@ and the caller restarts. It MUST NOT splice records from multiple revisions.
 | Existing surface | MPY-04 decision |
 |---|---|
 | `children_mut()` | Not exposed directly. Scripts use validated tree commands. |
-| `set_flag` / `set_state` | Exposed through runtime-owned descriptors with allowed-bit policy. Internal-only bits remain unsupported. |
+| `set_flag` / `set_state` | Raw mutation is not exposed. Runtime-owned descriptors admit the accepted writable flag subset; states remain read-only and change through semantic properties/actions. |
 | Local/shared/theme styles | v1 scripting writes local style only; shared/theme registries remain native until separately described. |
 | `set_layout_flex/grid/item_hints` | Semantics retained and projected through neutral Layout Directions. |
 | `effective_bounds()` | Canonical computed geometry source; never a writable property. |
 | `Queryable` false/None errors | Adapted to detailed descriptor errors; legacy direct behavior remains unchanged. |
 | Widget-specific collection methods | Exposed as typed actions when they are not durable properties. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 1. **No callback delivery.** MPY-04 records subscriptions in snapshots only
    after MPY-05 defines them.
@@ -203,25 +256,24 @@ and the caller restarts. It MUST NOT splice records from multiple revisions.
 4. **No writable computed geometry.** Absolute positioning, if supported, is a
    requested layout mode rather than mutation of runtime results.
 
-- **PCDN-MPY-04-001:** Which object flags/states are writable versus read-only
-  or internal? Ratification requires a table derived from `ObjectFlags` and
-  `ObjectStates`.
-- **PCDN-MPY-04-002:** Does v1 expose style properties through one global ID
-  domain or a separate `(Part, StylePropertyId)` pair? Recommendation: explicit
-  part plus stable style-property ID.
-- **PCDN-MPY-04-003:** How many snapshot revisions/pages must the smallest
-  target retain? Recommendation: one active snapshot cursor per Stage with
-  bounded page size and explicit SnapshotBusy for a second cursor.
+- **PCDN-MPY-04-001 — Closed 2026-08-16:** §6.3 freezes the writable flag
+  subset and makes raw object states read-only or semantic-action-owned.
+- **PCDN-MPY-04-002 — Closed 2026-08-16:** §6.4 freezes separate selector and
+  property ID domains for local-style commands.
+- **PCDN-MPY-04-003 — Closed 2026-08-16:** §8.2 requires one active cursor,
+  one starting revision token, traversal state, and one bounded page workspace
+  per Stage. Mutations invalidate rather than block the cursor; no historical
+  tree retention is required.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-04-1` generic property/action validation is accepted.
-- [ ] `INV-MPY-04-2` freezes requested layout versus computed geometry.
-- [ ] `INV-MPY-04-3` Stage Revision and atomic visibility are accepted.
-- [ ] `INV-MPY-04-4` invalidation ownership is accepted.
-- [ ] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
-- [ ] `INV-MPY-04-6` tree-command integrity is accepted.
-- [ ] PCDN-MPY-04-001 through PCDN-MPY-04-003 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] `INV-MPY-04-1` generic property/action validation is accepted.
+- [x] `INV-MPY-04-2` freezes requested layout versus computed geometry.
+- [x] `INV-MPY-04-3` Stage Revision and atomic visibility are accepted.
+- [x] `INV-MPY-04-4` invalidation ownership is accepted.
+- [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
+- [x] `INV-MPY-04-6` tree-command integrity is accepted.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-003 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -282,3 +334,28 @@ catalog, generic Create, stable lookup, and deletion substrate. MPY-04 may now
 reconcile its member IDs and directions against code and walk
 `PCDN-MPY-04-001` through `PCDN-MPY-04-003`; it remains Draft and authorizes no
 MPY-04 behavior before owner ratification.
+
+### 0.2.0 — 2026-08-16 — Ratified
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-04-1, INV-MPY-04-2, INV-MPY-04-3, INV-MPY-04-4, INV-MPY-04-5, INV-MPY-04-6, PCDN-MPY-04-001, PCDN-MPY-04-002, PCDN-MPY-04-003, §0, §5–§12, §14, §15
+
+**Commits:** pending
+
+**Summary:** Ratifies the MPY-04 command, transaction, layout, geometry, and
+snapshot model. It closes all three phase PCDNs with a conservative metadata
+write boundary, selector-aware local-style addressing, and a one-cursor
+snapshot floor that invalidates on mutation instead of retaining historical
+trees.
+
+#### Rationale
+
+The accepted boundary preserves rlvgl ownership of runtime states, native
+scroll/focus machinery, style selectors, computed geometry, and invalidation.
+It still gives the director complete durable intent through descriptor-checked
+commands and deterministic snapshots. Implementation and conformance evidence
+remain required before MPY-04 coverage becomes Current or MPY-06 consumes the
+surface.

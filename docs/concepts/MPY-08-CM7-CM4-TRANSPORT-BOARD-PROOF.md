@@ -4,9 +4,10 @@ MPY-08-CM7-CM4-TRANSPORT-BOARD-PROOF.md - Dual-core transport and board-proof co
 
 # MPY-08 — CM7/CM4 Transport and Board Proof
 
-**Status:** Draft 2026-08-09. Not ratified. Shared-memory placement, cache
-policy, signaling, and reset mechanics require platform review before behavior
-implementation.
+**Status:** Draft 2026-08-09; MPY-05 backpressure proof obligation adopted
+2026-08-16. Not ratified. Shared-memory placement, cache policy, signaling,
+ready/enable flow control, and reset mechanics require platform evidence before
+behavior implementation.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-07 must prove the same scenarios in-process before this phase may add a
@@ -122,6 +123,20 @@ epoch changes through the Transport Profile or Runtime Notices. Blocking waits
 must have a documented progress owner and timeout/watchdog policy; an
 unbounded spin loop is not an MPY release behavior.
 
+An enhanced board profile may advertise MPY-05 input pause or raw-event
+retention only after proving a ready-and-enable handshake. CM7 publishes Return
+Ring receive readiness or credits; CM4 derives a local task-level input-
+admission enable. Physical input is dequeued and dispatched only while both
+conditions hold, unless a separately bounded raw-input retention slot is
+reserved. The proof must cover queue capacity, bounded reaction latency,
+cache/barrier visibility, wraparound, peer stalls, saturation, and Boot Epoch
+reset. No interrupt may block or spin on the handshake.
+
+Until that proof exists, the profile uses MPY-05's conservative minimum:
+reserve worst-case non-coalescible cue capacity before native input dispatch,
+or reject the raw event before actor mutation and report Critical
+`CueOverflow`. A hardware FIFO is not an implicit retention guarantee.
+
 ## 7. Frozen Decisions — Memory and Coherency Contract
 
 MPY-08 does not preselect D2 SRAM3, D3 SRAM4, or another shared region. The
@@ -198,7 +213,9 @@ The initial STM32H747I-DISCO record includes:
 5. each core is deliberately stalled and reset, and the peer reports/recoveries
    match the Boot Epoch contract;
 6. queue saturation proves Critical Reserve, declared cue coalescing, loss
-   metadata, and eventual progress; and
+   metadata, and eventual progress, including ready/credit withdrawal, CM4
+   input-admission disable, bounded reaction, and the explicit-drop fallback;
+   and
 7. the relevant MPY-07 traces compare equal, with board timings and rendered
    capture retained as additional evidence rather than normalized semantics.
 
@@ -295,3 +312,19 @@ the opposite application/display roles and exposes only small native-layout
 messages. MPY requires a versioned replacement whose semantics have already
 been proven in-process and whose memory visibility, reset behavior, and
 capacity limits are explicit rather than incidental.
+
+### 0.1.1 — 2026-08-16 — Reconciled
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** clarification
+
+**Touches:** §0, §6, §9.1, §15
+
+**Commits:** pending
+
+**Summary:** Adopts MPY-05's evidence-gated ready-and-enable enhancement. The
+board profile must prove Return Ring readiness/credits and CM4 task-level input
+admission before advertising pause or raw-event retention; otherwise it uses
+the observable pre-dispatch-loss baseline. MPY-08 remains Draft with all five
+board PCDNs open.

@@ -433,7 +433,7 @@ contract before storage or binding code can choose convenient local layouts.
 Separating logical frames from Rust/C layout prevents pointers, padding, and
 adapter-specific errors from becoming accidental cross-core ABI.
 
-### 0.2.0 — 2026-08-15 — Amended: negotiated capacity floor adopted
+### 0.2.0 — 2026-08-15 — Amended
 
 **Author:** Ira Abbott
 
@@ -518,7 +518,7 @@ capacity floors adopted at 0.2.0 remain unchanged; golden protocol vectors are
 still required before MPY-03 implementation; and MPY-03 through MPY-09 remain
 separately gated Draft phases.
 
-### 0.4.0 — 2026-08-15 — Amended: canonical byte layout and vectors
+### 0.4.0 — 2026-08-15 — Amended
 
 **Author:** Ira Abbott with OpenAI Codex implementation
 

@@ -4,10 +4,10 @@ MPY-05-CUES-SAFE-SCHEDULING.md - Event descriptors, subscriptions, cue queues, a
 
 # MPY-05 — Cues and Safe Scheduling
 
-**Status:** Draft 2026-08-09; dependency gate satisfied 2026-08-15. Not
-ratified. The MPY-03 registry, actor lifecycle, and descriptor slices are now
-available; event IDs, propagation policy, overflow classes, three PCDNs, and
-the §12 checklist remain proposals pending owner review.
+**Status:** Ratified 2026-08-16. Normative for event descriptors,
+subscriptions, predeclared propagation policy, safe turns, endpoint-owned cue
+queues, observable overflow, and teardown. Implementation and conformance
+evidence remain separately gated.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 actor registry and LPAR-04/05/06 native event semantics.
@@ -20,7 +20,7 @@ MPY-03 actor registry and LPAR-04/05/06 native event semantics.
 | Event codes, trickle/target/bubble routing, focus, input, gestures, scroll, timers, and animations | LPAR-04, LPAR-05, LPAR-06 | Native semantic source. |
 | IDs, Cue frames, results, capabilities, and queue errors | MPY-02 | Consumed without redefining encoding. |
 | Actor/event descriptor catalog | MPY-03 | MPY-05 fills event and subscription metadata. |
-| Event descriptors, subscriptions, propagation policy, safe turns, queue classes, and cleanup | This document after ratification | MPY-05 is canonical. |
+| Event descriptors, subscriptions, propagation policy, safe turns, queue classes, and cleanup | This document | MPY-05 is canonical. |
 | Python callable retention/invocation | MPY-06 | Adapter consumes Callback IDs and cues. |
 
 ## 1. Purpose
@@ -123,6 +123,23 @@ The v1 policy classes are:
 | `StopAfterPhase` | Queue in the selected phase and stop later phases. | Custom/application events only in v1 unless LPAR-04 is amended. |
 | `PreventDefault` | Suppress a separately identified native default action while preserving observation. | Deferred until native widgets expose a pre-default hook; unsupported in the initial proof. |
 
+The initial `ConsumeAtTarget` matrix is deliberately narrow:
+
+| Event source | v1 eligibility |
+|---|---|
+| `ObjectEvent::Clicked` | Descriptor may permit `ConsumeAtTarget`. |
+| `ObjectEvent::Key` | Descriptor may permit it only for declared actor/key filters. |
+| `Button::Clicked` semantic event | Permitted when its emission adapter is installed. |
+| `Slider::ValueChanged` semantic event | Permitted when its emission adapter is installed. |
+| `List::SelectionChanged` semantic event | Permitted when its emission adapter is installed. |
+
+`Container` and `Label` expose no consumable event initially. `Pressed`,
+`Released`, `DoubleClicked`, `LongPressed`, `LongPressedRepeat`, `Rotary`,
+`Gesture`, focus, lifecycle, child, scroll, size, and layout events are
+Observe-only. Consumption stops later native propagation after the target
+phase; it does not undo actor state already changed and does not implement
+prevent-default.
+
 This resolves the broad direction of PCDN-MPY-004 while assigning exact event
 eligibility to the MPY-05 event matrix. Lifecycle, size/layout, scroll-state,
 and deletion events are Observe-only.
@@ -143,14 +160,23 @@ One logical runtime turn follows this order:
 9. admit callback-generated commands only after their Python callback returns
    through MPY-06.
 
-Each Stage maintains a monotonic `CueSequence`. Repeated subscriptions to one
-event produce cues in subscription-registration order after native phase order.
-Results include the committed Stage Revision; cues include the revision/event
-sequence that produced them so tests can establish causality.
+The endpoint allocates one monotonic `CueSequence` across all Stages within an
+Endpoint Epoch. Repeated subscriptions to one event produce cues in
+subscription-registration order after native phase order. Results include the
+committed Stage Revision; cues include `StageId`, actor and subscription
+identity, the revision/event sequence that produced them, and the endpoint-wide
+`CueSequence` so tests can establish causality.
 
 ## 9. Frozen Decisions — Queue Classes and Invariants
 
 ### 9.1 Queue behavior
+
+One endpoint-owned queue system serves every Stage. The endpoint owns total
+capacity, Critical Reserve, sequence allocation, overflow accounting, and
+drain budgets. Ordinary capacity has per-Stage occupancy quotas so one Stage
+cannot monopolize the endpoint. Cues drain in increasing `CueSequence`; fair
+bounded admission, not delivery reordering, limits interference between
+Stages. Each Safe Turn drains a bounded cue or byte budget.
 
 The transport advertises total slots plus a reserved Critical lane. Command
 Results never compete with ordinary cues for their last reserved capacity.
@@ -169,7 +195,39 @@ Pointer motion, scroll position, and rotary deltas may be Coalescible. Click,
 key, selection, lifecycle, attach/detach, subscription teardown, errors, and
 animation/timer completion are Critical or Ordered and not coalesced.
 
-### 9.2 Phase invariants
+Coalescing keys include `StageId`, so cues never merge across Stages. Stage
+teardown removes its pending ordinary cues and produces the required token-
+release and teardown notices. Stage-specific iteration or callback dispatch is
+adapter-side filtering, not a second runtime queue. Endpoint Epoch replacement
+invalidates every queue, sequence, and subscription identity together.
+
+### 9.2 Input admission under saturation
+
+Before processing an input event that may emit non-coalescible cues, the
+runtime reserves worst-case cue capacity across its active subscriptions. If
+capacity exists, input proceeds normally. Descriptor-coalescible input may
+instead merge into an already reserved record.
+
+An enhanced profile may use a ready-and-enable handshake analogous to
+RTS/CTS-style flow control: CM7 publishes Return Ring receive readiness or
+credits, and CM4 derives a local task-level input-admission enable. Input is
+dequeued and dispatched only while both conditions hold, unless a separately
+bounded raw-input retention slot is already reserved. The handshake never
+blocks or spins inside an interrupt.
+
+The conservative MPY v1 minimum assumes neither pause nor raw-event retention.
+When required cue capacity is unavailable, it rejects the raw event before
+native dispatch and actor mutation, then admits a Critical `CueOverflow`
+notice before further ordinary delivery. The notice identifies the Stage,
+input class, lost count, and first/last input sequence. If the Critical Reserve
+cannot accept that notice, the endpoint enters explicit fault/recovery.
+
+MPY-08 MUST prove any advertised pause or raw-retention capability, including
+queue capacity, ordering, bounded reaction latency, cache/barrier visibility,
+wraparound, saturation, and Endpoint Epoch reset. A hardware FIFO is not
+evidence by itself, and no profile may lose input silently.
+
+### 9.3 Phase invariants
 
 | Invariant | Normative statement | Verification surface |
 |---|---|---|
@@ -191,7 +249,7 @@ animation/timer completion are Critical or Ordered and not coalesced.
 | Lifecycle synchronous delivery | Native event remains synchronous; its Cue Record is queued for later Python delivery. |
 | Mutation-during-dispatch prohibition | Preserved and generalized by Safe Turn admission. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 1. **No VM invocation.** MPY-05 produces cues; MPY-06 invokes callables.
 2. **No Python-defined native handlers.** Python cannot execute inside
@@ -201,25 +259,25 @@ animation/timer completion are Critical or Ordered and not coalesced.
 4. **No silent best-effort queue.** Footprint limits may cause explicit loss or
    backpressure, never unreported disappearance.
 
-- **PCDN-MPY-05-001:** Which exact `ObjectEvent` variants permit
-  `ConsumeAtTarget` in the first actor set? Recommendation: `Clicked`, `Key`,
-  and actor-specific selection/value activation only.
-- **PCDN-MPY-05-002:** Does input backpressure pause device admission, preserve
-  raw events in a platform queue, or drop with `CueOverflow` when CM7 is stalled?
-  MPY-08 must resolve per device/transport while preserving `INV-MPY-05-5`.
-- **PCDN-MPY-05-003:** Should cue draining be per Stage or per endpoint across
-  stages? Recommendation: one endpoint queue with StageId and fair bounded
-  draining; Stage-specific filtering is adapter sugar.
+- **PCDN-MPY-05-001 — Closed 2026-08-16:** §7 limits
+  `ConsumeAtTarget` to descriptor-declared `Clicked`, filtered `Key`, and the
+  Button click, Slider value-change, and List selection semantic events.
+- **PCDN-MPY-05-002 — Closed 2026-08-16:** §9.2 defines explicit pre-dispatch
+  loss plus `CueOverflow` as the conservative minimum. Pause and raw-retention
+  enhancements require an MPY-08-proven ready-and-enable profile.
+- **PCDN-MPY-05-003 — Closed 2026-08-16:** §8 and §9.1 assign queue capacity,
+  Critical Reserve, per-Stage admission quotas, endpoint-wide sequencing, and
+  sequence-ordered draining to one endpoint-owned queue system.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-05-1` queued VM-safe callback boundary is accepted.
-- [ ] `INV-MPY-05-2` predeclared propagation policy resolves PCDN-MPY-004 direction.
-- [ ] `INV-MPY-05-3` phase/subscription/sequence ordering is accepted.
-- [ ] `INV-MPY-05-4` callback mutation deferral is accepted.
-- [ ] `INV-MPY-05-5` queue classes and explicit overflow/coalescing are accepted.
-- [ ] `INV-MPY-05-6` subscription/token teardown is accepted.
-- [ ] PCDN-MPY-05-001 through PCDN-MPY-05-003 are resolved without weakening `INV-MPY-5`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] `INV-MPY-05-1` queued VM-safe callback boundary is accepted.
+- [x] `INV-MPY-05-2` predeclared propagation policy resolves PCDN-MPY-004 direction.
+- [x] `INV-MPY-05-3` phase/subscription/sequence ordering is accepted.
+- [x] `INV-MPY-05-4` callback mutation deferral is accepted.
+- [x] `INV-MPY-05-5` queue classes and explicit overflow/coalescing are accepted.
+- [x] `INV-MPY-05-6` subscription/token teardown is accepted.
+- [x] PCDN-MPY-05-001 through PCDN-MPY-05-003 are resolved without weakening `INV-MPY-5`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -281,3 +339,29 @@ capacity failures observable and testable.
 and event-descriptor slots. MPY-05 may now reconcile event/cue policy against
 code and walk `PCDN-MPY-05-001` through `PCDN-MPY-05-003`; it remains Draft and
 authorizes no MPY-05 behavior before owner ratification.
+
+### 0.2.0 — 2026-08-16 — Ratified
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-05-1, INV-MPY-05-2, INV-MPY-05-3, INV-MPY-05-4, INV-MPY-05-5, INV-MPY-05-6, INV-MPY-5, INV-MPY-6, INV-MPY-8, PCDN-MPY-004, PCDN-MPY-05-001, PCDN-MPY-05-002, PCDN-MPY-05-003, §0, §5–§12, §14, §15
+
+**Commits:** pending
+
+**Summary:** Ratifies descriptor-declared consumable events, endpoint-owned
+cue capacity and sequencing, per-Stage admission quotas, and an observable
+input-saturation minimum. It closes the three phase PCDNs and parent
+`PCDN-MPY-004` while reserving pause and raw-event retention claims for an
+MPY-08-proven ready-and-enable profile.
+
+#### Rationale
+
+The accepted policy preserves native synchronous event semantics and keeps
+Python invocation outside dispatch and interrupt contexts. Endpoint-wide
+capacity makes Critical Reserve and overflow accounting coherent across
+Stages, while pre-dispatch rejection guarantees that an unreported actor
+mutation cannot occur when a required non-coalescible cue lacks capacity.
+Implementation and conformance evidence remain required before MPY-05 coverage
+becomes Current or MPY-06 consumes the cue surface.

@@ -387,7 +387,7 @@ a `Widget` supertrait change, which expands the public contract across every
 widget implementer; a speculative actor-count storage trigger; and a separate
 typed-screen root registry.
 
-### 0.3.0 — 2026-08-15 — Implemented: production registry exit gate
+### 0.3.0 — 2026-08-15 — Implemented
 
 **Author:** OpenAI Codex with owner direction
 

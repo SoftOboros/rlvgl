@@ -4,8 +4,10 @@ MPY-06-MICROPYTHON-DIRECTOR-BINDING.md - MicroPython Stage/Actor API and callbac
 
 # MPY-06 — MicroPython Director Binding
 
-**Status:** Draft 2026-08-09. Not ratified. Python names and scheduling details
-are proposed for review; the current module remains a placeholder.
+**Status:** Draft 2026-08-09; policy dependencies ratified 2026-08-16. Not
+ratified. MPY-04 and MPY-05 now freeze the consumed direction and cue semantics,
+but their implementations are not yet available; Python names, polling details,
+four PCDNs, and §12 remain proposals. The current module remains a placeholder.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-04 stage directions and MPY-05 cue runtime.
@@ -171,6 +173,13 @@ from the VM thread. Ports MAY integrate `micropython.schedule` to request a
 future poll, but scheduled execution cannot replace explicit polling in tests
 or change ordering.
 
+MPY-05 owns one endpoint queue rather than one queue per Stage. `Stage.poll()`
+is therefore an adapter convenience over the endpoint pump and filters records
+by `StageId`; it does not own capacity, Critical Reserve, sequencing, or loss
+accounting. The MPY-06 PCDN walk must freeze the exact cross-Stage polling
+facade without changing endpoint sequence order or allowing a Stage-local poll
+to strand an earlier endpoint cue.
+
 During one callback, mutating Stage/Actor operations are collected in a
 callback-local transaction and submitted only after the callable returns.
 Operations requiring a synchronous runtime read/result during Callback Drain
@@ -295,3 +304,18 @@ The director API must feel native to Python while remaining a projection of the
 neutral runtime. Explicit wrapper and callback lifetimes prevent garbage
 collection, VM scheduling, or C ABI details from changing actor behavior across
 same-core and dual-core targets.
+
+### 0.1.1 — 2026-08-16 — Reconciled
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** clarification
+
+**Touches:** §0, §8.2, §15
+
+**Commits:** pending
+
+**Summary:** Records ratification of the MPY-04/05 policy dependencies and
+clarifies that `Stage.poll()` is an adapter filter over the endpoint-owned cue
+pump. MPY-06 remains Draft and dependency-blocked on the corresponding runtime
+implementations; its four PCDNs and acceptance checklist remain open.
