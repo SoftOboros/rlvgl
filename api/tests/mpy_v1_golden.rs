@@ -8,15 +8,18 @@ use rlvgl_api::protocol::{
     OperationResultRef, ProtocolVersion, RuntimeNotice, ValueList, ValueRef, ValueTag,
     create_result_object, decode_batch_success, decode_batch_success_with_limits,
     decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
-    decode_field_list, decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    decode_delete_operation, decode_delete_payload, decode_field_list,
+    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
     decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
     decode_operation_list, decode_operation_list_with_limit, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
     encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
-    encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
-    encode_frame_with_limits, encode_mutation_target_envelope, encode_object_reference,
-    encode_operation_list, encode_operation_list_with_limit, encode_value, encode_value_list,
+    encode_delete_payload, encode_field_list, encode_field_list_with_limit,
+    encode_field_list_with_limits, encode_frame, encode_frame_with_limits,
+    encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
+    encode_operation_list_with_limit, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
+    validate_delete_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -764,6 +767,131 @@ fn mutation_target_preserves_object_reference_error_boundaries_and_context() {
         );
     }
     assert!(!is_batch_mutation_opcode(opcode::CREATE));
+}
+
+#[test]
+fn delete_payloads_are_exact_target_only_golden_vectors() {
+    for (target, fixture_name) in [
+        (
+            ObjectReference::Object(0x0000_0002_0000_0001),
+            "payload.delete_object",
+        ),
+        (
+            ObjectReference::BatchObject(7),
+            "payload.delete_batch_object",
+        ),
+    ] {
+        let mut encoded = [0u8; 16];
+        let length = encode_delete_payload(target, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_delete_payload(&encoded[..length]), Ok(target));
+        assert_eq!(
+            decode_delete_operation(OperationRef {
+                opcode: opcode::DELETE,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(target)
+        );
+    }
+}
+
+#[test]
+fn delete_rejects_remainders_bad_context_and_output_records() {
+    let mut trailing = fixture("payload.delete_batch_object");
+    trailing.push(0xaa);
+    assert_eq!(
+        decode_delete_payload(&trailing),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    for malformed in [
+        &[][..],
+        &[ValueTag::Object as u8, 1][..],
+        &[ValueTag::BatchObject as u8, 0, 0][..],
+    ] {
+        assert_eq!(
+            decode_delete_payload(malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+    assert_eq!(
+        decode_delete_payload(&[ValueTag::Bool as u8, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    for target in [ObjectReference::Object(1), ObjectReference::BatchObject(0)] {
+        assert_eq!(
+            encode_delete_payload(target, &mut [0; 16]),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_delete_payload(ObjectReference::BatchObject(7), &mut [0; 2]),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.delete_object");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::SET_PROPERTIES, 0),
+        (opcode::DELETE, 1),
+    ] {
+        assert_eq!(
+            decode_delete_operation(OperationRef {
+                opcode: operation_opcode,
+                flags,
+                payload: &valid,
+            }),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let outputless = BatchSuccess {
+        result_revision: 11,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 64];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.delete_success"));
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(decoded.result_revision, 11);
+    assert!(decoded.results.is_empty());
+    assert_eq!(validate_delete_result_absent(decoded, 1, 0), Ok(()));
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 12,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_delete_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_delete_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_delete_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_delete_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_delete_result_absent(
+            BatchSuccess {
+                result_revision: 12,
+                results: OperationResultList::from_slice(&forbidden_delete_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
 }
 
 #[test]

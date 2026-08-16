@@ -10,7 +10,8 @@ snapshot semantics. The in-process direction, revision, tree, requested-layout,
 geometry, invalidation, and snapshot substrate has focused implementation
 evidence. Local-style projection, subscription metadata in snapshots, and the
 complete cross-driver conformance gate remain open. The common Batch mutation-
-target envelope has an allocation-free codec and golden protocol evidence.
+target envelope and exact Delete payload have allocation-free codecs and golden
+protocol evidence; complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -103,18 +104,18 @@ or normalize remainder bytes. The following table freezes the target context
 only; the exact remainder fields and successful result schema remain deferred
 to operation-specific PCDNs.
 
-| Opcode | Common target context | Deferred opcode-owned schema |
+| Opcode | Common target context | Remainder/result status |
 |---|---|---|
-| `SET_PROPERTIES` | Actor whose properties are collectively set | Property fields and success values |
-| `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values |
-| `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values |
-| `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values |
-| `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo |
-| `REPARENT` | Actor subtree being moved | Destination, exact index, and success values |
-| `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values |
-| `REORDER` | Actor moving within its current owner | Exact index and success values |
-| `DELETE` | Root of the subtree being deleted | Any reserved options and success values |
-| `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values |
+| `SET_PROPERTIES` | Actor whose properties are collectively set | Property fields and success values deferred |
+| `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values deferred |
+| `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
+| `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values deferred |
+| `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
+| `REPARENT` | Actor subtree being moved | Destination, exact index, and success values deferred |
+| `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values deferred |
+| `REORDER` | Actor moving within its current owner | Exact index and success values deferred |
+| `DELETE` | Root of the subtree being deleted | Exact empty remainder and outputless success; §5.2 |
+| `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values deferred |
 
 This shared envelope does not resolve references. A structurally valid stable
 target is generation-checked later and can return `StaleObject`. A nonzero
@@ -135,6 +136,57 @@ with eight operation records carrying the largest nine-byte stable-Object
 prefix and empty remainders is 206 bytes, leaving the shared 256-byte frame
 floor intact. This is a common-envelope size proof, not a claim that any
 operation-specific empty remainder is valid.
+
+### 5.2 Delete payload, result, and subtree semantics
+
+Delete specializes the common envelope without adding any fields:
+
+```text
+delete_payload = target:ObjectReference
+```
+
+The operation opcode is exactly `DELETE` (`0x0000_000a`), flags are `0`, and
+the target consumes the complete operation payload. A missing/malformed target
+or any trailing byte is `InvalidFrame`; a canonical non-object value is
+`TypeMismatch`; an unknown value tag is `Unsupported`. There is no Delete
+`with_limits` payload helper because the only field is the fixed-size common
+reference. The enclosing Batch still applies operation-count and complete-frame
+limits. A Command carrying Delete is `Unsupported`.
+
+A stable target names the root of the complete live subtree to retire. Delete
+removes that root from its parent or named-root order, retires every descendant
+in deterministic child-first order, invalidates every retired `ObjectId`,
+removes the subtree's subscriptions and resources, and preserves unrelated
+actors and their identities. The complete Batch advances `StageRevision` once,
+not once per retired actor.
+
+Although the structural payload codec accepts `BatchObject`, Batch graph
+validation MUST reject Delete when its target was created earlier in the same
+Batch. It MUST also reject a stable target whose planned subtree contains any
+actor created earlier in that Batch. Both cases are `BatchInvalid` at the
+Delete operation. This forbids transient create-then-delete subtrees from
+escaping lifecycle and result accounting.
+
+Delete followed by Create is permitted when Delete targets preexisting stable
+state. The later Create may reuse a slot retired by that earlier Delete when
+the prepared allocator selects it, but it receives the slot's advanced
+generation and therefore a different `ObjectId`. Every old target/descendant ID
+is stale after commit; the Create's one-Object result carries the new identity.
+
+Delete is outputless. On success, the common BatchSuccess payload carries the
+final/current `result_revision`, but there is no `OperationResult` record for
+the Delete operation index. In a mixed Batch, records for other output-bearing
+operations remain present in strictly increasing operation-index order. A
+record correlated to Delete is `InvalidFrame` under the Delete result schema.
+An all-outputless successful Batch therefore canonically has
+`record_count = 0` even when it submitted one or more operations.
+
+The allocation-free API codec and in-process prepared Stage transaction do not
+claim the complete Endpoint path. Endpoint integration remains responsible for
+resolving Batch references, reserving all subtree subscription-release notices
+and cue capacity before mutation, committing without callback reentry, ordering
+child-first release publication, correlating the outputless result, and
+releasing retained transaction storage after commit.
 
 ## 6. Frozen Decisions — Properties and Actions
 
@@ -321,7 +373,12 @@ material, but they MUST preserve the same ordering and visible semantics.
   zero-flag Batch-only target prefix for all ten v1 mutation opcodes. It reuses
   contextual `Object`/`BatchObject` values, preserves the protocol error split,
   and leaves every opcode-owned remainder and successful result schema for its
-  following decision.
+  following decision except where §5.2 now closes Delete.
+- **PCDN-MPY-04-005 — Closed by owner acceptance 2026-08-16:** §5.2 freezes
+  Delete as the exact common target with no remainder and no operation-result
+  record. It preserves stable child-first subtree retirement, rejects same-
+  Batch-created targets or descendants, permits generation-advancing slot reuse
+  by a later Create, and keeps final Endpoint orchestration evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -331,7 +388,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-004 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-005 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -350,8 +407,9 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-The common mutation-target envelope now unblocks operation-specific payload and
-result PCDNs without authorizing guessed remainder schemas. After those codecs
+The common mutation-target envelope and exact Delete schema now unblock the
+remaining operation-specific payload/result PCDNs and Endpoint Delete
+orchestration without authorizing guessed remainder schemas. After those codecs
 and endpoint integration are implemented, MPY-04 provides the complete stage
 mutation/introspection surface consumed by MPY-06 and the deterministic
 snapshot oracle consumed by MPY-07/09.
@@ -455,7 +513,7 @@ metadata; and this evidence does not claim the MPY-07 byte-equivalence corpus.
 
 **Touches:** PCDN-MPY-04-004, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `cfe32af`
 
 **Summary:** Freezes one allocation-free contextual object-reference prefix for
 all ten zero-flag Batch-only MPY v1 mutation opcodes. The codec returns the
@@ -472,3 +530,30 @@ keeping property, action, flag, layout, tree, delete, and style schema authority
 with their own PCDNs. Returning the untouched remainder also lets those later
 codecs remain zero-copy and apply their negotiated limits with full semantic
 context.
+
+### 0.4.0 — 2026-08-16 — Delete wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-005, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes Delete as a zero-flag Batch-only operation whose complete
+payload is exactly the common contextual target. Success is outputless: only
+the BatchSuccess revision remains, with no record at the Delete operation
+index. Adds allocation-free payload/operation codecs, a structural
+result-absence validator, stable and BatchObject golden vectors,
+malformed/trailing coverage, and explicit same-Batch subtree and
+generation-reuse semantics.
+
+#### Rationale
+
+Delete needs no options in MPY v1; accepting an opaque remainder would create
+unused extension bytes and weaken canonical validation. Outputless completion
+keeps the response proportional while the shared Batch revision reports the
+committed state. Rejecting same-Batch-created members avoids ambiguous
+create/delete identity and lifecycle accounting, while delete-then-Create slot
+reuse preserves bounded capacity without ever reviving an old `ObjectId`.

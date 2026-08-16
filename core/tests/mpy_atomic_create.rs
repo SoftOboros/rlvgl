@@ -187,6 +187,28 @@ fn registry() -> StageRegistry {
     StageRegistry::new(StageId::new(91).unwrap(), &CATALOG, limits()).unwrap()
 }
 
+fn create_stable_container(
+    registry: &mut StageRegistry,
+    destination: rlvgl_core::actor::CreateDestination<'_>,
+) -> rlvgl_core::actor::ObjectId {
+    let container = descriptor("container::Container");
+    registry
+        .create(
+            container.type_id,
+            destination,
+            &[rlvgl_core::actor::ConstructorInput {
+                id: field(container, "bounds"),
+                value: ValueRef::Rect {
+                    x: BOUNDS.x,
+                    y: BOUNDS.y,
+                    width: BOUNDS.width,
+                    height: BOUNDS.height,
+                },
+            }],
+        )
+        .unwrap()
+}
+
 #[test]
 fn create_children_later_mutation_and_reorder_commit_once_with_owned_outputs() {
     let container = descriptor("container::Container");
@@ -337,6 +359,51 @@ fn invalid_bindings_and_create_then_delete_publish_nothing() {
         assert_eq!(registry.revision(), revision);
         assert_eq!(registry.usage(), usage);
     }
+}
+
+#[test]
+fn deleting_stable_ancestor_of_an_earlier_create_is_prepublication_batch_invalid() {
+    let container = descriptor("container::Container");
+    let mut registry = registry();
+    let stable_root = registry
+        .create(
+            container.type_id,
+            rlvgl_core::actor::CreateDestination::Root { name: "stable" },
+            &[rlvgl_core::actor::ConstructorInput {
+                id: field(container, "bounds"),
+                value: ValueRef::Rect {
+                    x: BOUNDS.x,
+                    y: BOUNDS.y,
+                    width: BOUNDS.width,
+                    height: BOUNDS.height,
+                },
+            }],
+        )
+        .unwrap();
+    let revision = registry.revision();
+    let usage = registry.usage();
+
+    let error = registry
+        .prepare_atomic_batch(vec![
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(stable_root),
+                },
+                vec![],
+            ),
+            BatchStageDirection::Delete {
+                object: BatchObjectReference::Stable(stable_root),
+            },
+        ])
+        .unwrap_err();
+
+    assert_eq!(error, RegistryError::BatchInvalid);
+    assert_eq!(registry.revision(), revision);
+    assert_eq!(registry.usage(), usage);
+    assert_eq!(registry.root_id("stable"), Some(stable_root));
+    assert!(registry.children(stable_root).unwrap().is_empty());
 }
 
 #[test]
@@ -586,6 +653,9 @@ fn delete_then_create_reuses_the_slot_at_the_next_generation_and_stale_commit_is
         ])
         .unwrap();
     let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+    assert_eq!(committed.create_outputs().len(), 1);
+    assert_eq!(committed.create_outputs()[0].operation_index, 1);
+    assert_eq!(committed.create_outputs()[0].batch_ref, 9);
     let new = committed.take_create_outputs().pop().unwrap().object_id;
     assert_eq!(new.slot(), old.slot());
     assert_eq!(new.generation(), old.generation() + 1);
@@ -614,6 +684,55 @@ fn delete_then_create_reuses_the_slot_at_the_next_generation_and_stale_commit_is
     assert_eq!(error.cause(), RegistryError::BatchInvalid);
     assert_eq!(registry.revision(), revision);
     assert_eq!(registry.root_id("later"), None);
+}
+
+#[test]
+fn stable_subtree_delete_commits_child_first_without_create_outputs() {
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "main" },
+    );
+    let branch = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent: root },
+    );
+    let leaf = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent: branch },
+    );
+    let unrelated = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "unrelated" },
+    );
+    let starting_revision = registry.revision();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::Delete {
+            object: BatchObjectReference::Stable(root),
+        }])
+        .unwrap();
+    assert_eq!(prepared.deleted_object_ids(), [leaf, branch, root]);
+    assert!(prepared.prepared_creates().is_empty());
+
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(committed.deleted_object_ids(), [leaf, branch, root]);
+    assert!(committed.create_outputs().is_empty());
+    for object_id in [root, branch, leaf] {
+        assert_eq!(
+            registry.actor_info(object_id),
+            Err(RegistryError::StaleObject { object_id })
+        );
+    }
+    assert!(registry.actor_info(unrelated).is_ok());
+    assert_eq!(registry.root_id("main"), None);
+    assert_eq!(registry.root_id("unrelated"), Some(unrelated));
+    assert!(registry.children(unrelated).unwrap().is_empty());
+    assert_eq!(registry.usage().actors, 1);
+    assert_eq!(registry.usage().roots, 1);
+
+    registry.release_committed_batch(committed).unwrap();
 }
 
 const REFERENCE_TYPE: TypeId = TypeId::registered(0x0001_ff01);
