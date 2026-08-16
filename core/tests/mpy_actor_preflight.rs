@@ -454,3 +454,185 @@ fn stale_prepared_batch_is_returned_intact_without_rollback_work() {
     assert_eq!(registry.usage(), current_usage);
     assert_eq!(registry.children(root).unwrap(), current_children);
 }
+
+#[test]
+fn full_stage_teardown_commits_once_without_allocator_activity_then_releases() {
+    let mut registry = registry();
+    let first_root = create_container(&mut registry, CreateDestination::Root { name: "first" });
+    let first_child = create_container(
+        &mut registry,
+        CreateDestination::Child { parent: first_root },
+    );
+    let first_leaf = create_container(
+        &mut registry,
+        CreateDestination::Child {
+            parent: first_child,
+        },
+    );
+    let second_root = create_container(&mut registry, CreateDestination::Root { name: "second" });
+    let second_child = create_container(
+        &mut registry,
+        CreateDestination::Child {
+            parent: second_root,
+        },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let prepared = registry.prepare_stage_teardown().unwrap();
+
+    assert_eq!(prepared.stage_id(), registry.stage_id());
+    assert_eq!(prepared.starting_revision(), starting_revision);
+    assert_eq!(
+        prepared.next_revision(),
+        StageRevision::new(starting_revision.get() + 1)
+    );
+    assert_eq!(prepared.deletion_count(), 5);
+    assert_eq!(
+        prepared.deleted_object_ids(),
+        [
+            first_leaf,
+            first_child,
+            first_root,
+            second_child,
+            second_root,
+        ]
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.root_id("first"), Some(first_root));
+
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_teardown(prepared));
+    assert_eq!(allocations, 0);
+    assert_eq!(deallocations, 0);
+    let committed = committed.unwrap();
+
+    assert_eq!(
+        committed.revision(),
+        StageRevision::new(starting_revision.get() + 1)
+    );
+    assert_eq!(committed.deletion_count(), 5);
+    assert_eq!(
+        committed.deleted_object_ids(),
+        [
+            first_leaf,
+            first_child,
+            first_root,
+            second_child,
+            second_root,
+        ]
+    );
+    assert_eq!(registry.revision(), committed.revision());
+    assert_eq!(registry.usage().actors, 0);
+    assert_eq!(registry.usage().roots, 0);
+    assert_eq!(
+        registry.preflight_teardown(),
+        Err(RegistryError::StageClosed)
+    );
+    assert!(!registry.last_invalidations().is_empty());
+
+    let (released, release_allocations, release_deallocations) =
+        count_allocator_operations(|| registry.release_committed_teardown(committed));
+    released.unwrap();
+    assert_eq!(release_allocations, 0);
+    assert!(release_deallocations > 0);
+}
+
+#[test]
+fn stale_and_busy_stage_teardown_rejections_preserve_exact_state() {
+    let mut stale_registry = registry();
+    let stale_root = create_container(
+        &mut stale_registry,
+        CreateDestination::Root { name: "main" },
+    );
+    let stale_child = create_container(
+        &mut stale_registry,
+        CreateDestination::Child { parent: stale_root },
+    );
+    let stale_prepared = stale_registry.prepare_stage_teardown().unwrap();
+    stale_registry
+        .apply_batch(&[StageDirection::SetFlag {
+            object_id: stale_child,
+            flag: RuntimeFlag::Hidden,
+            enabled: true,
+        }])
+        .unwrap();
+    let stale_revision = stale_registry.revision();
+    let stale_usage = stale_registry.usage();
+    let stale_children = stale_registry.children(stale_root).unwrap();
+
+    let (stale_error, allocations, deallocations) = count_allocator_operations(|| {
+        stale_registry
+            .commit_prepared_teardown(stale_prepared)
+            .unwrap_err()
+    });
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(stale_error.cause(), RegistryError::BatchInvalid);
+    assert_eq!(stale_registry.revision(), stale_revision);
+    assert_eq!(stale_registry.usage(), stale_usage);
+    assert_eq!(stale_registry.children(stale_root).unwrap(), stale_children);
+    assert_eq!(
+        stale_error.into_prepared().deleted_object_ids(),
+        [stale_child, stale_root]
+    );
+
+    let mut busy_registry = registry();
+    let busy_root = create_container(&mut busy_registry, CreateDestination::Root { name: "main" });
+    let busy_child = create_container(
+        &mut busy_registry,
+        CreateDestination::Child { parent: busy_root },
+    );
+    let busy_revision = busy_registry.revision();
+    let busy_usage = busy_registry.usage();
+    let busy_prepared = busy_registry.prepare_stage_teardown().unwrap();
+    let widget = busy_registry.node(busy_root).unwrap().widget().clone();
+    let retained_borrow = widget.borrow_mut();
+
+    let (busy_error, allocations, deallocations) = count_allocator_operations(|| {
+        busy_registry
+            .commit_prepared_teardown(busy_prepared)
+            .unwrap_err()
+    });
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(busy_error.cause(), RegistryError::DispatchBusy);
+    assert_eq!(busy_registry.revision(), busy_revision);
+    assert_eq!(busy_registry.usage(), busy_usage);
+    assert_eq!(busy_registry.children(busy_root).unwrap(), [busy_child]);
+
+    drop(retained_borrow);
+    let (committed, allocations, deallocations) = count_allocator_operations(|| {
+        busy_registry.commit_prepared_teardown(busy_error.into_prepared())
+    });
+    assert_eq!((allocations, deallocations), (0, 0));
+    busy_registry
+        .release_committed_teardown(committed.unwrap())
+        .unwrap();
+}
+
+#[test]
+fn empty_stage_teardown_is_a_single_owned_close_transaction() {
+    let mut registry = registry();
+    let starting_revision = registry.revision();
+    let prepared = registry.prepare_stage_teardown().unwrap();
+
+    assert_eq!(prepared.deletion_count(), 0);
+    assert_eq!(prepared.deleted_object_ids(), []);
+    assert_eq!(prepared.starting_revision(), starting_revision);
+    assert_eq!(
+        prepared.next_revision(),
+        StageRevision::new(starting_revision.get() + 1)
+    );
+
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_teardown(prepared));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let committed = committed.unwrap();
+    assert_eq!(committed.deletion_count(), 0);
+    assert_eq!(registry.revision(), committed.revision());
+    assert_eq!(
+        registry.preflight_teardown(),
+        Err(RegistryError::StageClosed)
+    );
+    registry.release_committed_teardown(committed).unwrap();
+}

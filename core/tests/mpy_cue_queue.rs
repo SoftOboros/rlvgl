@@ -822,6 +822,185 @@ fn exact_input_stale_and_rollback_paths_leave_queue_state_explicit() {
 }
 
 #[test]
+fn stage_teardown_preflight_reclaims_only_target_ordinary_capacity() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(4, 2, 2)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    queue
+        .enqueue(cue(2, 2, CueDelivery::Critical, &[2]))
+        .unwrap();
+    queue
+        .enqueue(cue(1, 3, CueDelivery::Ordered, &[3]))
+        .unwrap();
+    queue
+        .enqueue(cue(2, 4, CueDelivery::Critical, &[4]))
+        .unwrap();
+
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            cue(1, 5, CueDelivery::Critical, &[5]).with_subscription_release(),
+            cue(1, 6, CueDelivery::Critical, &[6]).with_subscription_release(),
+        ]),
+        Err(CueQueueError::AdmissionCapacity)
+    ));
+    let mut prepared = queue
+        .prepare_stage_teardown_inputs(
+            stage,
+            vec![
+                cue(1, 5, CueDelivery::Critical, &[5]).with_subscription_release(),
+                cue(1, 6, CueDelivery::Critical, &[6]).with_subscription_release(),
+            ],
+        )
+        .unwrap();
+    assert_eq!(prepared.stage_id(), stage);
+    assert_eq!(prepared.input_count(), 2);
+    assert_eq!(prepared.inputs().len(), 2);
+    assert_eq!(
+        prepared.purged_ordinary(),
+        rlvgl_core::cue::RemovedStageOrdinary {
+            count: 2,
+            first_sequence: Some(sequence(1)),
+            last_sequence: Some(sequence(3)),
+        }
+    );
+    assert_eq!((queue.len(), queue.ordinary_len()), (4, 2));
+
+    let (guard, allocations, deallocations) =
+        count_allocator_operations(|| queue.acquire_stage_teardown_commit(&mut prepared));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.unwrap().commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(
+        (queue.len(), queue.ordinary_len(), queue.critical_len()),
+        (4, 0, 4)
+    );
+    assert!(prepared.inputs().is_empty());
+
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_stage_teardown_inputs(prepared));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 4);
+    let drained = queue
+        .drain_endpoint(DrainBudget::new(8, usize::MAX))
+        .unwrap();
+    assert_eq!(
+        drained
+            .records
+            .iter()
+            .map(|record| record.sequence().get())
+            .collect::<Vec<_>>(),
+        [2, 4, 5, 6]
+    );
+    assert!(matches!(
+        drained.records.as_slice(),
+        [
+            EndpointRecord::Cue(_),
+            EndpointRecord::Cue(_),
+            EndpointRecord::Cue(first_release),
+            EndpointRecord::Cue(second_release),
+        ] if first_release.is_subscription_release() && second_release.is_subscription_release()
+    ));
+}
+
+#[test]
+fn stage_teardown_guard_is_stale_safe_and_rollback_is_retryable() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(5, 2, 3)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    let mut stale = queue
+        .prepare_stage_teardown_inputs(
+            stage,
+            vec![cue(1, 2, CueDelivery::Critical, &[2]).with_subscription_release()],
+        )
+        .unwrap();
+    queue
+        .enqueue(cue(2, 2, CueDelivery::Critical, &[9]))
+        .unwrap();
+    let (result, allocations, deallocations) =
+        count_allocator_operations(|| queue.acquire_stage_teardown_commit(&mut stale));
+    assert!(matches!(result, Err(CueQueueError::StalePreparedInputs)));
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!((queue.len(), queue.ordinary_len()), (2, 1));
+    queue.release_stage_teardown_inputs(stale);
+
+    let mut retry_queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    retry_queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    let mut retry = retry_queue
+        .prepare_stage_teardown_inputs(
+            stage,
+            vec![cue(1, 2, CueDelivery::Critical, &[2]).with_subscription_release()],
+        )
+        .unwrap();
+    let guard = retry_queue
+        .acquire_stage_teardown_commit(&mut retry)
+        .unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.rollback());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!((retry_queue.len(), retry_queue.ordinary_len()), (1, 1));
+
+    let guard = retry_queue
+        .acquire_stage_teardown_commit(&mut retry)
+        .unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!((retry_queue.len(), retry_queue.ordinary_len()), (1, 0));
+    retry_queue.release_stage_teardown_inputs(retry);
+}
+
+#[test]
+fn stage_teardown_rejects_noncritical_or_cross_stage_inputs_without_mutation() {
+    let stage = StageId::new(1).unwrap();
+    let queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    assert!(matches!(
+        queue.prepare_stage_teardown_inputs(
+            stage,
+            vec![cue(2, 1, CueDelivery::Critical, &[1])]
+        ),
+        Err(CueQueueError::StageTeardownInputStageMismatch {
+            expected,
+            offered,
+        }) if expected == stage && offered == StageId::new(2).unwrap()
+    ));
+    assert!(matches!(
+        queue.prepare_stage_teardown_inputs(stage, vec![cue(1, 1, CueDelivery::Ordered, &[1])]),
+        Err(CueQueueError::StageTeardownInputMustBeCritical)
+    ));
+    assert!(queue.is_empty());
+}
+
+#[test]
+fn purge_only_commit_advances_freshness_without_dropping_retained_records() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    queue
+        .enqueue(cue(1, 1, CueDelivery::Ordered, &[1]))
+        .unwrap();
+    let mut old_exact = queue.prepare_exact_inputs(Vec::new()).unwrap();
+    let mut purge = queue
+        .prepare_stage_teardown_inputs(stage, Vec::new())
+        .unwrap();
+    let guard = queue.acquire_stage_teardown_commit(&mut purge).unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert!(queue.is_empty());
+    assert_eq!(
+        queue.commit_exact_inputs(&mut old_exact),
+        Err(CueQueueError::StalePreparedInputs)
+    );
+    queue.release_exact_inputs(old_exact);
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_stage_teardown_inputs(purge));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 2);
+}
+
+#[test]
 fn exact_preflight_rejects_full_batch_validation_matrix_without_queue_mutation() {
     let queue = CueQueue::new(limits(3, 1, 2)).unwrap();
     assert!(matches!(

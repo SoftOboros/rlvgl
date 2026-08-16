@@ -1763,6 +1763,106 @@ impl core::fmt::Debug for PreparedBatchCommitError {
     }
 }
 
+/// Fully prepared transaction that retires and closes one complete Stage.
+pub struct PreparedStageTeardown {
+    prepared: Box<PreparedStageBatch>,
+}
+
+impl PreparedStageTeardown {
+    /// Return the Stage that will be closed.
+    pub const fn stage_id(&self) -> StageId {
+        self.prepared.stage_id
+    }
+
+    /// Return the Stage Revision against which teardown was prepared.
+    pub const fn starting_revision(&self) -> StageRevision {
+        self.prepared.starting_revision
+    }
+
+    /// Return the single final Stage Revision published by commit.
+    pub const fn next_revision(&self) -> StageRevision {
+        self.prepared.next_revision
+    }
+
+    /// Borrow every live object identity in exact child-first retirement order.
+    pub fn deleted_object_ids(&self) -> &[ObjectId] {
+        &self.prepared.deleted_object_ids
+    }
+
+    /// Return the exact number of objects retired by this teardown.
+    pub fn deletion_count(&self) -> usize {
+        self.prepared.deleted_object_ids.len()
+    }
+}
+
+impl core::fmt::Debug for PreparedStageTeardown {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PreparedStageTeardown")
+            .field("prepared", &self.prepared)
+            .finish()
+    }
+}
+
+/// Successful full-Stage teardown whose retired storage awaits release.
+pub struct CommittedStageTeardown {
+    committed: CommittedStageBatch,
+}
+
+impl CommittedStageTeardown {
+    /// Return the final revision published while closing the Stage.
+    pub const fn revision(&self) -> StageRevision {
+        self.committed.revision
+    }
+
+    /// Borrow exact child-first identities retired by the teardown.
+    pub fn deleted_object_ids(&self) -> &[ObjectId] {
+        self.committed.deleted_object_ids()
+    }
+
+    /// Return the exact number of retired objects awaiting release.
+    pub fn deletion_count(&self) -> usize {
+        self.committed.deleted_object_ids().len()
+    }
+}
+
+impl core::fmt::Debug for CommittedStageTeardown {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("CommittedStageTeardown")
+            .field("committed", &self.committed)
+            .finish()
+    }
+}
+
+/// Pre-mutation rejection of an owned full-Stage teardown transaction.
+pub struct PreparedStageTeardownCommitError {
+    cause: RegistryError,
+    prepared: PreparedStageTeardown,
+}
+
+impl PreparedStageTeardownCommitError {
+    /// Return why the final pre-mutation guard rejected teardown.
+    pub const fn cause(&self) -> RegistryError {
+        self.cause
+    }
+
+    /// Recover the still-owned prepared teardown transaction.
+    pub fn into_prepared(self) -> PreparedStageTeardown {
+        self.prepared
+    }
+}
+
+impl core::fmt::Debug for PreparedStageTeardownCommitError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PreparedStageTeardownCommitError")
+            .field("cause", &self.cause)
+            .field("prepared", &self.prepared)
+            .finish()
+    }
+}
+
 enum PendingLifecycle {
     Detached(ObjectNode),
     Attached(ObjectId),
@@ -2157,6 +2257,41 @@ impl StageRegistry {
         })
     }
 
+    /// Prepare one allocation-owned transaction that closes the complete Stage.
+    ///
+    /// Preparation is semantically read-only: it validates every current
+    /// actor/tree/geometry borrow, owns root-order deletion directions and
+    /// exact child-first identities, and reserves all commit and release
+    /// storage without changing revision, usage, tree order, or lifecycle.
+    pub fn prepare_stage_teardown(&self) -> Result<PreparedStageTeardown, RegistryError> {
+        self.ensure_active()?;
+        let mut directions = Vec::new();
+        directions
+            .try_reserve_exact(self.roots.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Roots,
+            })?;
+        for root in &self.roots {
+            let object_id = root
+                .node
+                .actor_identity()
+                .ok_or(RegistryError::Internal)?
+                .object_id;
+            directions.push(StageDirection::Delete { object_id });
+        }
+        let prepared = if directions.is_empty() {
+            self.build_empty_stage_teardown()?
+        } else {
+            self.build_prepared_batch(directions)?
+        };
+        if prepared.deleted_object_ids.len() != self.usage.actors {
+            return Err(RegistryError::Internal);
+        }
+        Ok(PreparedStageTeardown {
+            prepared: Box::new(prepared),
+        })
+    }
+
     /// Validate and publish an atomic group under one Stage Revision.
     pub fn apply_batch(
         &mut self,
@@ -2353,6 +2488,48 @@ impl StageRegistry {
             }
         }
         Ok(())
+    }
+
+    /// Atomically retire every live object and close the prepared Stage.
+    ///
+    /// All fallible validation occurs before the first mutation through the
+    /// same Stage/revision/geometry/borrow guard as ordinary prepared batches.
+    /// The successful path only moves or swaps prepared storage, then marks the
+    /// empty Stage closed.
+    pub fn commit_prepared_teardown(
+        &mut self,
+        prepared: PreparedStageTeardown,
+    ) -> Result<CommittedStageTeardown, PreparedStageTeardownCommitError> {
+        let PreparedStageTeardown { prepared } = prepared;
+        match self.commit_prepared_batch(prepared) {
+            Ok(committed) => {
+                debug_assert_eq!(self.usage, RegistryUsage::default());
+                debug_assert!(self.roots.is_empty());
+                self.active = false;
+                self.snapshot = None;
+                Ok(CommittedStageTeardown { committed })
+            }
+            Err(error) => {
+                let cause = error.cause();
+                Err(PreparedStageTeardownCommitError {
+                    cause,
+                    prepared: PreparedStageTeardown {
+                        prepared: error.into_prepared(),
+                    },
+                })
+            }
+        }
+    }
+
+    /// Publish detached-root lifecycle and release all retired Stage storage.
+    pub fn release_committed_teardown(
+        &mut self,
+        committed: CommittedStageTeardown,
+    ) -> Result<(), RegistryError> {
+        if self.active {
+            return Err(RegistryError::BatchInvalid);
+        }
+        self.release_committed_batch(committed.committed)
     }
 
     fn build_prepared_batch(
@@ -2586,6 +2763,40 @@ impl StageRegistry {
         })
     }
 
+    fn build_empty_stage_teardown(&self) -> Result<PreparedStageBatch, RegistryError> {
+        if self.usage != RegistryUsage::default()
+            || !self.roots.is_empty()
+            || self.slots.iter().any(|slot| slot.record.is_some())
+        {
+            return Err(RegistryError::Internal);
+        }
+        Ok(PreparedStageBatch {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            next_revision: self.next_revision()?,
+            directions: Vec::new(),
+            actor_groups: Vec::new(),
+            layout_mutations: Vec::new(),
+            final_usage: RegistryUsage::default(),
+            before_geometry: Vec::new(),
+            geometry_scratch: Vec::new(),
+            invalidations: Vec::new(),
+            effects: MutationEffects::DRAW
+                .union(MutationEffects::TREE)
+                .union(MutationEffects::LAYOUT)
+                .union(MutationEffects::SNAPSHOT),
+            touched: Vec::new(),
+            deleted_object_ids: Vec::new(),
+            delete_groups: Vec::new(),
+            depth_updates: Vec::new(),
+            child_capacities: Vec::new(),
+            max_roots: 0,
+            lifecycle: Vec::new(),
+            retired_records: Vec::new(),
+            retired_root_names: Vec::new(),
+        })
+    }
+
     /// Begin the minimum-profile single snapshot cursor.
     pub fn snapshot_begin(&mut self) -> Result<SnapshotToken, SnapshotError> {
         self.ensure_active().map_err(SnapshotError::Registry)?;
@@ -2804,18 +3015,12 @@ impl StageRegistry {
 
     /// Tear down every root and permanently close this Stage Registry.
     pub fn teardown(&mut self) -> Result<usize, RegistryError> {
-        self.ensure_active()?;
-        let mut deleted = 0;
-        while let Some(object_id) = self
-            .roots
-            .first()
-            .and_then(|root| root.node.actor_identity())
-            .map(|identity| identity.object_id)
-        {
-            deleted += self.delete(object_id)?;
-        }
-        self.active = false;
-        self.snapshot = None;
+        let prepared = self.prepare_stage_teardown()?;
+        let deleted = prepared.deletion_count();
+        let committed = self
+            .commit_prepared_teardown(prepared)
+            .map_err(|error| error.cause())?;
+        self.release_committed_teardown(committed)?;
         Ok(deleted)
     }
 

@@ -1018,6 +1018,10 @@ impl EndpointRecord {
     }
 }
 
+fn is_stage_ordinary(record: &EndpointRecord, stage_id: StageId) -> bool {
+    matches!(record, EndpointRecord::Cue(cue) if cue.stage_id == stage_id && cue.delivery.is_ordinary())
+}
+
 /// Outcome of a successful cue admission.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnqueueOutcome {
@@ -1145,6 +1149,15 @@ pub enum CueQueueError {
     StalePreparedInputs,
     /// The exact-input transaction was already committed.
     PreparedInputsAlreadyCommitted,
+    /// A purge-aware Stage teardown input belongs to another Stage.
+    StageTeardownInputStageMismatch {
+        /// Stage whose ordinary records the transaction would purge.
+        expected: StageId,
+        /// Stage carried by the mismatched Critical input.
+        offered: StageId,
+    },
+    /// A purge-aware Stage teardown transaction only accepts Critical inputs.
+    StageTeardownInputMustBeCritical,
     /// The internal exact-transaction revision can no longer advance.
     MutationRevisionExhausted,
     /// A latest-value coalescible cue omitted its exact-key discriminator.
@@ -1403,6 +1416,40 @@ pub struct ExactCueCommit<'a> {
     prepared: &'a mut PreparedCueInputs,
 }
 
+/// Purge-aware exact cue transaction for one full-Stage teardown.
+///
+/// Preparation simulates removal of every ordinary record for `stage_id`
+/// before validating the retained Critical inputs. Purged records and any
+/// displaced payloads remain owned here after commit until the endpoint calls
+/// [`CueQueue::release_stage_teardown_inputs`] outside the atomic Safe Turn.
+pub struct PreparedStageTeardownCues {
+    stage_id: StageId,
+    purged_ordinary: RemovedStageOrdinary,
+    purged_records: Vec<EndpointRecord>,
+    exact: PreparedCueInputs,
+}
+
+/// Exclusive full-Stage cue teardown commit capability.
+///
+/// Acquisition is the final fallible freshness check. The guard prevents an
+/// intervening queue mutation, and consuming it commits the purge and exact
+/// Critical inputs without allocation, deallocation, or error.
+pub struct StageTeardownCueCommit<'a> {
+    queue: &'a mut CueQueue,
+    prepared: &'a mut PreparedStageTeardownCues,
+}
+
+impl StageTeardownCueCommit<'_> {
+    /// Commit the planned Stage purge and Critical inputs infallibly.
+    pub fn commit(self) {
+        self.queue
+            .commit_stage_teardown_inputs_infallible(self.prepared);
+    }
+
+    /// Release the exclusive guard without changing queue or prepared state.
+    pub fn rollback(self) {}
+}
+
 impl ExactCueCommit<'_> {
     /// Commit every prepared input without allocation, deallocation, or error.
     pub fn commit(self) {
@@ -1427,6 +1474,28 @@ impl PreparedCueInputs {
     /// Return whether no cue input is represented by this transaction.
     pub const fn is_empty(&self) -> bool {
         self.input_count == 0
+    }
+}
+
+impl PreparedStageTeardownCues {
+    /// Return the Stage whose ordinary queue records will be purged.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the exact preflighted ordinary-record purge summary.
+    pub const fn purged_ordinary(&self) -> RemovedStageOrdinary {
+        self.purged_ordinary
+    }
+
+    /// Return the exact number of retained Critical teardown inputs.
+    pub const fn input_count(&self) -> usize {
+        self.exact.input_count
+    }
+
+    /// Borrow retained teardown inputs before commit moves them to the queue.
+    pub fn inputs(&self) -> &[CueInput] {
+        &self.exact.inputs
     }
 }
 
@@ -1680,10 +1749,59 @@ impl CueQueue {
         &self,
         inputs: Vec<CueInput>,
     ) -> Result<PreparedCueInputs, CueQueueError> {
+        self.prepare_exact_inputs_after_stage_purge(inputs, None)
+    }
+
+    /// Prepare a full-Stage ordinary purge and exact Critical teardown inputs.
+    ///
+    /// Capacity, ordering, causality, payload, and sequence validation observes
+    /// the virtual queue that would remain after every ordinary cue for
+    /// `stage_id` is removed. RuntimeNotices, Critical cues, and all records for
+    /// other Stages retain their relative order. Preparation never mutates the
+    /// live queue.
+    pub fn prepare_stage_teardown_inputs(
+        &self,
+        stage_id: StageId,
+        inputs: Vec<CueInput>,
+    ) -> Result<PreparedStageTeardownCues, CueQueueError> {
+        for input in &inputs {
+            if input.stage_id != stage_id {
+                return Err(CueQueueError::StageTeardownInputStageMismatch {
+                    expected: stage_id,
+                    offered: input.stage_id,
+                });
+            }
+            if input.delivery != CueDelivery::Critical {
+                return Err(CueQueueError::StageTeardownInputMustBeCritical);
+            }
+        }
+
+        let purged_ordinary = self.stage_ordinary_purge_summary(stage_id);
+        let mut purged_records = Vec::new();
+        purged_records
+            .try_reserve_exact(purged_ordinary.count)
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let exact = self.prepare_exact_inputs_after_stage_purge(inputs, Some(stage_id))?;
+        Ok(PreparedStageTeardownCues {
+            stage_id,
+            purged_ordinary,
+            purged_records,
+            exact,
+        })
+    }
+
+    fn prepare_exact_inputs_after_stage_purge(
+        &self,
+        inputs: Vec<CueInput>,
+        purged_stage: Option<StageId>,
+    ) -> Result<PreparedCueInputs, CueQueueError> {
         if self.state == CueEndpointState::Faulted {
             return Err(CueQueueError::Faulted);
         }
-        if !inputs.is_empty() && self.mutation_revision == u64::MAX {
+        let purged_count = purged_stage
+            .map(|stage_id| self.stage_ordinary_purge_summary(stage_id).count)
+            .unwrap_or(0);
+        if (!inputs.is_empty() || purged_count != 0) && self.mutation_revision == u64::MAX {
             return Err(CueQueueError::MutationRevisionExhausted);
         }
         if self.state == CueEndpointState::Backpressured
@@ -1707,12 +1825,21 @@ impl CueQueue {
             .map_err(|_| CueQueueError::AllocationFailed)?;
         virtual_causality.extend_from_slice(&self.stage_causality);
 
-        let mut virtual_records = self.records.len();
-        let mut virtual_ordinary = self.ordinary_records;
+        let mut virtual_records = self
+            .records
+            .len()
+            .checked_sub(purged_count)
+            .expect("purge count comes from queued records");
+        let mut virtual_ordinary = self
+            .ordinary_records
+            .checked_sub(purged_count)
+            .expect("purge count includes only ordinary records");
         let mut virtual_last_native_sequence = self.last_native_event_sequence;
         let mut virtual_tail = self
             .records
-            .back()
+            .iter()
+            .rev()
+            .find(|record| purged_stage.is_none_or(|stage_id| !is_stage_ordinary(record, stage_id)))
             .and_then(EndpointRecord::as_cue)
             .map(VirtualCueTail::from_record);
 
@@ -1756,8 +1883,15 @@ impl CueQueue {
                                 && matches!(action, PreparedCueAction::Queue { .. })
                         })
                         .count();
+                    let purged_for_input_stage = if purged_stage == Some(input.stage_id) {
+                        purged_count
+                    } else {
+                        0
+                    };
                     if self
                         .ordinary_for_stage(input.stage_id)
+                        .checked_sub(purged_for_input_stage)
+                        .expect("Stage purge count matches Stage ordinary records")
                         .checked_add(planned_for_stage)
                         .is_none_or(|count| count >= self.limits.per_stage_ordinary_quota)
                     {
@@ -1813,12 +1947,47 @@ impl CueQueue {
         })
     }
 
+    /// Acquire the exclusive full-Stage cue teardown guard before Stage mutation.
+    ///
+    /// This is the final fallible queue step. It rejects stale or already
+    /// committed preparations and then exclusively borrows the queue so commit
+    /// cannot encounter a newly changed capacity, sequence, or causality state.
+    pub fn acquire_stage_teardown_commit<'a>(
+        &'a mut self,
+        prepared: &'a mut PreparedStageTeardownCues,
+    ) -> Result<StageTeardownCueCommit<'a>, CueQueueError> {
+        if prepared.exact.state != PreparedInputsState::Prepared {
+            return Err(CueQueueError::PreparedInputsAlreadyCommitted);
+        }
+        if prepared.exact.queue_revision != self.mutation_revision {
+            return Err(CueQueueError::StalePreparedInputs);
+        }
+        if (prepared.purged_ordinary.count != 0 || prepared.exact.input_count != 0)
+            && self.mutation_revision == u64::MAX
+        {
+            return Err(CueQueueError::MutationRevisionExhausted);
+        }
+        Ok(StageTeardownCueCommit {
+            queue: self,
+            prepared,
+        })
+    }
+
     /// Compatibility wrapper that acquires and immediately commits the guard.
     pub fn commit_exact_inputs(
         &mut self,
         prepared: &mut PreparedCueInputs,
     ) -> Result<(), CueQueueError> {
         self.acquire_exact_commit(prepared)?.commit();
+        Ok(())
+    }
+
+    /// Compatibility wrapper that acquires and commits a Stage teardown guard.
+    pub fn commit_stage_teardown_inputs(
+        &mut self,
+        prepared: &mut PreparedStageTeardownCues,
+    ) -> Result<(), CueQueueError> {
+        self.acquire_stage_teardown_commit(prepared)?.commit();
         Ok(())
     }
 
@@ -1859,11 +2028,48 @@ impl CueQueue {
         prepared.state = PreparedInputsState::Committed;
     }
 
+    fn commit_stage_teardown_inputs_infallible(
+        &mut self,
+        prepared: &mut PreparedStageTeardownCues,
+    ) {
+        let original_len = self.records.len();
+        for _ in 0..original_len {
+            let record = self
+                .records
+                .pop_front()
+                .expect("bounded original queue length");
+            if is_stage_ordinary(&record, prepared.stage_id) {
+                prepared.purged_records.push(record);
+            } else {
+                self.records.push_back(record);
+            }
+        }
+        debug_assert_eq!(
+            prepared.purged_records.len(),
+            prepared.purged_ordinary.count
+        );
+        self.ordinary_records -= prepared.purged_ordinary.count;
+
+        let has_exact_inputs = prepared.exact.input_count != 0;
+        self.commit_exact_inputs_infallible(&mut prepared.exact);
+        if prepared.purged_ordinary.count != 0 && !has_exact_inputs {
+            self.bump_mutation_revision();
+        }
+    }
+
     /// Release prepared scratch and any displaced coalesced payloads.
     ///
     /// Releasing an uncommitted transaction is the rollback path and leaves
     /// queue state unchanged.
     pub fn release_exact_inputs(&self, prepared: PreparedCueInputs) {
+        drop(prepared);
+    }
+
+    /// Release Stage-teardown scratch and retained purged/displaced storage.
+    ///
+    /// Releasing an uncommitted preparation is an exact rollback because
+    /// preparation and guard acquisition do not mutate queue state.
+    pub fn release_stage_teardown_inputs(&self, prepared: PreparedStageTeardownCues) {
         drop(prepared);
     }
 
@@ -2108,6 +2314,21 @@ impl CueQueue {
         self.ordinary_records -= removed.count;
         if removed.count != 0 {
             self.bump_mutation_revision();
+        }
+        removed
+    }
+
+    fn stage_ordinary_purge_summary(&self, stage_id: StageId) -> RemovedStageOrdinary {
+        let mut removed = RemovedStageOrdinary::default();
+        for record in self
+            .records
+            .iter()
+            .filter(|record| is_stage_ordinary(record, stage_id))
+        {
+            let sequence = record.sequence();
+            removed.count += 1;
+            removed.first_sequence.get_or_insert(sequence);
+            removed.last_sequence = Some(sequence);
         }
         removed
     }
