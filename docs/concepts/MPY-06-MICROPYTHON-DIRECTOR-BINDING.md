@@ -4,10 +4,11 @@ MPY-06-MICROPYTHON-DIRECTOR-BINDING.md - MicroPython Stage/Actor API and callbac
 
 # MPY-06 — MicroPython Director Binding
 
-**Status:** Draft 2026-08-09; policy dependencies ratified 2026-08-16. Not
-ratified. MPY-04 and MPY-05 now freeze the consumed direction and cue semantics,
-but their implementations are not yet available; Python names, polling details,
-four PCDNs, and §12 remain proposals. The current module remains a placeholder.
+**Status:** Owner-accepted 2026-08-16; not yet ratified. MPY-04 and MPY-05
+freeze the consumed direction and cue semantics, and §11–§12 record the
+accepted MPY-06 policy. Ratification remains gated on the missing MPY-04/05
+runtime implementations and a compile-tested host MicroPython binding. The
+current module remains a placeholder.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-04 stage directions and MPY-05 cue runtime.
@@ -69,9 +70,12 @@ would violate MPY-05.
 
 ## 5. Frozen Decisions — Module and Object Model
 
-The primary import name is proposed as `rlvgl`. The current `mp_rlvgl` name
-MAY remain a compatibility alias during the 0.x transition but MUST expose the
-same module object rather than a second implementation.
+The primary import name is `rlvgl`. The current `mp_rlvgl` name remains a 0.x
+compatibility alias and MUST resolve to the same module object, globals,
+classes, exception types, and runtime state rather than a second
+implementation. `__name__` is `rlvgl` through either import. The alias MAY be
+removed at 1.0 with release-note notice. Internal C ABI symbols such as
+`mp_rlvgl_*` do not define the Python import name and need not be renamed.
 
 The required primary classes are:
 
@@ -83,9 +87,14 @@ The required primary classes are:
   and
 - `Transaction`: create/mutate/invoke/subscribe operations plus commit/abort.
 
-Actor subclasses or generated convenience constructors MAY improve
-discoverability, but their methods derive from descriptors and lower through
-the generic Stage/Actor implementation.
+Generic `Stage` and `Actor` are the complete mandatory v1 API. Actor lookup and
+creation through names or numeric descriptor IDs MUST work without synthesizing
+Python classes at runtime. A firmware profile MAY generate static convenience
+classes from the canonical descriptor catalog, but those classes only add
+typed names and ergonomic forwarding through generic Stage/Actor operations.
+They cannot add semantics, schemas, lifetime rules, or alternate command paths.
+Handwritten per-widget wrappers are prohibited, and generic-only and generated-
+class profiles run the same protocol scenarios.
 
 Wrappers do not own actor lifetime. `del actor` or garbage collection releases
 only the local wrapper. `actor.delete()` or ancestor/stage teardown deletes
@@ -126,7 +135,7 @@ Required generic behavior includes:
 | `actor.parent/children/reparent/reorder/delete` | tree commands |
 | `actor.layout` / `actor.geometry` | requested layout / read-only geometry |
 | `actor.on(event, callback, **policy)` | Subscribe plus adapter callable retention |
-| `stage.poll()` | Result/cue pump and callback invocation |
+| `rlvgl.poll()` / `stage.poll()` | Endpoint-wide Result/cue pump and callback invocation |
 | `stage.snapshot()` | revisioned snapshot pages projected to Python values |
 
 ## 7. Frozen Decisions — Value and Descriptor Conversion
@@ -167,29 +176,42 @@ coalescing/loss metadata, and typed payload fields.
 
 ### 8.2 Explicit poll baseline
 
-`Stage.poll(max_cues=None)` is the required baseline. It pumps pending Results,
-drains at most the requested number of cues, and invokes callables in cue order
-from the VM thread. Ports MAY integrate `micropython.schedule` to request a
-future poll, but scheduled execution cannot replace explicit polling in tests
-or change ordering.
+`rlvgl.poll(max_cues=None)` is the canonical endpoint-wide pump. It pumps
+pending Results, drains at most the selected bounded cue budget, and invokes
+callables in endpoint `CueSequence` order from the VM thread. `None` selects
+the target profile's advertised bounded default; it never means an unbounded
+drain. Ports MAY integrate `micropython.schedule` to request a future poll, but
+scheduled execution cannot replace explicit polling in tests or change
+ordering.
 
-MPY-05 owns one endpoint queue rather than one queue per Stage. `Stage.poll()`
-is therefore an adapter convenience over the endpoint pump and filters records
-by `StageId`; it does not own capacity, Critical Reserve, sequencing, or loss
-accounting. The MPY-06 PCDN walk must freeze the exact cross-Stage polling
-facade without changing endpoint sequence order or allowing a Stage-local poll
-to strand an earlier endpoint cue.
+`Stage.poll()` remains convenience syntax but delegates to that same global
+pump. A poll invokes eligible callbacks for every active Stage in sequence
+order, and `max_cues` counts total endpoint cues rather than cues for the
+calling Stage. The returned summary reports endpoint totals and per-Stage
+counts. The adapter does not introduce per-Stage inboxes or other secondary
+queues, and it does not own capacity, Critical Reserve, sequencing, or loss
+accounting.
 
 During one callback, mutating Stage/Actor operations are collected in a
 callback-local transaction and submitted only after the callable returns.
 Operations requiring a synchronous runtime read/result during Callback Drain
-Mode raise `CallbackBusyError` in v1; the application may use cue payload,
-cached immutable event data, or schedule later work. This keeps callback
-latency bounded and makes MPY-05 mutation deferral explicit.
+Mode raise `CallbackBusyError` before command submission in v1. This includes
+property, tree, layout, geometry, and snapshot reads. Immutable event/cue data,
+wrapper-local identity, and descriptor metadata already resident in the
+binding remain readable. Generic read methods MUST NOT become context-dependent
+by transparently consulting a snapshot cache. The application may use event
+data or perform the runtime read after the current callback returns. This keeps
+callback latency bounded and makes MPY-05 mutation deferral explicit.
 
-Callback exceptions are caught at the module boundary, reported through a
-configurable exception hook/default unhandled-exception printer, and recorded
-in binding statistics. They do not unwind into Rust/C or automatically consume
+Callback exceptions are caught at the module boundary and recorded in binding
+statistics. `rlvgl.set_exception_hook(callable_or_none)` installs a VM-owned
+hook that receives the exception plus immutable Stage, Actor, Subscription,
+and cue-sequence context. With no hook, the C shim calls
+`mp_obj_print_exception(MICROPY_ERROR_PRINTER, exception)`, matching
+MicroPython's own portable callback fallback without assuming
+`sys.excepthook` parity. A hook exception is itself contained, both exceptions
+are reported through the default printer, and the hook is not called
+recursively. Neither exception unwinds into Rust/C or automatically consumes
 the native event. The default keeps the subscription active; applications can
 close it from the exception hook or later code.
 
@@ -227,14 +249,14 @@ shim owns MicroPython C API calls; core/runtime Rust owns no `mp_obj_t`.
 
 | Existing surface | MPY-06 decision |
 |---|---|
-| Module name `mp_rlvgl` | Compatibility alias; proposed primary import is `rlvgl`. |
+| Module name `mp_rlvgl` | 0.x compatibility alias to the same module object; primary import and `__name__` are `rlvgl`. |
 | Fixed stack functions | Deprecated compatibility wrappers may lower to Stage commands; they do not define the new API. |
 | `mp_rlvgl_check` raises one `ValueError` | Replaced by stable exception mapping. |
 | Rust FFI one function per operation | Replaced or supplemented by generic encoded command/result transport entry points; convenience functions may remain. |
 | PyO3 host mirror | Optional after actual MicroPython tests. It consumes the same descriptors/protocol and cannot be the oracle. |
 | Wrapper finalizers | Release Python-local resources/subscriptions where safe; never implicitly delete an Actor. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 1. **No Python draw/measure handlers.** Native actor execution remains required.
 2. **No required CPython API.** PyO3 is optional convenience.
@@ -242,27 +264,31 @@ shim owns MicroPython C API calls; core/runtime Rust owns no `mp_obj_t`.
 4. **No hidden event loop dependency.** Explicit `Stage.poll()` remains
    testable on every port.
 
-- **PCDN-MPY-06-001:** Confirm `rlvgl` as primary import and `mp_rlvgl` as the
-  0.x compatibility alias.
-- **PCDN-MPY-06-002:** Should Callback Drain Mode forbid all synchronous reads,
-  or permit reads satisfied from a Stage snapshot cache at the cue's revision?
-  Recommendation: forbid runtime reads in v1; expose immutable event data.
-- **PCDN-MPY-06-003:** What default callback exception hook is available across
-  MicroPython ports without assuming `sys.excepthook` parity? A compile-tested
-  portable fallback is required before ratification.
-- **PCDN-MPY-06-004:** Should descriptor-backed convenience classes be generated
-  at firmware build time or provided dynamically through generic Actor?
-  Recommendation: generic Actor required; generated conveniences optional.
+- **PCDN-MPY-06-001 — Closed 2026-08-16:** §5 makes `rlvgl` canonical and
+  retains `mp_rlvgl` as a same-object 0.x compatibility alias.
+- **PCDN-MPY-06-002 — Closed 2026-08-16:** §8.2 forbids synchronous runtime
+  reads and transparent snapshot-cache substitution during Callback Drain
+  Mode while preserving immutable event, identity, and descriptor data.
+- **PCDN-MPY-06-003 — Policy closed 2026-08-16; evidence open:** §8.2 uses a
+  configurable binding hook plus `mp_obj_print_exception` on
+  `MICROPY_ERROR_PRINTER` as the portable default. Host MicroPython compile and
+  exception-injection proof remain required before ratification.
+- **PCDN-MPY-06-004 — Closed 2026-08-16:** §5 requires the complete generic
+  Stage/Actor API, prohibits runtime class synthesis and handwritten widget
+  wrappers, and permits descriptor-generated static conveniences by profile.
+- **PCDN-MPY-06-005 — Closed 2026-08-16:** §8.2 defines module-level and Stage
+  polling as one bounded endpoint-wide drain. All Stage callbacks run in
+  `CueSequence` order without per-Stage adapter inboxes.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-06-1` descriptor-derived Python API is accepted.
-- [ ] `INV-MPY-06-2` wrapper identity and explicit native lifetime are accepted.
-- [ ] `INV-MPY-06-3` callable retention/release behavior is accepted.
-- [ ] `INV-MPY-06-4` explicit poll and exception containment are accepted.
-- [ ] `INV-MPY-06-5` Callback Drain Mode restrictions are accepted.
-- [ ] `INV-MPY-06-6` exception hierarchy and code preservation are accepted.
-- [ ] PCDN-MPY-06-001 through PCDN-MPY-06-004 are resolved without weakening `INV-MPY-1`, `INV-MPY-5`, or `INV-MPY-10`.
+- [x] `INV-MPY-06-1` descriptor-derived Python API is accepted.
+- [x] `INV-MPY-06-2` wrapper identity and explicit native lifetime are accepted.
+- [x] `INV-MPY-06-3` callable retention/release behavior is accepted.
+- [x] `INV-MPY-06-4` explicit endpoint-wide poll and exception containment are accepted.
+- [x] `INV-MPY-06-5` Callback Drain Mode restrictions are accepted.
+- [x] `INV-MPY-06-6` exception hierarchy and code preservation are accepted.
+- [x] PCDN-MPY-06-001 through PCDN-MPY-06-005 are resolved without weakening `INV-MPY-1`, `INV-MPY-5`, or `INV-MPY-10`.
 
 ## 13. Files Cited
 
@@ -319,3 +345,26 @@ same-core and dual-core targets.
 clarifies that `Stage.poll()` is an adapter filter over the endpoint-owned cue
 pump. MPY-06 remains Draft and dependency-blocked on the corresponding runtime
 implementations; its four PCDNs and acceptance checklist remain open.
+
+### 0.2.0 — 2026-08-16 — Amended
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-06-1, INV-MPY-06-2, INV-MPY-06-3, INV-MPY-06-4, INV-MPY-06-5, INV-MPY-06-6, PCDN-MPY-06-001, PCDN-MPY-06-002, PCDN-MPY-06-003, PCDN-MPY-06-004, PCDN-MPY-06-005, §0, §5–§12, §14, §15
+
+**Commits:** pending
+
+**Summary:** Records owner acceptance of the complete MPY-06 policy, including
+the canonical module alias, callback read boundary, portable exception hook,
+generic Actor baseline, and endpoint-wide ordered polling facade. MPY-06
+remains unratified until its missing runtime dependencies and host MicroPython
+compile/behavior proof exist.
+
+#### Rationale
+
+The accepted surface prevents Python ergonomics from becoming a second actor
+schema or queue authority. Endpoint-wide polling preserves the ordering
+guaranteed by MPY-05, while explicit callback restrictions and a C-level
+exception fallback keep VM behavior bounded and portable across targets.

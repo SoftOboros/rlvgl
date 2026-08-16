@@ -1,5 +1,5 @@
 {
-  "edge_count": 466,
+  "edge_count": 478,
   "edges": [
     {
       "edge_type": "defines",
@@ -2370,233 +2370,317 @@
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 215,
+      "line": 237,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 216,
+      "line": 238,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 217,
+      "line": 239,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 218,
+      "line": 240,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 219,
+      "line": 241,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 220,
+      "line": 242,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 245,
+      "line": 267,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 247,
+      "line": 269,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 250,
+      "line": 272,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 253,
+      "line": 276,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 259,
+      "line": 279,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 285,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 260,
+      "line": 286,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 261,
+      "line": 287,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 262,
+      "line": 288,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 263,
+      "line": 289,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 264,
+      "line": 290,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-06-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 291,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
-      "target": "PCDN-MPY-06-004"
+      "target": "PCDN-MPY-06-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-06-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-MPY-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 292,
+      "line": 318,
       "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-MPY-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-MPY-06-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 355,
+      "source": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-MPY-06-005"
     },
     {
       "edge_type": "cites",
@@ -3266,14 +3350,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 28,
+    "amendment": 29,
     "gate": 80,
     "invariant": 65,
     "nongoal": 43,
-    "rationale": 23,
+    "rationale": 24,
     "term": 76
   },
-  "object_count": 315,
+  "object_count": 317,
   "objects": [
     {
       "attrs": {
@@ -6782,7 +6866,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 51,
+      "line": 52,
       "obj_id": "mpy:term:python stage",
       "text": "MicroPython wrapper holding an endpoint/session reference and `StageId`; primary director entry point."
     },
@@ -6794,7 +6878,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 53,
       "obj_id": "mpy:term:python actor",
       "text": "Lightweight wrapper holding Python Stage plus `ObjectId`; every operation revalidates runtime identity."
     },
@@ -6806,7 +6890,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 53,
+      "line": 54,
       "obj_id": "mpy:term:python subscription",
       "text": "Closeable wrapper holding Stage, `SubscriptionId`, and `CallbackId`; adapter retains the callable while active."
     },
@@ -6818,7 +6902,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 55,
       "obj_id": "mpy:term:python transaction",
       "text": "Context manager collecting neutral operations and batch-local actor wrappers before one atomic commit."
     },
@@ -6830,7 +6914,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 55,
+      "line": 56,
       "obj_id": "mpy:term:callback drain mode",
       "text": "Period while `Stage.poll()` invokes queued callables and defers their mutations until each callback returns."
     },
@@ -6842,7 +6926,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 57,
       "obj_id": "mpy:term:binding error",
       "text": "Python exception carrying the stable protocol error class, request/operation context, and optional diagnostic text."
     },
@@ -6861,7 +6945,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 215,
+      "line": 237,
       "obj_id": "INV-MPY-06-1",
       "text": "The Python API MUST derive actor names, constructors, properties, actions, and events from the canonical descriptor catalog and MUST NOT maintain an independent widget schema."
     },
@@ -6879,7 +6963,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 216,
+      "line": 238,
       "obj_id": "INV-MPY-06-2",
       "text": "Python Stage/Actor wrappers MUST contain only neutral identity/session state and MUST revalidate every runtime operation."
     },
@@ -6897,7 +6981,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 217,
+      "line": 239,
       "obj_id": "INV-MPY-06-3",
       "text": "The adapter MUST retain each callable exactly while its subscription is active and MUST release it exactly once at a VM-safe point."
     },
@@ -6916,7 +7000,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 218,
+      "line": 240,
       "obj_id": "INV-MPY-06-4",
       "text": "Python callbacks MUST run only through `Stage.poll()` or an equivalent VM-scheduled poll and MUST NOT unwind or call through the Rust/C ABI boundary."
     },
@@ -6934,7 +7018,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 219,
+      "line": 241,
       "obj_id": "INV-MPY-06-5",
       "text": "Mutations requested during a callback MUST be submitted only after that callback returns; synchronous runtime reads in Callback Drain Mode MUST fail explicitly in v1."
     },
@@ -6952,7 +7036,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 220,
+      "line": 242,
       "obj_id": "INV-MPY-06-6",
       "text": "Every protocol error MUST map to a stable Python exception carrying the original error code/context without collapsing all failures to `ValueError`."
     },
@@ -6961,7 +7045,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 239,
+      "line": 261,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:1",
       "text": "No Python draw/measure handlers. Native actor execution remains required."
     },
@@ -6970,7 +7054,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 240,
+      "line": 262,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:2",
       "text": "No required CPython API. PyO3 is optional convenience."
     },
@@ -6979,7 +7063,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 241,
+      "line": 263,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:3",
       "text": "No implicit actor deletion by GC. Stage lifetime is explicit."
     },
@@ -6988,13 +7072,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 242,
+      "line": 264,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:nongoal:4",
       "text": "No hidden event loop dependency. Explicit `Stage.poll()` remains"
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-1"
         ]
@@ -7002,13 +7086,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 259,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:259",
+      "line": 285,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:285",
       "text": "`INV-MPY-06-1` descriptor-derived Python API is accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-2"
         ]
@@ -7016,13 +7100,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 260,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:260",
+      "line": 286,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:286",
       "text": "`INV-MPY-06-2` wrapper identity and explicit native lifetime are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-3"
         ]
@@ -7030,13 +7114,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 261,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:261",
+      "line": 287,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:287",
       "text": "`INV-MPY-06-3` callable retention/release behavior is accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-4"
         ]
@@ -7044,13 +7128,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 262,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:262",
-      "text": "`INV-MPY-06-4` explicit poll and exception containment are accepted."
+      "line": 288,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:288",
+      "text": "`INV-MPY-06-4` explicit endpoint-wide poll and exception containment are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-5"
         ]
@@ -7058,13 +7142,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 263,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:263",
+      "line": 289,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:289",
       "text": "`INV-MPY-06-5` Callback Drain Mode restrictions are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-06-6"
         ]
@@ -7072,13 +7156,13 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 264,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:264",
+      "line": 290,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:290",
       "text": "`INV-MPY-06-6` exception hierarchy and code preservation are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-1",
           "INV-MPY-10",
@@ -7088,9 +7172,9 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 265,
-      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:265",
-      "text": "PCDN-MPY-06-001 through PCDN-MPY-06-004 are resolved without weakening `INV-MPY-1`, `INV-MPY-5`, or `INV-MPY-10`."
+      "line": 291,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md:gate:291",
+      "text": "PCDN-MPY-06-001 through PCDN-MPY-06-005 are resolved without weakening `INV-MPY-1`, `INV-MPY-5`, or `INV-MPY-10`."
     },
     {
       "attrs": {
@@ -7130,7 +7214,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 286,
+      "line": 312,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.0",
       "text": "Drafts the primary `rlvgl` MicroPython module, Stage/Actor/"
     },
@@ -7155,7 +7239,7 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 286,
+      "line": 312,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.0-rationale",
       "text": "The director API must feel native to Python while remaining a projection of the\nneutral runtime. Explicit wrapper and callback lifetimes prevent garbage\ncollection, VM scheduling, or C ABI details from changing actor behavior across\nsame-core and dual-core targets."
     },
@@ -7187,9 +7271,80 @@
       "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 308,
+      "line": 334,
       "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.1.1",
       "text": "Records ratification of the MPY-04/05 policy dependencies and"
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 3,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Records owner acceptance of the complete MPY-06 policy, including",
+        "touches": [
+          "INV-MPY-06-1",
+          "INV-MPY-06-2",
+          "INV-MPY-06-3",
+          "INV-MPY-06-4",
+          "INV-MPY-06-5",
+          "INV-MPY-06-6",
+          "PCDN-MPY-06-001",
+          "PCDN-MPY-06-002",
+          "PCDN-MPY-06-003",
+          "PCDN-MPY-06-004",
+          "PCDN-MPY-06-005",
+          "§0",
+          "§5–§12",
+          "§14",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 349,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.2.0",
+      "text": "Records owner acceptance of the complete MPY-06 policy, including"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-06-1",
+          "INV-MPY-06-2",
+          "INV-MPY-06-3",
+          "INV-MPY-06-4",
+          "INV-MPY-06-5",
+          "INV-MPY-06-6",
+          "PCDN-MPY-06-001",
+          "PCDN-MPY-06-002",
+          "PCDN-MPY-06-003",
+          "PCDN-MPY-06-004",
+          "PCDN-MPY-06-005",
+          "§0",
+          "§5–§12",
+          "§14",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 349,
+      "obj_id": "docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md#0.2.0-rationale",
+      "text": "The accepted surface prevents Python ergonomics from becoming a second actor\nschema or queue authority. Endpoint-wide polling preserves the ordering\nguaranteed by MPY-05, while explicit callback restrictions and a C-level\nexception fallback keep VM behavior bounded and portable across targets."
     },
     {
       "attrs": {
