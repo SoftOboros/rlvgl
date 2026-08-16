@@ -24,39 +24,39 @@ typedef struct {
 mp_rlvgl_api_version_t mp_rlvgl_api_version(void);
 
 // Helper to convert FFI status codes into MicroPython exceptions.
-STATIC void mp_rlvgl_check(int status) {
+static void mp_rlvgl_check(int status) {
   if (status < 0) {
     mp_raise_ValueError(MP_ERROR_TEXT("mp_rlvgl error"));
   }
 }
 
 // Python-exposed wrappers.
-STATIC mp_obj_t mp_rlvgl_init_py(void) {
+static mp_obj_t mp_rlvgl_init_py(void) {
   mp_rlvgl_check(mp_rlvgl_init());
   return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_init_obj, mp_rlvgl_init_py);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_init_obj, mp_rlvgl_init_py);
 
-STATIC mp_obj_t mp_rlvgl_stack_clear_py(void) {
+static mp_obj_t mp_rlvgl_stack_clear_py(void) {
   mp_rlvgl_check(mp_rlvgl_stack_clear());
   return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_stack_clear_obj,
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_stack_clear_obj,
                                  mp_rlvgl_stack_clear_py);
 
-STATIC mp_obj_t mp_rlvgl_present_py(void) {
+static mp_obj_t mp_rlvgl_present_py(void) {
   mp_rlvgl_check(mp_rlvgl_present());
   return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_present_obj, mp_rlvgl_present_py);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_present_obj, mp_rlvgl_present_py);
 
-STATIC mp_obj_t mp_rlvgl_stats_py(void) {
+static mp_obj_t mp_rlvgl_stats_py(void) {
   mp_rlvgl_check(mp_rlvgl_stats());
   return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_stats_obj, mp_rlvgl_stats_py);
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_stats_obj, mp_rlvgl_stats_py);
 
-STATIC mp_obj_t mp_rlvgl_api_version_py(void) {
+static mp_obj_t mp_rlvgl_api_version_py(void) {
   mp_rlvgl_api_version_t v = mp_rlvgl_api_version();
   mp_obj_t tuple[3];
   tuple[0] = mp_obj_new_int(v.major);
@@ -64,12 +64,12 @@ STATIC mp_obj_t mp_rlvgl_api_version_py(void) {
   tuple[2] = mp_obj_new_int(v.patch);
   return mp_obj_new_tuple(3, tuple);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_api_version_obj,
+static MP_DEFINE_CONST_FUN_OBJ_0(mp_rlvgl_api_version_obj,
                                  mp_rlvgl_api_version_py);
 
 // Module globals table.
-STATIC const mp_rom_map_elem_t mp_rlvgl_module_globals_table[] = {
-    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_mp_rlvgl)},
+static const mp_rom_map_elem_t mp_rlvgl_module_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_rlvgl)},
     {MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&mp_rlvgl_init_obj)},
     {MP_ROM_QSTR(MP_QSTR_stack_clear), MP_ROM_PTR(&mp_rlvgl_stack_clear_obj)},
     {MP_ROM_QSTR(MP_QSTR_present), MP_ROM_PTR(&mp_rlvgl_present_obj)},
@@ -77,7 +77,7 @@ STATIC const mp_rom_map_elem_t mp_rlvgl_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_api_version), MP_ROM_PTR(&mp_rlvgl_api_version_obj)},
 };
 
-STATIC MP_DEFINE_CONST_DICT(mp_rlvgl_module_globals,
+static MP_DEFINE_CONST_DICT(mp_rlvgl_module_globals,
                             mp_rlvgl_module_globals_table);
 
 // Define the module.
@@ -86,5 +86,7 @@ const mp_obj_module_t mp_rlvgl_user_cmodule = {
     .globals = (mp_obj_dict_t *)&mp_rlvgl_module_globals,
 };
 
-// Register the module to make it available in MicroPython.
+// Register the canonical module and its 0.x compatibility alias. Both names
+// resolve to this exact object, globals dictionary, and native runtime state.
+MP_REGISTER_MODULE(MP_QSTR_rlvgl, mp_rlvgl_user_cmodule);
 MP_REGISTER_MODULE(MP_QSTR_mp_rlvgl, mp_rlvgl_user_cmodule);

@@ -1,0 +1,29 @@
+# Cargo.toml - Final static-library packaging for the MicroPython C shim.
+
+[package]
+name = "rlvgl-micropython-staticlib"
+version = "0.2.3"
+edition = "2024"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+license = "MIT"
+description = "Static-library link artifact for the rlvgl MicroPython module"
+publish = false
+
+[lib]
+name = "rlvgl_micropython"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+rlvgl-binding = { package = "rlvgl-micropython", path = ".." }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+panic = "abort"
+strip = true
+incremental = false
+
+[workspace]
