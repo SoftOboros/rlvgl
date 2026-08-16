@@ -13,9 +13,10 @@ pub use rlvgl_api::protocol::{ErrorClass, ValueRef, ValueTag};
 
 use crate::{
     direction::{
-        ActorDirection, GeometryResult, GeometryRole, OwnedValue, RequestedLayout, RuntimeFlag,
-        SnapshotError, SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken,
-        StageDirection, StageRevision,
+        ActorDirection, BatchCreateDestination, BatchObjectReference, BatchStageDirection,
+        GeometryResult, GeometryRole, OwnedValue, RequestedLayout, RuntimeFlag, SnapshotError,
+        SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken, StageDirection,
+        StageRevision,
     },
     layout::{EngineConfig, GridTrack, LayoutRole, LayoutState},
     object::{
@@ -46,6 +47,7 @@ impl StageId {
 #[derive(Clone)]
 struct ShadowActor {
     object_id: ObjectId,
+    descriptor: &'static TypeDescriptor,
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
     max_children: usize,
@@ -74,6 +76,7 @@ impl TreeShadow {
             let max_children = children.len();
             actors.push(ShadowActor {
                 object_id,
+                descriptor: record.descriptor,
                 parent: record.parent,
                 children,
                 max_children,
@@ -119,6 +122,57 @@ impl TreeShadow {
             .ok_or(RegistryError::StaleObject { object_id })
     }
 
+    fn append_create(
+        &mut self,
+        registry: &StageRegistry,
+        object_id: ObjectId,
+        descriptor: &'static TypeDescriptor,
+        destination: &PreparedCreateDestination,
+    ) -> Result<(), RegistryError> {
+        if self.actors.iter().filter(|actor| actor.alive).count() >= registry.limits.max_actors {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            });
+        }
+        let parent = match destination {
+            PreparedCreateDestination::Root { name } => {
+                if name.is_empty()
+                    || !descriptor
+                        .capabilities
+                        .contains(ActorCapabilities::STAGE_ROOT)
+                {
+                    return Err(RegistryError::InvalidParent);
+                }
+                if self.roots.iter().any(|(candidate, _)| candidate == name) {
+                    return Err(RegistryError::DuplicateRoot);
+                }
+                self.roots.push((name.clone(), object_id));
+                None
+            }
+            PreparedCreateDestination::Child { parent } => {
+                let parent_descriptor = self.actor(*parent)?.descriptor;
+                if !parent_descriptor.child_policy.allows(descriptor) {
+                    return Err(RegistryError::InvalidParent);
+                }
+                self.actor_mut(*parent)?.children.push(object_id);
+                Some(*parent)
+            }
+        };
+        self.actors.push(ShadowActor {
+            object_id,
+            descriptor,
+            parent,
+            children: Vec::new(),
+            max_children: 0,
+            alive: true,
+        });
+        self.max_roots = self.max_roots.max(self.roots.len());
+        for actor in &mut self.actors {
+            actor.max_children = actor.max_children.max(actor.children.len());
+        }
+        Ok(())
+    }
+
     fn remove_from_owner(&mut self, object_id: ObjectId) -> Result<(), RegistryError> {
         let parent = self.actor(object_id)?.parent;
         if let Some(parent) = parent {
@@ -141,7 +195,7 @@ impl TreeShadow {
 
     fn apply(
         &mut self,
-        registry: &StageRegistry,
+        _registry: &StageRegistry,
         direction: &StageDirection,
     ) -> Result<(), RegistryError> {
         match direction {
@@ -155,8 +209,8 @@ impl TreeShadow {
                 if object_id == new_parent || self.is_descendant(*object_id, *new_parent)? {
                     return Err(RegistryError::InvalidParent);
                 }
-                let child_descriptor = registry.record(*object_id)?.descriptor;
-                let parent_descriptor = registry.record(*new_parent)?.descriptor;
+                let child_descriptor = self.actor(*object_id)?.descriptor;
+                let parent_descriptor = self.actor(*new_parent)?.descriptor;
                 if !parent_descriptor.child_policy.allows(child_descriptor) {
                     return Err(RegistryError::InvalidParent);
                 }
@@ -174,7 +228,7 @@ impl TreeShadow {
                 name,
                 index,
             } => {
-                let descriptor = registry.record(*object_id)?.descriptor;
+                let descriptor = self.actor(*object_id)?.descriptor;
                 self.actor(*object_id)?;
                 if name.is_empty()
                     || !descriptor
@@ -1649,6 +1703,8 @@ pub enum CapacityKind {
     EventPayloadBytes,
     /// Pre-dispatch native publication invalidation reservation.
     NativeEventPublications,
+    /// Retained output mappings for successful Create operations.
+    ResultOutputs,
 }
 
 /// Stage Registry or actor-construction failure.
@@ -1794,6 +1850,7 @@ struct ActiveSnapshot {
 
 struct PreparedActorGroup {
     object_id: ObjectId,
+    create_index: Option<usize>,
     mutation: Box<dyn PreparedActorMutation>,
     final_text_bytes: u32,
 }
@@ -1801,6 +1858,72 @@ struct PreparedActorGroup {
 struct PreparedLayoutMutation {
     object_id: ObjectId,
     next: Option<Box<LayoutState>>,
+}
+
+enum PreparedCreateDestination {
+    Root { name: String },
+    Child { parent: ObjectId },
+}
+
+/// Fully validated and preconstructed Create retained by a prepared Stage batch.
+///
+/// The reserved stable Object identity deliberately remains private until the
+/// batch commits. Callers may inspect correlation and descriptor identity only.
+pub struct PreparedCreate {
+    operation_index: u16,
+    batch_ref: u16,
+    type_id: TypeId,
+    object_id: ObjectId,
+    reservation: SlotReservation,
+    descriptor: &'static TypeDescriptor,
+    destination: Option<PreparedCreateDestination>,
+    text_bytes: u32,
+    root_name_bytes: u32,
+    constructed: Option<ConstructedActor>,
+}
+
+impl PreparedCreate {
+    /// Return the submitted zero-based operation index.
+    pub const fn operation_index(&self) -> u16 {
+        self.operation_index
+    }
+
+    /// Return the raw nonzero batch-local binding.
+    pub const fn batch_ref(&self) -> u16 {
+        self.batch_ref
+    }
+
+    /// Return the registered actor type that was preconstructed.
+    pub const fn type_id(&self) -> TypeId {
+        self.type_id
+    }
+}
+
+impl core::fmt::Debug for PreparedCreate {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PreparedCreate")
+            .field("operation_index", &self.operation_index)
+            .field("batch_ref", &self.batch_ref)
+            .field("type_id", &self.type_id)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One committed Create output correlated to its submitted operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CreateOutput {
+    /// Submitted zero-based operation index.
+    pub operation_index: u16,
+    /// Raw nonzero batch-local binding supplied by Create.
+    pub batch_ref: u16,
+    /// Stable Object identity published by the successful commit.
+    pub object_id: ObjectId,
+}
+
+enum PreparedStageOperation {
+    Direction(StageDirection),
+    Create(usize),
 }
 
 /// Fully validated and allocation-reserved Stage transaction.
@@ -1813,7 +1936,9 @@ pub struct PreparedStageBatch {
     stage_id: StageId,
     starting_revision: StageRevision,
     next_revision: StageRevision,
-    directions: Vec<StageDirection>,
+    operations: Vec<PreparedStageOperation>,
+    creates: Vec<PreparedCreate>,
+    create_outputs: Vec<CreateOutput>,
     actor_groups: Vec<PreparedActorGroup>,
     layout_mutations: Vec<PreparedLayoutMutation>,
     final_usage: RegistryUsage,
@@ -1827,6 +1952,7 @@ pub struct PreparedStageBatch {
     depth_updates: Vec<(ObjectId, usize)>,
     child_capacities: Vec<(ObjectId, usize)>,
     max_roots: usize,
+    max_slots: usize,
     lifecycle: Vec<PendingLifecycle>,
     retired_records: Vec<ActorRecord>,
     retired_root_names: Vec<String>,
@@ -1852,6 +1978,11 @@ impl PreparedStageBatch {
     pub fn deleted_object_ids(&self) -> &[ObjectId] {
         &self.deleted_object_ids
     }
+
+    /// Borrow prepared Create metadata without exposing reserved Object identities.
+    pub fn prepared_creates(&self) -> &[PreparedCreate] {
+        &self.creates
+    }
 }
 
 impl core::fmt::Debug for PreparedStageBatch {
@@ -1861,7 +1992,8 @@ impl core::fmt::Debug for PreparedStageBatch {
             .field("stage_id", &self.stage_id)
             .field("starting_revision", &self.starting_revision)
             .field("next_revision", &self.next_revision)
-            .field("direction_count", &self.directions.len())
+            .field("operation_count", &self.operations.len())
+            .field("create_count", &self.creates.len())
             .field("deleted_object_ids", &self.deleted_object_ids)
             .finish_non_exhaustive()
     }
@@ -1882,6 +2014,16 @@ impl CommittedStageBatch {
     /// Borrow exact child-first identities retired by the commit.
     pub fn deleted_object_ids(&self) -> &[ObjectId] {
         &self.prepared.deleted_object_ids
+    }
+
+    /// Borrow committed Create mappings in submitted operation order.
+    pub fn create_outputs(&self) -> &[CreateOutput] {
+        &self.prepared.create_outputs
+    }
+
+    /// Move all Create mappings out without allocating or releasing batch scratch.
+    pub fn take_create_outputs(&mut self) -> Vec<CreateOutput> {
+        core::mem::take(&mut self.prepared.create_outputs)
     }
 }
 
@@ -2048,6 +2190,97 @@ struct SlotReservation {
     index: usize,
     generation: u32,
     append: bool,
+}
+
+#[derive(Clone, Copy)]
+enum PlannedSlot {
+    Occupied(ObjectId),
+    Available(u32),
+    Retired,
+}
+
+struct SlotPlanner {
+    slots: Vec<PlannedSlot>,
+    initial_len: usize,
+    maximum: usize,
+}
+
+impl SlotPlanner {
+    fn capture(registry: &StageRegistry) -> Self {
+        let slots = registry
+            .slots
+            .iter()
+            .enumerate()
+            .map(|(index, slot)| {
+                if slot.retired {
+                    PlannedSlot::Retired
+                } else if slot.record.is_some() {
+                    PlannedSlot::Occupied(ObjectId::from_parts(slot.generation, index as u32))
+                } else {
+                    PlannedSlot::Available(slot.generation)
+                }
+            })
+            .collect();
+        Self {
+            slots,
+            initial_len: registry.slots.len(),
+            maximum: registry.limits.max_actors,
+        }
+    }
+
+    fn allocate(&mut self) -> Result<SlotReservation, RegistryError> {
+        if let Some((index, generation)) =
+            self.slots.iter().enumerate().find_map(|(index, slot)| {
+                if let PlannedSlot::Available(generation) = slot {
+                    Some((index, *generation))
+                } else {
+                    None
+                }
+            })
+        {
+            let object_id = ObjectId::from_parts(generation, index as u32);
+            self.slots[index] = PlannedSlot::Occupied(object_id);
+            return Ok(SlotReservation {
+                index,
+                generation,
+                append: index >= self.initial_len,
+            });
+        }
+        if self.slots.len() >= self.maximum {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            });
+        }
+        let index = self.slots.len();
+        let generation = 1;
+        let object_id = ObjectId::from_parts(generation, index as u32);
+        self.slots.push(PlannedSlot::Occupied(object_id));
+        Ok(SlotReservation {
+            index,
+            generation,
+            append: true,
+        })
+    }
+
+    fn retire(&mut self, object_id: ObjectId) -> Result<(), RegistryError> {
+        let slot = self
+            .slots
+            .get_mut(object_id.slot_index())
+            .ok_or(RegistryError::Internal)?;
+        if !matches!(slot, PlannedSlot::Occupied(current) if *current == object_id) {
+            return Err(RegistryError::Internal);
+        }
+        *slot = if object_id.generation() == u32::MAX {
+            PlannedSlot::Retired
+        } else {
+            PlannedSlot::Available(object_id.generation() + 1)
+        };
+        Ok(())
+    }
+
+    fn maximum_len(&self) -> usize {
+        self.slots.len()
+    }
 }
 
 /// Read-only deletion work discovered by a validated batch or Stage teardown.
@@ -2725,6 +2958,21 @@ impl StageRegistry {
         Ok(Box::new(prepared))
     }
 
+    /// Validate and preconstruct an owned atomic batch that may contain Create.
+    ///
+    /// Raw batch bindings are nonzero and unique. Batch-local references resolve
+    /// only to earlier Creates, while stable references must name actors that are
+    /// still live at that point in the sequential shadow. No reserved Object ID
+    /// is visible until [`CommittedStageBatch::create_outputs`].
+    pub fn prepare_atomic_batch(
+        &mut self,
+        directions: Vec<BatchStageDirection>,
+    ) -> Result<Box<PreparedStageBatch>, RegistryError> {
+        let mut prepared = self.build_prepared_atomic_batch(directions)?;
+        self.reserve_prepared_capacity(&mut prepared)?;
+        Ok(Box::new(prepared))
+    }
+
     /// Publish a prepared batch under one callback-free Stage Revision.
     ///
     /// A rejected transaction is returned intact by
@@ -2752,6 +3000,16 @@ impl StageRegistry {
         {
             return Err(reject(RegistryError::DispatchBusy, prepared));
         }
+        for create in &prepared.creates {
+            let Some(constructed) = create.constructed.as_ref() else {
+                return Err(reject(RegistryError::BatchInvalid, prepared));
+            };
+            if constructed.ops.bounds().is_err()
+                || constructed.node.try_effective_bounds().is_none()
+            {
+                return Err(reject(RegistryError::DispatchBusy, prepared));
+            }
+        }
         if let Err(cause) = self.capture_geometry_into(&mut prepared.geometry_scratch) {
             return Err(reject(cause, prepared));
         }
@@ -2765,18 +3023,29 @@ impl StageRegistry {
 
         for group in &mut prepared.actor_groups {
             group.mutation.commit();
-            let slot = &mut self.slots[group.object_id.slot_index()];
-            debug_assert_eq!(slot.generation, group.object_id.generation());
-            slot.record
-                .as_mut()
-                .expect("prepared actor remains live until its tree direction")
-                .text_bytes = group.final_text_bytes;
+            if let Some(create_index) = group.create_index {
+                prepared.creates[create_index].text_bytes = group.final_text_bytes;
+            } else {
+                let slot = &mut self.slots[group.object_id.slot_index()];
+                debug_assert_eq!(slot.generation, group.object_id.generation());
+                slot.record
+                    .as_mut()
+                    .expect("prepared actor remains live until its tree direction")
+                    .text_bytes = group.final_text_bytes;
+            }
         }
 
         let mut layout_index = 0usize;
         let mut delete_index = 0usize;
-        let mut directions = core::mem::take(&mut prepared.directions);
-        for direction in &mut directions {
+        let mut operations = core::mem::take(&mut prepared.operations);
+        for operation in &mut operations {
+            let direction = match operation {
+                PreparedStageOperation::Direction(direction) => direction,
+                PreparedStageOperation::Create(create_index) => {
+                    self.commit_prepared_create(*create_index, &mut prepared);
+                    continue;
+                }
+            };
             match direction {
                 StageDirection::SetFlag {
                     object_id,
@@ -2833,7 +3102,7 @@ impl StageRegistry {
                 }
             }
         }
-        prepared.directions = directions;
+        prepared.operations = operations;
         debug_assert_eq!(layout_index, prepared.layout_mutations.len());
         debug_assert_eq!(delete_index, prepared.delete_groups.len());
 
@@ -3067,6 +3336,7 @@ impl StageRegistry {
             }
             prepared.push(PreparedActorGroup {
                 object_id,
+                create_index: None,
                 mutation,
                 final_text_bytes,
             });
@@ -3149,7 +3419,12 @@ impl StageRegistry {
             stage_id: self.stage_id,
             starting_revision: self.revision,
             next_revision,
-            directions,
+            operations: directions
+                .into_iter()
+                .map(PreparedStageOperation::Direction)
+                .collect(),
+            creates: Vec::new(),
+            create_outputs: Vec::new(),
             actor_groups: prepared,
             layout_mutations,
             final_usage,
@@ -3163,6 +3438,456 @@ impl StageRegistry {
             depth_updates,
             child_capacities,
             max_roots: tree_shadow.max_roots,
+            max_slots: self.slots.len(),
+            lifecycle,
+            retired_records,
+            retired_root_names,
+        })
+    }
+
+    fn build_prepared_atomic_batch(
+        &self,
+        directions: Vec<BatchStageDirection>,
+    ) -> Result<PreparedStageBatch, RegistryError> {
+        self.ensure_active()?;
+        if directions.is_empty() || directions.len() > u16::MAX as usize {
+            return Err(RegistryError::BatchInvalid);
+        }
+        let next_revision = self.next_revision()?;
+        let mut tree_shadow = TreeShadow::capture(self)?;
+        let mut slot_planner = SlotPlanner::capture(self);
+        let mut operations = Vec::new();
+        operations
+            .try_reserve_exact(directions.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut creates = Vec::new();
+        creates
+            .try_reserve_exact(directions.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut create_outputs = Vec::new();
+        create_outputs
+            .try_reserve_exact(directions.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::ResultOutputs,
+            })?;
+        let mut bindings: Vec<(u16, ObjectId, usize)> = Vec::new();
+        bindings
+            .try_reserve_exact(directions.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::ResultOutputs,
+            })?;
+        let mut actor_groups: Vec<(ObjectId, Vec<ActorDirection>)> = Vec::new();
+        let mut effects = MutationEffects::NONE;
+        let mut touched = Vec::new();
+        let mut layout_mutations = Vec::new();
+        let mut layout_presence: Vec<(ObjectId, bool, Option<Rect>)> = Vec::new();
+
+        for (operation_index, direction) in directions.into_iter().enumerate() {
+            let operation_index =
+                u16::try_from(operation_index).map_err(|_| RegistryError::BatchInvalid)?;
+            if let BatchStageDirection::Create(create) = direction {
+                if create.batch_ref == 0
+                    || bindings
+                        .iter()
+                        .any(|(batch_ref, _, _)| *batch_ref == create.batch_ref)
+                {
+                    return Err(RegistryError::BatchInvalid);
+                }
+                let descriptor =
+                    self.descriptor(create.type_id)
+                        .ok_or(RegistryError::UnknownType {
+                            type_id: create.type_id,
+                        })?;
+                let mut resolved_fields = create.fields;
+                validate_atomic_constructor_fields(descriptor, &resolved_fields)?;
+                for field in &mut resolved_fields {
+                    let declared = descriptor
+                        .constructor_fields
+                        .iter()
+                        .find(|declared| declared.id == field.id)
+                        .expect("atomic schema validation resolved every constructor field");
+                    if declared.value_tag != ValueTag::Object {
+                        continue;
+                    }
+                    field.value = match field.value {
+                        OwnedValue::Object(raw) => {
+                            let object_id =
+                                ObjectId::new(raw).ok_or(RegistryError::BatchInvalid)?;
+                            let object_id = self.resolve_atomic_reference(
+                                BatchObjectReference::Stable(object_id),
+                                &tree_shadow,
+                                &bindings,
+                            )?;
+                            OwnedValue::Object(object_id.get())
+                        }
+                        OwnedValue::BatchObject(batch_ref) => {
+                            let object_id = self.resolve_atomic_reference(
+                                BatchObjectReference::EarlierBatch(batch_ref),
+                                &tree_shadow,
+                                &bindings,
+                            )?;
+                            OwnedValue::Object(object_id.get())
+                        }
+                        _ => unreachable!(
+                            "atomic schema validation accepts only Object references here"
+                        ),
+                    };
+                }
+                let mut inputs = Vec::new();
+                inputs
+                    .try_reserve_exact(resolved_fields.len())
+                    .map_err(|_| RegistryError::Capacity {
+                        kind: CapacityKind::Actors,
+                    })?;
+                for field in &resolved_fields {
+                    inputs.push(ConstructorInput {
+                        id: field.id,
+                        value: field.value.as_ref(),
+                    });
+                }
+                validate_constructor_inputs(descriptor, &inputs)?;
+                let destination = match create.destination {
+                    BatchCreateDestination::Root { name } => {
+                        PreparedCreateDestination::Root { name }
+                    }
+                    BatchCreateDestination::Child { parent } => {
+                        let parent =
+                            self.resolve_atomic_reference(parent, &tree_shadow, &bindings)?;
+                        PreparedCreateDestination::Child { parent }
+                    }
+                };
+                let root_name_bytes = match &destination {
+                    PreparedCreateDestination::Root { name } => name.len(),
+                    PreparedCreateDestination::Child { .. } => 0,
+                };
+                let text_bytes = required_text_bytes(descriptor, &inputs, root_name_bytes)?;
+                let reservation = slot_planner.allocate()?;
+                let object_id =
+                    ObjectId::from_parts(reservation.generation, reservation.index as u32);
+                let constructed = (descriptor.constructor)(ConstructorArgs::new(&inputs))?;
+                if constructed.ops.type_id() != descriptor.type_id
+                    || !constructed.node.children().is_empty()
+                {
+                    return Err(RegistryError::Internal);
+                }
+                tree_shadow.append_create(self, object_id, descriptor, &destination)?;
+                let create_index = creates.len();
+                creates.push(PreparedCreate {
+                    operation_index,
+                    batch_ref: create.batch_ref,
+                    type_id: create.type_id,
+                    object_id,
+                    reservation,
+                    descriptor,
+                    destination: Some(destination),
+                    text_bytes,
+                    root_name_bytes: u32::try_from(root_name_bytes).map_err(|_| {
+                        RegistryError::Capacity {
+                            kind: CapacityKind::TextBytes,
+                        }
+                    })?,
+                    constructed: Some(constructed),
+                });
+                create_outputs.push(CreateOutput {
+                    operation_index,
+                    batch_ref: create.batch_ref,
+                    object_id,
+                });
+                bindings.push((create.batch_ref, object_id, create_index));
+                operations.push(PreparedStageOperation::Create(create_index));
+                push_unique(&mut touched, object_id);
+                effects = effects
+                    .union(MutationEffects::DRAW)
+                    .union(MutationEffects::TREE)
+                    .union(MutationEffects::LAYOUT)
+                    .union(MutationEffects::SNAPSHOT);
+                continue;
+            }
+
+            let resolved = self.resolve_atomic_direction(direction, &tree_shadow, &bindings)?;
+            match &resolved {
+                StageDirection::MutateActor {
+                    object_id,
+                    directions,
+                } => {
+                    let descriptor = tree_shadow.actor(*object_id)?.descriptor;
+                    if directions.is_empty() {
+                        return Err(RegistryError::BatchInvalid);
+                    }
+                    validate_actor_directions(descriptor, directions)?;
+                    effects = effects.union(actor_direction_effects(descriptor, directions)?);
+                    push_unique(&mut touched, *object_id);
+                    if let Some((_, group)) = actor_groups
+                        .iter_mut()
+                        .find(|(candidate, _)| candidate == object_id)
+                    {
+                        group.extend(directions.iter().cloned());
+                    } else {
+                        actor_groups.push((*object_id, directions.clone()));
+                    }
+                }
+                StageDirection::SetFlag {
+                    object_id, flag, ..
+                } => {
+                    let descriptor = tree_shadow.actor(*object_id)?.descriptor;
+                    validate_runtime_flag_descriptor(descriptor, *flag)?;
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::SNAPSHOT);
+                    if matches!(flag, RuntimeFlag::Enabled | RuntimeFlag::Focusable) {
+                        effects = effects.union(MutationEffects::FOCUS);
+                    }
+                    push_unique(&mut touched, *object_id);
+                }
+                StageDirection::SetRequestedLayout { object_id, layout } => {
+                    let descriptor = tree_shadow.actor(*object_id)?.descriptor;
+                    validate_requested_layout_descriptor(descriptor, layout)?;
+                    let state = if let Some((_, present, computed)) = layout_presence
+                        .iter()
+                        .find(|(candidate, _, _)| candidate == object_id)
+                    {
+                        (*present, *computed)
+                    } else if let Some((_, _, create_index)) = bindings
+                        .iter()
+                        .find(|(_, candidate, _)| candidate == object_id)
+                    {
+                        creates[*create_index]
+                            .constructed
+                            .as_ref()
+                            .ok_or(RegistryError::Internal)?
+                            .node
+                            .layout
+                            .as_deref()
+                            .map_or((false, None), |state| (true, state.computed))
+                    } else {
+                        self.node(*object_id)?
+                            .layout
+                            .as_deref()
+                            .map_or((false, None), |state| (true, state.computed))
+                    };
+                    let next = prepared_layout_state(layout, state);
+                    if let Some((_, present, computed)) = layout_presence
+                        .iter_mut()
+                        .find(|(candidate, _, _)| candidate == object_id)
+                    {
+                        *present = next.is_some();
+                        *computed = next.as_deref().and_then(|state| state.computed);
+                    } else {
+                        layout_presence.push((
+                            *object_id,
+                            next.is_some(),
+                            next.as_deref().and_then(|state| state.computed),
+                        ));
+                    }
+                    layout_mutations.push(PreparedLayoutMutation {
+                        object_id: *object_id,
+                        next,
+                    });
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::LAYOUT)
+                        .union(MutationEffects::SNAPSHOT);
+                    push_unique(&mut touched, *object_id);
+                }
+                StageDirection::SetComputedGeometry { object_id, .. } => {
+                    tree_shadow.actor(*object_id)?;
+                    return Err(RegistryError::ReadOnly);
+                }
+                StageDirection::SetLocalStyle { object_id, .. } => {
+                    tree_shadow.actor(*object_id)?;
+                    return Err(RegistryError::Unsupported);
+                }
+                _ => {
+                    let deleted_start = tree_shadow.deleted_object_ids.len();
+                    tree_shadow.apply(self, &resolved)?;
+                    for object_id in &tree_shadow.deleted_object_ids[deleted_start..] {
+                        if bindings.iter().any(|(_, created, _)| created == object_id) {
+                            return Err(RegistryError::BatchInvalid);
+                        }
+                        slot_planner.retire(*object_id)?;
+                    }
+                    effects = effects
+                        .union(MutationEffects::DRAW)
+                        .union(MutationEffects::TREE)
+                        .union(MutationEffects::LAYOUT)
+                        .union(MutationEffects::SNAPSHOT);
+                }
+            }
+            operations.push(PreparedStageOperation::Direction(resolved));
+        }
+
+        tree_shadow.validate_final(self)?;
+        let depth_updates = tree_shadow.final_depths()?;
+        let mut prepared_actor_groups = Vec::new();
+        prepared_actor_groups
+            .try_reserve_exact(actor_groups.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut total_text_delta = tree_shadow.root_text_delta;
+        for (object_id, group) in actor_groups {
+            let create_index = bindings
+                .iter()
+                .find_map(|(_, candidate, index)| (*candidate == object_id).then_some(*index));
+            let (mutation, current_text) = if let Some(create_index) = create_index {
+                let create = &creates[create_index];
+                (
+                    create
+                        .constructed
+                        .as_ref()
+                        .ok_or(RegistryError::Internal)?
+                        .ops
+                        .prepare(&group)?,
+                    create.text_bytes,
+                )
+            } else {
+                let record = self.record(object_id)?;
+                (record.ops.prepare(&group)?, record.text_bytes)
+            };
+            let final_text_bytes = apply_text_delta(current_text, mutation.text_delta())?;
+            if !tree_shadow.deleted_object_ids.contains(&object_id) {
+                total_text_delta = total_text_delta.checked_add(mutation.text_delta()).ok_or(
+                    RegistryError::Capacity {
+                        kind: CapacityKind::TextBytes,
+                    },
+                )?;
+            }
+            prepared_actor_groups.push(PreparedActorGroup {
+                object_id,
+                create_index,
+                mutation,
+                final_text_bytes,
+            });
+        }
+        for create in &creates {
+            let durable_text = create
+                .text_bytes
+                .checked_sub(create.root_name_bytes)
+                .ok_or(RegistryError::Internal)?;
+            total_text_delta = total_text_delta
+                .checked_add(i64::from(durable_text))
+                .ok_or(RegistryError::Capacity {
+                    kind: CapacityKind::TextBytes,
+                })?;
+        }
+        let final_text = i64::from(self.usage.text_bytes)
+            .checked_add(total_text_delta)
+            .filter(|total| *total >= 0 && *total <= i64::from(self.limits.max_text_bytes))
+            .ok_or(RegistryError::Capacity {
+                kind: CapacityKind::TextBytes,
+            })?;
+        let deleted_resources =
+            tree_shadow
+                .deleted_object_ids
+                .iter()
+                .try_fold(0u16, |total, object_id| {
+                    total
+                        .checked_add(self.record(*object_id)?.resources)
+                        .ok_or(RegistryError::Internal)
+                })?;
+        let created_resources = creates.iter().try_fold(0u16, |total, create| {
+            total
+                .checked_add(create.descriptor.resource_cost.resources)
+                .ok_or(RegistryError::Capacity {
+                    kind: CapacityKind::Resources,
+                })
+        })?;
+        let final_resources = self
+            .usage
+            .resources
+            .checked_sub(deleted_resources)
+            .and_then(|resources| resources.checked_add(created_resources))
+            .filter(|resources| *resources <= self.limits.max_resources)
+            .ok_or(RegistryError::Capacity {
+                kind: CapacityKind::Resources,
+            })?;
+        let final_actor_count = tree_shadow
+            .actors
+            .iter()
+            .filter(|actor| actor.alive)
+            .count();
+        if final_actor_count > self.limits.max_actors {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            });
+        }
+        let final_usage = RegistryUsage {
+            roots: tree_shadow.roots.len(),
+            actors: final_actor_count,
+            text_bytes: u32::try_from(final_text).map_err(|_| RegistryError::Internal)?,
+            resources: final_resources,
+        };
+        let before_geometry = self.capture_geometry()?;
+        let child_capacities = tree_shadow
+            .actors
+            .iter()
+            .map(|actor| (actor.object_id, actor.max_children))
+            .collect();
+        let geometry_capacity = self.usage.actors.max(final_usage.actors);
+        let mut geometry_scratch = Vec::new();
+        geometry_scratch
+            .try_reserve_exact(geometry_capacity)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut invalidations = Vec::new();
+        invalidations
+            .try_reserve_exact(
+                self.usage
+                    .actors
+                    .checked_add(final_usage.actors)
+                    .ok_or(RegistryError::Internal)?,
+            )
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let lifecycle_capacity = operations
+            .len()
+            .checked_mul(3)
+            .ok_or(RegistryError::Internal)?;
+        let mut lifecycle = Vec::new();
+        lifecycle
+            .try_reserve_exact(lifecycle_capacity)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut retired_records = Vec::new();
+        retired_records
+            .try_reserve_exact(tree_shadow.deleted_object_ids.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut retired_root_names = Vec::new();
+        retired_root_names
+            .try_reserve_exact(operations.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Roots,
+            })?;
+        Ok(PreparedStageBatch {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            next_revision,
+            operations,
+            creates,
+            create_outputs,
+            actor_groups: prepared_actor_groups,
+            layout_mutations,
+            final_usage,
+            before_geometry,
+            geometry_scratch,
+            invalidations,
+            effects,
+            touched,
+            deleted_object_ids: tree_shadow.deleted_object_ids,
+            delete_groups: tree_shadow.delete_groups,
+            depth_updates,
+            child_capacities,
+            max_roots: tree_shadow.max_roots,
+            max_slots: slot_planner.maximum_len(),
             lifecycle,
             retired_records,
             retired_root_names,
@@ -3180,7 +3905,9 @@ impl StageRegistry {
             stage_id: self.stage_id,
             starting_revision: self.revision,
             next_revision: self.next_revision()?,
-            directions: Vec::new(),
+            operations: Vec::new(),
+            creates: Vec::new(),
+            create_outputs: Vec::new(),
             actor_groups: Vec::new(),
             layout_mutations: Vec::new(),
             final_usage: RegistryUsage::default(),
@@ -3197,9 +3924,115 @@ impl StageRegistry {
             depth_updates: Vec::new(),
             child_capacities: Vec::new(),
             max_roots: 0,
+            max_slots: self.slots.len(),
             lifecycle: Vec::new(),
             retired_records: Vec::new(),
             retired_root_names: Vec::new(),
+        })
+    }
+
+    fn resolve_atomic_reference(
+        &self,
+        reference: BatchObjectReference,
+        shadow: &TreeShadow,
+        bindings: &[(u16, ObjectId, usize)],
+    ) -> Result<ObjectId, RegistryError> {
+        match reference {
+            BatchObjectReference::Stable(object_id) => {
+                self.record(object_id)?;
+                shadow.actor(object_id)?;
+                Ok(object_id)
+            }
+            BatchObjectReference::EarlierBatch(batch_ref) => {
+                if batch_ref == 0 {
+                    return Err(RegistryError::BatchInvalid);
+                }
+                let object_id = bindings
+                    .iter()
+                    .find_map(|(candidate, object_id, _)| {
+                        (*candidate == batch_ref).then_some(*object_id)
+                    })
+                    .ok_or(RegistryError::BatchInvalid)?;
+                shadow.actor(object_id)?;
+                Ok(object_id)
+            }
+        }
+    }
+
+    fn resolve_atomic_direction(
+        &self,
+        direction: BatchStageDirection,
+        shadow: &TreeShadow,
+        bindings: &[(u16, ObjectId, usize)],
+    ) -> Result<StageDirection, RegistryError> {
+        let resolve = |reference| self.resolve_atomic_reference(reference, shadow, bindings);
+        Ok(match direction {
+            BatchStageDirection::Create(_) => return Err(RegistryError::Internal),
+            BatchStageDirection::MutateActor { object, directions } => {
+                StageDirection::MutateActor {
+                    object_id: resolve(object)?,
+                    directions,
+                }
+            }
+            BatchStageDirection::SetFlag {
+                object,
+                flag,
+                enabled,
+            } => StageDirection::SetFlag {
+                object_id: resolve(object)?,
+                flag,
+                enabled,
+            },
+            BatchStageDirection::SetRequestedLayout { object, layout } => {
+                StageDirection::SetRequestedLayout {
+                    object_id: resolve(object)?,
+                    layout,
+                }
+            }
+            BatchStageDirection::SetComputedGeometry { object, bounds } => {
+                StageDirection::SetComputedGeometry {
+                    object_id: resolve(object)?,
+                    bounds,
+                }
+            }
+            BatchStageDirection::Reparent {
+                object,
+                new_parent,
+                index,
+            } => StageDirection::Reparent {
+                object_id: resolve(object)?,
+                new_parent: resolve(new_parent)?,
+                index,
+            },
+            BatchStageDirection::PromoteRoot {
+                object,
+                name,
+                index,
+            } => StageDirection::PromoteRoot {
+                object_id: resolve(object)?,
+                name,
+                index,
+            },
+            BatchStageDirection::Reorder { object, index } => StageDirection::Reorder {
+                object_id: resolve(object)?,
+                index,
+            },
+            BatchStageDirection::Delete { object } => StageDirection::Delete {
+                object_id: resolve(object)?,
+            },
+            BatchStageDirection::SetLocalStyle {
+                object,
+                part_id,
+                state_mask,
+                property_id,
+                value,
+            } => StageDirection::SetLocalStyle {
+                object_id: resolve(object)?,
+                part_id,
+                state_mask,
+                property_id,
+                value,
+            },
         })
     }
 
@@ -3592,19 +4425,7 @@ impl StageRegistry {
         object_id: ObjectId,
         flag: RuntimeFlag,
     ) -> Result<(), RegistryError> {
-        let record = self.record(object_id)?;
-        match flag {
-            RuntimeFlag::Hidden | RuntimeFlag::Enabled => Ok(()),
-            RuntimeFlag::Clickable | RuntimeFlag::Focusable
-                if record
-                    .descriptor
-                    .capabilities
-                    .contains(ActorCapabilities::CONTROL) =>
-            {
-                Ok(())
-            }
-            RuntimeFlag::Clickable | RuntimeFlag::Focusable => Err(RegistryError::Unsupported),
-        }
+        validate_runtime_flag_descriptor(self.record(object_id)?.descriptor, flag)
     }
 
     fn commit_runtime_flag(
@@ -3642,51 +4463,19 @@ impl StageRegistry {
         object_id: ObjectId,
         layout: &RequestedLayout,
     ) -> Result<(), RegistryError> {
-        let descriptor = self.record(object_id)?.descriptor;
-        let required = match layout {
-            RequestedLayout::None => return Ok(()),
-            RequestedLayout::Flex(_) => LayoutCapabilities::FLEX_CONTAINER,
-            RequestedLayout::Grid(_) => LayoutCapabilities::GRID_CONTAINER,
-            RequestedLayout::Item(_) => LayoutCapabilities::ITEM_HINTS,
-        };
-        if !descriptor.layout.contains(required) {
-            return Err(RegistryError::Unsupported);
-        }
-        if let RequestedLayout::Item(hints) = layout
-            && (hints.col_span == 0
-                || hints.row_span == 0
-                || hints
-                    .min_width
-                    .zip(hints.max_width)
-                    .is_some_and(|(min, max)| min > max)
-                || hints
-                    .min_height
-                    .zip(hints.max_height)
-                    .is_some_and(|(min, max)| min > max))
-        {
-            return Err(RegistryError::Range { field_id: 0 });
-        }
-        if let RequestedLayout::Grid(config) = layout
-            && (config.col_tracks.is_empty()
-                || config.row_tracks.is_empty()
-                || config
-                    .col_tracks
-                    .iter()
-                    .chain(config.row_tracks.iter())
-                    .any(|track| {
-                        matches!(track, GridTrack::Px(value) if *value < 0)
-                            || matches!(track, GridTrack::Fr(0))
-                    }))
-        {
-            return Err(RegistryError::Range { field_id: 0 });
-        }
-        Ok(())
+        validate_requested_layout_descriptor(self.record(object_id)?.descriptor, layout)
     }
 
     fn reserve_prepared_capacity(
         &mut self,
         prepared: &mut PreparedStageBatch,
     ) -> Result<(), RegistryError> {
+        let additional_slots = prepared.max_slots.saturating_sub(self.slots.len());
+        self.slots
+            .try_reserve_exact(additional_slots)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
         let additional_roots = prepared.max_roots.saturating_sub(self.roots.len());
         self.roots
             .try_reserve_exact(additional_roots)
@@ -3694,7 +4483,20 @@ impl StageRegistry {
                 kind: CapacityKind::Roots,
             })?;
         for (object_id, maximum) in &prepared.child_capacities {
-            let children = self.node_mut(*object_id)?.children_mut();
+            let children = if let Some(create) = prepared
+                .creates
+                .iter_mut()
+                .find(|create| create.object_id == *object_id)
+            {
+                create
+                    .constructed
+                    .as_mut()
+                    .ok_or(RegistryError::Internal)?
+                    .node
+                    .children_mut()
+            } else {
+                self.node_mut(*object_id)?.children_mut()
+            };
             let additional = maximum.saturating_sub(children.len());
             children
                 .try_reserve_exact(additional)
@@ -3703,6 +4505,61 @@ impl StageRegistry {
                 })?;
         }
         Ok(())
+    }
+
+    fn commit_prepared_create(&mut self, create_index: usize, prepared: &mut PreparedStageBatch) {
+        let create = &mut prepared.creates[create_index];
+        let mut constructed = create
+            .constructed
+            .take()
+            .expect("prepared Create retains its preconstructed actor until commit");
+        let destination = create
+            .destination
+            .take()
+            .expect("prepared Create retains its destination until commit");
+        let object_id = create.object_id;
+        constructed
+            .node
+            .meta_mut()
+            .set_actor_identity(ActorIdentity {
+                object_id,
+                type_id: create.type_id,
+            });
+
+        let (parent, root_name_bytes) = match destination {
+            PreparedCreateDestination::Root { name } => {
+                debug_assert!(self.roots.len() < self.roots.capacity());
+                self.roots.push(RootRecord {
+                    name,
+                    node: constructed.node,
+                });
+                (None, create.root_name_bytes)
+            }
+            PreparedCreateDestination::Child { parent } => {
+                self.node_mut(parent)
+                    .expect("prepared Create parent remains live")
+                    .append_child_quiet(constructed.node);
+                debug_assert!(prepared.lifecycle.len() + 2 <= prepared.lifecycle.capacity());
+                prepared
+                    .lifecycle
+                    .push(PendingLifecycle::Attached(object_id));
+                prepared
+                    .lifecycle
+                    .push(PendingLifecycle::ChildChanged(parent));
+                (Some(parent), 0)
+            }
+        };
+        let record = ActorRecord {
+            descriptor: create.descriptor,
+            parent,
+            depth: 0,
+            text_bytes: create.text_bytes,
+            root_name_bytes,
+            resources: create.descriptor.resource_cost.resources,
+            ops: constructed.ops,
+        };
+        debug_assert_eq!(create.reservation.index, object_id.slot_index());
+        self.publish_slot(create.reservation, record);
     }
 
     fn detach_prepared(
@@ -4048,6 +4905,65 @@ impl StageRegistry {
     }
 }
 
+fn validate_runtime_flag_descriptor(
+    descriptor: &TypeDescriptor,
+    flag: RuntimeFlag,
+) -> Result<(), RegistryError> {
+    match flag {
+        RuntimeFlag::Hidden | RuntimeFlag::Enabled => Ok(()),
+        RuntimeFlag::Clickable | RuntimeFlag::Focusable
+            if descriptor.capabilities.contains(ActorCapabilities::CONTROL) =>
+        {
+            Ok(())
+        }
+        RuntimeFlag::Clickable | RuntimeFlag::Focusable => Err(RegistryError::Unsupported),
+    }
+}
+
+fn validate_requested_layout_descriptor(
+    descriptor: &TypeDescriptor,
+    layout: &RequestedLayout,
+) -> Result<(), RegistryError> {
+    let required = match layout {
+        RequestedLayout::None => return Ok(()),
+        RequestedLayout::Flex(_) => LayoutCapabilities::FLEX_CONTAINER,
+        RequestedLayout::Grid(_) => LayoutCapabilities::GRID_CONTAINER,
+        RequestedLayout::Item(_) => LayoutCapabilities::ITEM_HINTS,
+    };
+    if !descriptor.layout.contains(required) {
+        return Err(RegistryError::Unsupported);
+    }
+    if let RequestedLayout::Item(hints) = layout
+        && (hints.col_span == 0
+            || hints.row_span == 0
+            || hints
+                .min_width
+                .zip(hints.max_width)
+                .is_some_and(|(min, max)| min > max)
+            || hints
+                .min_height
+                .zip(hints.max_height)
+                .is_some_and(|(min, max)| min > max))
+    {
+        return Err(RegistryError::Range { field_id: 0 });
+    }
+    if let RequestedLayout::Grid(config) = layout
+        && (config.col_tracks.is_empty()
+            || config.row_tracks.is_empty()
+            || config
+                .col_tracks
+                .iter()
+                .chain(config.row_tracks.iter())
+                .any(|track| {
+                    matches!(track, GridTrack::Px(value) if *value < 0)
+                        || matches!(track, GridTrack::Fr(0))
+                }))
+    {
+        return Err(RegistryError::Range { field_id: 0 });
+    }
+    Ok(())
+}
+
 fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
     if catalog.is_empty() {
         return Err(RegistryError::InvalidCatalog);
@@ -4202,6 +5118,40 @@ fn validate_constructor_inputs(
     for field in descriptor.constructor_fields {
         if field.required && !inputs.iter().any(|input| input.id == field.id) {
             return Err(RegistryError::MissingField { field_id: field.id });
+        }
+    }
+    Ok(())
+}
+
+fn validate_atomic_constructor_fields(
+    descriptor: &TypeDescriptor,
+    fields: &[crate::direction::CreateField],
+) -> Result<(), RegistryError> {
+    for (index, field) in fields.iter().enumerate() {
+        if fields[..index].iter().any(|prior| prior.id == field.id) {
+            return Err(RegistryError::DuplicateField { field_id: field.id });
+        }
+        let declared = descriptor
+            .constructor_fields
+            .iter()
+            .find(|declared| declared.id == field.id)
+            .ok_or(RegistryError::UnknownField { field_id: field.id })?;
+        let actual = field.value.tag();
+        let contextually_admissible = declared.value_tag == ValueTag::Object
+            && matches!(actual, ValueTag::Object | ValueTag::BatchObject);
+        if actual != declared.value_tag && !contextually_admissible {
+            return Err(RegistryError::TypeMismatch {
+                field_id: field.id,
+                expected: declared.value_tag,
+                actual,
+            });
+        }
+    }
+    for declared in descriptor.constructor_fields {
+        if declared.required && !fields.iter().any(|field| field.id == declared.id) {
+            return Err(RegistryError::MissingField {
+                field_id: declared.id,
+            });
         }
     }
     Ok(())

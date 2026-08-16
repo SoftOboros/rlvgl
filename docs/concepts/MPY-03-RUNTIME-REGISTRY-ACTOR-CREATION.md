@@ -194,21 +194,88 @@ stage teardown without changing the public `Widget` trait.
 
 ## 7. Frozen Decisions — Generic Creation
 
-Create inputs are `StageId`, parent/root destination, `TypeId`, ordered or
-keyed constructor fields, and optional initial property/layout values. The
-runtime:
+Create is a Batch-only operation. A Command carrying opcode `Create` is
+`Unsupported`, and a Create Batch operation MUST carry flags `0`. The enclosing
+Batch supplies `StageId`; its operation payload is:
+
+| Field | Wire form | Validation |
+|---|---|---|
+| `batch_ref` | `u16` | Nonzero raw binding declaration; zero is `InvalidFrame`. |
+| `type_id` | `u32` | Nonzero registered actor type; zero is `InvalidFrame`. |
+| `destination_tag` | `u8` | `01` Root, `02` Child, `00` invalid, unknown future values `Unsupported`. |
+| `destination_data` | Tag-dependent | Root name or contextual parent reference as defined below. |
+| `constructor_fields` | MPY-02 `FieldList` | Descriptor-owned constructor fields only. |
+
+All integers use MPY-02 little-endian encoding. The payload is complete: extra
+or truncated bytes are `InvalidFrame`.
+
+### 7.1 Destination and append behavior
+
+`Root` destination data is a `u32` byte length followed by that many UTF-8
+bytes. The codec preserves the exact name bytes and performs no normalization.
+Although an empty UTF-8 string is structurally decodable, the Stage semantic
+validator MUST reject it as `InvalidParent`; this retains the existing named-
+root error authority. The name counts against `max_text_bytes` and the Batch
+text budget. A successful Create appends the actor to the named-root order.
+
+`Child` destination data is one contextual MPY-02 `ObjectReference`, encoded
+with either `ValueTag::Object` or `ValueTag::BatchObject`. A successful Create
+appends the actor to that parent's child order. A canonical value with another
+tag is `TypeMismatch`; stale stable objects use `StaleObject`; graph and policy
+failures use their existing Stage errors.
+
+Both destinations are deliberately append-only. A later same-Batch `Reorder`
+operation establishes an exact root or child position when append order is not
+the desired final order.
+
+### 7.2 Batch reference binding
+
+The leading `batch_ref` is a raw declaration of the object binding produced by
+this operation; it is not a tagged `BatchObject` value. Bindings are unique
+within the enclosing Batch and become eligible for use only by subsequent
+operations. Zero is structurally invalid. Duplicate declarations and
+forward/self/unbound `BatchObject` uses are context-validating Batch failures
+reported as `BatchInvalid` at the operation and field that caused the failure.
+The shared structural codec does not claim to resolve that operation graph.
+
+### 7.3 Construction transaction and mutable state
+
+The runtime:
 
 1. resolves the type descriptor and target availability;
-2. validates constructor and initial values;
-3. validates parent/child policy;
-4. reserves actor, text, resource, and tree capacity;
+2. validates the constructor `FieldList` against the descriptor;
+3. validates the destination, parent/child policy, and Batch-reference graph;
+4. reserves actor, text, resource, result, and tree capacity;
 5. constructs native state without publishing it;
-6. attaches the actor and applies initial state inside the batch; and
-7. publishes the stable `ObjectId` only on commit.
+6. attaches the actor within the prepared Batch; and
+7. publishes the stable `ObjectId` only when the complete Batch commits.
 
-Constructor fields are immutable construction inputs only when the descriptor
-says so. Durable mutable state belongs in properties. One-shot behavior belongs
-in actions.
+Create carries constructor fields only. It has no initial mutable-property or
+requested-layout section. Durable mutable state belongs in MPY-04 properties
+and layout; one-shot behavior belongs in actions. A caller sets such initial
+state with later operations in the same Batch, referring to the new actor with
+`ValueTag::BatchObject`.
+
+### 7.4 Successful output and limits
+
+Each successful Create contributes exactly one output-bearing Batch-success
+record: its `operation_index` identifies the Create operation, and its value
+list contains exactly one `ValueTag::Object` with the committed stable
+`ObjectId`. That operation index also correlates the output to the Create's
+input `batch_ref`; the response does not echo a `BatchObject`. An empty or
+multi-value record is `InvalidFrame`, and a one-value record with another tag
+is `TypeMismatch` for the Create output schema.
+
+The Create codec enforces the complete negotiated `Limits` relevant to its
+payload: the Root name and each Text constructor value use `max_text_bytes`,
+each Bytes constructor value uses `max_byte_payload`, and each constructor
+`FieldList` independently uses `max_items_per_command`. The enclosing Batch
+still enforces the same limit independently on its operation count and applies
+`max_frame_bytes` to the complete frame. Create result records contribute to
+the BatchSuccess aggregate `max_values_per_result`. Eight minimal Create
+operations and eight corresponding one-Object records fit the MPY-02 minimum
+profile (`max_frame_bytes = 256`, `max_items_per_command = 8`,
+`max_values_per_result = 8`).
 
 ## 8. Frozen Decisions — Representative Actor Descriptors
 
@@ -277,6 +344,13 @@ a limit returns Capacity before publication.
 - **PCDN-MPY-03-003 — Resolved by owner direction 2026-08-15:** Stage roots are
   ordinary actors carrying an explicit `StageRoot` capability and no parent.
   They use the common registry identity, lifecycle, and storage path. See §5.3.
+- **PCDN-MPY-03-004 — Resolved by owner direction 2026-08-16:** Create is the
+  zero-flag Batch-only payload frozen in §7: one raw nonzero `batch_ref`, one
+  nonzero `type_id`, an append-only Root or Child destination, and one shared
+  constructor `FieldList`. Later same-Batch operations own mutable initial
+  state through `BatchObject`; success returns exactly one stable `Object`
+  correlated by operation index. The shared field/value/reference codecs stay
+  schema-neutral.
 
 ## 12. Acceptance Checklist
 
@@ -286,7 +360,7 @@ a limit returns Capacity before publication.
 - [x] `INV-MPY-03-4` generic Create ordering and publication rules are accepted.
 - [x] `INV-MPY-03-5` subtree deletion and subscription cleanup are accepted.
 - [x] `INV-MPY-03-6` closes the MPY-01 representative actor decision.
-- [x] PCDN-MPY-03-001 through PCDN-MPY-03-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`.
+- [x] PCDN-MPY-03-001 through PCDN-MPY-03-004 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`.
 
 Implementation evidence satisfies the phase exit gate for the in-process
 profile. Coverage rows MPY-BL-001, MPY-BL-003, and MPY-BL-004 are Current;
@@ -315,11 +389,20 @@ future MPY-04/05 behavior.
 
 ## 14. Unblocks
 
-MPY-03 is ratified and its production exit gate is satisfied. MPY-04 stage
-directions and MPY-05 cue/scheduling drafts may now reconcile against the
-implemented registry and catalog, resolve their own PCDNs, and seek separate
-owner ratification. This does not authorize MPY-04 or MPY-05 behavior before
-their respective §12 gates close.
+MPY-03 is ratified and its in-process registry/catalog exit gate is satisfied.
+The canonical Create payload/result codecs and the core prepared Stage
+transaction now support Create followed by MPY-04 directions in one atomic
+Batch. Preparation preconstructs actors, resolves earlier `BatchObject`
+references, reserves commit storage, and keeps provisional identities private;
+one allocation-free commit advances one Stage Revision and makes the ordered
+Create mappings movable from the committed completion.
+
+The Endpoint and wire decoder do not yet admit this Create-capable transaction.
+That MPY-04 integration must decode opcode payloads into the prepared core
+surface and retain all Create mappings in the single Batch completion. The
+existing direction-only Endpoint completion is not Create evidence. MPY-04 and
+MPY-05 behavior remains governed by their own accepted contracts and evidence
+gates.
 
 ## 15. Change Log
 
@@ -331,7 +414,7 @@ their respective §12 gates close.
 
 **Touches:** INV-MPY-03-1, INV-MPY-03-2, INV-MPY-03-3, INV-MPY-03-4, INV-MPY-03-5, INV-MPY-03-6, INV-MPY-2, INV-MPY-3, INV-MPY-10, PCDN-MPY-005, PCDN-MPY-006, §0–§14
 
-**Commits:** pending
+**Commits:** `35f5e5c`
 
 **Summary:** Drafts the compatibility-first Stage Registry, actor-local
 descriptor schema, generic Create lifecycle, native operation-erasure boundary,
@@ -356,7 +439,7 @@ PCDN-MPY-03-003, INV-MPY-03-1, INV-MPY-03-2, INV-MPY-03-3,
 INV-MPY-03-4, INV-MPY-03-5, INV-MPY-03-6, §0, §5.2, §5.3, §6.3,
 §11–§15
 
-**Commits:** pending
+**Commits:** `61cdb0d`
 
 **Summary:** Owner ratified MPY-03 and selected a parallel object-safe
 `ActorOps` adapter sharing native actor state with `ObjectNode`, retained
@@ -396,7 +479,7 @@ typed-screen root registry.
 **Touches:** INV-MPY-03-1, INV-MPY-03-2, INV-MPY-03-3, INV-MPY-03-4,
 INV-MPY-03-5, INV-MPY-03-6, §0, §6.1, §6.3, §12–§15
 
-**Commits:** pending
+**Commits:** `e37710e`
 
 **Summary:** Implements the `no_std + alloc` compatibility-first Stage
 Registry in `rlvgl-core`, actor-local descriptors and constructors for the five
@@ -415,3 +498,38 @@ advance on reuse, unrelated-handle preservation, and stage teardown.
 `widgets/tests/mpy_actor_ops_compile.rs` exercises the production parallel typed
 adapter for all five native widget types. Core and widgets cross-compile for
 `thumbv7em-none-eabihf` without default features.
+
+### 0.4.0 — 2026-08-16 — Create wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-03-004, INV-MPY-03-4, §7, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes Create as a zero-flag Batch-only operation with a raw
+nonzero Batch binding, registered type, append-only Root or Child destination,
+and the shared constructor `FieldList`. Mutable initial state moves to later
+same-Batch operations. A successful Create emits exactly one stable `Object`
+value correlated by operation index. Adds allocation-free codecs, negotiated-
+limit enforcement, canonical vectors, malformed/floor conformance tests, and a
+prepared core transaction for Create plus later directions under one Stage
+Revision.
+
+#### Rationale
+
+Keeping destination and constructor schema opcode-owned avoids changing the
+shared MPY-02 value model or prematurely freezing another operation's payload.
+One stable output value also lets all eight minimum-profile Create operations
+return their committed identities without exceeding
+`max_values_per_result = 8`. Append-first creation keeps placement deterministic
+while delegating exact positioning to the common MPY-04 `Reorder` operation.
+
+`core/tests/mpy_atomic_create.rs` proves earlier-only reference resolution,
+constructor object-reference normalization, augmented tree and capacity
+validation, delete-then-Create generation reuse, Create-then-Delete rejection,
+prepublication busy/stale failure, one-revision publication, and zero allocator
+activity while committing or moving the ordered Create results. Endpoint wire
+admission remains deliberately deferred to MPY-04.

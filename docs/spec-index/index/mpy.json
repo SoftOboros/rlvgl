@@ -1,5 +1,5 @@
 {
-  "edge_count": 520,
+  "edge_count": 523,
   "edges": [
     {
       "edge_type": "defines",
@@ -1523,345 +1523,366 @@
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 233,
+      "line": 300,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 234,
+      "line": 301,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 235,
+      "line": 302,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 236,
+      "line": 303,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 237,
+      "line": 304,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 238,
+      "line": 305,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 267,
+      "line": 334,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 272,
+      "line": 339,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 277,
+      "line": 344,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 283,
+      "line": 347,
+      "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "target": "PCDN-MPY-03-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 357,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 284,
+      "line": 358,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 285,
+      "line": 359,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 285,
+      "line": 359,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 286,
+      "line": 360,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 287,
+      "line": 361,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 288,
+      "line": 362,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 289,
+      "line": 363,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 289,
+      "line": 363,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 289,
+      "line": 363,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 289,
+      "line": 363,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 289,
+      "line": 363,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
-      "target": "PCDN-MPY-03-003"
+      "target": "PCDN-MPY-03-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 415,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 354,
+      "line": 437,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 354,
+      "line": 437,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 354,
+      "line": 437,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 438,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 438,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 438,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 355,
+      "line": 438,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-03-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 356,
+      "line": 439,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 356,
+      "line": 439,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 356,
+      "line": 439,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 365,
+      "line": 448,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "PCDN-MPY-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 396,
+      "line": 479,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 396,
+      "line": 479,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 396,
+      "line": 479,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 396,
+      "line": 479,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 397,
+      "line": 480,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 397,
+      "line": 480,
       "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "target": "INV-MPY-03-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 508,
+      "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "target": "INV-MPY-03-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 508,
+      "source": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "target": "PCDN-MPY-03-004"
     },
     {
       "edge_type": "defines",
@@ -3644,14 +3665,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 36,
+    "amendment": 37,
     "gate": 82,
     "invariant": 65,
     "nongoal": 43,
-    "rationale": 27,
+    "rationale": 28,
     "term": 80
   },
-  "object_count": 333,
+  "object_count": 335,
   "objects": [
     {
       "attrs": {
@@ -5982,7 +6003,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 233,
+      "line": 300,
       "obj_id": "INV-MPY-03-1",
       "text": "A live actor MUST have exactly one stable `ObjectId`, one registered `TypeId`, and one parent or stage-root position."
     },
@@ -6000,7 +6021,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 234,
+      "line": 301,
       "obj_id": "INV-MPY-03-2",
       "text": "The registry MUST resolve handles without storing or transporting raw node/widget pointers in protocol-visible state."
     },
@@ -6019,7 +6040,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 235,
+      "line": 302,
       "obj_id": "INV-MPY-03-3",
       "text": "Type, property, action, and event metadata MUST derive from one actor-local declarative schema and MUST NOT be independently reauthored by a binding."
     },
@@ -6037,7 +6058,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 236,
+      "line": 303,
       "obj_id": "INV-MPY-03-4",
       "text": "Generic Create MUST validate type, constructor fields, parent policy, and capacity before publishing an actor ID."
     },
@@ -6055,7 +6076,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 237,
+      "line": 304,
       "obj_id": "INV-MPY-03-5",
       "text": "Deleting an actor MUST invalidate its descendants and subscriptions deterministically while preserving unrelated actor IDs."
     },
@@ -6073,7 +6094,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 238,
+      "line": 305,
       "obj_id": "INV-MPY-03-6",
       "text": "The first catalog MUST generically construct `Container`, `Label`, `Button`, `Slider`, and `widgets::list::List`."
     },
@@ -6082,7 +6103,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 258,
+      "line": 325,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:nongoal:1",
       "text": "No generic mutation surface. MPY-03 constructs actors and catalogs"
     },
@@ -6091,7 +6112,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 260,
+      "line": 327,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:nongoal:2",
       "text": "No Python callbacks. Event metadata may be listed, but MPY-05/06 own"
     },
@@ -6100,7 +6121,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 262,
+      "line": 329,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:nongoal:3",
       "text": "No Python-authored actor classes. Composition through factories is"
     },
@@ -6109,7 +6130,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 264,
+      "line": 331,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:nongoal:4",
       "text": "No mandatory O(1) lookup in v1. Correct stable identity precedes an"
     },
@@ -6123,8 +6144,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 283,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:283",
+      "line": 357,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:357",
       "text": "`INV-MPY-03-1` registry ownership and root/parent uniqueness are accepted."
     },
     {
@@ -6137,8 +6158,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 284,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:284",
+      "line": 358,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:358",
       "text": "`INV-MPY-03-2` compatibility-first lookup preserves opaque identity."
     },
     {
@@ -6151,8 +6172,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 285,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:285",
+      "line": 359,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:359",
       "text": "`INV-MPY-03-3` resolves PCDN-MPY-006 through actor-local schema and derived projections."
     },
     {
@@ -6165,8 +6186,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 286,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:286",
+      "line": 360,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:360",
       "text": "`INV-MPY-03-4` generic Create ordering and publication rules are accepted."
     },
     {
@@ -6179,8 +6200,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 287,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:287",
+      "line": 361,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:361",
       "text": "`INV-MPY-03-5` subtree deletion and subscription cleanup are accepted."
     },
     {
@@ -6193,8 +6214,8 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 288,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:288",
+      "line": 362,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:362",
       "text": "`INV-MPY-03-6` closes the MPY-01 representative actor decision."
     },
     {
@@ -6209,9 +6230,9 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 289,
-      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:289",
-      "text": "PCDN-MPY-03-001 through PCDN-MPY-03-003 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`."
+      "line": 363,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md:gate:363",
+      "text": "PCDN-MPY-03-001 through PCDN-MPY-03-004 are resolved without weakening `INV-MPY-2`, `INV-MPY-3`, or `INV-MPY-10`."
     },
     {
       "attrs": {
@@ -6219,7 +6240,7 @@
         "change_kind": "semantic",
         "chronological_rank": 1,
         "commits": [
-          "pending"
+          "`35f5e5c`"
         ],
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -6250,7 +6271,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 326,
+      "line": 409,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.1.0",
       "text": "Drafts the compatibility-first Stage Registry, actor-local"
     },
@@ -6274,7 +6295,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 326,
+      "line": 409,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.1.0-rationale",
       "text": "The protocol cannot become a working object system until stable IDs resolve to\nruntime-owned native actors and one catalog supplies both construction and\nintrospection metadata. A compatibility-first facade preserves existing\n`ObjectNode` consumers while keeping storage optimization behind the semantic\ncontract."
     },
@@ -6284,7 +6305,7 @@
         "change_kind": "semantic and compile evidence",
         "chronological_rank": 2,
         "commits": [
-          "pending"
+          "`61cdb0d`"
         ],
         "conformant_change_kind": false,
         "conformant_status": true,
@@ -6306,7 +6327,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 348,
+      "line": 431,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.2.0",
       "text": "Owner ratified MPY-03 and selected a parallel object-safe"
     },
@@ -6321,7 +6342,7 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 348,
+      "line": 431,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.2.0-rationale",
       "text": "The existing `ObjectNode` stores `Rc<RefCell<dyn Widget>>`, which cannot recover\nactor-specific Rust APIs without adding a downcast surface or changing the\npublic `Widget` contract. Retaining a typed handle inside a parallel adapter\nand giving `ObjectNode` an erased clone preserves one native allocation while\nkeeping all type-specific dispatch inside Rust. The compile experiment proves\nthis additive shape for every representative actor before production registry\nwork begins.\n\nAn actor-count threshold would turn an unmeasured implementation preference\ninto architecture. The adopted evidence gate keeps the compatible nested tree\nuntil MPY-07 demonstrates a causal budget failure. Treating roots as ordinary\ncapable actors likewise preserves one identity, descriptor, lifecycle, and\nstorage model instead of introducing a second screen-object path.\n\nConsidered and rejected: a raw function-pointer vtable over\n`Rc<RefCell<dyn Widget>>`, which has no safe route back to the concrete actor;\na `Widget` supertrait change, which expands the public contract across every\nwidget implementer; a speculative actor-count storage trigger; and a separate\ntyped-screen root registry."
     },
@@ -6331,7 +6352,7 @@
         "change_kind": "implementation and evidence",
         "chronological_rank": 3,
         "commits": [
-          "pending"
+          "`e37710e`"
         ],
         "conformant_change_kind": false,
         "conformant_status": false,
@@ -6354,9 +6375,58 @@
       "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 390,
+      "line": 473,
       "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.3.0",
       "text": "Implements the `no_std + alloc` compatibility-first Stage"
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott with OpenAI Codex implementation evidence",
+        "change_kind": "semantic and protocol implementation",
+        "chronological_rank": 4,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": false,
+        "rev": "0.4.0",
+        "shape": "block",
+        "status": "create wire ratified",
+        "summary": "Freezes Create as a zero-flag Batch-only operation with a raw",
+        "touches": [
+          "PCDN-MPY-03-004",
+          "INV-MPY-03-4",
+          "§7",
+          "§11–§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 502,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.4.0",
+      "text": "Freezes Create as a zero-flag Batch-only operation with a raw"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "PCDN-MPY-03-004",
+          "INV-MPY-03-4",
+          "§7",
+          "§11–§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 502,
+      "obj_id": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md#0.4.0-rationale",
+      "text": "Keeping destination and constructor schema opcode-owned avoids changing the\nshared MPY-02 value model or prematurely freezing another operation's payload.\nOne stable output value also lets all eight minimum-profile Create operations\nreturn their committed identities without exceeding\n`max_values_per_result = 8`. Append-first creation keeps placement deterministic\nwhile delegating exact positioning to the common MPY-04 `Reorder` operation.\n\n`core/tests/mpy_atomic_create.rs` proves earlier-only reference resolution,\nconstructor object-reference normalization, augmented tree and capacity\nvalidation, delete-then-Create generation reuse, Create-then-Delete rejection,\nprepublication busy/stale failure, one-revision publication, and zero allocator\nactivity while committing or moving the ordered Create results. Endpoint wire\nadmission remains deliberately deferred to MPY-04."
     },
     {
       "attrs": {

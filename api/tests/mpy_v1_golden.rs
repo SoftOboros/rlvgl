@@ -2,16 +2,19 @@
 
 use rlvgl_api::protocol::{
     Batch, BatchBudget, BatchSuccess, Capabilities, CodecError, Command, Completion,
-    CompletionStatus, Cue, DiscriminantDomain, ErrorClass, FieldList, FieldRef, FrameRef, Hello,
-    Limits, MPY_V1, ObjectReference, ObjectReferenceError, OpcodeList, OperationList, OperationRef,
-    OperationResultList, OperationResultRef, ProtocolVersion, RuntimeNotice, ValueList, ValueRef,
-    ValueTag, decode_batch_success, decode_batch_success_with_limits, decode_field_list,
+    CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
+    FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, ObjectReference, ObjectReferenceError,
+    OpcodeList, OperationList, OperationRef, OperationResultList, OperationResultRef,
+    ProtocolVersion, RuntimeNotice, ValueList, ValueRef, ValueTag, create_result_object,
+    decode_batch_success, decode_batch_success_with_limits, decode_create_operation_with_limits,
+    decode_create_payload, decode_create_payload_with_limits, decode_field_list,
     decode_field_list_with_limits, decode_frame, decode_frame_with_limits, decode_object_reference,
     decode_operation_list, decode_operation_list_with_limit, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
-    encode_batch_success_with_limits, encode_field_list, encode_field_list_with_limit,
-    encode_field_list_with_limits, encode_frame, encode_frame_with_limits, encode_object_reference,
-    encode_operation_list, encode_operation_list_with_limit, encode_value, encode_value_list,
+    encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
+    encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
+    encode_frame_with_limits, encode_object_reference, encode_operation_list,
+    encode_operation_list_with_limit, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, opcode,
 };
 
@@ -73,6 +76,17 @@ const BATCH_RESULTS: &[OperationResultRef<'static>] = &[
         values: ValueList::from_slice(MUTATION_RESULT_VALUES),
     },
 ];
+const CREATE_FIELDS: &[FieldRef<'static>] = &[
+    FieldRef {
+        id: 1,
+        value: ValueRef::U32(5),
+    },
+    FieldRef {
+        id: 2,
+        value: ValueRef::Text("Hi"),
+    },
+];
+const CREATE_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Object(0x0000_0002_0000_0001)];
 
 const fn empty_operation(opcode: u32) -> OperationRef<'static> {
     OperationRef {
@@ -332,6 +346,305 @@ fn contextual_object_references_reuse_value_tags_and_preserve_error_classificati
         decode_object_reference(&[ValueTag::Object as u8]),
         Err(ObjectReferenceError::Codec(CodecError::Truncated))
     );
+}
+
+#[test]
+fn create_payloads_match_golden_bytes_and_decode_zero_copy() {
+    let fields = FieldList::from_slice(CREATE_FIELDS);
+    let root = CreatePayload {
+        batch_ref: 7,
+        type_id: 0x1122_3344,
+        destination: CreateDestinationRef::Root("main"),
+        constructor_fields: fields,
+    };
+    let child = CreatePayload {
+        batch_ref: 8,
+        type_id: 0x1122_3344,
+        destination: CreateDestinationRef::Child(ObjectReference::BatchObject(7)),
+        constructor_fields: fields,
+    };
+
+    for (name, payload) in [
+        ("payload.create_root", root),
+        ("payload.create_child", child),
+    ] {
+        let mut encoded = [0u8; 256];
+        let length = encode_create_payload_with_limits(payload, limits(), &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(name));
+        let decoded = decode_create_payload_with_limits(&encoded[..length], limits()).unwrap();
+        assert_eq!(decoded, payload);
+
+        if let CreateDestinationRef::Root(name) = decoded.destination {
+            let encoded_range = encoded.as_ptr() as usize..encoded.as_ptr() as usize + length;
+            assert!(encoded_range.contains(&(name.as_ptr() as usize)));
+        }
+        let borrowed_text = match decoded.constructor_fields.iter().nth(1).unwrap().value {
+            ValueRef::Text(value) => value,
+            value => panic!("expected text, got {value:?}"),
+        };
+        let encoded_range = encoded.as_ptr() as usize..encoded.as_ptr() as usize + length;
+        assert!(encoded_range.contains(&(borrowed_text.as_ptr() as usize)));
+
+        let operation = OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &encoded[..length],
+        };
+        assert_eq!(
+            decode_create_operation_with_limits(operation, limits()),
+            Ok(payload)
+        );
+    }
+
+    let root_bytes = fixture("payload.create_root");
+    for operation in [
+        OperationRef {
+            opcode: opcode::DELETE,
+            flags: 0,
+            payload: &root_bytes,
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 1,
+            payload: &root_bytes,
+        },
+    ] {
+        assert_eq!(
+            decode_create_operation_with_limits(operation, limits()),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn create_payload_rejects_malformed_destinations_bindings_and_fields() {
+    let valid = fixture("payload.create_root");
+
+    for offset in [0usize, 2] {
+        let mut malformed = valid.clone();
+        if offset == 0 {
+            malformed[0..2].copy_from_slice(&0u16.to_le_bytes());
+        } else {
+            malformed[2..6].copy_from_slice(&0u32.to_le_bytes());
+        }
+        assert_eq!(
+            decode_create_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let mut invalid_destination = valid.clone();
+    invalid_destination[6] = 0;
+    assert_eq!(
+        decode_create_payload(&invalid_destination),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    invalid_destination[6] = 0xff;
+    assert_eq!(
+        decode_create_payload(&invalid_destination),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::CreateDestination,
+                value: 0xff,
+            }
+        ))
+    );
+
+    let empty_root = [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0];
+    assert_eq!(
+        decode_create_payload(&empty_root),
+        Ok(CreatePayload {
+            batch_ref: 1,
+            type_id: 1,
+            destination: CreateDestinationRef::Root(""),
+            constructor_fields: FieldList::from_slice(&[]),
+        }),
+        "the runtime retains InvalidParent authority over an empty root name"
+    );
+    let invalid_utf8_root = [1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0xff, 0, 0];
+    for malformed in [&invalid_utf8_root[..], &valid[..valid.len() - 1]] {
+        assert_eq!(
+            decode_create_payload(malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+    let mut trailing = valid;
+    trailing.push(0);
+    assert_eq!(
+        decode_create_payload(&trailing),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    let mut duplicate_wire_fields = fixture("payload.create_root");
+    duplicate_wire_fields[26..30].copy_from_slice(&1u32.to_le_bytes());
+    assert_eq!(
+        decode_create_payload(&duplicate_wire_fields),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    let child_bool = [1, 0, 1, 0, 0, 0, 2, ValueTag::Bool as u8, 1, 0, 0];
+    assert_eq!(
+        decode_create_payload(&child_bool),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    let invalid_child_object = [
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        2,
+        ValueTag::Object as u8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ];
+    assert_eq!(
+        decode_create_payload(&invalid_child_object),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    let duplicate_fields = [
+        FieldRef {
+            id: 1,
+            value: ValueRef::None,
+        },
+        FieldRef {
+            id: 1,
+            value: ValueRef::None,
+        },
+    ];
+    let malformed = CreatePayload {
+        batch_ref: 0,
+        type_id: 1,
+        destination: CreateDestinationRef::Root("main"),
+        constructor_fields: FieldList::from_slice(&duplicate_fields),
+    };
+    let mut one_item = limits();
+    one_item.max_items_per_command = 1;
+    assert_eq!(
+        encode_create_payload_with_limits(malformed, one_item, &mut [0; 64]),
+        Err(CodecError::InvalidFrame),
+        "structural errors precede negotiated limits"
+    );
+}
+
+#[test]
+fn create_payload_enforces_full_negotiated_limits() {
+    let payload = CreatePayload {
+        batch_ref: 7,
+        type_id: 0x1122_3344,
+        destination: CreateDestinationRef::Root("main"),
+        constructor_fields: FieldList::from_slice(CREATE_FIELDS),
+    };
+    let mut encoded = [0u8; 256];
+    let length = encode_create_payload(payload, &mut encoded).unwrap();
+
+    let mut short_root = limits();
+    short_root.max_text_bytes = 3;
+    assert_eq!(
+        encode_create_payload_with_limits(payload, short_root, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_create_payload_with_limits(&encoded[..length], short_root),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut one_field = limits();
+    one_field.max_items_per_command = 1;
+    assert_eq!(
+        encode_create_payload_with_limits(payload, one_field, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_create_payload_with_limits(&encoded[..length], one_field),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut short_field_text = limits();
+    short_field_text.max_text_bytes = 1;
+    assert_eq!(
+        encode_create_payload_with_limits(payload, short_field_text, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_create_payload_with_limits(&encoded[..length], short_field_text),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let bytes_fields = [FieldRef {
+        id: 1,
+        value: ValueRef::Bytes(&[1, 2]),
+    }];
+    let bytes_payload = CreatePayload {
+        batch_ref: 8,
+        type_id: 1,
+        destination: CreateDestinationRef::Root("b"),
+        constructor_fields: FieldList::from_slice(&bytes_fields),
+    };
+    let bytes_length = encode_create_payload(bytes_payload, &mut encoded).unwrap();
+    let mut short_bytes = limits();
+    short_bytes.max_byte_payload = 1;
+    assert_eq!(
+        encode_create_payload_with_limits(bytes_payload, short_bytes, &mut [0; 64]),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_create_payload_with_limits(&encoded[..bytes_length], short_bytes),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+}
+
+#[test]
+fn create_success_is_exactly_one_correlated_stable_object() {
+    let result = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let success = BatchSuccess {
+        result_revision: 10,
+        results: OperationResultList::from_slice(&result),
+    };
+    let mut encoded = [0u8; 64];
+    let length = encode_batch_success_with_limits(success, 3, limits(), &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.create_success"));
+    let decoded = decode_batch_success_with_limits(&encoded[..length], 3, limits()).unwrap();
+    let record = decoded.results.iter().next().unwrap();
+    assert_eq!(record.operation_index, 1);
+    assert_eq!(
+        create_result_object(record.values),
+        Ok(0x0000_0002_0000_0001)
+    );
+
+    assert_eq!(
+        create_result_object(ValueList::from_slice(&[])),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        create_result_object(ValueList::from_slice(&[
+            ValueRef::Object(0x0000_0002_0000_0001),
+            ValueRef::None,
+        ])),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    for value in [ValueRef::BatchObject(7), ValueRef::U32(7)] {
+        assert_eq!(
+            create_result_object(ValueList::from_slice(&[value])),
+            Err(ObjectReferenceError::TypeMismatch {
+                actual: value.tag(),
+            })
+        );
+    }
 }
 
 #[test]
@@ -825,4 +1138,148 @@ fn interoperability_floor_values_fit_the_floor_frame() {
     let batch_length = encode_frame(MPY_V1, batch, &mut frame).expect("eight-operation floor");
     assert!(batch_length <= frame.len());
     assert_eq!(limits().max_fields_per_command(), 8);
+}
+
+#[test]
+fn eight_minimal_creates_and_one_object_results_fit_the_floor() {
+    let root_names = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    let mut create_payloads = [[0u8; 32]; 8];
+    let mut create_lengths = [0usize; 8];
+    for (index, output) in create_payloads.iter_mut().enumerate() {
+        create_lengths[index] = encode_create_payload_with_limits(
+            CreatePayload {
+                batch_ref: u16::try_from(index + 1).unwrap(),
+                type_id: 1,
+                destination: CreateDestinationRef::Root(root_names[index]),
+                constructor_fields: FieldList::from_slice(&[]),
+            },
+            limits(),
+            output,
+        )
+        .unwrap();
+    }
+    let operations = [
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[0][..create_lengths[0]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[1][..create_lengths[1]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[2][..create_lengths[2]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[3][..create_lengths[3]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[4][..create_lengths[4]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[5][..create_lengths[5]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[6][..create_lengths[6]],
+        },
+        OperationRef {
+            opcode: opcode::CREATE,
+            flags: 0,
+            payload: &create_payloads[7][..create_lengths[7]],
+        },
+    ];
+    let batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 8,
+            text_bytes: 8,
+            resources: 0,
+            result_bytes: 256,
+        },
+        operations: OperationList::from_slice(&operations),
+    });
+    let mut frame = [0u8; 256];
+    let batch_length = encode_frame_with_limits(MPY_V1, batch, limits(), &mut frame).unwrap();
+    assert!(batch_length <= frame.len());
+
+    let result_value_0 = [ValueRef::Object(0x0000_0002_0000_0001)];
+    let result_value_1 = [ValueRef::Object(0x0000_0002_0000_0002)];
+    let result_value_2 = [ValueRef::Object(0x0000_0002_0000_0003)];
+    let result_value_3 = [ValueRef::Object(0x0000_0002_0000_0004)];
+    let result_value_4 = [ValueRef::Object(0x0000_0002_0000_0005)];
+    let result_value_5 = [ValueRef::Object(0x0000_0002_0000_0006)];
+    let result_value_6 = [ValueRef::Object(0x0000_0002_0000_0007)];
+    let result_value_7 = [ValueRef::Object(0x0000_0002_0000_0008)];
+    let result_records = [
+        OperationResultRef {
+            operation_index: 0,
+            values: ValueList::from_slice(&result_value_0),
+        },
+        OperationResultRef {
+            operation_index: 1,
+            values: ValueList::from_slice(&result_value_1),
+        },
+        OperationResultRef {
+            operation_index: 2,
+            values: ValueList::from_slice(&result_value_2),
+        },
+        OperationResultRef {
+            operation_index: 3,
+            values: ValueList::from_slice(&result_value_3),
+        },
+        OperationResultRef {
+            operation_index: 4,
+            values: ValueList::from_slice(&result_value_4),
+        },
+        OperationResultRef {
+            operation_index: 5,
+            values: ValueList::from_slice(&result_value_5),
+        },
+        OperationResultRef {
+            operation_index: 6,
+            values: ValueList::from_slice(&result_value_6),
+        },
+        OperationResultRef {
+            operation_index: 7,
+            values: ValueList::from_slice(&result_value_7),
+        },
+    ];
+    let success = BatchSuccess {
+        result_revision: 1,
+        results: OperationResultList::from_slice(&result_records),
+    };
+    let mut success_payload = [0u8; 256];
+    let success_length =
+        encode_batch_success_with_limits(success, 8, limits(), &mut success_payload).unwrap();
+    let completion = FrameRef::Result(Completion {
+        request_id: 1,
+        status: CompletionStatus::Success,
+        operation_index: None,
+        field_id: None,
+        diagnostic: "",
+        payload: &success_payload[..success_length],
+    });
+    let result_length = encode_frame_with_limits(MPY_V1, completion, limits(), &mut frame).unwrap();
+    assert!(result_length <= frame.len());
+
+    let mut seven_values = limits();
+    seven_values.max_values_per_result = 7;
+    assert_eq!(
+        encode_batch_success_with_limits(success, 8, seven_values, &mut success_payload),
+        Err(CodecError::LimitExceeded)
+    );
 }

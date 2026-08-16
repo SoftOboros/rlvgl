@@ -170,6 +170,176 @@ impl OwnedValue {
             _ => 0,
         }
     }
+
+    pub(crate) fn as_ref(&self) -> ValueRef<'_> {
+        match self {
+            Self::None => ValueRef::None,
+            Self::Bool(value) => ValueRef::Bool(*value),
+            Self::I32(value) => ValueRef::I32(*value),
+            Self::U32(value) => ValueRef::U32(*value),
+            Self::I64(value) => ValueRef::I64(*value),
+            Self::U64(value) => ValueRef::U64(*value),
+            Self::Precise(value) => ValueRef::Precise(*value),
+            Self::Color(value) => ValueRef::Color(*value),
+            Self::Point { x, y } => ValueRef::Point { x: *x, y: *y },
+            Self::Size { width, height } => ValueRef::Size {
+                width: *width,
+                height: *height,
+            },
+            Self::Rect {
+                x,
+                y,
+                width,
+                height,
+            } => ValueRef::Rect {
+                x: *x,
+                y: *y,
+                width: *width,
+                height: *height,
+            },
+            Self::Enum { domain, value } => ValueRef::Enum {
+                domain: *domain,
+                value: *value,
+            },
+            Self::Text(value) => ValueRef::Text(value.as_str()),
+            Self::Bytes(value) => ValueRef::Bytes(value.as_slice()),
+            Self::Object(value) => ValueRef::Object(*value),
+            Self::Resource { kind, id } => ValueRef::Resource {
+                kind: *kind,
+                id: *id,
+            },
+            Self::BatchObject(value) => ValueRef::BatchObject(*value),
+        }
+    }
+}
+
+/// Stable or earlier batch-local actor reference used by an atomic Stage batch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BatchObjectReference {
+    /// Generation-checked actor already published in the Stage.
+    Stable(ObjectId),
+    /// Raw nonzero binding produced by an earlier Create in this batch.
+    EarlierBatch(u16),
+}
+
+/// One owned constructor-only field supplied to an atomic Create.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CreateField {
+    /// Descriptor-local constructor field identifier.
+    pub id: u32,
+    /// Owned neutral constructor value.
+    pub value: OwnedValue,
+}
+
+/// Append-only destination of one atomic Create operation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BatchCreateDestination {
+    /// Append a uniquely named Stage root.
+    Root {
+        /// Stage-owned root name.
+        name: String,
+    },
+    /// Append below a stable or earlier-created parent.
+    Child {
+        /// Parent reference resolved by the batch shadow.
+        parent: BatchObjectReference,
+    },
+}
+
+/// One owned generic Create request inside an atomic Stage batch.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CreateDirection {
+    /// Raw nonzero binding unique within the submitted batch.
+    pub batch_ref: u16,
+    /// Registered actor type to construct.
+    pub type_id: TypeId,
+    /// Append-only root or child destination.
+    pub destination: BatchCreateDestination,
+    /// Constructor-only fields; initial mutable state uses later directions.
+    pub fields: Vec<CreateField>,
+}
+
+/// One atomic Stage operation whose actor references may name earlier Creates.
+///
+/// Vector order is the submitted zero-based operation index. A successful
+/// Create contributes one retained Object result at that index.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BatchStageDirection {
+    /// Construct and append one actor without publishing it before commit.
+    Create(CreateDirection),
+    /// Apply one or more actor-local property/action transitions collectively.
+    MutateActor {
+        /// Stable or earlier-created target actor.
+        object: BatchObjectReference,
+        /// Collectively validated actor-local directions.
+        directions: Vec<ActorDirection>,
+    },
+    /// Set a descriptor-gated runtime flag.
+    SetFlag {
+        /// Stable or earlier-created target actor.
+        object: BatchObjectReference,
+        /// Runtime-owned flag.
+        flag: RuntimeFlag,
+        /// Requested semantic value.
+        enabled: bool,
+    },
+    /// Replace requested layout state.
+    SetRequestedLayout {
+        /// Stable or earlier-created target actor.
+        object: BatchObjectReference,
+        /// Complete replacement layout request.
+        layout: RequestedLayout,
+    },
+    /// Attempt to write computed geometry; always rejected as read-only.
+    SetComputedGeometry {
+        /// Stable or earlier-created target actor.
+        object: BatchObjectReference,
+        /// Rejected replacement geometry.
+        bounds: Rect,
+    },
+    /// Reparent an actor subtree at one exact ordered index.
+    Reparent {
+        /// Stable or earlier-created subtree root.
+        object: BatchObjectReference,
+        /// Stable or earlier-created destination parent.
+        new_parent: BatchObjectReference,
+        /// Exact final child index.
+        index: usize,
+    },
+    /// Promote or move an actor into the named-root order.
+    PromoteRoot {
+        /// Stable or earlier-created subtree root.
+        object: BatchObjectReference,
+        /// Unique Stage-root name.
+        name: String,
+        /// Exact final root index.
+        index: usize,
+    },
+    /// Reorder an actor within its current parent or root order.
+    Reorder {
+        /// Stable or earlier-created actor.
+        object: BatchObjectReference,
+        /// Exact final sibling/root index.
+        index: usize,
+    },
+    /// Delete an existing actor and its subtree.
+    Delete {
+        /// Stable or earlier-created subtree root.
+        object: BatchObjectReference,
+    },
+    /// Local style addressing remains explicitly unsupported in this slice.
+    SetLocalStyle {
+        /// Stable or earlier-created target actor.
+        object: BatchObjectReference,
+        /// Independent part selector.
+        part_id: u32,
+        /// Independent native state mask.
+        state_mask: u32,
+        /// Stable style property identifier.
+        property_id: u32,
+        /// Replacement local value.
+        value: OwnedValue,
+    },
 }
 
 /// One descriptor-validated actor-local mutation.

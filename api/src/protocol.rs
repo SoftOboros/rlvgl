@@ -257,6 +257,8 @@ pub enum DiscriminantDomain {
     ValueTag,
     /// Stable error class.
     ErrorClass,
+    /// Create destination kind.
+    CreateDestination,
 }
 
 /// Canonical codec failure.
@@ -814,6 +816,61 @@ pub struct BatchSuccess<'a> {
     /// Output-bearing operations in submitted operation order.
     pub results: OperationResultList<'a>,
 }
+
+/// Stable Create destination discriminants.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CreateDestinationTag {
+    /// Append a named Stage root.
+    Root = 0x01,
+    /// Append below an existing or earlier-created parent.
+    Child = 0x02,
+}
+
+impl CreateDestinationTag {
+    fn decode(value: u8) -> Result<Self, CodecError> {
+        match value {
+            0x00 => Err(CodecError::InvalidFrame),
+            0x01 => Ok(Self::Root),
+            0x02 => Ok(Self::Child),
+            value => Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::CreateDestination,
+                value,
+            }),
+        }
+    }
+}
+
+/// Destination carried by one Batch-only Create operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CreateDestinationRef<'a> {
+    /// Append a root under one UTF-8 name.
+    ///
+    /// The codec preserves an empty name so runtime graph validation can
+    /// report the existing `InvalidParent` semantic error.
+    Root(&'a str),
+    /// Append below one contextual stable or batch-local parent reference.
+    Child(ObjectReference),
+}
+
+/// Borrowed canonical payload for the Batch-only Create opcode.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CreatePayload<'a> {
+    /// Nonzero batch-local binding declared by this Create.
+    pub batch_ref: u16,
+    /// Nonzero registered actor type identifier.
+    pub type_id: u32,
+    /// Append-only root or child destination.
+    pub destination: CreateDestinationRef<'a>,
+    /// Constructor-only descriptor fields in strictly increasing ID order.
+    pub constructor_fields: FieldList<'a>,
+}
+
+/// Structural or contextual failure while decoding a Create payload.
+///
+/// This reuses [`ObjectReferenceError`] so a canonical non-object child value
+/// remains distinguishable from malformed bytes.
+pub type CreatePayloadError = ObjectReferenceError;
 
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1534,6 +1591,105 @@ fn decode_field_list_inner(input: &[u8]) -> Result<FieldList<'_>, CodecError> {
     Ok(FieldList::from_wire(count, &input[fields_start..]))
 }
 
+/// Encode one complete canonical Batch-only Create payload.
+pub fn encode_create_payload(
+    payload: CreatePayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_create_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_create_payload_into(payload, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode a Create payload under active negotiated payload limits.
+///
+/// This enforces the root-name, constructor-field count, and contained
+/// Text/Bytes limits. The caller still applies the complete-frame limit when it
+/// wraps the payload in an [`OperationRef`] and [`Batch`].
+pub fn encode_create_payload_with_limits(
+    payload: CreatePayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_create_payload_structure(payload)?;
+    validate_create_payload_limits(payload, limits)?;
+    encode_create_payload(payload, output)
+}
+
+/// Decode one complete canonical Batch-only Create payload.
+pub fn decode_create_payload(input: &[u8]) -> Result<CreatePayload<'_>, CreatePayloadError> {
+    decode_create_payload_inner(input).map_err(nested_create_payload_error)
+}
+
+/// Decode a Create payload under active negotiated payload limits.
+pub fn decode_create_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<CreatePayload<'_>, CreatePayloadError> {
+    let payload = decode_create_payload(input)?;
+    validate_create_payload_limits(payload, limits)?;
+    Ok(payload)
+}
+
+/// Decode a zero-flag Create operation from the counted Batch operation list.
+///
+/// There is deliberately no Command counterpart: MPY v1 Create is Batch-only.
+pub fn decode_create_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<CreatePayload<'_>, CreatePayloadError> {
+    if operation.opcode != opcode::CREATE || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_create_payload_with_limits(operation.payload, limits)
+}
+
+/// Validate the exact one-Object output schema of one successful Create record.
+///
+/// The containing [`OperationResultRef::operation_index`] correlates this
+/// stable object to the Create operation and therefore to its input BatchRef.
+pub fn create_result_object(values: ValueList<'_>) -> Result<u64, CreatePayloadError> {
+    validate_value_list_structure(values)?;
+    if values.len() != 1 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    match values.iter().next().expect("one value was validated") {
+        ValueRef::Object(object_id) => Ok(object_id),
+        value => Err(ObjectReferenceError::TypeMismatch {
+            actual: value.tag(),
+        }),
+    }
+}
+
+fn decode_create_payload_inner(input: &[u8]) -> Result<CreatePayload<'_>, CreatePayloadError> {
+    let mut reader = Reader::new(input);
+    let batch_ref = reader.u16()?;
+    if batch_ref == 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    let type_id = reader.u32()?;
+    require_nonzero(type_id)?;
+    let destination = match CreateDestinationTag::decode(reader.u8()?)? {
+        CreateDestinationTag::Root => {
+            let name = str::from_utf8(reader.bytes_with_length()?)
+                .map_err(|_| CodecError::InvalidFrame)?;
+            CreateDestinationRef::Root(name)
+        }
+        CreateDestinationTag::Child => {
+            let value = decode_value_from_reader(&mut reader)?;
+            CreateDestinationRef::Child(ObjectReference::try_from(value)?)
+        }
+    };
+    let constructor_fields = decode_field_list(&input[reader.position..])?;
+    Ok(CreatePayload {
+        batch_ref,
+        type_id,
+        destination,
+        constructor_fields,
+    })
+}
+
 /// Encode one canonical successful Batch payload.
 ///
 /// `submitted_operation_count` correlates every output record to the submitted
@@ -2069,6 +2225,25 @@ fn encode_field_list_into(
     Ok(())
 }
 
+fn encode_create_payload_into(
+    payload: CreatePayload<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    writer.u16(payload.batch_ref)?;
+    writer.u32(payload.type_id)?;
+    match payload.destination {
+        CreateDestinationRef::Root(name) => {
+            writer.u8(CreateDestinationTag::Root as u8)?;
+            writer.bytes_with_length(name.as_bytes())?;
+        }
+        CreateDestinationRef::Child(parent) => {
+            writer.u8(CreateDestinationTag::Child as u8)?;
+            encode_value_into(parent.as_value(), writer)?;
+        }
+    }
+    encode_field_list_into(payload.constructor_fields, writer)
+}
+
 fn encode_batch_success_into(
     success: BatchSuccess<'_>,
     submitted_operation_count: u16,
@@ -2170,6 +2345,34 @@ fn validate_field_list_structure(fields: FieldList<'_>) -> Result<(), CodecError
         validate_value_structure(field.value)?;
     }
     Ok(())
+}
+
+fn validate_create_payload_structure(payload: CreatePayload<'_>) -> Result<(), CodecError> {
+    if payload.batch_ref == 0 {
+        return Err(CodecError::InvalidFrame);
+    }
+    require_nonzero(payload.type_id)?;
+    match payload.destination {
+        CreateDestinationRef::Root(name) => {
+            let _ = u32::try_from(name.len()).map_err(|_| CodecError::InvalidFrame)?;
+        }
+        CreateDestinationRef::Child(parent) => validate_value_structure(parent.as_value())?,
+    }
+    validate_field_list_structure(payload.constructor_fields)
+}
+
+fn validate_create_payload_limits(
+    payload: CreatePayload<'_>,
+    limits: Limits,
+) -> Result<(), CodecError> {
+    match payload.destination {
+        CreateDestinationRef::Root(name) if name.len() > limits.max_text_bytes as usize => {
+            return Err(CodecError::LimitExceeded);
+        }
+        CreateDestinationRef::Root(_) | CreateDestinationRef::Child(_) => {}
+    }
+    validate_field_count(payload.constructor_fields, limits.max_items_per_command)?;
+    validate_field_list_payload_limits(payload.constructor_fields, limits)
 }
 
 fn validate_value_payload_limits(value: ValueRef<'_>, limits: Limits) -> Result<(), CodecError> {
@@ -2340,6 +2543,15 @@ fn validate_frame_item_limit(frame: FrameRef<'_>, maximum_items: u16) -> Result<
 fn nested_frame_error(error: CodecError) -> CodecError {
     match error {
         CodecError::Truncated => CodecError::InvalidFrame,
+        other => other,
+    }
+}
+
+fn nested_create_payload_error(error: CreatePayloadError) -> CreatePayloadError {
+    match error {
+        ObjectReferenceError::Codec(CodecError::Truncated) => {
+            ObjectReferenceError::Codec(CodecError::InvalidFrame)
+        }
         other => other,
     }
 }
