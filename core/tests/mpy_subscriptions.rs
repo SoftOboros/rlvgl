@@ -761,13 +761,36 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
         subscriptions.teardown_stage_child_first(stage.stage_id(), &[child]),
         Err(SubscriptionError::TeardownOrderIncomplete)
     );
-    let reports = subscriptions
-        .teardown_stage_child_first(stage.stage_id(), &[child, parent])
+    let mut prepared = subscriptions
+        .prepare_teardown_stage_child_first(stage.stage_id(), &[child, parent])
         .unwrap();
-    assert_eq!(reports[0].subscription_id, child_subscription);
-    assert_eq!(reports[1].subscription_id, parent_subscription);
-    assert_eq!(reports[0].event_id.get(), button::MPY_CLICKED_EVENT_ID);
+    assert_eq!(prepared.report_count(), 2);
+    assert!(!prepared.is_empty());
+    assert_eq!(prepared.reports()[0].subscription_id, child_subscription);
+    assert_eq!(prepared.reports()[1].subscription_id, parent_subscription);
+    assert_eq!(
+        prepared.reports()[0].event_id.get(),
+        button::MPY_CLICKED_EVENT_ID
+    );
+    assert_eq!(subscriptions.len(), 2);
+
+    let (committed, allocations, deallocations) = count_allocator_operations(|| {
+        let guard = subscriptions.prepare_teardown_commit(&mut prepared)?;
+        guard.commit();
+        Ok::<(), SubscriptionError>(())
+    });
+    assert_eq!(committed, Ok(()));
+    assert_eq!((allocations, deallocations), (0, 0));
     assert!(subscriptions.is_empty());
+    assert_eq!(prepared.report_count(), 2);
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| subscriptions.commit_teardown(&mut prepared));
+    assert_eq!(committed, Err(SubscriptionError::TeardownAlreadyCommitted));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| subscriptions.release_teardown(prepared));
+    assert_eq!(allocations, 0);
+    assert_eq!(deallocations, 1);
     assert_eq!(
         subscriptions
             .unsubscribe(stage.stage_id(), parent_identity, parent_subscription)
@@ -778,6 +801,53 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
         subscriptions.unsubscribe(stage.stage_id(), child_identity, child_subscription),
         Err(SubscriptionError::StaleSubscription)
     );
+}
+
+#[test]
+fn prepared_teardown_drop_rolls_back_and_revision_changes_make_it_stale() {
+    let mut stage = stage();
+    let actor = create_button(&mut stage);
+    let mut subscriptions =
+        SubscriptionRegistry::new(EndpointEpoch::new(11).unwrap(), subscription_limits(3, 3))
+            .unwrap();
+    let first = subscriptions
+        .subscribe(
+            &stage,
+            request(
+                stage.stage_id(),
+                actor,
+                button::MPY_CLICKED_EVENT_ID,
+                1,
+                PropagationPolicy::Observe,
+            ),
+        )
+        .unwrap();
+    let prepared = subscriptions
+        .prepare_teardown_objects_child_first(stage.stage_id(), &[actor.object_id])
+        .unwrap();
+    assert_eq!(prepared.report_count(), 1);
+    assert_eq!(subscriptions.len(), 1);
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| subscriptions.release_teardown(prepared));
+    assert_eq!((allocations, deallocations), (0, 1));
+    assert_eq!(subscriptions.len(), 1);
+
+    let mut prepared = subscriptions
+        .prepare_teardown_stage_child_first(stage.stage_id(), &[actor.object_id])
+        .unwrap();
+    assert!(matches!(
+        subscriptions
+            .unsubscribe(stage.stage_id(), actor, first)
+            .unwrap(),
+        UnsubscribeOutcome::Removed(_)
+    ));
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| subscriptions.commit_teardown(&mut prepared));
+    assert_eq!(committed, Err(SubscriptionError::StaleTeardown));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| subscriptions.release_teardown(prepared));
+    assert_eq!((allocations, deallocations), (0, 1));
 }
 
 const DUPLICATE_EVENT_CONTAINER: TypeDescriptor = TypeDescriptor {

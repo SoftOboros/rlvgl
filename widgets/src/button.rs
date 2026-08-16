@@ -233,7 +233,7 @@ impl MpyActor for Button {
         })
     }
 
-    fn commit(&mut self, prepared: String) {
-        self.set_text(prepared);
+    fn commit(&mut self, prepared: String) -> String {
+        self.label.replace_text(prepared)
     }
 }

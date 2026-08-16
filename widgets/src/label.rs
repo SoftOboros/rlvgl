@@ -63,6 +63,10 @@ impl Label {
         self.text = text.into();
     }
 
+    pub(crate) fn replace_text(&mut self, text: String) -> String {
+        core::mem::replace(&mut self.text, text)
+    }
+
     /// Retrieve the current label text.
     pub fn text(&self) -> &str {
         &self.text
@@ -229,7 +233,7 @@ impl MpyActor for Label {
         })
     }
 
-    fn commit(&mut self, prepared: String) {
-        self.set_text(prepared);
+    fn commit(&mut self, prepared: String) -> String {
+        self.replace_text(prepared)
     }
 }

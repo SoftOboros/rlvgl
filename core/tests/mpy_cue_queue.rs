@@ -25,10 +25,11 @@ struct TrackingAllocator;
 thread_local! {
     static TRACK_ALLOCATIONS: Cell<bool> = const { Cell::new(false) };
     static ALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
+    static DEALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
 }
 
 // SAFETY: every operation delegates unchanged layouts and pointers to the
-// process System allocator; thread-local bookkeeping observes allocation only.
+// process System allocator; thread-local bookkeeping only observes calls.
 unsafe impl GlobalAlloc for TrackingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
@@ -39,6 +40,9 @@ unsafe impl GlobalAlloc for TrackingAllocator {
     }
 
     unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+        if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+            let _ = DEALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+        }
         // SAFETY: both values came from the matching System allocation.
         unsafe { System.dealloc(pointer, layout) }
     }
@@ -65,6 +69,11 @@ unsafe impl GlobalAlloc for TrackingAllocator {
 static GLOBAL_ALLOCATOR: TrackingAllocator = TrackingAllocator;
 
 fn count_allocations<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    let (result, allocations, _) = count_allocator_operations(operation);
+    (result, allocations)
+}
+
+fn count_allocator_operations<T>(operation: impl FnOnce() -> T) -> (T, usize, usize) {
     struct TrackingGuard;
 
     impl Drop for TrackingGuard {
@@ -74,12 +83,14 @@ fn count_allocations<T>(operation: impl FnOnce() -> T) -> (T, usize) {
     }
 
     ALLOCATION_COUNT.with(|count| count.set(0));
+    DEALLOCATION_COUNT.with(|count| count.set(0));
     TRACK_ALLOCATIONS.with(|tracking| tracking.set(true));
     let guard = TrackingGuard;
     let result = operation();
     drop(guard);
-    let count = ALLOCATION_COUNT.with(Cell::get);
-    (result, count)
+    let allocations = ALLOCATION_COUNT.with(Cell::get);
+    let deallocations = DEALLOCATION_COUNT.with(Cell::get);
+    (result, allocations, deallocations)
 }
 
 fn limits(total: usize, reserve: usize, quota: usize) -> CueLimits {
@@ -703,6 +714,223 @@ fn reserved_enqueue_moves_preallocated_payload_without_allocating() {
 
     let drained = queue.drain(DrainBudget::new(1, usize::MAX)).unwrap();
     assert_eq!(drained.cues[0].payload().as_ptr(), payload_pointer);
+}
+
+#[test]
+fn exact_input_commit_is_infallible_and_retains_displaced_payloads() {
+    let mut queue = CueQueue::new(limits(6, 2, 4)).unwrap();
+    queue.enqueue(coalescible(1, 1, 1, 7, &[0xaa])).unwrap();
+    let mut prepared = queue
+        .prepare_exact_inputs(vec![
+            coalescible(1, 1, 2, 7, &[0xbb, 0xcc]),
+            cue_with_causality(1, 9, 3, 2, 2, CueDelivery::Critical, &[0xdd]),
+        ])
+        .unwrap();
+    assert_eq!(prepared.input_count(), 2);
+    assert_eq!(prepared.inputs().len(), 2);
+    assert!(!prepared.is_empty());
+
+    let (guard, allocations, deallocations) =
+        count_allocator_operations(|| queue.acquire_exact_commit(&mut prepared));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let guard = guard.unwrap();
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.commit());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert!(prepared.inputs().is_empty());
+    assert_eq!(queue.len(), 2);
+
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| queue.commit_exact_inputs(&mut prepared));
+    assert_eq!(
+        committed,
+        Err(CueQueueError::PreparedInputsAlreadyCommitted)
+    );
+    assert_eq!((allocations, deallocations), (0, 0));
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_exact_inputs(prepared));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 3);
+
+    let drained = queue.drain(DrainBudget::new(2, usize::MAX)).unwrap();
+    assert_eq!(drained.cues[0].first_sequence(), sequence(1));
+    assert_eq!(drained.cues[0].last_sequence(), sequence(2));
+    assert_eq!(drained.cues[0].merge_count(), 1);
+    assert_eq!(drained.cues[0].payload(), &[0xbb, 0xcc]);
+    assert_eq!(drained.cues[1].last_sequence(), sequence(3));
+}
+
+#[test]
+fn exact_input_stale_and_rollback_paths_leave_queue_state_explicit() {
+    let mut queue = CueQueue::new(limits(6, 2, 4)).unwrap();
+    let mut stale = queue
+        .prepare_exact_inputs(vec![cue_with_causality(
+            1,
+            9,
+            1,
+            1,
+            1,
+            CueDelivery::Critical,
+            &[1],
+        )])
+        .unwrap();
+    queue
+        .enqueue(cue_with_causality(
+            1,
+            9,
+            2,
+            2,
+            2,
+            CueDelivery::Critical,
+            &[2],
+        ))
+        .unwrap();
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| queue.commit_exact_inputs(&mut stale));
+    assert_eq!(committed, Err(CueQueueError::StalePreparedInputs));
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(stale.inputs().len(), 1);
+    assert_eq!(queue.len(), 1);
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| queue.release_exact_inputs(stale));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 3);
+
+    let mut rollback_queue = CueQueue::new(limits(4, 1, 3)).unwrap();
+    let rollback = rollback_queue
+        .prepare_exact_inputs(vec![cue(1, 1, CueDelivery::Critical, &[1])])
+        .unwrap();
+    let mut rollback = rollback;
+    assert!(rollback_queue.is_empty());
+    let (guard, allocations, deallocations) =
+        count_allocator_operations(|| rollback_queue.acquire_exact_commit(&mut rollback));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let ((), allocations, deallocations) = count_allocator_operations(|| guard.unwrap().rollback());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(rollback.inputs().len(), 1);
+    assert!(rollback_queue.is_empty());
+    let ((), allocations, deallocations) =
+        count_allocator_operations(|| rollback_queue.release_exact_inputs(rollback));
+    assert_eq!(allocations, 0);
+    assert!(deallocations >= 3);
+    assert!(rollback_queue.is_empty());
+    assert_eq!(
+        rollback_queue.enqueue(cue(1, 1, CueDelivery::Critical, &[1])),
+        Ok(EnqueueOutcome::Queued {
+            sequence: sequence(1),
+        })
+    );
+}
+
+#[test]
+fn exact_preflight_rejects_full_batch_validation_matrix_without_queue_mutation() {
+    let queue = CueQueue::new(limits(3, 1, 2)).unwrap();
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![CueInput::new(
+            CueIdentity::new(
+                StageId::new(1).unwrap(),
+                ObjectId::new((1_u64 << 32) | 1).unwrap(),
+                SubscriptionId::new(1).unwrap(),
+                CallbackId::new(1).unwrap(),
+                EventId::new(1).unwrap(),
+            ),
+            StageRevision::new(1),
+            NativeEventSequence::new(1).unwrap(),
+            CueDelivery::LatestValueCoalescible,
+            vec![1],
+        )]),
+        Err(CueQueueError::MissingCoalescingKey)
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            cue(1, 1, CueDelivery::Ordered, &[1]).with_coalescing_key(CoalescingKey::new(1))
+        ]),
+        Err(CueQueueError::UnexpectedCoalescingKey)
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![cue(1, 1, CueDelivery::Ordered, &[0; 65])]),
+        Err(CueQueueError::PayloadTooLarge {
+            actual: 65,
+            maximum: 64,
+        })
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            cue_with_causality(1, 2, 1, 1, 1, CueDelivery::Critical, &[1]),
+            cue_with_causality(1, 1, 2, 2, 2, CueDelivery::Critical, &[2]),
+        ]),
+        Err(CueQueueError::StageRevisionRegressed { .. })
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            cue_with_causality(1, 1, 2, 1, 1, CueDelivery::Critical, &[1]),
+            cue_with_causality(1, 1, 1, 2, 2, CueDelivery::Critical, &[2]),
+        ]),
+        Err(CueQueueError::NativeEventSequenceRegressed { .. })
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            coalescible(1, 1, 1, 9, &[1]),
+            coalescible(1, 1, 1, 9, &[2]),
+        ]),
+        Err(CueQueueError::NonMonotonicCoalescingEventSequence { .. })
+    ));
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![
+            cue(1, 1, CueDelivery::Critical, &[1]),
+            cue(1, 2, CueDelivery::Critical, &[2]),
+            cue(1, 3, CueDelivery::Critical, &[3]),
+            cue(1, 4, CueDelivery::Critical, &[4]),
+        ]),
+        Err(CueQueueError::AdmissionCapacity)
+    ));
+    assert!(queue.is_empty());
+}
+
+#[test]
+fn backpressure_permits_only_critical_count_and_exact_reservations() {
+    let stage = StageId::new(1).unwrap();
+    let mut queue = CueQueue::new(limits(5, 2, 3)).unwrap();
+    for event in 1..=3 {
+        queue
+            .enqueue(cue(1, event, CueDelivery::Ordered, &[event as u8]))
+            .unwrap();
+    }
+    assert!(matches!(
+        queue.enqueue(cue(1, 4, CueDelivery::Ordered, &[4])),
+        Err(CueQueueError::OrdinaryCapacityExhausted { .. })
+    ));
+    assert_eq!(queue.state(), CueEndpointState::Backpressured);
+    assert!(matches!(
+        queue.reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 1,
+            critical_slots: 0,
+        }),
+        Err(CueQueueError::AdmissionBackpressured)
+    ));
+    let mut critical = queue
+        .reserve(CueAdmission {
+            stage_id: stage,
+            ordinary_slots: 0,
+            critical_slots: 1,
+        })
+        .unwrap();
+    critical
+        .enqueue(cue(1, 5, CueDelivery::Critical, &[5]))
+        .unwrap();
+    critical.finish();
+
+    assert!(matches!(
+        queue.prepare_exact_inputs(vec![cue(1, 6, CueDelivery::Ordered, &[6])]),
+        Err(CueQueueError::AdmissionBackpressured)
+    ));
+    let mut prepared = queue
+        .prepare_exact_inputs(vec![cue(1, 6, CueDelivery::Critical, &[6])])
+        .unwrap();
+    queue.commit_exact_inputs(&mut prepared).unwrap();
+    queue.release_exact_inputs(prepared);
+    assert_eq!(queue.critical_len(), 2);
+    assert_eq!(queue.state(), CueEndpointState::Backpressured);
 }
 
 #[test]

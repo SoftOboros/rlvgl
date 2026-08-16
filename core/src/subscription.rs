@@ -295,6 +295,84 @@ pub enum UnsubscribeOutcome {
     AlreadyRemoved,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreparedTeardownState {
+    Prepared,
+    Committed,
+}
+
+/// Fallibly prepared, child-first subscription teardown transaction.
+///
+/// Preparation owns the exact ordered release reports but does not mutate the
+/// registry. The endpoint may inspect them and reserve Critical release cues
+/// before committing a Stage batch, then call
+/// [`SubscriptionRegistry::commit_teardown`] allocation-free afterward.
+pub struct PreparedSubscriptionTeardown {
+    endpoint_epoch: EndpointEpoch,
+    registry_revision: u64,
+    next_revision: Option<u64>,
+    reports: Vec<TeardownReport>,
+    state: PreparedTeardownState,
+}
+
+impl PreparedSubscriptionTeardown {
+    /// Return the exact number of subscriptions that commit will remove.
+    pub fn report_count(&self) -> usize {
+        self.reports.len()
+    }
+
+    /// Return exact callback-token reports in current child-first order.
+    pub fn reports(&self) -> &[TeardownReport] {
+        &self.reports
+    }
+
+    /// Return whether the prepared transaction has no matching subscriptions.
+    pub fn is_empty(&self) -> bool {
+        self.reports.is_empty()
+    }
+
+    fn into_reports(mut self) -> Vec<TeardownReport> {
+        core::mem::take(&mut self.reports)
+    }
+}
+
+/// Exclusively validated subscription teardown ready for infallible commit.
+///
+/// Construct this guard only after every release cue has been prepared and
+/// reserved. Holding it prevents subscription state from changing between the
+/// final freshness check and the Stage commit it accompanies.
+pub struct SubscriptionTeardownCommit<'a> {
+    registry: &'a mut SubscriptionRegistry,
+    prepared: &'a mut PreparedSubscriptionTeardown,
+}
+
+impl SubscriptionTeardownCommit<'_> {
+    /// Remove the prepared records and publish their tombstones infallibly.
+    ///
+    /// All revision, identity, and capacity checks ran before this guard was
+    /// created. The operation performs no allocation or deallocation.
+    pub fn commit(self) {
+        let Self { registry, prepared } = self;
+        for report in &prepared.reports {
+            registry.push_tombstone(Tombstone {
+                stage_id: report.stage_id,
+                actor_identity: report.actor_identity,
+                subscription_id: report.subscription_id,
+            });
+        }
+        registry.records.retain(|record| {
+            !prepared
+                .reports
+                .iter()
+                .any(|report| record_matches_report(record, report))
+        });
+        if let Some(revision) = prepared.next_revision {
+            registry.revision = revision;
+        }
+        prepared.state = PreparedTeardownState::Committed;
+    }
+}
+
 /// Subscription validation, capacity, identity, or adapter failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SubscriptionError {
@@ -324,6 +402,12 @@ pub enum SubscriptionError {
     StaleSubscription,
     /// Caller-supplied postorder omitted an actor that still has a matching record.
     TeardownOrderIncomplete,
+    /// A prepared teardown belongs to a different endpoint registry.
+    TeardownRegistryMismatch,
+    /// Subscription state changed after teardown preparation.
+    StaleTeardown,
+    /// The prepared teardown transaction was already committed.
+    TeardownAlreadyCommitted,
     /// Subscription state changed after observation preflight.
     StaleWorkspace,
     /// Completion facts do not match the reserved native observation.
@@ -886,33 +970,118 @@ impl SubscriptionRegistry {
 
     /// Remove selected actors' records in caller-supplied current child-first order.
     ///
-    /// Reports are fallibly reserved before any state change. Tombstones use
-    /// capacity reserved at construction, preserving exact-once token release.
+    /// This compatibility wrapper prepares and commits the same transaction
+    /// exposed by [`Self::prepare_teardown_objects_child_first`].
     pub fn teardown_objects_child_first(
         &mut self,
         stage_id: StageId,
         object_ids_child_first: &[ObjectId],
     ) -> Result<Vec<TeardownReport>, SubscriptionError> {
-        self.teardown_matching(object_ids_child_first, |record| {
+        let mut prepared =
+            self.prepare_teardown_objects_child_first(stage_id, object_ids_child_first)?;
+        self.commit_teardown(&mut prepared)?;
+        Ok(prepared.into_reports())
+    }
+
+    /// Prepare selected actors' exact reports without mutating registry state.
+    pub fn prepare_teardown_objects_child_first(
+        &self,
+        stage_id: StageId,
+        object_ids_child_first: &[ObjectId],
+    ) -> Result<PreparedSubscriptionTeardown, SubscriptionError> {
+        self.prepare_teardown_matching(object_ids_child_first, |record| {
             record.stage_id == stage_id
                 && object_ids_child_first.contains(&record.actor_identity.object_id)
         })
     }
 
     /// Remove every Stage record in caller-supplied current child-first order.
+    ///
+    /// This compatibility wrapper prepares and commits the same transaction
+    /// exposed by [`Self::prepare_teardown_stage_child_first`].
     pub fn teardown_stage_child_first(
         &mut self,
         stage_id: StageId,
         object_ids_child_first: &[ObjectId],
     ) -> Result<Vec<TeardownReport>, SubscriptionError> {
-        self.teardown_matching(object_ids_child_first, |record| record.stage_id == stage_id)
+        let mut prepared =
+            self.prepare_teardown_stage_child_first(stage_id, object_ids_child_first)?;
+        self.commit_teardown(&mut prepared)?;
+        Ok(prepared.into_reports())
     }
 
-    fn teardown_matching(
+    /// Prepare every Stage record in caller-supplied current child-first order.
+    pub fn prepare_teardown_stage_child_first(
+        &self,
+        stage_id: StageId,
+        object_ids_child_first: &[ObjectId],
+    ) -> Result<PreparedSubscriptionTeardown, SubscriptionError> {
+        self.prepare_teardown_matching(object_ids_child_first, |record| record.stage_id == stage_id)
+    }
+
+    /// Commit one prepared teardown without allocation or deallocation.
+    ///
+    /// The caller retains the preparation and its report storage until after
+    /// the Safe Turn. A successful commit removes each represented record and
+    /// enters its exact identity into the bounded completion window once.
+    pub fn commit_teardown(
         &mut self,
+        prepared: &mut PreparedSubscriptionTeardown,
+    ) -> Result<(), SubscriptionError> {
+        self.prepare_teardown_commit(prepared)?.commit();
+        Ok(())
+    }
+
+    /// Acquire the exclusive, fully validated commit guard for a preparation.
+    ///
+    /// The endpoint acquires this guard before committing the corresponding
+    /// Stage transaction. Once returned, [`SubscriptionTeardownCommit::commit`]
+    /// cannot fail or allocate.
+    pub fn prepare_teardown_commit<'a>(
+        &'a mut self,
+        prepared: &'a mut PreparedSubscriptionTeardown,
+    ) -> Result<SubscriptionTeardownCommit<'a>, SubscriptionError> {
+        if prepared.state != PreparedTeardownState::Prepared {
+            return Err(SubscriptionError::TeardownAlreadyCommitted);
+        }
+        if prepared.endpoint_epoch != self.endpoint_epoch {
+            return Err(SubscriptionError::TeardownRegistryMismatch);
+        }
+        if prepared.registry_revision != self.revision {
+            return Err(SubscriptionError::StaleTeardown);
+        }
+        let matching_records = self
+            .records
+            .iter()
+            .filter(|record| {
+                prepared
+                    .reports
+                    .iter()
+                    .any(|report| record_matches_report(record, report))
+            })
+            .count();
+        if matching_records != prepared.reports.len() {
+            return Err(SubscriptionError::StaleTeardown);
+        }
+        Ok(SubscriptionTeardownCommit {
+            registry: self,
+            prepared,
+        })
+    }
+
+    /// Release an uncommitted or committed preparation outside the Safe Turn.
+    ///
+    /// Releasing an uncommitted preparation is the rollback path: the registry
+    /// remains unchanged because preparation never mutates it.
+    pub fn release_teardown(&self, prepared: PreparedSubscriptionTeardown) {
+        drop(prepared);
+    }
+
+    fn prepare_teardown_matching(
+        &self,
         object_ids_child_first: &[ObjectId],
         matches: impl Fn(&SubscriptionRecord) -> bool,
-    ) -> Result<Vec<TeardownReport>, SubscriptionError> {
+    ) -> Result<PreparedSubscriptionTeardown, SubscriptionError> {
         let count = self.records.iter().filter(|record| matches(record)).count();
         let mut reports: Vec<TeardownReport> = Vec::new();
         reports
@@ -935,19 +1104,17 @@ impl SubscriptionRegistry {
         if reports.len() != count {
             return Err(SubscriptionError::TeardownOrderIncomplete);
         }
-        if !reports.is_empty() {
-            let revision = self.next_revision()?;
-            for report in &reports {
-                self.push_tombstone(Tombstone {
-                    stage_id: report.stage_id,
-                    actor_identity: report.actor_identity,
-                    subscription_id: report.subscription_id,
-                });
-            }
-            self.records.retain(|record| !matches(record));
-            self.revision = revision;
-        }
-        Ok(reports)
+        Ok(PreparedSubscriptionTeardown {
+            endpoint_epoch: self.endpoint_epoch,
+            registry_revision: self.revision,
+            next_revision: if reports.is_empty() {
+                None
+            } else {
+                Some(self.next_revision()?)
+            },
+            reports,
+            state: PreparedTeardownState::Prepared,
+        })
     }
 
     fn validate_actor(
@@ -1031,4 +1198,12 @@ fn descriptor_reservation_matches(
 ) -> bool {
     record.event_id.get() == descriptor.id
         && reservation_matches(record, stage_id, actor_identity, phase, event)
+}
+
+fn record_matches_report(record: &SubscriptionRecord, report: &TeardownReport) -> bool {
+    record.stage_id == report.stage_id
+        && record.actor_identity == report.actor_identity
+        && record.subscription_id == report.subscription_id
+        && record.event_id == report.event_id
+        && record.callback_id == report.callback_id
 }

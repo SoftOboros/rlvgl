@@ -342,9 +342,9 @@ impl MpyActor for Slider {
         })
     }
 
-    fn commit(&mut self, (min, max, value): Self::Prepared) {
-        self.min = min;
-        self.max = max;
-        self.value = value;
+    fn commit(&mut self, prepared: Self::Prepared) -> Self::Prepared {
+        let retired = (self.min, self.max, self.value);
+        (self.min, self.max, self.value) = prepared;
+        retired
     }
 }

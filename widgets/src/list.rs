@@ -412,9 +412,10 @@ impl MpyActor for List {
         })
     }
 
-    fn commit(&mut self, (items, selected): Self::Prepared) {
-        self.items = items;
-        self.selected = selected;
+    fn commit(&mut self, (items, selected): Self::Prepared) -> Self::Prepared {
+        let items = core::mem::replace(&mut self.items, items);
+        let selected = core::mem::replace(&mut self.selected, selected);
+        (items, selected)
     }
 }
 

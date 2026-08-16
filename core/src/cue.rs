@@ -671,6 +671,19 @@ impl CueRecord {
         self.payload = input.payload;
     }
 
+    fn replace_with_retained_payload(
+        &mut self,
+        mut input: CueInput,
+        sequence: CueSequence,
+    ) -> Vec<u8> {
+        debug_assert!(self.exact_coalescing_key_matches(&input));
+        self.last_sequence = sequence;
+        self.last_native_event_sequence = input.native_event_sequence;
+        self.merge_count += 1;
+        core::mem::swap(&mut self.payload, &mut input.payload);
+        input.payload
+    }
+
     /// Return the owning Stage.
     pub const fn stage_id(&self) -> StageId {
         self.stage_id
@@ -1128,6 +1141,12 @@ pub enum CueQueueError {
     ReservationStageMismatch,
     /// A reservation has no remaining slot for the offered delivery class.
     ReservationClassExhausted,
+    /// Queue state changed after exact-input preparation.
+    StalePreparedInputs,
+    /// The exact-input transaction was already committed.
+    PreparedInputsAlreadyCommitted,
+    /// The internal exact-transaction revision can no longer advance.
+    MutationRevisionExhausted,
     /// A latest-value coalescible cue omitted its exact-key discriminator.
     MissingCoalescingKey,
     /// A Critical or Ordered cue supplied a coalescing discriminator.
@@ -1325,6 +1344,7 @@ pub struct DrainedEndpointRecords {
 /// One endpoint-owned sequence-ordered cue queue.
 pub struct CueQueue {
     limits: CueLimits,
+    mutation_revision: u64,
     records: VecDeque<EndpointRecord>,
     stage_causality: Vec<StageCausality>,
     last_native_event_sequence: Option<NativeEventSequence>,
@@ -1346,6 +1366,127 @@ pub struct CueReservation<'a> {
     stage_id: StageId,
     remaining_ordinary: usize,
     remaining_critical: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreparedInputsState {
+    Prepared,
+    Committed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PreparedCueAction {
+    Queue { sequence: CueSequence },
+    Coalesce { sequence: CueSequence },
+}
+
+/// Fully validated exact cue inputs retained across one Safe Turn.
+///
+/// Preparation validates the inputs in caller order against both current and
+/// earlier prepared records. Commit then performs only infallible planned
+/// moves after checking that the queue has not changed.
+pub struct PreparedCueInputs {
+    queue_revision: u64,
+    input_count: usize,
+    inputs: Vec<CueInput>,
+    actions: Vec<PreparedCueAction>,
+    retired_payloads: Vec<Vec<u8>>,
+    state: PreparedInputsState,
+}
+
+/// Exclusive, fully validated exact-input commit capability.
+///
+/// Acquisition happens before Stage mutation and prevents any intervening
+/// queue mutation. Consuming the guard commits the retained inputs infallibly.
+pub struct ExactCueCommit<'a> {
+    queue: &'a mut CueQueue,
+    prepared: &'a mut PreparedCueInputs,
+}
+
+impl ExactCueCommit<'_> {
+    /// Commit every prepared input without allocation, deallocation, or error.
+    pub fn commit(self) {
+        self.queue.commit_exact_inputs_infallible(self.prepared);
+    }
+
+    /// Release the exclusive guard without changing queue or prepared state.
+    pub fn rollback(self) {}
+}
+
+impl PreparedCueInputs {
+    /// Return the exact number of validated inputs in this transaction.
+    pub const fn input_count(&self) -> usize {
+        self.input_count
+    }
+
+    /// Borrow the fully formed inputs before they are moved during commit.
+    pub fn inputs(&self) -> &[CueInput] {
+        &self.inputs
+    }
+
+    /// Return whether no cue input is represented by this transaction.
+    pub const fn is_empty(&self) -> bool {
+        self.input_count == 0
+    }
+}
+
+#[derive(Clone, Copy)]
+struct VirtualCueTail {
+    stage_id: StageId,
+    stage_revision: StageRevision,
+    native_event_sequence: NativeEventSequence,
+    object_id: ObjectId,
+    subscription_id: SubscriptionId,
+    callback_id: CallbackId,
+    event_id: EventId,
+    delivery: CueDelivery,
+    coalescing_key: Option<CoalescingKey>,
+    flags: u32,
+}
+
+impl VirtualCueTail {
+    fn from_record(record: &CueRecord) -> Self {
+        Self {
+            stage_id: record.stage_id,
+            stage_revision: record.stage_revision,
+            native_event_sequence: record.last_native_event_sequence,
+            object_id: record.object_id,
+            subscription_id: record.subscription_id,
+            callback_id: record.callback_id,
+            event_id: record.event_id,
+            delivery: record.delivery,
+            coalescing_key: record.coalescing_key,
+            flags: record.flags,
+        }
+    }
+
+    fn from_input(input: &CueInput) -> Self {
+        Self {
+            stage_id: input.stage_id,
+            stage_revision: input.stage_revision,
+            native_event_sequence: input.native_event_sequence,
+            object_id: input.object_id,
+            subscription_id: input.subscription_id,
+            callback_id: input.callback_id,
+            event_id: input.event_id,
+            delivery: input.delivery,
+            coalescing_key: input.coalescing_key,
+            flags: input.flags,
+        }
+    }
+
+    fn exact_coalescing_key_matches(self, input: &CueInput) -> bool {
+        self.delivery == CueDelivery::LatestValueCoalescible
+            && input.delivery == CueDelivery::LatestValueCoalescible
+            && self.stage_id == input.stage_id
+            && self.stage_revision == input.stage_revision
+            && self.object_id == input.object_id
+            && self.subscription_id == input.subscription_id
+            && self.callback_id == input.callback_id
+            && self.event_id == input.event_id
+            && self.coalescing_key == input.coalescing_key
+            && self.flags == input.flags
+    }
 }
 
 impl CueReservation<'_> {
@@ -1408,6 +1549,7 @@ impl CueQueue {
 
         Ok(Self {
             limits,
+            mutation_revision: 1,
             records,
             stage_causality,
             last_native_event_sequence: None,
@@ -1478,10 +1620,10 @@ impl CueQueue {
     ) -> Result<CueReservation<'_>, CueQueueError> {
         match self.state {
             CueEndpointState::Faulted => return Err(CueQueueError::Faulted),
-            CueEndpointState::Backpressured => {
+            CueEndpointState::Backpressured if admission.ordinary_slots != 0 => {
                 return Err(CueQueueError::AdmissionBackpressured);
             }
-            CueEndpointState::Ready => {}
+            CueEndpointState::Backpressured | CueEndpointState::Ready => {}
         }
 
         let total = admission
@@ -1529,6 +1671,202 @@ impl CueQueue {
         })
     }
 
+    /// Validate and retain an exact caller-owned input set before Stage mutation.
+    ///
+    /// Structural, causality, coalescing, quota, record-capacity, and sequence
+    /// checks are evaluated in input order, including the effects earlier
+    /// inputs would have on later inputs. No queue state changes on failure.
+    pub fn prepare_exact_inputs(
+        &self,
+        inputs: Vec<CueInput>,
+    ) -> Result<PreparedCueInputs, CueQueueError> {
+        if self.state == CueEndpointState::Faulted {
+            return Err(CueQueueError::Faulted);
+        }
+        if !inputs.is_empty() && self.mutation_revision == u64::MAX {
+            return Err(CueQueueError::MutationRevisionExhausted);
+        }
+        if self.state == CueEndpointState::Backpressured
+            && inputs.iter().any(|input| input.delivery.is_ordinary())
+        {
+            return Err(CueQueueError::AdmissionBackpressured);
+        }
+        self.validate_sequence_capacity(inputs.len())?;
+
+        let mut actions = Vec::new();
+        actions
+            .try_reserve_exact(inputs.len())
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let mut retired_payloads = Vec::new();
+        retired_payloads
+            .try_reserve_exact(inputs.len())
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        let mut virtual_causality = Vec::new();
+        virtual_causality
+            .try_reserve_exact(self.limits.total_slots)
+            .map_err(|_| CueQueueError::AllocationFailed)?;
+        virtual_causality.extend_from_slice(&self.stage_causality);
+
+        let mut virtual_records = self.records.len();
+        let mut virtual_ordinary = self.ordinary_records;
+        let mut virtual_last_native_sequence = self.last_native_event_sequence;
+        let mut virtual_tail = self
+            .records
+            .back()
+            .and_then(EndpointRecord::as_cue)
+            .map(VirtualCueTail::from_record);
+
+        for (index, input) in inputs.iter().enumerate() {
+            self.validate_input(input)?;
+            validate_virtual_causality(
+                &virtual_causality,
+                virtual_last_native_sequence,
+                self.limits.total_slots,
+                input,
+            )?;
+
+            let exact_tail_match =
+                virtual_tail.is_some_and(|tail| tail.exact_coalescing_key_matches(input));
+            if exact_tail_match {
+                let tail = virtual_tail.expect("exact virtual tail checked above");
+                if input.native_event_sequence <= tail.native_event_sequence {
+                    return Err(CueQueueError::NonMonotonicCoalescingEventSequence {
+                        previous: tail.native_event_sequence,
+                        offered: input.native_event_sequence,
+                    });
+                }
+            }
+
+            let sequence = self.sequence_at_offset(index);
+            let action = if exact_tail_match {
+                PreparedCueAction::Coalesce { sequence }
+            } else {
+                if input.delivery.is_ordinary() {
+                    if virtual_ordinary >= self.limits.ordinary_capacity()
+                        || virtual_records >= self.limits.total_slots
+                    {
+                        return Err(CueQueueError::AdmissionCapacity);
+                    }
+                    let planned_for_stage = inputs[..index]
+                        .iter()
+                        .zip(&actions)
+                        .filter(|(planned, action)| {
+                            planned.stage_id == input.stage_id
+                                && planned.delivery.is_ordinary()
+                                && matches!(action, PreparedCueAction::Queue { .. })
+                        })
+                        .count();
+                    if self
+                        .ordinary_for_stage(input.stage_id)
+                        .checked_add(planned_for_stage)
+                        .is_none_or(|count| count >= self.limits.per_stage_ordinary_quota)
+                    {
+                        return Err(CueQueueError::AdmissionStageQuota {
+                            stage_id: input.stage_id,
+                        });
+                    }
+                    virtual_ordinary += 1;
+                } else if virtual_records >= self.limits.total_slots {
+                    return Err(CueQueueError::AdmissionCapacity);
+                }
+                virtual_records += 1;
+                PreparedCueAction::Queue { sequence }
+            };
+
+            record_virtual_causality(&mut virtual_causality, input);
+            virtual_last_native_sequence = Some(input.native_event_sequence);
+            virtual_tail = Some(VirtualCueTail::from_input(input));
+            actions.push(action);
+        }
+
+        Ok(PreparedCueInputs {
+            queue_revision: self.mutation_revision,
+            input_count: inputs.len(),
+            inputs,
+            actions,
+            retired_payloads,
+            state: PreparedInputsState::Prepared,
+        })
+    }
+
+    /// Acquire an exclusive exact-input commit guard before Stage mutation.
+    ///
+    /// This is the last fallible step: it validates transaction state and queue
+    /// freshness, then prevents any queue mutation until the guard is committed
+    /// or dropped as a rollback.
+    pub fn acquire_exact_commit<'a>(
+        &'a mut self,
+        prepared: &'a mut PreparedCueInputs,
+    ) -> Result<ExactCueCommit<'a>, CueQueueError> {
+        if prepared.state != PreparedInputsState::Prepared {
+            return Err(CueQueueError::PreparedInputsAlreadyCommitted);
+        }
+        if prepared.queue_revision != self.mutation_revision {
+            return Err(CueQueueError::StalePreparedInputs);
+        }
+        if prepared.input_count != 0 && self.mutation_revision == u64::MAX {
+            return Err(CueQueueError::MutationRevisionExhausted);
+        }
+        Ok(ExactCueCommit {
+            queue: self,
+            prepared,
+        })
+    }
+
+    /// Compatibility wrapper that acquires and immediately commits the guard.
+    pub fn commit_exact_inputs(
+        &mut self,
+        prepared: &mut PreparedCueInputs,
+    ) -> Result<(), CueQueueError> {
+        self.acquire_exact_commit(prepared)?.commit();
+        Ok(())
+    }
+
+    fn commit_exact_inputs_infallible(&mut self, prepared: &mut PreparedCueInputs) {
+        for action in prepared.actions.iter().copied().take(prepared.input_count) {
+            let input = prepared.inputs.remove(0);
+            let sequence = match action {
+                PreparedCueAction::Queue { sequence }
+                | PreparedCueAction::Coalesce { sequence } => sequence,
+            };
+            debug_assert_eq!(self.next_sequence, sequence.get());
+            self.record_causality(&input);
+            self.next_sequence = self.next_sequence.checked_add(1).unwrap_or(0);
+
+            match action {
+                PreparedCueAction::Queue { .. } => {
+                    if input.delivery.is_ordinary() {
+                        self.ordinary_records += 1;
+                    }
+                    self.records
+                        .push_back(EndpointRecord::Cue(CueRecord::from_input(input, sequence)));
+                }
+                PreparedCueAction::Coalesce { .. } => {
+                    let tail = self
+                        .records
+                        .back_mut()
+                        .and_then(EndpointRecord::as_cue_mut)
+                        .expect("prepared exact coalescing tail");
+                    debug_assert!(tail.exact_coalescing_key_matches(&input));
+                    let retired = tail.replace_with_retained_payload(input, sequence);
+                    prepared.retired_payloads.push(retired);
+                }
+            }
+        }
+        if prepared.input_count != 0 {
+            self.bump_mutation_revision();
+        }
+        prepared.state = PreparedInputsState::Committed;
+    }
+
+    /// Release prepared scratch and any displaced coalesced payloads.
+    ///
+    /// Releasing an uncommitted transaction is the rollback path and leaves
+    /// queue state unchanged.
+    pub fn release_exact_inputs(&self, prepared: PreparedCueInputs) {
+        drop(prepared);
+    }
+
     /// Admit one cue or merge it into an exact matching tail record.
     ///
     /// Every structurally valid emission receives an endpoint-wide sequence,
@@ -1566,6 +1904,7 @@ impl CueQueue {
 
         if input.delivery.is_ordinary() && self.state == CueEndpointState::Backpressured {
             self.record_loss(sequence);
+            self.bump_mutation_revision();
             return Err(CueQueueError::OrdinaryBackpressured { sequence });
         }
 
@@ -1576,11 +1915,13 @@ impl CueQueue {
                 .and_then(EndpointRecord::as_cue_mut)
                 .expect("cue tail checked above");
             tail.replace_with(input, sequence);
-            return Ok(EnqueueOutcome::Coalesced {
+            let outcome = EnqueueOutcome::Coalesced {
                 first_sequence: tail.first_sequence,
                 last_sequence: tail.last_sequence,
                 merge_count: tail.merge_count,
-            });
+            };
+            self.bump_mutation_revision();
+            return Ok(outcome);
         }
 
         if input.delivery.is_ordinary() {
@@ -1588,10 +1929,12 @@ impl CueQueue {
                 || self.records.len() >= self.limits.total_slots
             {
                 self.record_loss(sequence);
+                self.bump_mutation_revision();
                 return Err(CueQueueError::OrdinaryCapacityExhausted { sequence });
             }
             if self.ordinary_for_stage(input.stage_id) >= self.limits.per_stage_ordinary_quota {
                 self.record_loss(sequence);
+                self.bump_mutation_revision();
                 return Err(CueQueueError::StageQuotaExhausted {
                     sequence,
                     stage_id: input.stage_id,
@@ -1600,11 +1943,13 @@ impl CueQueue {
             self.ordinary_records += 1;
         } else if self.records.len() >= self.limits.total_slots {
             self.fault_critical_capacity(sequence, input.stage_id, input.event_id);
+            self.bump_mutation_revision();
             return Err(CueQueueError::CriticalCapacityExhausted { sequence });
         }
 
         self.records
             .push_back(EndpointRecord::Cue(CueRecord::from_input(input, sequence)));
+        self.bump_mutation_revision();
         Ok(EnqueueOutcome::Queued { sequence })
     }
 
@@ -1632,6 +1977,7 @@ impl CueQueue {
         let notice_sequence = self.allocate_sequence()?;
         if self.records.len() >= self.limits.total_slots {
             self.fault_critical_capacity(notice_sequence, input.stage_id, input.event_id);
+            self.bump_mutation_revision();
             return Err(CueQueueError::CriticalCapacityExhausted {
                 sequence: notice_sequence,
             });
@@ -1646,6 +1992,7 @@ impl CueQueue {
         if self.pending_input_loss.is_none() {
             self.state = CueEndpointState::Ready;
         }
+        self.bump_mutation_revision();
         Ok(OverflowNoticeOutcome {
             loss,
             notice_sequence,
@@ -1689,6 +2036,7 @@ impl CueQueue {
         }
         self.last_input_sequence = Some(sequence);
         self.state = CueEndpointState::Backpressured;
+        self.bump_mutation_revision();
         Ok(self
             .pending_input_loss
             .expect("input loss was inserted or extended"))
@@ -1718,6 +2066,7 @@ impl CueQueue {
                 sequence: notice_sequence,
                 kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
             });
+            self.bump_mutation_revision();
             return Err(CueQueueError::CriticalNoticeCapacityExhausted {
                 sequence: notice_sequence,
                 kind: RUNTIME_NOTICE_INPUT_OVERFLOW,
@@ -1731,6 +2080,7 @@ impl CueQueue {
         if self.pending_loss.is_none() {
             self.state = CueEndpointState::Ready;
         }
+        self.bump_mutation_revision();
         Ok(InputOverflowNoticeOutcome {
             loss,
             notice_sequence,
@@ -1756,6 +2106,9 @@ impl CueQueue {
             !remove
         });
         self.ordinary_records -= removed.count;
+        if removed.count != 0 {
+            self.bump_mutation_revision();
+        }
         removed
     }
 
@@ -1791,6 +2144,7 @@ impl CueQueue {
             return Ok(false);
         };
         self.stage_causality.remove(position);
+        self.bump_mutation_revision();
         Ok(true)
     }
 
@@ -1824,6 +2178,9 @@ impl CueQueue {
         }
 
         debug_assert_eq!(frame_bytes, drain_bytes);
+        if drain_count != 0 {
+            self.bump_mutation_revision();
+        }
         Ok(DrainedCues { cues, frame_bytes })
     }
 
@@ -1856,6 +2213,9 @@ impl CueQueue {
         }
 
         debug_assert_eq!(frame_bytes, drain_bytes);
+        if drain_count != 0 {
+            self.bump_mutation_revision();
+        }
         Ok(DrainedEndpointRecords {
             records,
             frame_bytes,
@@ -1877,6 +2237,7 @@ impl CueQueue {
         self.pending_loss = None;
         self.pending_input_loss = None;
         self.emergency_fault = None;
+        self.bump_mutation_revision();
     }
 
     fn validate_input(&self, input: &CueInput) -> Result<(), CueQueueError> {
@@ -1936,6 +2297,16 @@ impl CueQueue {
     }
 
     fn preflight_sequence_capacity(&mut self, requested: usize) -> Result<(), CueQueueError> {
+        if self.validate_sequence_capacity(requested).is_ok() {
+            return Ok(());
+        }
+        self.state = CueEndpointState::Faulted;
+        self.emergency_fault = Some(EmergencyFault::SequenceExhausted);
+        self.bump_mutation_revision();
+        Err(CueQueueError::SequenceExhausted)
+    }
+
+    fn validate_sequence_capacity(&self, requested: usize) -> Result<(), CueQueueError> {
         if requested == 0 {
             return Ok(());
         }
@@ -1946,17 +2317,29 @@ impl CueQueue {
         };
         let requested = u64::try_from(requested).unwrap_or(u64::MAX);
         if requested > available {
-            self.state = CueEndpointState::Faulted;
-            self.emergency_fault = Some(EmergencyFault::SequenceExhausted);
             return Err(CueQueueError::SequenceExhausted);
         }
         Ok(())
+    }
+
+    fn sequence_at_offset(&self, offset: usize) -> CueSequence {
+        let offset = u32::try_from(offset).expect("sequence capacity validated");
+        CueSequence(
+            self.next_sequence
+                .checked_add(offset)
+                .expect("sequence capacity validated"),
+        )
+    }
+
+    fn bump_mutation_revision(&mut self) {
+        self.mutation_revision = self.mutation_revision.saturating_add(1);
     }
 
     fn allocate_sequence(&mut self) -> Result<CueSequence, CueQueueError> {
         if self.next_sequence == 0 {
             self.state = CueEndpointState::Faulted;
             self.emergency_fault = Some(EmergencyFault::SequenceExhausted);
+            self.bump_mutation_revision();
             return Err(CueQueueError::SequenceExhausted);
         }
 
@@ -1977,6 +2360,7 @@ impl CueQueue {
                 stage_id: input.stage_id,
                 event_id: input.event_id,
             });
+            self.bump_mutation_revision();
         }
         result
     }
@@ -2104,9 +2488,111 @@ impl CueQueue {
     }
 }
 
+fn validate_virtual_causality(
+    stage_causality: &[StageCausality],
+    last_native_event_sequence: Option<NativeEventSequence>,
+    stage_capacity: usize,
+    input: &CueInput,
+) -> Result<(), CueQueueError> {
+    if let Some(stage) = stage_causality
+        .iter()
+        .find(|stage| stage.stage_id == input.stage_id)
+    {
+        if input.stage_revision < stage.revision {
+            return Err(CueQueueError::StageRevisionRegressed {
+                stage_id: input.stage_id,
+                previous: stage.revision,
+                offered: input.stage_revision,
+            });
+        }
+    } else if stage_causality.len() >= stage_capacity {
+        return Err(CueQueueError::StageCausalityCapacityExhausted {
+            stage_id: input.stage_id,
+        });
+    }
+
+    if let Some(previous) =
+        last_native_event_sequence.filter(|previous| input.native_event_sequence < *previous)
+    {
+        return Err(CueQueueError::NativeEventSequenceRegressed {
+            previous,
+            offered: input.native_event_sequence,
+        });
+    }
+    Ok(())
+}
+
+fn record_virtual_causality(stage_causality: &mut Vec<StageCausality>, input: &CueInput) {
+    if let Some(stage) = stage_causality
+        .iter_mut()
+        .find(|stage| stage.stage_id == input.stage_id)
+    {
+        stage.revision = input.stage_revision;
+    } else {
+        stage_causality.push(StageCausality {
+            stage_id: input.stage_id,
+            revision: input.stage_revision,
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn critical_input(stage_id: StageId) -> CueInput {
+        CueInput::new(
+            CueIdentity::new(
+                stage_id,
+                ObjectId::new((1u64 << 32) | 1).unwrap(),
+                SubscriptionId::new(1).unwrap(),
+                CallbackId::new(1).unwrap(),
+                EventId::new(1).unwrap(),
+            ),
+            StageRevision::new(1),
+            NativeEventSequence::new(1).unwrap(),
+            CueDelivery::Critical,
+            Vec::new(),
+        )
+    }
+
+    #[test]
+    fn exact_preflight_checks_sequence_space_without_faulting_or_mutating() {
+        let limits = CueLimits::new(4, 1, 3, 0, CUE_FRAME_OVERHEAD_BYTES).unwrap();
+        let stage_id = StageId::new(1).unwrap();
+        let mut queue = CueQueue::new(limits).unwrap();
+        queue.next_sequence = u32::MAX;
+
+        assert!(matches!(
+            queue.prepare_exact_inputs(vec![critical_input(stage_id), critical_input(stage_id)]),
+            Err(CueQueueError::SequenceExhausted)
+        ));
+        assert!(queue.is_empty());
+        assert_eq!(queue.state(), CueEndpointState::Ready);
+
+        let prepared = queue
+            .prepare_exact_inputs(vec![critical_input(stage_id)])
+            .unwrap();
+        assert!(queue.is_empty());
+        queue.release_exact_inputs(prepared);
+        assert_eq!(queue.next_sequence, u32::MAX);
+    }
+
+    #[test]
+    fn exact_transaction_revision_never_wraps_or_revalidates_work() {
+        let limits = CueLimits::new(4, 1, 3, 0, CUE_FRAME_OVERHEAD_BYTES).unwrap();
+        let stage_id = StageId::new(1).unwrap();
+        let mut queue = CueQueue::new(limits).unwrap();
+        queue.mutation_revision = u64::MAX;
+
+        assert!(matches!(
+            queue.prepare_exact_inputs(vec![critical_input(stage_id)]),
+            Err(CueQueueError::MutationRevisionExhausted)
+        ));
+        assert!(queue.is_empty());
+        assert_eq!(queue.mutation_revision, u64::MAX);
+        assert_eq!(queue.state(), CueEndpointState::Ready);
+    }
 
     #[test]
     fn reservation_preflights_sequence_exhaustion_before_admission() {
@@ -2132,19 +2618,7 @@ mod tests {
 
         queue.reset_epoch();
         queue.next_sequence = u32::MAX;
-        let input = CueInput::new(
-            CueIdentity::new(
-                stage_id,
-                ObjectId::new((1u64 << 32) | 1).unwrap(),
-                SubscriptionId::new(1).unwrap(),
-                CallbackId::new(1).unwrap(),
-                EventId::new(1).unwrap(),
-            ),
-            StageRevision::new(1),
-            NativeEventSequence::new(1).unwrap(),
-            CueDelivery::Critical,
-            Vec::new(),
-        );
+        let input = critical_input(stage_id);
         let mut reservation = queue
             .reserve(CueAdmission {
                 stage_id,

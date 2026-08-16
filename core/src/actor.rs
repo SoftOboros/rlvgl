@@ -17,7 +17,7 @@ use crate::{
         SnapshotError, SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken,
         StageDirection, StageRevision,
     },
-    layout::{GridTrack, LayoutRole},
+    layout::{EngineConfig, GridTrack, LayoutRole, LayoutState},
     object::{DispatchPhase, ObjectEvent, ObjectFlags, ObjectNode, ObjectStates},
     widget::{Rect, Widget},
 };
@@ -44,12 +44,16 @@ struct ShadowActor {
     object_id: ObjectId,
     parent: Option<ObjectId>,
     children: Vec<ObjectId>,
+    max_children: usize,
     alive: bool,
 }
 
 struct TreeShadow {
     actors: Vec<ShadowActor>,
     roots: Vec<(String, ObjectId)>,
+    deleted_object_ids: Vec<ObjectId>,
+    delete_groups: Vec<Vec<ObjectId>>,
+    max_roots: usize,
     initial_root_text: i64,
     root_text_delta: i64,
 }
@@ -62,10 +66,13 @@ impl TreeShadow {
                 continue;
             };
             let object_id = ObjectId::from_parts(slot.generation, index as u32);
+            let children = registry.children(object_id)?;
+            let max_children = children.len();
             actors.push(ShadowActor {
                 object_id,
                 parent: record.parent,
-                children: registry.children(object_id)?,
+                children,
+                max_children,
                 alive: true,
             });
         }
@@ -86,6 +93,9 @@ impl TreeShadow {
         Ok(Self {
             actors,
             roots,
+            deleted_object_ids: Vec::new(),
+            delete_groups: Vec::new(),
+            max_roots: registry.roots.len(),
             initial_root_text,
             root_text_delta: 0,
         })
@@ -208,9 +218,16 @@ impl TreeShadow {
             }
             StageDirection::Delete { object_id } => {
                 self.remove_from_owner(*object_id)?;
+                let first_deleted = self.deleted_object_ids.len();
                 self.mark_deleted(*object_id)?;
+                self.delete_groups
+                    .push(self.deleted_object_ids[first_deleted..].to_vec());
             }
             _ => {}
+        }
+        self.max_roots = self.max_roots.max(self.roots.len());
+        for actor in &mut self.actors {
+            actor.max_children = actor.max_children.max(actor.children.len());
         }
         Ok(())
     }
@@ -237,6 +254,7 @@ impl TreeShadow {
             self.mark_deleted(child)?;
         }
         self.actor_mut(object_id)?.alive = false;
+        push_unique(&mut self.deleted_object_ids, object_id);
         Ok(())
     }
 
@@ -296,6 +314,32 @@ impl TreeShadow {
         }
         for child in &self.actor(object_id)?.children {
             self.validate_depth(registry, *child, depth + 1)?;
+        }
+        Ok(())
+    }
+
+    fn final_depths(&self) -> Result<Vec<(ObjectId, usize)>, RegistryError> {
+        let live_count = self.actors.iter().filter(|actor| actor.alive).count();
+        let mut depths = Vec::with_capacity(live_count);
+        for (_, root) in &self.roots {
+            self.collect_depths(*root, 1, &mut depths)?;
+        }
+        if depths.len() != live_count {
+            return Err(RegistryError::Internal);
+        }
+        Ok(depths)
+    }
+
+    fn collect_depths(
+        &self,
+        object_id: ObjectId,
+        depth: usize,
+        output: &mut Vec<(ObjectId, usize)>,
+    ) -> Result<(), RegistryError> {
+        let actor = self.actor(object_id)?;
+        output.push((object_id, depth));
+        for child in &actor.children {
+            self.collect_depths(*child, depth + 1, output)?;
         }
         Ok(())
     }
@@ -402,6 +446,23 @@ fn push_rect_unique(values: &mut Vec<Rect>, value: Rect) {
     if !values.contains(&value) {
         values.push(value);
     }
+}
+
+fn prepared_layout_state(
+    requested: &RequestedLayout,
+    current: (bool, Option<Rect>),
+) -> Option<Box<LayoutState>> {
+    let role = match requested {
+        RequestedLayout::None => return None,
+        RequestedLayout::Flex(config) => LayoutRole::Container(EngineConfig::Flex(config.clone())),
+        RequestedLayout::Grid(config) => LayoutRole::Container(EngineConfig::Grid(config.clone())),
+        RequestedLayout::Item(hints) => LayoutRole::Item(hints.clone()),
+    };
+    Some(Box::new(LayoutState {
+        role,
+        computed: current.0.then_some(current.1).flatten(),
+        layout_dirty: true,
+    }))
 }
 
 fn validate_property_constraint(
@@ -1085,7 +1146,9 @@ impl<'a> ConstructorArgs<'a> {
 /// Actor-local MPY preparation implemented beside each native widget.
 ///
 /// `prepare` may validate and allocate. `commit` must only swap prepared state
-/// into the actor and therefore cannot fail.
+/// into the actor and return the retired state without allocating, dropping its
+/// owned storage, or failing. The Stage transaction retains that retired value
+/// until its explicit post-commit release phase.
 pub trait MpyActor: Widget {
     /// Fully allocated actor-local state for one mutation group.
     type Prepared: 'static;
@@ -1112,8 +1175,8 @@ pub trait MpyActor: Widget {
         directions: &[ActorDirection],
     ) -> Result<ActorPreparation<Self::Prepared>, RegistryError>;
 
-    /// Infallibly publish state returned by [`prepare`](Self::prepare).
-    fn commit(&mut self, prepared: Self::Prepared);
+    /// Infallibly swap in prepared state and return the retired state.
+    fn commit(&mut self, prepared: Self::Prepared) -> Self::Prepared;
 }
 
 /// Prepared actor-local state plus its exact change in stage-owned text bytes.
@@ -1128,8 +1191,10 @@ pub struct ActorPreparation<T> {
 pub trait PreparedActorMutation {
     /// Exact change in stage-owned text bytes.
     fn text_delta(&self) -> i64;
-    /// Infallibly publish the prepared native state.
-    fn commit(self: Box<Self>);
+    /// Confirm the actor can be borrowed for a callback-free commit window.
+    fn ready(&self) -> bool;
+    /// Infallibly swap the prepared and retired native states in place.
+    fn commit(&mut self);
 }
 
 /// Type-erased operations retained beside an [`ObjectNode`].
@@ -1210,15 +1275,21 @@ impl<T: MpyActor + 'static> PreparedActorMutation for TypedPrepared<T> {
         self.text_delta
     }
 
-    fn commit(mut self: Box<Self>) {
+    fn ready(&self) -> bool {
+        self.actor.try_borrow_mut().is_ok()
+    }
+
+    fn commit(&mut self) {
         let prepared = self
             .prepared
             .take()
             .expect("prepared mutation consumed once");
-        self.actor
+        let retired = self
+            .actor
             .try_borrow_mut()
             .expect("atomic commit follows exclusive borrow preflight without callbacks")
             .commit(prepared);
+        self.prepared = Some(retired);
     }
 }
 
@@ -1561,6 +1632,135 @@ struct ActiveSnapshot {
 struct PreparedActorGroup {
     object_id: ObjectId,
     mutation: Box<dyn PreparedActorMutation>,
+    final_text_bytes: u32,
+}
+
+struct PreparedLayoutMutation {
+    object_id: ObjectId,
+    next: Option<Box<LayoutState>>,
+}
+
+/// Fully validated and allocation-reserved Stage transaction.
+///
+/// This value is tied to the Stage Revision observed by
+/// [`StageRegistry::prepare_batch`]. It owns every direction, actor-local
+/// preparation, tree scratch buffer, layout replacement, deletion identity,
+/// and lifecycle slot required by the callback-free commit window.
+pub struct PreparedStageBatch {
+    stage_id: StageId,
+    starting_revision: StageRevision,
+    next_revision: StageRevision,
+    directions: Vec<StageDirection>,
+    actor_groups: Vec<PreparedActorGroup>,
+    layout_mutations: Vec<PreparedLayoutMutation>,
+    final_usage: RegistryUsage,
+    before_geometry: Vec<(ObjectId, Rect)>,
+    geometry_scratch: Vec<(ObjectId, Rect)>,
+    invalidations: Vec<Rect>,
+    effects: MutationEffects,
+    touched: Vec<ObjectId>,
+    deleted_object_ids: Vec<ObjectId>,
+    delete_groups: Vec<Vec<ObjectId>>,
+    depth_updates: Vec<(ObjectId, usize)>,
+    child_capacities: Vec<(ObjectId, usize)>,
+    max_roots: usize,
+    lifecycle: Vec<PendingLifecycle>,
+    retired_records: Vec<ActorRecord>,
+    retired_root_names: Vec<String>,
+}
+
+impl PreparedStageBatch {
+    /// Return the Stage that owns this transaction.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the Stage Revision against which preparation was validated.
+    pub const fn starting_revision(&self) -> StageRevision {
+        self.starting_revision
+    }
+
+    /// Return the single revision that a successful commit will publish.
+    pub const fn next_revision(&self) -> StageRevision {
+        self.next_revision
+    }
+
+    /// Borrow exact unique deletion identities in child-first order.
+    pub fn deleted_object_ids(&self) -> &[ObjectId] {
+        &self.deleted_object_ids
+    }
+}
+
+impl core::fmt::Debug for PreparedStageBatch {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PreparedStageBatch")
+            .field("stage_id", &self.stage_id)
+            .field("starting_revision", &self.starting_revision)
+            .field("next_revision", &self.next_revision)
+            .field("direction_count", &self.directions.len())
+            .field("deleted_object_ids", &self.deleted_object_ids)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Successful Stage commit whose retained resources await explicit release.
+pub struct CommittedStageBatch {
+    revision: StageRevision,
+    prepared: Box<PreparedStageBatch>,
+}
+
+impl CommittedStageBatch {
+    /// Return the revision published by the commit.
+    pub const fn revision(&self) -> StageRevision {
+        self.revision
+    }
+
+    /// Borrow exact child-first identities retired by the commit.
+    pub fn deleted_object_ids(&self) -> &[ObjectId] {
+        &self.prepared.deleted_object_ids
+    }
+}
+
+impl core::fmt::Debug for CommittedStageBatch {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("CommittedStageBatch")
+            .field("revision", &self.revision)
+            .field("prepared", &self.prepared)
+            .finish()
+    }
+}
+
+/// Pre-mutation rejection of an owned prepared transaction.
+///
+/// The transaction remains owned by the error so returning a stale or busy
+/// result does not deallocate its prepared storage inside the commit window.
+pub struct PreparedBatchCommitError {
+    cause: RegistryError,
+    prepared: Box<PreparedStageBatch>,
+}
+
+impl PreparedBatchCommitError {
+    /// Return why the pre-mutation type-state guard rejected the commit.
+    pub const fn cause(&self) -> RegistryError {
+        self.cause
+    }
+
+    /// Recover the still-owned prepared transaction.
+    pub fn into_prepared(self) -> Box<PreparedStageBatch> {
+        self.prepared
+    }
+}
+
+impl core::fmt::Debug for PreparedBatchCommitError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("PreparedBatchCommitError")
+            .field("cause", &self.cause)
+            .field("prepared", &self.prepared)
+            .finish()
+    }
 }
 
 enum PendingLifecycle {
@@ -1587,6 +1787,39 @@ struct SlotReservation {
     append: bool,
 }
 
+/// Read-only deletion work discovered by a validated batch or Stage teardown.
+///
+/// Identifiers are unique and ordered exactly as native subtree retirement:
+/// children precede their parent, while sibling and root order is stable.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StageDeletionPreflight {
+    stage_id: StageId,
+    starting_revision: StageRevision,
+    deleted_object_ids: Vec<ObjectId>,
+}
+
+impl StageDeletionPreflight {
+    /// Return the Stage that produced this report.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the Stage Revision observed during validation.
+    pub const fn starting_revision(&self) -> StageRevision {
+        self.starting_revision
+    }
+
+    /// Borrow exact unique deletion identities in child-first order.
+    pub fn deleted_object_ids(&self) -> &[ObjectId] {
+        &self.deleted_object_ids
+    }
+
+    /// Return the exact number of deleted actor identities in the report.
+    pub fn deletion_count(&self) -> usize {
+        self.deleted_object_ids.len()
+    }
+}
+
 /// Compatibility-first owner of one stage's roots, actors, and generations.
 pub struct StageRegistry {
     stage_id: StageId,
@@ -1599,7 +1832,6 @@ pub struct StageRegistry {
     revision: StageRevision,
     snapshot: Option<ActiveSnapshot>,
     next_snapshot_token: u32,
-    pending_lifecycle: Vec<PendingLifecycle>,
     last_effects: MutationEffects,
     last_invalidations: Vec<Rect>,
 }
@@ -1631,7 +1863,6 @@ impl StageRegistry {
             revision: StageRevision::default(),
             snapshot: None,
             next_snapshot_token: 1,
-            pending_lifecycle: Vec::new(),
             last_effects: MutationEffects::NONE,
             last_invalidations: Vec::new(),
         })
@@ -1882,11 +2113,252 @@ impl StageRegistry {
             .ok_or(RegistryError::Internal)
     }
 
+    /// Validate a batch and report its exact actor deletions without mutation.
+    ///
+    /// This runs the same tree, descriptor, actor-state, resource, borrow, and
+    /// geometry preparation used by [`Self::apply_batch`]. The endpoint can
+    /// reserve child-first subscription-release cues from the returned report
+    /// before it permits the batch to mutate the Stage.
+    pub fn preflight_batch(
+        &self,
+        directions: &[StageDirection],
+    ) -> Result<StageDeletionPreflight, RegistryError> {
+        let prepared = self.build_prepared_batch(directions.to_vec())?;
+        Ok(StageDeletionPreflight {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            deleted_object_ids: prepared.deleted_object_ids,
+        })
+    }
+
+    /// Enumerate every live Stage actor in deterministic child-first order.
+    ///
+    /// This is a read-only teardown preflight: it neither publishes lifecycle
+    /// events nor deletes actors, advances the revision, or closes the Stage.
+    pub fn preflight_teardown(&self) -> Result<StageDeletionPreflight, RegistryError> {
+        self.ensure_active()?;
+        let mut deleted_object_ids = Vec::with_capacity(self.usage.actors);
+        for root in &self.roots {
+            collect_postorder_ids(&root.node, &mut deleted_object_ids)?;
+        }
+        if deleted_object_ids.len() != self.usage.actors {
+            return Err(RegistryError::Internal);
+        }
+        for (index, object_id) in deleted_object_ids.iter().enumerate() {
+            if deleted_object_ids[..index].contains(object_id) {
+                return Err(RegistryError::Internal);
+            }
+            self.record(*object_id)?;
+        }
+        Ok(StageDeletionPreflight {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            deleted_object_ids,
+        })
+    }
+
     /// Validate and publish an atomic group under one Stage Revision.
     pub fn apply_batch(
         &mut self,
         directions: &[StageDirection],
     ) -> Result<StageRevision, RegistryError> {
+        let prepared = self.prepare_batch(directions.to_vec())?;
+        let committed = self
+            .commit_prepared_batch(prepared)
+            .map_err(|error| error.cause())?;
+        let revision = committed.revision();
+        self.release_committed_batch(committed)?;
+        Ok(revision)
+    }
+
+    /// Validate an owned batch and reserve every commit-window buffer.
+    ///
+    /// Capacity-only reservations may grow native vectors, but preparation
+    /// does not change actor state, tree order, lifecycle, usage, or revision.
+    pub fn prepare_batch(
+        &mut self,
+        directions: Vec<StageDirection>,
+    ) -> Result<Box<PreparedStageBatch>, RegistryError> {
+        let mut prepared = self.build_prepared_batch(directions)?;
+        self.reserve_prepared_capacity(&mut prepared)?;
+        Ok(Box::new(prepared))
+    }
+
+    /// Publish a prepared batch under one callback-free Stage Revision.
+    ///
+    /// A rejected transaction is returned intact by
+    /// [`PreparedBatchCommitError`]. Once the pre-mutation revision, geometry,
+    /// and actor-borrow guard succeeds, the remaining path only moves or swaps
+    /// storage reserved by [`Self::prepare_batch`] and cannot return an error.
+    pub fn commit_prepared_batch(
+        &mut self,
+        mut prepared: Box<PreparedStageBatch>,
+    ) -> Result<CommittedStageBatch, PreparedBatchCommitError> {
+        let reject = |cause, prepared| PreparedBatchCommitError { cause, prepared };
+        if prepared.stage_id != self.stage_id {
+            return Err(reject(RegistryError::InvalidStage, prepared));
+        }
+        if !self.active {
+            return Err(reject(RegistryError::StageClosed, prepared));
+        }
+        if prepared.starting_revision != self.revision {
+            return Err(reject(RegistryError::BatchInvalid, prepared));
+        }
+        if prepared
+            .actor_groups
+            .iter()
+            .any(|group| !group.mutation.ready())
+        {
+            return Err(reject(RegistryError::DispatchBusy, prepared));
+        }
+        if let Err(cause) = self.capture_geometry_into(&mut prepared.geometry_scratch) {
+            return Err(reject(cause, prepared));
+        }
+        if prepared.geometry_scratch != prepared.before_geometry {
+            return Err(reject(RegistryError::BatchInvalid, prepared));
+        }
+        if let Err(cause) = self.preflight_after_geometry_borrows(&prepared) {
+            return Err(reject(cause, prepared));
+        }
+        prepared.geometry_scratch.clear();
+
+        for group in &mut prepared.actor_groups {
+            group.mutation.commit();
+            let slot = &mut self.slots[group.object_id.slot_index()];
+            debug_assert_eq!(slot.generation, group.object_id.generation());
+            slot.record
+                .as_mut()
+                .expect("prepared actor remains live until its tree direction")
+                .text_bytes = group.final_text_bytes;
+        }
+
+        let mut layout_index = 0usize;
+        let mut delete_index = 0usize;
+        let mut directions = core::mem::take(&mut prepared.directions);
+        for direction in &mut directions {
+            match direction {
+                StageDirection::SetFlag {
+                    object_id,
+                    flag,
+                    enabled,
+                } => self.commit_runtime_flag(*object_id, *flag, *enabled).expect(
+                    "prepared runtime flag remains descriptor-valid through callback-free commit",
+                ),
+                StageDirection::SetRequestedLayout { object_id, .. } => {
+                    let replacement = &mut prepared.layout_mutations[layout_index];
+                    debug_assert_eq!(replacement.object_id, *object_id);
+                    let node = self
+                        .node_mut(*object_id)
+                        .expect("prepared layout target remains live");
+                    core::mem::swap(&mut node.layout, &mut replacement.next);
+                    layout_index += 1;
+                }
+                StageDirection::Reparent {
+                    object_id,
+                    new_parent,
+                    index,
+                } => self.commit_prepared_reparent(
+                    *object_id,
+                    *new_parent,
+                    *index,
+                    &mut prepared,
+                ),
+                StageDirection::PromoteRoot {
+                    object_id,
+                    name,
+                    index,
+                } => {
+                    let owned_name = core::mem::take(name);
+                    self.commit_prepared_promote(
+                        *object_id,
+                        owned_name,
+                        *index,
+                        &mut prepared,
+                    );
+                }
+                StageDirection::Reorder { object_id, index } => {
+                    self.commit_prepared_reorder(*object_id, *index, &mut prepared)
+                }
+                StageDirection::Delete { object_id } => {
+                    let ids = core::mem::take(&mut prepared.delete_groups[delete_index]);
+                    self.commit_prepared_delete(*object_id, &ids, &mut prepared);
+                    prepared.delete_groups[delete_index] = ids;
+                    delete_index += 1;
+                }
+                StageDirection::MutateActor { .. } => {}
+                StageDirection::SetComputedGeometry { .. }
+                | StageDirection::SetLocalStyle { .. } => {
+                    unreachable!("unsupported directions cannot survive preparation")
+                }
+            }
+        }
+        prepared.directions = directions;
+        debug_assert_eq!(layout_index, prepared.layout_mutations.len());
+        debug_assert_eq!(delete_index, prepared.delete_groups.len());
+
+        for (object_id, depth) in &prepared.depth_updates {
+            let slot = &mut self.slots[object_id.slot_index()];
+            debug_assert_eq!(slot.generation, object_id.generation());
+            slot.record
+                .as_mut()
+                .expect("final shadow depth names a live actor")
+                .depth = *depth;
+        }
+        self.usage = prepared.final_usage;
+        self.revision = prepared.next_revision;
+        self.last_effects = prepared.effects;
+        self.capture_geometry_into(&mut prepared.geometry_scratch)
+            .expect("actor borrows were validated before callback-free commit");
+        self.derive_invalidations_into(
+            &prepared.before_geometry,
+            &prepared.geometry_scratch,
+            &prepared.touched,
+            prepared.effects.contains(MutationEffects::TREE)
+                || prepared.effects.contains(MutationEffects::LAYOUT),
+            &mut prepared.invalidations,
+        );
+        core::mem::swap(&mut self.last_invalidations, &mut prepared.invalidations);
+
+        Ok(CommittedStageBatch {
+            revision: self.revision,
+            prepared,
+        })
+    }
+
+    /// Publish retained lifecycle events and release transaction scratch.
+    ///
+    /// This explicit post-commit phase may invoke native lifecycle handlers
+    /// and deallocate the old actor/layout/tree state retained by the
+    /// [`CommittedStageBatch`].
+    pub fn release_committed_batch(
+        &mut self,
+        mut committed: CommittedStageBatch,
+    ) -> Result<(), RegistryError> {
+        if committed.prepared.stage_id != self.stage_id {
+            return Err(RegistryError::InvalidStage);
+        }
+        for event in committed.prepared.lifecycle.drain(..) {
+            match event {
+                PendingLifecycle::Detached(mut node) => node.emit_detached(),
+                PendingLifecycle::Attached(object_id) => {
+                    if let Ok(node) = self.node_mut(object_id) {
+                        node.emit_attached();
+                    }
+                }
+                PendingLifecycle::ChildChanged(object_id) => {
+                    if let Ok(node) = self.node_mut(object_id) {
+                        node.emit_child_changed();
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn build_prepared_batch(
+        &self,
+        directions: Vec<StageDirection>,
+    ) -> Result<PreparedStageBatch, RegistryError> {
         self.ensure_active()?;
         if directions.is_empty() {
             return Err(RegistryError::BatchInvalid);
@@ -1896,8 +2368,10 @@ impl StageRegistry {
         let mut tree_shadow = TreeShadow::capture(self)?;
         let mut effects = MutationEffects::NONE;
         let mut touched = Vec::new();
+        let mut layout_mutations = Vec::new();
+        let mut layout_presence: Vec<(ObjectId, bool, Option<Rect>)> = Vec::new();
 
-        for direction in directions {
+        for direction in &directions {
             match direction {
                 StageDirection::MutateActor {
                     object_id,
@@ -1937,6 +2411,35 @@ impl StageRegistry {
                 StageDirection::SetRequestedLayout { object_id, layout } => {
                     tree_shadow.actor(*object_id)?;
                     self.validate_requested_layout(*object_id, layout)?;
+                    let state = if let Some((_, present, computed)) = layout_presence
+                        .iter()
+                        .find(|(candidate, _, _)| candidate == object_id)
+                    {
+                        (*present, *computed)
+                    } else {
+                        self.node(*object_id)?
+                            .layout
+                            .as_deref()
+                            .map_or((false, None), |state| (true, state.computed))
+                    };
+                    let next = prepared_layout_state(layout, state);
+                    if let Some((_, present, computed)) = layout_presence
+                        .iter_mut()
+                        .find(|(candidate, _, _)| candidate == object_id)
+                    {
+                        *present = next.is_some();
+                        *computed = next.as_deref().and_then(|state| state.computed);
+                    } else {
+                        layout_presence.push((
+                            *object_id,
+                            next.is_some(),
+                            next.as_deref().and_then(|state| state.computed),
+                        ));
+                    }
+                    layout_mutations.push(PreparedLayoutMutation {
+                        object_id: *object_id,
+                        next,
+                    });
                     effects = effects
                         .union(MutationEffects::DRAW)
                         .union(MutationEffects::LAYOUT)
@@ -1964,19 +2467,25 @@ impl StageRegistry {
             }
         }
         tree_shadow.validate_final(self)?;
+        let depth_updates = tree_shadow.final_depths()?;
 
         let mut prepared = Vec::with_capacity(actor_groups.len());
         let mut total_text_delta = tree_shadow.root_text_delta;
         for (object_id, group) in actor_groups {
             let mutation = self.record(object_id)?.ops.prepare(&group)?;
-            total_text_delta = total_text_delta.checked_add(mutation.text_delta()).ok_or(
-                RegistryError::Capacity {
-                    kind: CapacityKind::TextBytes,
-                },
-            )?;
+            let final_text_bytes =
+                apply_text_delta(self.record(object_id)?.text_bytes, mutation.text_delta())?;
+            if !tree_shadow.deleted_object_ids.contains(&object_id) {
+                total_text_delta = total_text_delta.checked_add(mutation.text_delta()).ok_or(
+                    RegistryError::Capacity {
+                        kind: CapacityKind::TextBytes,
+                    },
+                )?;
+            }
             prepared.push(PreparedActorGroup {
                 object_id,
                 mutation,
+                final_text_bytes,
             });
         }
         let final_text = i64::from(self.usage.text_bytes)
@@ -1986,41 +2495,95 @@ impl StageRegistry {
                 kind: CapacityKind::TextBytes,
             })?;
         let before_geometry = self.capture_geometry()?;
-
-        for group in prepared {
-            let delta = group.mutation.text_delta();
-            group.mutation.commit();
-            let record = self.record_mut(group.object_id)?;
-            record.text_bytes = apply_text_delta(record.text_bytes, delta)?;
-            self.usage.text_bytes = apply_text_delta(self.usage.text_bytes, delta)?;
-        }
-        for direction in directions {
-            match direction {
-                StageDirection::SetFlag {
-                    object_id,
-                    flag,
-                    enabled,
-                } => self.commit_runtime_flag(*object_id, *flag, *enabled)?,
-                StageDirection::SetRequestedLayout { object_id, layout } => {
-                    self.commit_requested_layout(*object_id, layout.clone())?
-                }
-                StageDirection::Reparent { .. }
-                | StageDirection::PromoteRoot { .. }
-                | StageDirection::Reorder { .. }
-                | StageDirection::Delete { .. } => self.commit_tree_direction(direction)?,
-                _ => {}
-            }
-        }
-        debug_assert_eq!(u32::try_from(final_text).ok(), Some(self.usage.text_bytes));
-        self.revision = next_revision;
-        self.last_effects = effects;
-        self.last_invalidations = self.derive_invalidations(
-            &before_geometry,
-            &touched,
-            effects.contains(MutationEffects::TREE) || effects.contains(MutationEffects::LAYOUT),
-        )?;
-        self.publish_pending_lifecycle();
-        Ok(self.revision)
+        let deleted_resources =
+            tree_shadow
+                .deleted_object_ids
+                .iter()
+                .try_fold(0u16, |total, object_id| {
+                    total
+                        .checked_add(self.record(*object_id)?.resources)
+                        .ok_or(RegistryError::Internal)
+                })?;
+        let final_usage = RegistryUsage {
+            roots: tree_shadow.roots.len(),
+            actors: self
+                .usage
+                .actors
+                .checked_sub(tree_shadow.deleted_object_ids.len())
+                .ok_or(RegistryError::Internal)?,
+            text_bytes: u32::try_from(final_text).map_err(|_| RegistryError::Internal)?,
+            resources: self
+                .usage
+                .resources
+                .checked_sub(deleted_resources)
+                .ok_or(RegistryError::Internal)?,
+        };
+        let child_capacities = tree_shadow
+            .actors
+            .iter()
+            .map(|actor| (actor.object_id, actor.max_children))
+            .collect();
+        let mut geometry_scratch = Vec::new();
+        geometry_scratch
+            .try_reserve_exact(self.usage.actors)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut invalidations = Vec::new();
+        invalidations
+            .try_reserve_exact(
+                self.usage
+                    .actors
+                    .checked_mul(2)
+                    .ok_or(RegistryError::Internal)?,
+            )
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let lifecycle_capacity = directions
+            .len()
+            .checked_mul(3)
+            .ok_or(RegistryError::Internal)?;
+        let mut lifecycle = Vec::new();
+        lifecycle
+            .try_reserve_exact(lifecycle_capacity)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut retired_records = Vec::new();
+        retired_records
+            .try_reserve_exact(tree_shadow.deleted_object_ids.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Actors,
+            })?;
+        let mut retired_root_names = Vec::new();
+        retired_root_names
+            .try_reserve_exact(directions.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Roots,
+            })?;
+        Ok(PreparedStageBatch {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            next_revision,
+            directions,
+            actor_groups: prepared,
+            layout_mutations,
+            final_usage,
+            before_geometry,
+            geometry_scratch,
+            invalidations,
+            effects,
+            touched,
+            deleted_object_ids: tree_shadow.deleted_object_ids,
+            delete_groups: tree_shadow.delete_groups,
+            depth_updates,
+            child_capacities,
+            max_roots: tree_shadow.max_roots,
+            lifecycle,
+            retired_records,
+            retired_root_names,
+        })
     }
 
     /// Begin the minimum-profile single snapshot cursor.
@@ -2509,40 +3072,60 @@ impl StageRegistry {
         Ok(())
     }
 
-    fn commit_requested_layout(
+    fn reserve_prepared_capacity(
         &mut self,
-        object_id: ObjectId,
-        layout: RequestedLayout,
+        prepared: &mut PreparedStageBatch,
     ) -> Result<(), RegistryError> {
-        let node = self.node_mut(object_id)?;
-        match layout {
-            RequestedLayout::None => node.clear_requested_layout(),
-            RequestedLayout::Flex(config) => node.set_layout_flex(config),
-            RequestedLayout::Grid(config) => node.set_layout_grid(config),
-            RequestedLayout::Item(hints) => node.set_item_hints(hints),
+        let additional_roots = prepared.max_roots.saturating_sub(self.roots.len());
+        self.roots
+            .try_reserve_exact(additional_roots)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::Roots,
+            })?;
+        for (object_id, maximum) in &prepared.child_capacities {
+            let children = self.node_mut(*object_id)?.children_mut();
+            let additional = maximum.saturating_sub(children.len());
+            children
+                .try_reserve_exact(additional)
+                .map_err(|_| RegistryError::Capacity {
+                    kind: CapacityKind::Children,
+                })?;
         }
         Ok(())
     }
 
-    fn detach_for_tree(&mut self, object_id: ObjectId) -> Result<ObjectNode, RegistryError> {
-        let parent = self.record(object_id)?.parent;
+    fn detach_prepared(
+        &mut self,
+        object_id: ObjectId,
+        prepared: &mut PreparedStageBatch,
+    ) -> ObjectNode {
+        let parent = self
+            .record(object_id)
+            .expect("prepared tree object remains live")
+            .parent;
         if let Some(parent_id) = parent {
-            let parent_node = self.node_mut(parent_id)?;
-            let index = parent_node
-                .children()
-                .iter()
-                .position(|child| {
-                    child
-                        .actor_identity()
-                        .is_some_and(|identity| identity.object_id == object_id)
-                })
-                .ok_or(RegistryError::Internal)?;
-            let node = parent_node
-                .detach_child_quiet(index)
-                .ok_or(RegistryError::Internal)?;
-            self.pending_lifecycle
+            let node = {
+                let parent_node = self
+                    .node_mut(parent_id)
+                    .expect("prepared parent remains live");
+                let index = parent_node
+                    .children()
+                    .iter()
+                    .position(|child| {
+                        child
+                            .actor_identity()
+                            .is_some_and(|identity| identity.object_id == object_id)
+                    })
+                    .expect("prepared shadow preserves native child membership");
+                parent_node
+                    .detach_child_quiet(index)
+                    .expect("prepared child index is in range")
+            };
+            debug_assert!(prepared.lifecycle.len() < prepared.lifecycle.capacity());
+            prepared
+                .lifecycle
                 .push(PendingLifecycle::ChildChanged(parent_id));
-            Ok(node)
+            node
         } else {
             let index = self
                 .roots
@@ -2552,135 +3135,144 @@ impl StageRegistry {
                         .actor_identity()
                         .is_some_and(|identity| identity.object_id == object_id)
                 })
-                .ok_or(RegistryError::Internal)?;
-            let root = self.roots.remove(index);
-            self.usage.roots -= 1;
-            self.usage.text_bytes -= self.record(object_id)?.root_name_bytes;
-            let record = self.record_mut(object_id)?;
+                .expect("prepared shadow preserves native root membership");
+            let RootRecord { name, node } = self.roots.remove(index);
+            debug_assert!(
+                prepared.retired_root_names.len() < prepared.retired_root_names.capacity()
+            );
+            prepared.retired_root_names.push(name);
+            let record = self
+                .record_mut(object_id)
+                .expect("prepared root record remains live");
             record.text_bytes -= record.root_name_bytes;
             record.root_name_bytes = 0;
-            Ok(root.node)
+            node
         }
     }
 
-    fn commit_tree_direction(&mut self, direction: &StageDirection) -> Result<(), RegistryError> {
-        match direction {
-            StageDirection::Reparent {
-                object_id,
-                new_parent,
-                index,
-            } => {
-                let node = self.detach_for_tree(*object_id)?;
-                if !self.node_mut(*new_parent)?.insert_child_quiet(*index, node) {
-                    return Err(RegistryError::Internal);
-                }
-                self.record_mut(*object_id)?.parent = Some(*new_parent);
-                self.refresh_depths(*object_id, self.record(*new_parent)?.depth + 1)?;
-                self.pending_lifecycle
-                    .push(PendingLifecycle::Attached(*object_id));
-                self.pending_lifecycle
-                    .push(PendingLifecycle::ChildChanged(*new_parent));
-            }
-            StageDirection::PromoteRoot {
-                object_id,
-                name,
-                index,
-            } => {
-                let node = self.detach_for_tree(*object_id)?;
-                self.roots.insert(
-                    *index,
-                    RootRecord {
-                        name: name.clone(),
-                        node,
-                    },
-                );
-                let name_bytes = u32::try_from(name.len()).map_err(|_| RegistryError::Internal)?;
-                let record = self.record_mut(*object_id)?;
-                record.parent = None;
-                record.root_name_bytes = name_bytes;
-                record.text_bytes = record
-                    .text_bytes
-                    .checked_add(name_bytes)
-                    .ok_or(RegistryError::Internal)?;
-                self.usage.roots += 1;
-                self.usage.text_bytes = self
-                    .usage
-                    .text_bytes
-                    .checked_add(name_bytes)
-                    .ok_or(RegistryError::Internal)?;
-                self.refresh_depths(*object_id, 1)?;
-                self.pending_lifecycle
-                    .push(PendingLifecycle::Attached(*object_id));
-            }
-            StageDirection::Reorder { object_id, index } => {
-                let parent = self.record(*object_id)?.parent;
-                if let Some(parent) = parent {
-                    let parent_node = self.node_mut(parent)?;
-                    let old = parent_node
-                        .children()
-                        .iter()
-                        .position(|child| {
-                            child
-                                .actor_identity()
-                                .is_some_and(|identity| identity.object_id == *object_id)
-                        })
-                        .ok_or(RegistryError::Internal)?;
-                    let node = parent_node
-                        .detach_child_quiet(old)
-                        .ok_or(RegistryError::Internal)?;
-                    if !parent_node.insert_child_quiet(*index, node) {
-                        return Err(RegistryError::Internal);
-                    }
-                    self.pending_lifecycle
-                        .push(PendingLifecycle::ChildChanged(parent));
-                } else {
-                    let old = self.position(*object_id)?;
-                    let root = self.roots.remove(old);
-                    self.roots.insert(*index, root);
-                }
-            }
-            StageDirection::Delete { object_id } => {
-                let mut removed = self.detach_for_tree(*object_id)?;
-                let mut ids = Vec::new();
-                collect_postorder_ids(&removed, &mut ids)?;
-                for id in &ids {
-                    self.retire_slot(*id)?;
-                }
-                removed.set_detached_recursive(true);
-                self.pending_lifecycle
-                    .push(PendingLifecycle::Detached(removed));
-            }
-            _ => {}
-        }
-        Ok(())
+    fn commit_prepared_reparent(
+        &mut self,
+        object_id: ObjectId,
+        new_parent: ObjectId,
+        index: usize,
+        prepared: &mut PreparedStageBatch,
+    ) {
+        let node = self.detach_prepared(object_id, prepared);
+        let inserted = self
+            .node_mut(new_parent)
+            .expect("prepared destination remains live")
+            .insert_child_quiet(index, node);
+        debug_assert!(inserted);
+        self.record_mut(object_id)
+            .expect("prepared actor record remains live")
+            .parent = Some(new_parent);
+        debug_assert!(prepared.lifecycle.len() + 2 <= prepared.lifecycle.capacity());
+        prepared
+            .lifecycle
+            .push(PendingLifecycle::Attached(object_id));
+        prepared
+            .lifecycle
+            .push(PendingLifecycle::ChildChanged(new_parent));
     }
 
-    fn refresh_depths(&mut self, root: ObjectId, depth: usize) -> Result<(), RegistryError> {
-        self.record_mut(root)?.depth = depth;
-        let children = self.children(root)?;
-        for child in children {
-            self.refresh_depths(child, depth + 1)?;
-        }
-        Ok(())
+    fn commit_prepared_promote(
+        &mut self,
+        object_id: ObjectId,
+        name: String,
+        index: usize,
+        prepared: &mut PreparedStageBatch,
+    ) {
+        let node = self.detach_prepared(object_id, prepared);
+        debug_assert!(self.roots.len() < self.roots.capacity());
+        let name_bytes = u32::try_from(name.len()).expect("prepared root name fits text budget");
+        self.roots.insert(index, RootRecord { name, node });
+        let record = self
+            .record_mut(object_id)
+            .expect("prepared promoted actor remains live");
+        record.parent = None;
+        record.root_name_bytes = name_bytes;
+        record.text_bytes = record
+            .text_bytes
+            .checked_add(name_bytes)
+            .expect("prepared root text budget was validated");
+        debug_assert!(prepared.lifecycle.len() < prepared.lifecycle.capacity());
+        prepared
+            .lifecycle
+            .push(PendingLifecycle::Attached(object_id));
     }
 
-    fn publish_pending_lifecycle(&mut self) {
-        let pending = core::mem::take(&mut self.pending_lifecycle);
-        for event in pending {
-            match event {
-                PendingLifecycle::Detached(mut node) => node.emit_detached(),
-                PendingLifecycle::Attached(object_id) => {
-                    if let Ok(node) = self.node_mut(object_id) {
-                        node.emit_attached();
-                    }
-                }
-                PendingLifecycle::ChildChanged(object_id) => {
-                    if let Ok(node) = self.node_mut(object_id) {
-                        node.emit_child_changed();
-                    }
-                }
-            }
+    fn commit_prepared_reorder(
+        &mut self,
+        object_id: ObjectId,
+        index: usize,
+        prepared: &mut PreparedStageBatch,
+    ) {
+        let parent = self
+            .record(object_id)
+            .expect("prepared reordered actor remains live")
+            .parent;
+        if let Some(parent) = parent {
+            let parent_node = self
+                .node_mut(parent)
+                .expect("prepared reorder parent remains live");
+            let old = parent_node
+                .children()
+                .iter()
+                .position(|child| {
+                    child
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .expect("prepared shadow preserves reorder membership");
+            let node = parent_node
+                .detach_child_quiet(old)
+                .expect("prepared reorder index is in range");
+            let inserted = parent_node.insert_child_quiet(index, node);
+            debug_assert!(inserted);
+            debug_assert!(prepared.lifecycle.len() < prepared.lifecycle.capacity());
+            prepared
+                .lifecycle
+                .push(PendingLifecycle::ChildChanged(parent));
+        } else {
+            let old = self
+                .roots
+                .iter()
+                .position(|root| {
+                    root.node
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .expect("prepared shadow preserves root reorder membership");
+            let root = self.roots.remove(old);
+            self.roots.insert(index, root);
         }
+    }
+
+    fn commit_prepared_delete(
+        &mut self,
+        object_id: ObjectId,
+        ids: &[ObjectId],
+        prepared: &mut PreparedStageBatch,
+    ) {
+        let mut removed = self.detach_prepared(object_id, prepared);
+        removed.set_detached_recursive(true);
+        for id in ids {
+            let slot = &mut self.slots[id.slot_index()];
+            debug_assert_eq!(slot.generation, id.generation());
+            let record = slot
+                .record
+                .take()
+                .expect("prepared deletion identity remains live");
+            if slot.generation == u32::MAX {
+                slot.retired = true;
+            } else {
+                slot.generation += 1;
+            }
+            debug_assert!(prepared.retired_records.len() < prepared.retired_records.capacity());
+            prepared.retired_records.push(record);
+        }
+        debug_assert!(prepared.lifecycle.len() < prepared.lifecycle.capacity());
+        prepared.lifecycle.push(PendingLifecycle::Detached(removed));
     }
 
     fn snapshot_record(
@@ -2730,6 +3322,15 @@ impl StageRegistry {
 
     fn capture_geometry(&self) -> Result<Vec<(ObjectId, Rect)>, RegistryError> {
         let mut geometry = Vec::with_capacity(self.usage.actors);
+        self.capture_geometry_into(&mut geometry)?;
+        Ok(geometry)
+    }
+
+    fn capture_geometry_into(
+        &self,
+        geometry: &mut Vec<(ObjectId, Rect)>,
+    ) -> Result<(), RegistryError> {
+        geometry.clear();
         for (index, slot) in self.slots.iter().enumerate() {
             if slot.record.is_none() {
                 continue;
@@ -2739,19 +3340,50 @@ impl StageRegistry {
                 .node(object_id)?
                 .try_effective_bounds()
                 .ok_or(RegistryError::DispatchBusy)?;
+            debug_assert!(geometry.len() < geometry.capacity());
             geometry.push((object_id, bounds));
         }
-        Ok(geometry)
+        Ok(())
     }
 
-    fn derive_invalidations(
+    fn preflight_after_geometry_borrows(
+        &self,
+        prepared: &PreparedStageBatch,
+    ) -> Result<(), RegistryError> {
+        for (index, slot) in self.slots.iter().enumerate() {
+            let Some(record) = slot.record.as_ref() else {
+                continue;
+            };
+            let object_id = ObjectId::from_parts(slot.generation, index as u32);
+            if prepared.deleted_object_ids.contains(&object_id) {
+                continue;
+            }
+            let final_layout = if let Some(mutation) = prepared
+                .layout_mutations
+                .iter()
+                .rev()
+                .find(|mutation| mutation.object_id == object_id)
+            {
+                mutation.next.as_deref()
+            } else {
+                self.node(object_id)?.layout.as_deref()
+            };
+            if final_layout.and_then(|layout| layout.computed).is_none() {
+                record.ops.bounds()?;
+            }
+        }
+        Ok(())
+    }
+
+    fn derive_invalidations_into(
         &self,
         before: &[(ObjectId, Rect)],
+        after: &[(ObjectId, Rect)],
         touched: &[ObjectId],
         whole_stage: bool,
-    ) -> Result<Vec<Rect>, RegistryError> {
-        let after = self.capture_geometry()?;
-        let mut invalidations = Vec::new();
+        invalidations: &mut Vec<Rect>,
+    ) {
+        invalidations.clear();
         for (object_id, old) in before {
             let new = after
                 .iter()
@@ -2759,19 +3391,18 @@ impl StageRegistry {
                 .map(|(_, bounds)| *bounds);
             if whole_stage || touched.contains(object_id) || new.is_none() || new != Some(*old) {
                 push_rect_unique(
-                    &mut invalidations,
+                    invalidations,
                     new.map_or(*old, |new_bounds| old.union(new_bounds)),
                 );
             }
         }
-        for (object_id, bounds) in after {
+        for (object_id, bounds) in after.iter().copied() {
             if before.iter().all(|(candidate, _)| *candidate != object_id)
                 && (whole_stage || touched.contains(&object_id))
             {
-                push_rect_unique(&mut invalidations, bounds);
+                push_rect_unique(invalidations, bounds);
             }
         }
-        Ok(invalidations)
     }
 
     fn node_mut(&mut self, object_id: ObjectId) -> Result<&mut ObjectNode, RegistryError> {
@@ -3058,4 +3689,253 @@ fn collect_preorder_ids(node: &ObjectNode, ids: &mut Vec<ObjectId>) -> Result<()
         collect_preorder_ids(child, ids)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod prepared_geometry_tests {
+    use std::{
+        alloc::{GlobalAlloc, Layout, System},
+        cell::Cell,
+    };
+
+    use super::*;
+    use crate::event::Event;
+    use crate::layout::FlexConfig;
+    use crate::renderer::Renderer;
+
+    struct TrackingAllocator;
+
+    thread_local! {
+        static TRACK_ALLOCATIONS: Cell<bool> = const { Cell::new(false) };
+        static ALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
+        static DEALLOCATION_COUNT: Cell<usize> = const { Cell::new(0) };
+    }
+
+    // SAFETY: every operation delegates unchanged layouts and pointers to the
+    // process System allocator; thread-local bookkeeping only observes calls.
+    unsafe impl GlobalAlloc for TrackingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+                let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+            // SAFETY: `layout` is forwarded unchanged to the System allocator.
+            unsafe { System.alloc(layout) }
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+                let _ = DEALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+            // SAFETY: both values came from the matching System allocation.
+            unsafe { System.dealloc(pointer, layout) }
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+                let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+            // SAFETY: `layout` is forwarded unchanged to the System allocator.
+            unsafe { System.alloc_zeroed(layout) }
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            if TRACK_ALLOCATIONS.try_with(Cell::get).unwrap_or(false) {
+                let _ = ALLOCATION_COUNT.try_with(|count| count.set(count.get() + 1));
+            }
+            // SAFETY: the allocation and layout belong to System; `size` is
+            // the requested replacement size under GlobalAlloc's contract.
+            unsafe { System.realloc(pointer, layout, size) }
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL_ALLOCATOR: TrackingAllocator = TrackingAllocator;
+
+    const TEST_TYPE: TypeId = TypeId::registered(0x0001_ff01);
+    const TEST_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+        type_id: TEST_TYPE,
+        stable_name: "rlvgl_core::actor::tests::PreparedGeometryActor",
+        schema_revision: 1,
+        family: ActorFamily::Container,
+        capabilities: ActorCapabilities::STAGE_ROOT.union(ActorCapabilities::CHILDREN),
+        targets: TargetSet::ALL,
+        constructor_fields: &[ConstructorFieldDescriptor {
+            id: 1,
+            name: "bounds",
+            value_tag: ValueTag::Rect,
+            required: true,
+        }],
+        properties: &[],
+        actions: &[],
+        events: &[],
+        child_policy: ChildPolicy::AnyActor,
+        layout: LayoutCapabilities::FLEX_CONTAINER,
+        resource_cost: ResourceCost {
+            text_bytes: 0,
+            resources: 0,
+        },
+        constructor: construct_test_actor,
+    };
+    static TEST_CATALOG: [TypeDescriptor; 1] = [TEST_DESCRIPTOR];
+
+    struct TestActor {
+        bounds: Rect,
+    }
+
+    impl Widget for TestActor {
+        fn bounds(&self) -> Rect {
+            self.bounds
+        }
+
+        fn draw(&self, _renderer: &mut dyn Renderer) {}
+
+        fn handle_event(&mut self, _event: &Event) -> bool {
+            false
+        }
+    }
+
+    impl MpyActor for TestActor {
+        type Prepared = ();
+
+        fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+            Err(RegistryError::UnknownProperty { property_id: id })
+        }
+
+        fn prepare(
+            &self,
+            directions: &[ActorDirection],
+        ) -> Result<ActorPreparation<Self::Prepared>, RegistryError> {
+            if directions.is_empty() {
+                Ok(ActorPreparation {
+                    prepared: (),
+                    text_delta: 0,
+                })
+            } else {
+                Err(RegistryError::BatchInvalid)
+            }
+        }
+
+        fn commit(&mut self, (): Self::Prepared) {}
+    }
+
+    fn construct_test_actor(
+        arguments: ConstructorArgs<'_>,
+    ) -> Result<ConstructedActor, RegistryError> {
+        Ok(construct_native_actor(
+            TEST_TYPE,
+            TestActor {
+                bounds: arguments.required_rect(1)?,
+            },
+        ))
+    }
+
+    fn count_allocator_operations<T>(operation: impl FnOnce() -> T) -> (T, usize, usize) {
+        struct TrackingGuard;
+
+        impl Drop for TrackingGuard {
+            fn drop(&mut self) {
+                TRACK_ALLOCATIONS.with(|tracking| tracking.set(false));
+            }
+        }
+
+        ALLOCATION_COUNT.with(|count| count.set(0));
+        DEALLOCATION_COUNT.with(|count| count.set(0));
+        TRACK_ALLOCATIONS.with(|tracking| tracking.set(true));
+        let guard = TrackingGuard;
+        let result = operation();
+        drop(guard);
+        let allocations = ALLOCATION_COUNT.with(Cell::get);
+        let deallocations = DEALLOCATION_COUNT.with(Cell::get);
+        (result, allocations, deallocations)
+    }
+
+    fn registry() -> StageRegistry {
+        StageRegistry::new(
+            StageId::new(13).unwrap(),
+            &TEST_CATALOG,
+            RegistryLimits {
+                max_roots: 2,
+                max_actors: 4,
+                max_tree_depth: 4,
+                max_children_per_actor: 4,
+                max_text_bytes: 64,
+                max_resources: 4,
+            },
+        )
+        .unwrap()
+    }
+
+    fn create_container(registry: &mut StageRegistry) -> ObjectId {
+        registry
+            .create(
+                TEST_TYPE,
+                CreateDestination::Root { name: "main" },
+                &[ConstructorInput {
+                    id: 1,
+                    value: ValueRef::Rect {
+                        x: 0,
+                        y: 0,
+                        width: 20,
+                        height: 10,
+                    },
+                }],
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn computed_to_none_with_retained_widget_borrow_rejects_before_mutation() {
+        let mut registry = registry();
+        let root = create_container(&mut registry);
+        registry
+            .apply_batch(&[StageDirection::SetRequestedLayout {
+                object_id: root,
+                layout: RequestedLayout::Flex(FlexConfig::default()),
+            }])
+            .unwrap();
+        let computed = Rect {
+            x: 3,
+            y: 4,
+            width: 30,
+            height: 40,
+        };
+        registry
+            .node_mut(root)
+            .unwrap()
+            .layout
+            .as_deref_mut()
+            .unwrap()
+            .computed = Some(computed);
+        let starting_revision = registry.revision();
+        let starting_usage = registry.usage();
+        let starting_effects = registry.last_commit_effects();
+        let starting_invalidations = registry.last_invalidations().to_vec();
+        let prepared = registry
+            .prepare_batch(vec![StageDirection::SetRequestedLayout {
+                object_id: root,
+                layout: RequestedLayout::None,
+            }])
+            .unwrap();
+        let widget = registry.node(root).unwrap().widget().clone();
+        let retained_borrow = widget.borrow_mut();
+
+        let (error, allocations, deallocations) =
+            count_allocator_operations(|| registry.commit_prepared_batch(prepared).unwrap_err());
+
+        assert_eq!(allocations, 0);
+        assert_eq!(deallocations, 0);
+        assert_eq!(error.cause(), RegistryError::DispatchBusy);
+        assert_eq!(registry.revision(), starting_revision);
+        assert_eq!(registry.usage(), starting_usage);
+        assert_eq!(registry.last_commit_effects(), starting_effects);
+        assert_eq!(registry.last_invalidations(), starting_invalidations);
+        assert_eq!(
+            registry.requested_layout(root).unwrap(),
+            RequestedLayout::Flex(FlexConfig::default())
+        );
+        assert_eq!(registry.node(root).unwrap().effective_bounds(), computed);
+
+        drop(retained_borrow);
+        drop(error.into_prepared());
+    }
 }
