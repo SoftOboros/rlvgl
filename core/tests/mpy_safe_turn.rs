@@ -1,4 +1,4 @@
-//! Focused actor-delete Safe Turn endpoint conformance tests.
+//! Focused batch and full-Stage teardown Safe Turn endpoint conformance tests.
 
 use rlvgl_api::protocol::ValueRef;
 use rlvgl_core::{
@@ -549,4 +549,359 @@ fn exact_release_capacity_rejects_delete_before_stage_mutation() {
             error: BatchRejection::Cue(rlvgl_core::cue::CueQueueError::AdmissionCapacity),
         }
     );
+}
+
+#[test]
+fn stage_teardown_shares_fifo_and_fences_later_stage_admission() {
+    let mut first_stage = stage(1);
+    let first_root = create_root(&mut first_stage);
+    let first_actor = create_button(&mut first_stage, first_root, "First");
+    let first_start = first_stage.revision();
+    let mut second_stage = stage(2);
+    let second_root = create_root(&mut second_stage);
+    let second_actor = create_button(&mut second_stage, second_root, "Second");
+    let second_start = second_stage.revision();
+    let text_property = property(descriptor("button::Button"), "text");
+    let mut endpoint = endpoint_with_limits(endpoint_limits());
+    endpoint.register_stage(first_stage).unwrap();
+    endpoint.register_stage(second_stage).unwrap();
+
+    endpoint
+        .enqueue_batch(
+            RequestId::new(1).unwrap(),
+            StageId::new(1).unwrap(),
+            vec![StageDirection::MutateActor {
+                object_id: first_actor.object_id,
+                directions: vec![ActorDirection::SetProperty {
+                    id: text_property,
+                    value: OwnedValue::Text(String::from("prepared-before-teardown")),
+                }],
+            }],
+        )
+        .unwrap();
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(2).unwrap(), StageId::new(1).unwrap())
+        .unwrap();
+    assert_eq!(
+        endpoint.enqueue_batch(
+            RequestId::new(3).unwrap(),
+            StageId::new(1).unwrap(),
+            Vec::new(),
+        ),
+        Err(EndpointError::StageTeardownPending)
+    );
+    assert_eq!(
+        endpoint.enqueue_stage_teardown(RequestId::new(3).unwrap(), StageId::new(1).unwrap()),
+        Err(EndpointError::StageTeardownPending)
+    );
+    assert_eq!(
+        endpoint.subscribe(subscribe_request(StageId::new(1).unwrap(), first_actor, 10,)),
+        Err(EndpointError::StageTeardownPending)
+    );
+    endpoint
+        .enqueue_batch(
+            RequestId::new(3).unwrap(),
+            StageId::new(2).unwrap(),
+            vec![StageDirection::MutateActor {
+                object_id: second_actor.object_id,
+                directions: vec![ActorDirection::SetProperty {
+                    id: text_property,
+                    value: OwnedValue::Text(String::from("third-in-fifo")),
+                }],
+            }],
+        )
+        .unwrap();
+
+    let summary = endpoint.run_safe_turn().unwrap();
+    assert_eq!((summary.turn, summary.processed_batches), (1, 3));
+    assert!(endpoint.stage(StageId::new(1).unwrap()).is_none());
+    assert_eq!(
+        endpoint
+            .stage(StageId::new(2).unwrap())
+            .unwrap()
+            .property(second_actor.object_id, text_property)
+            .unwrap(),
+        OwnedValue::Text(String::from("third-in-fifo"))
+    );
+    let completions = endpoint.drain_completions(8).unwrap();
+    assert_eq!(
+        completions
+            .iter()
+            .map(|completion| completion.request_id.get())
+            .collect::<Vec<_>>(),
+        [1, 2, 3]
+    );
+    assert_eq!(
+        completions[0].outcome,
+        BatchOutcome::Committed {
+            revision: StageRevision::new(first_start.get() + 1),
+            deleted_objects: 0,
+            released_subscriptions: 0,
+        }
+    );
+    assert_eq!(
+        completions[1].outcome,
+        BatchOutcome::StageTeardownCommitted {
+            revision: StageRevision::new(first_start.get() + 2),
+            deleted_objects: 2,
+            released_subscriptions: 0,
+            purged_ordinary: 0,
+        }
+    );
+    assert_eq!(
+        completions[2].outcome,
+        BatchOutcome::Committed {
+            revision: StageRevision::new(second_start.get() + 1),
+            deleted_objects: 0,
+            released_subscriptions: 0,
+        }
+    );
+}
+
+#[test]
+fn full_stage_teardown_releases_child_first_and_ack_gates_stage_capacity() {
+    let mut owned_stage = stage(1);
+    let root = create_root(&mut owned_stage);
+    let first_actor = create_button(&mut owned_stage, root, "First");
+    let second_actor = create_button(&mut owned_stage, root, "Second");
+    let stage_id = owned_stage.stage_id();
+    let final_revision = StageRevision::new(owned_stage.revision().get() + 1);
+    let limits = EndpointLimits::new(1, 8, 8, 16).unwrap();
+    let mut endpoint = endpoint_with_limits(limits);
+    endpoint.register_stage(owned_stage).unwrap();
+    for (actor, callback) in [(first_actor, 10), (first_actor, 11), (second_actor, 12)] {
+        endpoint
+            .subscribe(subscribe_request(stage_id, actor, callback))
+            .unwrap();
+    }
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(1).unwrap(), stage_id)
+        .unwrap();
+    endpoint.run_safe_turn().unwrap();
+
+    assert!(endpoint.stage(stage_id).is_none());
+    assert!(endpoint.stage_finalization_pending(stage_id));
+    assert_eq!(
+        endpoint.register_stage(stage(2)),
+        Err(EndpointError::StageCapacity)
+    );
+    assert_eq!(
+        endpoint.drain_completions(1).unwrap()[0].outcome,
+        BatchOutcome::StageTeardownCommitted {
+            revision: final_revision,
+            deleted_objects: 3,
+            released_subscriptions: 3,
+            purged_ordinary: 0,
+        }
+    );
+
+    let first_drain = endpoint
+        .drain_records(DrainBudget::for_limits(cue_limits(), 2))
+        .unwrap();
+    assert_eq!(
+        first_drain
+            .records()
+            .iter()
+            .map(|record| match record {
+                EndpointRecord::Cue(cue) => cue.callback_id().get(),
+                EndpointRecord::RuntimeNotice(_) => panic!("unexpected RuntimeNotice"),
+            })
+            .collect::<Vec<_>>(),
+        [10, 11]
+    );
+    let first_native_sequence = match &first_drain.records()[0] {
+        EndpointRecord::Cue(cue) => cue.first_native_event_sequence(),
+        EndpointRecord::RuntimeNotice(_) => panic!("unexpected RuntimeNotice"),
+    };
+    for record in first_drain.records() {
+        let EndpointRecord::Cue(cue) = record else {
+            panic!("unexpected RuntimeNotice");
+        };
+        assert!(cue.is_subscription_release());
+        assert_eq!(cue.delivery(), CueDelivery::Critical);
+        assert_eq!(cue.stage_revision(), final_revision);
+        assert!(cue.payload().is_empty());
+        assert_eq!(cue.first_native_event_sequence(), first_native_sequence);
+    }
+
+    let mut other = endpoint_with_limits(endpoint_limits());
+    let other_drain = other
+        .drain_records(DrainBudget::for_limits(cue_limits(), 1))
+        .unwrap();
+    let mismatch = endpoint.acknowledge_records(other_drain).unwrap_err();
+    assert_eq!(mismatch.error(), EndpointError::DrainMismatch);
+    assert!(endpoint.stage_finalization_pending(stage_id));
+    assert_eq!(
+        endpoint.register_stage(stage(2)),
+        Err(EndpointError::StageCapacity)
+    );
+    other.acknowledge_records(mismatch.into_drain()).unwrap();
+
+    endpoint.acknowledge_records(first_drain).unwrap();
+    assert!(endpoint.stage_finalization_pending(stage_id));
+    assert_eq!(
+        endpoint.register_stage(stage(2)),
+        Err(EndpointError::StageCapacity)
+    );
+
+    let final_drain = endpoint
+        .drain_records(DrainBudget::for_limits(cue_limits(), 2))
+        .unwrap();
+    assert!(matches!(
+        final_drain.records(),
+        [EndpointRecord::Cue(cue)]
+            if cue.callback_id().get() == 12
+                && cue.is_subscription_release()
+                && cue.payload().is_empty()
+                && cue.first_native_event_sequence() == first_native_sequence
+    ));
+    endpoint.acknowledge_records(final_drain).unwrap();
+    assert!(!endpoint.stage_finalization_pending(stage_id));
+    endpoint.register_stage(stage(2)).unwrap();
+}
+
+#[test]
+fn dropped_teardown_drain_never_finalizes_or_releases_stage_capacity() {
+    let mut owned_stage = stage(1);
+    let root = create_root(&mut owned_stage);
+    let actor = create_button(&mut owned_stage, root, "Button");
+    let stage_id = owned_stage.stage_id();
+    let mut endpoint = endpoint_with_limits(EndpointLimits::new(1, 4, 4, 8).unwrap());
+    endpoint.register_stage(owned_stage).unwrap();
+    endpoint
+        .subscribe(subscribe_request(stage_id, actor, 10))
+        .unwrap();
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(1).unwrap(), stage_id)
+        .unwrap();
+    endpoint.run_safe_turn().unwrap();
+    let drain = endpoint
+        .drain_records(DrainBudget::for_limits(cue_limits(), 4))
+        .unwrap();
+    drop(drain);
+
+    assert!(endpoint.stage_finalization_pending(stage_id));
+    assert_eq!(
+        endpoint.register_stage(stage(2)),
+        Err(EndpointError::StageCapacity)
+    );
+    assert_eq!(
+        endpoint.run_safe_turn(),
+        Err(EndpointError::DrainOutstanding)
+    );
+}
+
+#[test]
+fn stage_teardown_capacity_rejection_is_exact_and_retryable() {
+    let tight_cues = CueLimits::new(2, 1, 1, 64, CUE_FRAME_OVERHEAD_BYTES + 64).unwrap();
+    let mut first_stage = stage(1);
+    let first_root = create_root(&mut first_stage);
+    let first_actor = create_button(&mut first_stage, first_root, "First");
+    let first_revision = first_stage.revision();
+    let mut second_stage = stage(2);
+    let second_root = create_root(&mut second_stage);
+    let second_actor = create_button(&mut second_stage, second_root, "Second");
+    let second_stage_id = second_stage.stage_id();
+    let mut endpoint = Endpoint::new(
+        EndpointEpoch::new(2).unwrap(),
+        endpoint_limits(),
+        SubscriptionLimits::new(8, 64, 8, 8).unwrap(),
+        tight_cues,
+    )
+    .unwrap();
+    endpoint.register_stage(first_stage).unwrap();
+    endpoint.register_stage(second_stage).unwrap();
+    endpoint
+        .subscribe(subscribe_request(StageId::new(1).unwrap(), first_actor, 10))
+        .unwrap();
+    for callback in [20, 21] {
+        endpoint
+            .subscribe(subscribe_request(second_stage_id, second_actor, callback))
+            .unwrap();
+    }
+    endpoint
+        .enqueue_batch(
+            RequestId::new(1).unwrap(),
+            second_stage_id,
+            vec![StageDirection::Delete {
+                object_id: second_actor.object_id,
+            }],
+        )
+        .unwrap();
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(2).unwrap(), StageId::new(1).unwrap())
+        .unwrap();
+    endpoint.run_safe_turn().unwrap();
+
+    let first = endpoint.stage(StageId::new(1).unwrap()).unwrap();
+    assert_eq!(first.revision(), first_revision);
+    assert_eq!(first.usage().actors, 2);
+    assert_eq!(first.root_id("main"), Some(first_root));
+    let completions = endpoint.drain_completions(8).unwrap();
+    assert_eq!(completions.len(), 2);
+    assert!(matches!(
+        completions[0].outcome,
+        BatchOutcome::Committed { .. }
+    ));
+    assert_eq!(
+        completions[1].outcome,
+        BatchOutcome::Rejected {
+            observed_revision: first_revision,
+            operation_index: None,
+            error: BatchRejection::Cue(rlvgl_core::cue::CueQueueError::AdmissionCapacity),
+        }
+    );
+    assert_eq!(
+        endpoint.enqueue_batch(
+            RequestId::new(3).unwrap(),
+            StageId::new(1).unwrap(),
+            Vec::new(),
+        ),
+        Ok(())
+    );
+    endpoint.run_safe_turn().unwrap();
+    endpoint.drain_completions(1).unwrap();
+
+    let drain = endpoint
+        .drain_records(DrainBudget::for_limits(tight_cues, 2))
+        .unwrap();
+    endpoint.acknowledge_records(drain).unwrap();
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(4).unwrap(), StageId::new(1).unwrap())
+        .unwrap();
+    endpoint.run_safe_turn().unwrap();
+    assert!(endpoint.stage(StageId::new(1).unwrap()).is_none());
+    assert!(matches!(
+        endpoint.drain_completions(1).unwrap()[0].outcome,
+        BatchOutcome::StageTeardownCommitted {
+            released_subscriptions: 1,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn empty_stage_teardown_advances_once_and_releases_capacity_immediately() {
+    let owned_stage = stage(1);
+    let starting_revision = owned_stage.revision();
+    let stage_id = owned_stage.stage_id();
+    let mut endpoint = endpoint_with_limits(EndpointLimits::new(1, 2, 2, 2).unwrap());
+    endpoint.register_stage(owned_stage).unwrap();
+    endpoint
+        .enqueue_stage_teardown(RequestId::new(1).unwrap(), stage_id)
+        .unwrap();
+    endpoint.run_safe_turn().unwrap();
+
+    assert!(endpoint.stage(stage_id).is_none());
+    assert!(!endpoint.stage_finalization_pending(stage_id));
+    assert_eq!(
+        endpoint.drain_completions(1).unwrap()[0].outcome,
+        BatchOutcome::StageTeardownCommitted {
+            revision: StageRevision::new(starting_revision.get() + 1),
+            deleted_objects: 0,
+            released_subscriptions: 0,
+            purged_ordinary: 0,
+        }
+    );
+    endpoint.register_stage(stage(2)).unwrap();
 }
