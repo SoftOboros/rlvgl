@@ -16,6 +16,43 @@ pub const MIN_FRAME_BYTES: u32 = 256;
 /// MPY v1 minimum UTF-8 text capacity.
 pub const MIN_TEXT_BYTES: u32 = 128;
 
+/// MPY v1 minimum command fields or Batch operations per logical frame.
+pub const MIN_ITEMS_PER_COMMAND: u16 = 8;
+
+/// Stable MPY command and Batch-operation opcode registry.
+pub mod opcode {
+    /// Invalid opcode sentinel.
+    pub const INVALID: u32 = 0;
+    /// Create one actor and bind its nonzero Batch reference.
+    pub const CREATE: u32 = 0x0000_0001;
+    /// Set one or more actor properties collectively.
+    pub const SET_PROPERTIES: u32 = 0x0000_0002;
+    /// Reset one or more actor properties to descriptor defaults or absence.
+    pub const RESET_PROPERTIES: u32 = 0x0000_0003;
+    /// Invoke one descriptor-owned actor action.
+    pub const INVOKE_ACTION: u32 = 0x0000_0004;
+    /// Set one descriptor-gated runtime flag.
+    pub const SET_FLAG: u32 = 0x0000_0005;
+    /// Replace one actor's complete requested-layout state.
+    pub const SET_REQUESTED_LAYOUT: u32 = 0x0000_0006;
+    /// Reparent an actor subtree at one exact child index.
+    pub const REPARENT: u32 = 0x0000_0007;
+    /// Promote or move an actor into the named-root order.
+    pub const PROMOTE_ROOT: u32 = 0x0000_0008;
+    /// Reorder an actor within its current parent or root order.
+    pub const REORDER: u32 = 0x0000_0009;
+    /// Delete an actor and its complete subtree.
+    pub const DELETE: u32 = 0x0000_000a;
+    /// Set one actor-local style value at an explicit selector.
+    pub const SET_LOCAL_STYLE: u32 = 0x0000_000b;
+    /// First opcode available only through explicit experimental/private negotiation.
+    pub const EXPERIMENTAL_FIRST: u32 = 0x8000_0000;
+    /// Last opcode available only through explicit experimental/private negotiation.
+    pub const EXPERIMENTAL_LAST: u32 = 0xffff_fffe;
+    /// Permanently reserved opcode sentinel.
+    pub const RESERVED: u32 = 0xffff_ffff;
+}
+
 /// MPY protocol version.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProtocolVersion {
@@ -231,6 +268,8 @@ pub enum CodecError {
     Truncated,
     /// A field has a noncanonical or structurally invalid representation.
     InvalidFrame,
+    /// A structurally valid frame exceeds an active negotiated capacity.
+    LimitExceeded,
     /// A discriminant is not part of MPY v1.
     UnsupportedDiscriminant {
         /// Table in which the value was looked up.
@@ -249,10 +288,21 @@ pub struct Limits {
     pub max_text_bytes: u32,
     /// Maximum bytes in one opaque byte value.
     pub max_byte_payload: u32,
-    /// Maximum typed fields in one command.
-    pub max_fields_per_command: u16,
+    /// Maximum typed fields or Batch operations in one command envelope.
+    pub max_items_per_command: u16,
     /// Maximum typed values in one result.
     pub max_values_per_result: u16,
+}
+
+impl Limits {
+    /// Return the v1 wire slot's former fields-only projection.
+    ///
+    /// PCDN-MPY-02-005 generalized this unchanged `u16` wire position to
+    /// [`Self::max_items_per_command`]. This accessor preserves source-level
+    /// reads for adapters that still use the earlier fields-only terminology.
+    pub const fn max_fields_per_command(self) -> u16 {
+        self.max_items_per_command
+    }
 }
 
 /// Borrowed MPY tagged value.
@@ -425,6 +475,129 @@ impl Iterator for OpcodeIter<'_> {
 
 impl ExactSizeIterator for OpcodeIter<'_> {}
 
+/// Canonical fixed-envelope Batch operation borrowing its opcode-owned payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OperationRef<'a> {
+    /// Explicit globally registered operation opcode.
+    pub opcode: u32,
+    /// Opcode-declared flags; all initial MPY v1 operations require zero.
+    pub flags: u32,
+    /// Opcode-owned payload bytes.
+    pub payload: &'a [u8],
+}
+
+#[derive(Clone, Copy)]
+enum OperationSource<'a> {
+    Native(&'a [OperationRef<'a>]),
+    Wire { count: usize, records: &'a [u8] },
+}
+
+/// Borrowed counted list of canonical Batch operations.
+#[derive(Clone, Copy)]
+pub struct OperationList<'a> {
+    source: OperationSource<'a>,
+}
+
+impl<'a> OperationList<'a> {
+    /// Build an operation list from native borrowed records for encoding.
+    pub const fn from_slice(operations: &'a [OperationRef<'a>]) -> Self {
+        Self {
+            source: OperationSource::Native(operations),
+        }
+    }
+
+    fn from_wire(count: usize, records: &'a [u8]) -> Self {
+        Self {
+            source: OperationSource::Wire { count, records },
+        }
+    }
+
+    /// Return the exact operation count.
+    pub fn len(self) -> usize {
+        match self.source {
+            OperationSource::Native(operations) => operations.len(),
+            OperationSource::Wire { count, .. } => count,
+        }
+    }
+
+    /// Return whether the Batch contains no operations.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterate operations in their implicit zero-based operation-index order.
+    pub fn iter(self) -> OperationIter<'a> {
+        let source = match self.source {
+            OperationSource::Native(operations) => OperationIterSource::Native(operations.iter()),
+            OperationSource::Wire { count, records } => OperationIterSource::Wire {
+                remaining: count,
+                reader: Reader::new(records),
+            },
+        };
+        OperationIter { source }
+    }
+}
+
+impl fmt::Debug for OperationList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for OperationList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+impl Eq for OperationList<'_> {}
+
+enum OperationIterSource<'a> {
+    Native(core::slice::Iter<'a, OperationRef<'a>>),
+    Wire {
+        remaining: usize,
+        reader: Reader<'a>,
+    },
+}
+
+/// Iterator over native or wire-backed Batch operation records.
+pub struct OperationIter<'a> {
+    source: OperationIterSource<'a>,
+}
+
+impl<'a> Iterator for OperationIter<'a> {
+    type Item = OperationRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.source {
+            OperationIterSource::Native(operations) => operations.next().copied(),
+            OperationIterSource::Wire { remaining, reader } => {
+                if *remaining == 0 {
+                    return None;
+                }
+                *remaining -= 1;
+                Some(OperationRef {
+                    opcode: reader.u32().expect("wire operation list was validated"),
+                    flags: reader.u32().expect("wire operation list was validated"),
+                    payload: reader
+                        .bytes_with_length()
+                        .expect("wire operation list was validated"),
+                })
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match &self.source {
+            OperationIterSource::Native(operations) => operations.len(),
+            OperationIterSource::Wire { remaining, .. } => *remaining,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for OperationIter<'_> {}
+
 /// Hello-frame payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hello {
@@ -490,8 +663,8 @@ pub struct Batch<'a> {
     pub flags: u32,
     /// Preflight resource budget.
     pub budget: BatchBudget,
-    /// Ordered operation records, encoded by their registered opcode schemas.
-    pub operations: &'a [u8],
+    /// Counted ordered operation records using the canonical fixed envelope.
+    pub operations: OperationList<'a>,
 }
 
 /// Result-frame payload.
@@ -734,7 +907,72 @@ pub fn decode_value(input: &[u8]) -> Result<(ValueRef<'_>, usize), CodecError> {
     Ok((value, reader.position))
 }
 
+/// Encode a counted canonical Batch operation list into caller-provided storage.
+///
+/// This structural codec does not enforce a negotiated item limit. Use
+/// [`encode_operation_list_with_limit`] after negotiation; direct use is for
+/// pre-negotiation tooling, golden vectors, and other callers that enforce
+/// capacity separately.
+pub fn encode_operation_list(
+    operations: OperationList<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    let mut writer = Writer::new(output);
+    encode_operation_list_into(operations, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode a Batch operation list under the active negotiated item limit.
+pub fn encode_operation_list_with_limit(
+    operations: OperationList<'_>,
+    maximum_items: u16,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_operation_count(operations, maximum_items)?;
+    encode_operation_list(operations, output)
+}
+
+/// Decode and structurally validate one complete canonical Batch operation list.
+///
+/// This structural codec does not enforce a negotiated item limit. Use
+/// [`decode_operation_list_with_limit`] after negotiation; direct use is for
+/// pre-negotiation tooling, golden vectors, and other callers that enforce
+/// capacity separately.
+pub fn decode_operation_list(input: &[u8]) -> Result<OperationList<'_>, CodecError> {
+    decode_operation_list_inner(input).map_err(nested_frame_error)
+}
+
+/// Decode a Batch operation list under the active negotiated item limit.
+pub fn decode_operation_list_with_limit(
+    input: &[u8],
+    maximum_items: u16,
+) -> Result<OperationList<'_>, CodecError> {
+    let operations = decode_operation_list(input)?;
+    validate_operation_count(operations, maximum_items)?;
+    Ok(operations)
+}
+
+fn decode_operation_list_inner(input: &[u8]) -> Result<OperationList<'_>, CodecError> {
+    let mut reader = Reader::new(input);
+    let count = reader.u16()? as usize;
+    let records_start = reader.position;
+    for _ in 0..count {
+        require_opcode(reader.u32()?)?;
+        require_operation_flags(reader.u32()?)?;
+        let _ = reader.bytes_with_length()?;
+    }
+    if reader.position != input.len() {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(OperationList::from_wire(count, &input[records_start..]))
+}
+
 /// Encodes one complete canonical logical frame.
+///
+/// This structural codec does not enforce negotiated frame or item limits. Use
+/// [`encode_frame_with_limits`] after negotiation; direct use is for Hello and
+/// Capabilities exchange, golden vectors, and callers that enforce capacity
+/// separately.
 pub fn encode_frame(
     version: ProtocolVersion,
     frame: FrameRef<'_>,
@@ -762,7 +1000,33 @@ pub fn encode_frame(
     Ok(FRAME_HEADER_LEN + writer.position)
 }
 
+/// Encode a post-negotiation frame under its negotiated envelope limits.
+///
+/// Hello and Capabilities negotiation itself uses [`encode_frame`]. After
+/// negotiation, endpoint adapters use this function so Batch operation count
+/// and complete-frame size are rejected before transport submission. Opcode
+/// payload codecs remain responsible for text, byte-payload, Command-field,
+/// and Result-value limits.
+pub fn encode_frame_with_limits(
+    version: ProtocolVersion,
+    frame: FrameRef<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_frame_item_limit(frame, limits.max_items_per_command)?;
+    let length = encode_frame(version, frame, output)?;
+    if length > limits.max_frame_bytes as usize {
+        return Err(CodecError::LimitExceeded);
+    }
+    Ok(length)
+}
+
 /// Decodes one complete canonical logical frame.
+///
+/// This structural codec does not enforce negotiated frame or item limits. Use
+/// [`decode_frame_with_limits`] after negotiation; direct use is for Hello and
+/// Capabilities exchange, golden vectors, and callers that enforce capacity
+/// separately.
 pub fn decode_frame(input: &[u8]) -> Result<DecodedFrame<'_>, CodecError> {
     if input.len() < FRAME_HEADER_LEN {
         return Err(CodecError::Truncated);
@@ -794,6 +1058,25 @@ pub fn decode_frame(input: &[u8]) -> Result<DecodedFrame<'_>, CodecError> {
     Ok(DecodedFrame { version, frame })
 }
 
+/// Decode a post-negotiation frame under its negotiated envelope limits.
+///
+/// Hello and Capabilities negotiation itself uses [`decode_frame`]. After
+/// negotiation, endpoint adapters use this function to enforce complete-frame
+/// size and Batch operation count before accepting work. Opcode payload codecs
+/// remain responsible for text, byte-payload, Command-field, and Result-value
+/// limits.
+pub fn decode_frame_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<DecodedFrame<'_>, CodecError> {
+    if input.len() > limits.max_frame_bytes as usize {
+        return Err(CodecError::LimitExceeded);
+    }
+    let decoded = decode_frame(input)?;
+    validate_frame_item_limit(decoded.frame, limits.max_items_per_command)?;
+    Ok(decoded)
+}
+
 fn encode_frame_payload(frame: FrameRef<'_>, writer: &mut Writer<'_>) -> Result<(), CodecError> {
     match frame {
         FrameRef::Hello(frame) => {
@@ -809,11 +1092,13 @@ fn encode_frame_payload(frame: FrameRef<'_>, writer: &mut Writer<'_>) -> Result<
             let count = u16::try_from(frame.opcodes.len()).map_err(|_| CodecError::InvalidFrame)?;
             writer.u16(count)?;
             for opcode in frame.opcodes.iter() {
+                require_opcode(opcode)?;
                 writer.u32(opcode)?;
             }
         }
         FrameRef::Command(frame) => {
             require_stage_request(frame.stage_id, frame.request_id)?;
+            require_opcode(frame.opcode)?;
             writer.u32(frame.stage_id)?;
             writer.u32(frame.request_id)?;
             writer.u32(frame.opcode)?;
@@ -829,7 +1114,9 @@ fn encode_frame_payload(frame: FrameRef<'_>, writer: &mut Writer<'_>) -> Result<
             writer.u32(frame.budget.text_bytes)?;
             writer.u16(frame.budget.resources)?;
             writer.u32(frame.budget.result_bytes)?;
-            writer.bytes_with_length(frame.operations)?;
+            let encoded_length = encoded_operation_list_length(frame.operations)?;
+            writer.u32(encoded_length)?;
+            encode_operation_list_into(frame.operations, writer)?;
         }
         FrameRef::Result(frame) => {
             require_nonzero(frame.request_id)?;
@@ -899,6 +1186,9 @@ fn decode_frame_payload<'a>(
                 .checked_mul(4)
                 .ok_or(CodecError::InvalidFrame)?;
             let opcodes = OpcodeList::from_wire(reader.bytes(opcode_bytes)?);
+            for opcode in opcodes.iter() {
+                require_opcode(opcode)?;
+            }
             FrameRef::Capabilities(Capabilities {
                 schema_version,
                 limits,
@@ -911,10 +1201,12 @@ fn decode_frame_payload<'a>(
             let stage_id = reader.u32()?;
             let request_id = reader.u32()?;
             require_stage_request(stage_id, request_id)?;
+            let opcode = reader.u32()?;
+            require_opcode(opcode)?;
             FrameRef::Command(Command {
                 stage_id,
                 request_id,
-                opcode: reader.u32()?,
+                opcode,
                 flags: reader.u32()?,
                 payload: reader.bytes_with_length()?,
             })
@@ -923,17 +1215,21 @@ fn decode_frame_payload<'a>(
             let stage_id = reader.u32()?;
             let request_id = reader.u32()?;
             require_stage_request(stage_id, request_id)?;
+            let flags = reader.u32()?;
+            let budget = BatchBudget {
+                actors: reader.u16()?,
+                text_bytes: reader.u32()?,
+                resources: reader.u16()?,
+                result_bytes: reader.u32()?,
+            };
+            let operation_bytes = reader.bytes_with_length().map_err(nested_frame_error)?;
+            let operations = decode_operation_list(operation_bytes)?;
             FrameRef::Batch(Batch {
                 stage_id,
                 request_id,
-                flags: reader.u32()?,
-                budget: BatchBudget {
-                    actors: reader.u16()?,
-                    text_bytes: reader.u32()?,
-                    resources: reader.u16()?,
-                    result_bytes: reader.u32()?,
-                },
-                operations: reader.bytes_with_length()?,
+                flags,
+                budget,
+                operations,
             })
         }
         FrameKind::Result => {
@@ -1005,6 +1301,83 @@ fn tagged_i32(writer: &mut Writer<'_>, tag: ValueTag, value: i32) -> Result<(), 
 fn tagged_u32(writer: &mut Writer<'_>, tag: ValueTag, value: u32) -> Result<(), CodecError> {
     writer.u8(tag as u8)?;
     writer.u32(value)
+}
+
+fn encoded_operation_list_length(operations: OperationList<'_>) -> Result<u32, CodecError> {
+    let mut length = 2usize;
+    let _ = u16::try_from(operations.len()).map_err(|_| CodecError::InvalidFrame)?;
+    for operation in operations.iter() {
+        require_opcode(operation.opcode)?;
+        require_operation_flags(operation.flags)?;
+        let _ = u32::try_from(operation.payload.len()).map_err(|_| CodecError::InvalidFrame)?;
+        length = length
+            .checked_add(12)
+            .and_then(|value| value.checked_add(operation.payload.len()))
+            .ok_or(CodecError::InvalidFrame)?;
+    }
+    u32::try_from(length).map_err(|_| CodecError::InvalidFrame)
+}
+
+fn encode_operation_list_into(
+    operations: OperationList<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    let count = u16::try_from(operations.len()).map_err(|_| CodecError::InvalidFrame)?;
+    writer.u16(count)?;
+    for operation in operations.iter() {
+        require_opcode(operation.opcode)?;
+        require_operation_flags(operation.flags)?;
+        writer.u32(operation.opcode)?;
+        writer.u32(operation.flags)?;
+        writer.bytes_with_length(operation.payload)?;
+    }
+    Ok(())
+}
+
+fn require_opcode(value: u32) -> Result<(), CodecError> {
+    if value == opcode::INVALID || value == opcode::RESERVED {
+        Err(CodecError::InvalidFrame)
+    } else {
+        Ok(())
+    }
+}
+
+fn require_operation_flags(value: u32) -> Result<(), CodecError> {
+    if value == 0 {
+        Ok(())
+    } else {
+        Err(CodecError::InvalidFrame)
+    }
+}
+
+fn validate_operation_count(
+    operations: OperationList<'_>,
+    maximum_items: u16,
+) -> Result<(), CodecError> {
+    if operations.len() > maximum_items as usize {
+        Err(CodecError::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_frame_item_limit(frame: FrameRef<'_>, maximum_items: u16) -> Result<(), CodecError> {
+    match frame {
+        FrameRef::Batch(batch) => validate_operation_count(batch.operations, maximum_items),
+        FrameRef::Hello(_)
+        | FrameRef::Capabilities(_)
+        | FrameRef::Command(_)
+        | FrameRef::Result(_)
+        | FrameRef::Cue(_)
+        | FrameRef::RuntimeNotice(_) => Ok(()),
+    }
+}
+
+fn nested_frame_error(error: CodecError) -> CodecError {
+    match error {
+        CodecError::Truncated => CodecError::InvalidFrame,
+        other => other,
+    }
 }
 
 fn require_stage_request(stage_id: u32, request_id: u32) -> Result<(), CodecError> {
@@ -1101,7 +1474,7 @@ impl<'a> Writer<'a> {
         self.u32(value.max_frame_bytes)?;
         self.u32(value.max_text_bytes)?;
         self.u32(value.max_byte_payload)?;
-        self.u16(value.max_fields_per_command)?;
+        self.u16(value.max_items_per_command)?;
         self.u16(value.max_values_per_result)
     }
 
@@ -1200,7 +1573,7 @@ impl<'a> Reader<'a> {
             max_frame_bytes: self.u32()?,
             max_text_bytes: self.u32()?,
             max_byte_payload: self.u32()?,
-            max_fields_per_command: self.u16()?,
+            max_items_per_command: self.u16()?,
             max_values_per_result: self.u16()?,
         })
     }

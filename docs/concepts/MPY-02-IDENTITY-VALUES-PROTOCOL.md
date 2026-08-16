@@ -8,7 +8,8 @@ MPY-02-IDENTITY-VALUES-PROTOCOL.md - Stable IDs, values, envelopes, batches, and
 frames, atomic batches, errors, capability negotiation, and transport traits.
 MPY-03 behavior remains separately gated. Its golden-vector prerequisite is
 satisfied by `api/tests/fixtures/mpy_v1_vectors.txt` and the conformance tests
-in `api/tests/mpy_v1_golden.rs`.
+in `api/tests/mpy_v1_golden.rs`. The same corpus now includes the counted Batch
+operation envelope and initial opcode registry accepted in `PCDN-MPY-02-005`.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-01 was ratified and committed at `74dc28a` before this phase's ratification.
@@ -53,6 +54,7 @@ part of an accidental ABI.
 | **Endpoint Epoch** | One initialized lifetime of a protocol endpoint pair. Stage IDs are unique within it; a restart, reset, or reinitialization establishes a new epoch and invalidates prior handles. | Owned semantically by MPY-02; MPY-08 `Boot Epoch` is the board realization. |
 | **Protocol Capability** | Versioned declaration of supported opcodes, value tags, actor/schema version, and bounded capacities for one target profile. | Owned by MPY-02; populated by later phases. |
 | **Value Envelope** | Explicit tag, length where applicable, and payload encoding for one protocol value. | Owned by MPY-02. |
+| **Operation Record** | One counted Batch member carrying an explicit opcode, flags, and length-delimited opcode-owned payload. Its operation index is its zero-based list position. | Owned by MPY-02; payload schema owned by the opcode's phase. |
 | **Transport Endpoint** | Ordered send/receive boundary for command, result, and cue frames without runtime semantics of its own. | Owned jointly by MPY-02 traits and MPY-07/08 implementations. |
 
 ## 4. Source-of-Truth Map
@@ -146,18 +148,23 @@ profile to advertise larger limits:
 |---|---:|
 | `max_frame_bytes` | 256 bytes |
 | `max_text_bytes` | 128 UTF-8 bytes |
+| `max_items_per_command` | 8 typed fields or Batch operations |
 
 `max_frame_bytes` counts one complete canonical logical frame after any
 transport-local reassembly; transport headers and fragment metadata do not
 consume that logical limit. `max_text_bytes` counts the encoded bytes of one
 `Text` value, not Unicode scalar values or display cells.
 
-Each endpoint advertises the maxima it can encode and receive. The active
-limit in each direction is the component-wise minimum of the two endpoints'
-advertised maxima. An endpoint advertising less than either MPY v1 minimum is
-not an MPY v1-compatible profile and MUST reject activation with a structured
-`Unsupported` result. A value or frame above the negotiated maximum MUST fail
-with `Capacity` before mutation and MUST NOT be silently truncated.
+Each endpoint advertises the maxima it can encode and receive. The active limit
+in each direction is the component-wise minimum of the two endpoints'
+advertised maxima. The `max_items_per_command:u16` wire position generalizes
+the earlier fields-only name without moving or enlarging the field; it bounds
+both typed fields in one command and top-level operation records in one Batch.
+An endpoint advertising less than any MPY v1 minimum is not an MPY
+v1-compatible profile and MUST reject activation with a structured
+`Unsupported` result. A value, item count, or frame above the negotiated
+maximum MUST fail with `Capacity` before mutation and MUST NOT be silently
+truncated.
 
 MPY-07 MAY advertise larger host/same-core capacities. MPY-08 MUST measure and
 publish the board profile's actual capacities and prove that both minima are
@@ -244,10 +251,10 @@ Fields appear in the following order without alignment gaps:
 
 | Frame | Canonical payload order |
 |---|---|
-| `Hello` | schema version `3*u8`; five limits (`max_frame_bytes:u32`, `max_text_bytes:u32`, `max_byte_payload:u32`, `max_fields_per_command:u16`, `max_values_per_result:u16`); feature bits `u64` |
+| `Hello` | schema version `3*u8`; five limits (`max_frame_bytes:u32`, `max_text_bytes:u32`, `max_byte_payload:u32`, `max_items_per_command:u16`, `max_values_per_result:u16`); feature bits `u64` |
 | `Capabilities` | Hello fields; supported ValueTag bitset `u32` indexed by §7.2; opcode count `u16`; that many registered opcode IDs as `u32` |
 | `Command` | `StageId:u32`; `RequestId:u32`; opcode `u32`; flags `u32`; length-delimited opcode payload |
-| `Batch` | `StageId:u32`; `RequestId:u32`; flags `u32`; budget (`actors:u16`, `text_bytes:u32`, `resources:u16`, `result_bytes:u32`); length-delimited ordered operation records |
+| `Batch` | `StageId:u32`; `RequestId:u32`; flags `u32`; budget (`actors:u16`, `text_bytes:u32`, `resources:u16`, `result_bytes:u32`); length-delimited counted operation list from §7.3.1 |
 | `Result` | `RequestId:u32`; status `u8`; optional operation index; optional field/descriptor ID; length-delimited UTF-8 diagnostic; length-delimited typed payload |
 | `Cue` | sequence `u32`; `StageId:u32`; `ObjectId:u64`; `SubscriptionId:u32`; `CallbackId:u32`; `EventId:u32`; flags `u32`; length-delimited typed payload |
 | `RuntimeNotice` | sequence `u32`; notice kind `u32`; length-delimited UTF-8 diagnostic; length-delimited notice payload |
@@ -257,6 +264,52 @@ owning MPY phases; they cannot alter this envelope. A successful Result has
 status `00` and no error index, field ID, or diagnostic. Failure status bytes
 `01` through `12` map in §9.1 order from `InvalidFrame` through `Internal`.
 
+#### 7.3.1 Batch operation records and opcode registry
+
+The length-delimited Batch operation list begins with `operation_count:u16`,
+then contains exactly that many records in order. Each record is:
+
+| Field | Encoding |
+|---|---|
+| opcode | nonzero registered `u32` |
+| flags | `u32`; zero for every initially registered MPY v1 operation |
+| payload | `u32 byte_length` followed by opcode-owned bytes |
+
+The record's zero-based order is its operation index; no duplicate index is
+encoded. Fewer records than declared are truncated `InvalidFrame`; extra
+records, bytes after the declared list, opcode zero, opcode `ffffffff`, and
+unknown flag bits are noncanonical. The count MUST NOT exceed the negotiated
+`max_items_per_command`, and the complete list remains subject to
+`max_frame_bytes`.
+
+One explicit global `u32` registry serves Command and Batch contexts. Values
+`00000001` through `7fffffff` require standards action in this specification;
+`80000000` through `fffffffe` are experimental/private and legal only after
+explicit capability negotiation; zero is invalid; and `ffffffff` is reserved.
+An assigned value is never repurposed, including after deprecation. A registry
+entry declares whether it is legal in Command, Batch, or both contexts.
+
+The initial Batch registry is:
+
+| Opcode | Operation |
+|---:|---|
+| `00000001` | Create |
+| `00000002` | SetProperties |
+| `00000003` | ResetProperties |
+| `00000004` | InvokeAction |
+| `00000005` | SetFlag |
+| `00000006` | SetRequestedLayout |
+| `00000007` | Reparent |
+| `00000008` | PromoteRoot |
+| `00000009` | Reorder |
+| `0000000a` | Delete |
+| `0000000b` | SetLocalStyle |
+
+Capability advertisement includes only entries actually implemented by that
+endpoint. Reserving a standards value here does not let a profile advertise an
+unimplemented operation. The owning MPY-03/04 payload schemas are the next
+separate decision and cannot reinterpret this envelope or reuse these values.
+
 ### 7.4 Canonical implementation and vectors
 
 `api/src/protocol.rs` is the allocation-free reference codec. It writes into a
@@ -265,6 +318,15 @@ lists. `api/tests/fixtures/mpy_v1_vectors.txt` is the language-neutral canonical
 hex corpus; `api/tests/mpy_v1_golden.rs` proves encode equality, decode equality,
 and byte-identical re-encoding for every §7.2 value and §7.1 frame class. C and
 MicroPython consumers must pass the same corpus rather than copying Rust layout.
+The corpus also contains `operation.initial_registry`, a counted empty-payload
+record for every opcode assigned in §7.3.1. Structural Hello/Capabilities
+parsing uses `encode_frame`/`decode_frame`; after negotiation, adapters MUST use
+`encode_frame_with_limits`/`decode_frame_with_limits` (or the corresponding
+operation-list limit functions) so `max_items_per_command` and complete-frame
+capacity are enforced before request acceptance. These envelope codecs do not
+interpret opcode-owned payloads; the owning payload codec MUST separately
+enforce `max_text_bytes`, `max_byte_payload`, Command field counts, and Result
+value counts before request acceptance.
 
 ## 8. Frozen Decisions — Atomic Batches
 
@@ -371,6 +433,12 @@ Python exception text is adapter policy; the stable class is authoritative.
   little-endian; flags are `u32`; counts/indexes are `u16`; lengths are `u32`;
   and no serialization framework, magic, padding, or native layout is part of
   the logical frame.
+- **PCDN-MPY-02-005 — Resolved by owner direction 2026-08-16:** Batch operations
+  use the counted fixed envelope in §7.3.1 and the explicit non-reusable global
+  opcode registry. The unchanged former fields-limit wire slot is generalized
+  to `max_items_per_command`, with an MPY v1 floor of eight items. The first
+  eleven standards opcodes are assigned to the accepted Create and MPY-04
+  mutation families; capability advertisement remains implementation-truthful.
 
 ## 12. Acceptance Checklist
 
@@ -384,6 +452,7 @@ Python exception text is adapter policy; the stable class is authoritative.
 - [x] `PCDN-MPY-02-002` adopts negotiated profile limits plus the §6.1 MPY v1 floors without weakening `INV-MPY-7` or `INV-MPY-8`.
 - [x] `PCDN-MPY-02-003` is resolved without weakening atomic batches or bounded Results.
 - [x] `PCDN-MPY-02-004` fixes an allocation-free canonical byte layout and committed golden corpus without weakening `INV-MPY-02-2` or the 256-byte floor.
+- [x] `PCDN-MPY-02-005` fixes bounded Batch operation records and non-reusable opcode assignments without changing the established Hello field positions or weakening `INV-MPY-02-4`/`INV-MPY-02-5`.
 
 ## 13. Files Cited
 
@@ -406,9 +475,10 @@ transport prototypes to consume the same neutral frames. It does not ratify
 MPY-03 or authorize registry behavior before that phase closes its own PCDNs
 and §12 gate.
 
-The canonical vectors and reference codec are now committed with this
-amendment, so the MPY-03 dependency is satisfied; MPY-03 remains Draft until its
-own PCDNs and acceptance checklist close.
+The canonical vectors and reference codec are now committed with these
+amendments. The counted operation iterator unblocks opcode-owned Create and
+mutation payload codecs without authorizing either schema to change the common
+record envelope.
 
 ## 15. Change Log
 
@@ -541,3 +611,44 @@ smallest implementation that meets the 256-byte floor and remains practical on
 both MicroPython and shared-memory targets. TLV and general serialization
 frameworks were rejected for v1 because they add overhead and decoder surface
 without a demonstrated compatibility requirement.
+
+### 0.5.0 — 2026-08-16 — Amended
+
+**Author:** Ira Abbott with OpenAI Codex implementation
+
+**Change kind:** semantic and implementation
+
+**Touches:** PCDN-MPY-02-005, INV-MPY-02-2, INV-MPY-02-4,
+INV-MPY-02-5, §3, §6.1, §7.3, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes the counted fixed Batch-operation envelope, generalizes
+the existing fields-only capacity slot to `max_items_per_command`, establishes
+an eight-item MPY v1 floor, and assigns the initial eleven standards opcodes.
+The allocation-free reference codec and golden Batch vector now decode and
+re-encode structured borrowed operation records instead of an opaque byte blob.
+The language-neutral corpus includes all eleven initial assignments, and the
+post-negotiation codec rejects operation counts above the active item limit.
+
+#### Rationale
+
+The outer Batch frame previously length-delimited an opaque byte sequence, so
+the host binding could not determine record boundaries, enforce a negotiated
+operation count, report the first failing operation, or distinguish a stable
+opcode from payload bytes. A counted fixed record header is the smallest
+bounded representation that preserves opcode-owned payload evolution and
+zero-copy decode.
+
+Reusing the existing `u16` fields-capacity wire position as a general item
+limit avoids changing Hello/Capabilities byte positions. Eight empty operation
+records plus the complete Batch envelope fit comfortably within the 256-byte
+logical-frame floor, while every real payload remains independently subject to
+the frame limit. Explicit non-reusable opcode assignment prevents phase-local
+or adapter-local discriminants from becoming competing wire authorities.
+
+Considered and rejected: keeping the operation blob opaque, which cannot
+support bounded structural validation; deriving opcodes from Rust enum order or
+names, which makes refactoring a wire break; adding a second Hello limit, which
+would move established fields; and interpreting numeric opcode ranges as
+semantics, which would constrain later standards action unnecessarily.
