@@ -1,5 +1,5 @@
 {
-  "edge_count": 478,
+  "edge_count": 490,
   "edges": [
     {
       "edge_type": "defines",
@@ -2685,205 +2685,289 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 18,
+      "line": 20,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 155,
+      "line": 170,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 156,
+      "line": 171,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 157,
+      "line": 172,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 158,
+      "line": 173,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 159,
+      "line": 174,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 160,
+      "line": 175,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 184,
+      "line": 208,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 186,
+      "line": 212,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 189,
+      "line": 215,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 194,
+      "line": 222,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 195,
+      "line": 223,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 196,
+      "line": 224,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 197,
+      "line": 225,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 198,
+      "line": 226,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 199,
+      "line": 227,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 200,
+      "line": 228,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 200,
+      "line": 228,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 200,
+      "line": 228,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 200,
+      "line": 228,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-07-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-07-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "INV-MPY-9"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 226,
+      "line": 255,
       "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "target": "PCDN-MPY-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-07-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "INV-MPY-9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-07-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-07-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "target": "PCDN-MPY-07-003"
     },
     {
       "edge_type": "defines",
@@ -3350,14 +3434,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 29,
+    "amendment": 30,
     "gate": 80,
     "invariant": 65,
     "nongoal": 43,
-    "rationale": 24,
+    "rationale": 25,
     "term": 76
   },
-  "object_count": 317,
+  "object_count": 319,
   "objects": [
     {
       "attrs": {
@@ -7354,7 +7438,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 47,
+      "line": 49,
       "obj_id": "mpy:term:canonical scenario",
       "text": "Versioned declarative inputs plus expected semantic checkpoints runnable through direct runtime and MicroPython paths."
     },
@@ -7366,7 +7450,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 48,
+      "line": 50,
       "obj_id": "mpy:term:direct driver",
       "text": "Host adapter that submits neutral frames directly to the in-process runtime without Python conversion."
     },
@@ -7378,7 +7462,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 49,
+      "line": 51,
       "obj_id": "mpy:term:micropython driver",
       "text": "Host-build MicroPython VM/module path that runs the public Python script and captures neutral frames/results/cues."
     },
@@ -7390,7 +7474,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 50,
+      "line": 52,
       "obj_id": "mpy:term:trace equivalence",
       "text": "Equality after removing explicitly nondeterministic transport timing while retaining IDs, revisions, results, cue order, errors, and payloads."
     },
@@ -7402,7 +7486,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 51,
+      "line": 53,
       "obj_id": "mpy:term:semantic checkpoint",
       "text": "Named point containing expected snapshot, cue/result suffix, geometry, and optional frame evidence."
     },
@@ -7414,7 +7498,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 54,
       "obj_id": "mpy:term:golden update record",
       "text": "Reviewed artifact explaining why an expected trace/snapshot/image changed and which invariant or descriptor revision authorizes it."
     },
@@ -7432,7 +7516,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 155,
+      "line": 170,
       "obj_id": "INV-MPY-07-1",
       "text": "Every required Canonical Scenario MUST run through Direct Driver and actual MicroPython Driver with equivalent logical traces."
     },
@@ -7450,7 +7534,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 156,
+      "line": 171,
       "obj_id": "INV-MPY-07-2",
       "text": "Scenario execution MUST use deterministic logical time, reset allocation state, and contain no pointer, wall-clock, or host-path-dependent expected values."
     },
@@ -7469,7 +7553,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 157,
+      "line": 172,
       "obj_id": "INV-MPY-07-3",
       "text": "A binding divergence MUST fail at the first differing Result, Cue, revision, snapshot field, geometry value, or frame artifact and MUST NOT be hidden by broad tolerance."
     },
@@ -7487,7 +7571,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 158,
+      "line": 173,
       "obj_id": "INV-MPY-07-4",
       "text": "Golden artifacts MUST change only with a Golden Update Record citing the authorizing descriptor/spec revision and affected MPY rows."
     },
@@ -7505,7 +7589,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 159,
+      "line": 174,
       "obj_id": "INV-MPY-07-5",
       "text": "Simulator evidence MUST prove requested layout is performed natively and callback mutations appear only after the callback and next Safe Turn."
     },
@@ -7523,7 +7607,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 160,
+      "line": 175,
       "obj_id": "INV-MPY-07-6",
       "text": "Performance characterization MUST measure 50-, 250-, and 1,000-actor lookup before MPY-03 storage optimization or MPY-08 admission."
     },
@@ -7532,7 +7616,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 178,
+      "line": 202,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:1",
       "text": "No board transport. MPY-07 is in-process/same-core."
     },
@@ -7541,7 +7625,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 179,
+      "line": 203,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:2",
       "text": "No wall-clock UI loop. Logical ticks and synthetic input are mandatory."
     },
@@ -7550,7 +7634,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 180,
+      "line": 204,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:3",
       "text": "No performance target invention. Measure first; MPY-09 gates later."
     },
@@ -7559,13 +7643,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 181,
+      "line": 205,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:nongoal:4",
       "text": "No CPython equivalence requirement. It may be added without changing the"
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-1"
         ]
@@ -7573,13 +7657,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 194,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:194",
+      "line": 222,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:222",
       "text": "`INV-MPY-07-1` requires actual MicroPython/direct trace equivalence."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-2"
         ]
@@ -7587,13 +7671,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 195,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:195",
+      "line": 223,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:223",
       "text": "`INV-MPY-07-2` deterministic scenario inputs and expected artifacts are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-3"
         ]
@@ -7601,13 +7685,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 196,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:196",
+      "line": 224,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:224",
       "text": "`INV-MPY-07-3` first-divergence comparison policy is accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-4"
         ]
@@ -7615,13 +7699,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 197,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:197",
+      "line": 225,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:225",
       "text": "`INV-MPY-07-4` golden update metadata is accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-5"
         ]
@@ -7629,13 +7713,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 198,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:198",
+      "line": 226,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:226",
       "text": "`INV-MPY-07-5` layout/callback ordering checkpoints are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-07-6"
         ]
@@ -7643,13 +7727,13 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 199,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:199",
+      "line": 227,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:227",
       "text": "`INV-MPY-07-6` benchmark sizes resolve the MPY-03 storage trigger."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": [
           "INV-MPY-7"
         ]
@@ -7657,8 +7741,8 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 200,
-      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:200",
+      "line": 228,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md:gate:228",
       "text": "PCDN-MPY-07-001 through PCDN-MPY-07-003 are resolved without weakening `INV-MPY-7` or resolved PCDN-MPY-003."
     },
     {
@@ -7696,7 +7780,7 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 220,
+      "line": 249,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.1.0",
       "text": "Drafts the direct-runtime versus actual-MicroPython scenario"
     },
@@ -7718,9 +7802,78 @@
       "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 220,
+      "line": 249,
       "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.1.0-rationale",
       "text": "Separating semantic proof from board transport makes failures attributable and\nprevents a CPython convenience layer from defining device behavior. Shared\nscenarios become the transport-independent oracle replayed by MPY-08."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 2,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Records owner acceptance of the complete MPY-07 policy, pins the",
+        "touches": [
+          "INV-MPY-07-1",
+          "INV-MPY-07-2",
+          "INV-MPY-07-3",
+          "INV-MPY-07-4",
+          "INV-MPY-07-5",
+          "INV-MPY-07-6",
+          "INV-MPY-7",
+          "INV-MPY-9",
+          "PCDN-MPY-003",
+          "PCDN-MPY-07-001",
+          "PCDN-MPY-07-002",
+          "PCDN-MPY-07-003",
+          "§0",
+          "§4–§14"
+        ]
+      },
+      "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 269,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.2.0",
+      "text": "Records owner acceptance of the complete MPY-07 policy, pins the"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-07-1",
+          "INV-MPY-07-2",
+          "INV-MPY-07-3",
+          "INV-MPY-07-4",
+          "INV-MPY-07-5",
+          "INV-MPY-07-6",
+          "INV-MPY-7",
+          "INV-MPY-9",
+          "PCDN-MPY-003",
+          "PCDN-MPY-07-001",
+          "PCDN-MPY-07-002",
+          "PCDN-MPY-07-003",
+          "§0",
+          "§4–§14"
+        ]
+      },
+      "doc": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 269,
+      "obj_id": "docs/concepts/MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md#0.2.0-rationale",
+      "text": "An auditable upstream pin prevents VM drift from masquerading as binding\nbehavior. A raw software framebuffer keeps pixel evidence deterministic, and\nexplicit Git/CI limits preserve reviewability without making regenerated\nbinary payloads permanent repository weight."
     },
     {
       "attrs": {

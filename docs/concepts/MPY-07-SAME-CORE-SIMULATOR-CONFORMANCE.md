@@ -4,8 +4,10 @@ MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md - Host MicroPython, direct-runtime, an
 
 # MPY-07 — Same-Core Simulator Conformance
 
-**Status:** Draft 2026-08-09. Not ratified. Harness tooling and evidence paths
-are proposed pending implementation experiments.
+**Status:** Owner-accepted 2026-08-16; not yet ratified. The MicroPython pin,
+canonical software renderer, evidence-retention policy, invariants, and
+acceptance checklist are frozen. Harness implementation and a green required
+scenario corpus remain evidence gates.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-06 must expose the real MicroPython API before binding equivalence can
@@ -59,6 +61,7 @@ prove MicroPython C-module behavior and must not become the oracle.
 | Stage snapshots and revisions | MPY-04 |
 | Cue ordering/overflow | MPY-05 |
 | Public MicroPython behavior | MPY-06 |
+| Pinned MicroPython source | `vendor/micropython` at the MPY-07 §5 commit |
 | Existing simulator renderer | `examples/sim`, `examples/disco-sim`, renderer tests |
 | Canonical scenarios and comparison rules | This document |
 | Board replay of the same scenarios | MPY-08 |
@@ -71,8 +74,12 @@ MPY-07 has four independently failing layers:
 1. **Protocol vectors:** canonical bytes decode/encode and reject invalid frames.
 2. **Direct runtime:** neutral Commands/Batches drive an in-process Stage and
    produce Results/Cues/Snapshots.
-3. **Actual MicroPython binding:** a pinned host-build MicroPython VM loads the
-   same C/Rust module surface and runs Python scenarios.
+3. **Actual MicroPython binding:** official MicroPython `v1.28.0`, commit
+   `e0e9fbb17ed6fd06bb76e266ae554784c9c80804`, built from the
+   `vendor/micropython` submodule with `ports/unix`, `VARIANT=standard`, loads
+   the same C/Rust module surface through `USER_C_MODULES` and runs Python
+   scenarios. CI and local proof MUST use that checked-out commit rather than a
+   branch, `latest`, or an independent fetch.
 4. **Simulator presentation:** relevant checkpoints draw deterministic frames
    and compare geometry/pixels or approved hashes.
 
@@ -129,9 +136,17 @@ only explicitly declared transport-only measurements such as host duration.
 Object/Stage/Request/Subscription IDs, Stage Revision, CueSequence, operation
 order, payloads, error classes, snapshots, and coalescing metadata remain exact.
 
-Image comparison uses exact pixels when renderer inputs are deterministic.
-Tolerance-based comparison requires an owning LPAR fixture policy and cannot
-hide geometry or ordering divergence.
+The canonical pixel backend is `rlvgl_platform::CpuBlitter` with
+`BlitterRenderer` targeting a caller-owned, zero-initialized `Argb8888`
+`320×240` buffer. Required comparison bypasses `WgpuDisplay`, windowing, ASCII
+conversion, and PNG encoding and compares exact raw framebuffer bytes.
+Deterministic built-in or packed fonts and pinned assets are required. Optional
+`fontdue`, GPU, animation, and wall-clock behavior cannot affect required
+goldens. `examples/sim` carries this harness; `examples/disco-sim` may provide
+supplementary integration evidence but is not the golden-image oracle.
+
+Tolerance-based image comparison requires an owning LPAR fixture policy and
+cannot hide geometry or ordering divergence.
 
 ### 8.2 Performance characterization
 
@@ -159,21 +174,30 @@ data exists.
 | **INV-MPY-07-5** | Simulator evidence MUST prove requested layout is performed natively and callback mutations appear only after the callback and next Safe Turn. | Layout/callback frame and trace checkpoints. |
 | **INV-MPY-07-6** | Performance characterization MUST measure 50-, 250-, and 1,000-actor lookup before MPY-03 storage optimization or MPY-08 admission. | Reproducible benchmark report artifact. |
 
-Evidence artifacts are committed when compact/deterministic or retained by CI
-with a stable manifest and checksum when large. Every artifact names scenario,
-schema revision, source commit, and target profile.
+Deterministic artifacts up to 256 KiB stored size MAY be committed, subject to
+a 1 MiB committed bundle limit per scenario. If either limit is exceeded, Git
+stores the manifest, SHA-256 checksums, compact trace excerpts, and an optional
+review PNG while CI retains the full payload. Splitting or compressing an
+artifact solely to evade a limit is prohibited; stored and expanded sizes are
+both recorded. Git LFS is not used for the MPY corpus.
+
+Every artifact names the scenario, schema revision, rlvgl source commit,
+MicroPython commit, target profile, toolchain, media type, checksum, retention
+class, and sizes. Release evidence is promoted to durable MPY-09 publication
+storage before routine CI retention expires.
 
 ## 10. Reconciliation Decisions
 
 | Existing surface | MPY-07 decision |
 |---|---|
 | Rust unit tests | Remain necessary but cannot substitute for cross-driver scenarios. |
-| Existing simulator examples | Reused as renderer/platform carriers where deterministic; MPY adds a stage/protocol harness rather than embedding test policy in demos. |
+| `examples/sim` | Canonical harness carrier using its CPU blitter path directly; window/GPU/ASCII/PNG layers are excluded from required comparison. |
+| `examples/disco-sim` | Supplementary integration evidence only; timing-sensitive board-demo automation is not the pixel oracle. |
 | PyO3 proposal | Optional consumer only; actual MicroPython Driver is normative. |
 | Visual goldens from LPAR | Reuse when the same actor behavior is in scope; MPY adds director/binding trace evidence. |
 | Hardware screenshots | MPY-08 evidence, not a replacement for deterministic host frames. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 1. **No board transport.** MPY-07 is in-process/same-core.
 2. **No wall-clock UI loop.** Logical ticks and synthetic input are mandatory.
@@ -181,23 +205,27 @@ schema revision, source commit, and target profile.
 4. **No CPython equivalence requirement.** It may be added without changing the
    oracle.
 
-- **PCDN-MPY-07-001:** Which MicroPython source revision/host port is pinned for
-  the first harness, and is it vendored, submoduled, or fetched in CI?
-- **PCDN-MPY-07-002:** Which existing simulator provides the canonical pixel
-  backend for MPY goldens? Recommendation: the smallest deterministic software
-  renderer that already passes LPAR fixtures.
-- **PCDN-MPY-07-003:** What artifact size threshold moves data from Git to CI
-  retention? MPY-09 publication policy must set it.
+- **PCDN-MPY-07-001 — Closed 2026-08-16:** §5 pins official MicroPython
+  `v1.28.0` at `e0e9fbb17ed6fd06bb76e266ae554784c9c80804` as
+  `vendor/micropython` and selects the Unix standard port plus
+  `USER_C_MODULES` for the canonical host binding proof.
+- **PCDN-MPY-07-002 — Closed 2026-08-16:** §8.1 selects the existing CPU
+  blitter and `BlitterRenderer` over a raw ARGB8888 surface, carried through
+  `examples/sim`, as the exact pixel oracle. Disco-sim remains supplementary.
+- **PCDN-MPY-07-003 — Closed 2026-08-16:** §9 caps committed artifacts at
+  256 KiB each and committed bundles at 1 MiB per scenario. Larger payloads
+  remain in CI with committed manifests and checksums, and release evidence is
+  promoted under MPY-09 before expiry.
 
 ## 12. Acceptance Checklist
 
-- [ ] `INV-MPY-07-1` requires actual MicroPython/direct trace equivalence.
-- [ ] `INV-MPY-07-2` deterministic scenario inputs and expected artifacts are accepted.
-- [ ] `INV-MPY-07-3` first-divergence comparison policy is accepted.
-- [ ] `INV-MPY-07-4` golden update metadata is accepted.
-- [ ] `INV-MPY-07-5` layout/callback ordering checkpoints are accepted.
-- [ ] `INV-MPY-07-6` benchmark sizes resolve the MPY-03 storage trigger.
-- [ ] PCDN-MPY-07-001 through PCDN-MPY-07-003 are resolved without weakening `INV-MPY-7` or resolved PCDN-MPY-003.
+- [x] `INV-MPY-07-1` requires actual MicroPython/direct trace equivalence.
+- [x] `INV-MPY-07-2` deterministic scenario inputs and expected artifacts are accepted.
+- [x] `INV-MPY-07-3` first-divergence comparison policy is accepted.
+- [x] `INV-MPY-07-4` golden update metadata is accepted.
+- [x] `INV-MPY-07-5` layout/callback ordering checkpoints are accepted.
+- [x] `INV-MPY-07-6` benchmark sizes resolve the MPY-03 storage trigger.
+- [x] PCDN-MPY-07-001 through PCDN-MPY-07-003 are resolved without weakening `INV-MPY-7` or resolved PCDN-MPY-003.
 
 ## 13. Files Cited
 
@@ -206,6 +234,7 @@ schema revision, source commit, and target profile.
 - `docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md`
 - `docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md`
 - `docs/concepts/MPY-06-MICROPYTHON-DIRECTOR-BINDING.md`
+- `vendor/micropython/`
 - `examples/sim/`
 - `examples/disco-sim/`
 
@@ -236,3 +265,26 @@ golden update policy, and pre-board performance characterization.
 Separating semantic proof from board transport makes failures attributable and
 prevents a CPython convenience layer from defining device behavior. Shared
 scenarios become the transport-independent oracle replayed by MPY-08.
+
+### 0.2.0 — 2026-08-16 — Amended
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-MPY-07-1, INV-MPY-07-2, INV-MPY-07-3, INV-MPY-07-4, INV-MPY-07-5, INV-MPY-07-6, INV-MPY-7, INV-MPY-9, PCDN-MPY-003, PCDN-MPY-07-001, PCDN-MPY-07-002, PCDN-MPY-07-003, §0, §4–§14
+
+**Commits:** pending
+
+**Summary:** Records owner acceptance of the complete MPY-07 policy, pins the
+actual MicroPython Unix-standard host source, selects the CPU blitter as the
+exact pixel oracle, and bounds committed evidence by per-artifact and
+per-scenario thresholds. MPY-07 remains unratified until the harness and
+required scenario corpus pass.
+
+#### Rationale
+
+An auditable upstream pin prevents VM drift from masquerading as binding
+behavior. A raw software framebuffer keeps pixel evidence deterministic, and
+explicit Git/CI limits preserve reviewability without making regenerated
+binary payloads permanent repository weight.
