@@ -18,7 +18,11 @@ use crate::{
         StageDirection, StageRevision,
     },
     layout::{EngineConfig, GridTrack, LayoutRole, LayoutState},
-    object::{DispatchPhase, ObjectEvent, ObjectFlags, ObjectNode, ObjectStates},
+    object::{
+        CompletedObjectDispatch, DispatchInput, DispatchPhase, NativeEventObserver,
+        ObjectDispatchError, ObjectDispatchObservationPlans, ObjectEvent, ObjectFlags, ObjectNode,
+        ObjectStates, ResolvedObjectDispatch, resolve_object_dispatch,
+    },
     widget::{Rect, Widget},
 };
 
@@ -998,6 +1002,165 @@ pub struct NativeMutationPublication {
     pub object_id: ObjectId,
     /// Descriptor-declared director-visible effects.
     pub effects: MutationEffects,
+}
+
+/// One actor and its geometry captured before a possible native observation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativePublicationTarget {
+    /// Exact actor generation and type expected during dispatch.
+    pub actor_identity: ActorIdentity,
+    /// Canonical effective bounds captured while resolving the route.
+    pub pre_dispatch_bounds: Rect,
+}
+
+/// Sealed descriptor-first publication produced by native observation.
+///
+/// Construction is crate-private so an armed Stage commit only receives
+/// publications derived from its preflighted subscription workspace.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeDispatchPublication {
+    actor_identity: ActorIdentity,
+    effects: MutationEffects,
+    invalidation_bounds: Rect,
+}
+
+impl NativeDispatchPublication {
+    pub(crate) const fn new(
+        actor_identity: ActorIdentity,
+        effects: MutationEffects,
+        invalidation_bounds: Rect,
+    ) -> Self {
+        Self {
+            actor_identity,
+            effects,
+            invalidation_bounds,
+        }
+    }
+
+    /// Return the exact actor that emitted this publication.
+    pub const fn actor_identity(&self) -> ActorIdentity {
+        self.actor_identity
+    }
+
+    /// Return the descriptor-declared director-visible effects.
+    pub const fn effects(&self) -> MutationEffects {
+        self.effects
+    }
+
+    /// Return the union of pre-dispatch and observed effective geometry.
+    pub const fn invalidation_bounds(&self) -> Rect {
+        self.invalidation_bounds
+    }
+}
+
+/// Allocation-owned Stage publication preparation made before native dispatch.
+#[must_use = "native publication preparation must be armed or explicitly released"]
+pub struct PreparedNativePublications {
+    stage_id: StageId,
+    starting_revision: StageRevision,
+    next_revision: Option<StageRevision>,
+    maximum_publications: usize,
+    possible_effects: MutationEffects,
+    targets: Vec<NativePublicationTarget>,
+}
+
+impl PreparedNativePublications {
+    /// Return the Stage that owns this preparation.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the revision captured before dispatch.
+    pub const fn starting_revision(&self) -> StageRevision {
+        self.starting_revision
+    }
+
+    /// Return the maximum descriptor publications reserved for the traversal.
+    pub const fn maximum_publications(&self) -> usize {
+        self.maximum_publications
+    }
+}
+
+/// Fully refreshed native publication transaction ready for infallible commit.
+#[must_use = "armed native publications must be committed or explicitly released"]
+pub struct NativePublicationCommit {
+    prepared: PreparedNativePublications,
+}
+
+/// Committed native publication scratch retained through cue enqueue.
+#[must_use = "committed native publication scratch must be explicitly released"]
+pub struct CompletedNativePublications {
+    prepared: PreparedNativePublications,
+}
+
+impl CompletedNativePublications {
+    /// Return the Stage that accepted the publication.
+    pub const fn stage_id(&self) -> StageId {
+        self.prepared.stage_id
+    }
+}
+
+/// One Stage-selected, allocation-owned object route.
+///
+/// Pointer and focused resolution is explicitly scoped to `root_id`. Direct
+/// actor resolution derives that actor's owning root and structural path.
+pub struct ResolvedStageDispatch {
+    stage_id: StageId,
+    stage_revision: StageRevision,
+    root_id: ObjectId,
+    resolved: ResolvedObjectDispatch,
+}
+
+impl ResolvedStageDispatch {
+    /// Return the owning Stage.
+    pub const fn stage_id(&self) -> StageId {
+        self.stage_id
+    }
+
+    /// Return the selected Stage root.
+    pub const fn root_id(&self) -> ObjectId {
+        self.root_id
+    }
+
+    /// Borrow the exact object-semantic event.
+    pub const fn event(&self) -> &ObjectEvent {
+        self.resolved.event()
+    }
+
+    /// Return the target actor when the resolved target belongs to this Stage.
+    pub const fn target_identity(&self) -> Option<ActorIdentity> {
+        self.resolved.target_view().actor_identity
+    }
+
+    /// Iterate the conservative native phase/node reservation plan.
+    pub fn possible_observations(&self) -> ObjectDispatchObservationPlans<'_> {
+        self.resolved.possible_observations()
+    }
+}
+
+/// Stage-scoped route resolution or final object-dispatch failure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StageDispatchError {
+    /// Stage identity, actor identity, or lifecycle validation failed.
+    Registry(RegistryError),
+    /// Object route resolution or final freshness validation failed.
+    Object(ObjectDispatchError),
+    /// The Stage changed after route resolution.
+    StaleStage,
+    /// The supplied resolved route belongs to another Stage.
+    StageMismatch,
+}
+
+impl From<RegistryError> for StageDispatchError {
+    fn from(value: RegistryError) -> Self {
+        Self::Registry(value)
+    }
+}
+
+impl From<ObjectDispatchError> for StageDispatchError {
+    fn from(value: ObjectDispatchError) -> Self {
+        Self::Object(value)
+    }
 }
 
 /// Encode a descriptor-owned event value sequence into caller-owned storage.
@@ -2041,6 +2204,249 @@ impl StageRegistry {
             type_id: record.descriptor.type_id,
             ops: record.ops.clone(),
         })
+    }
+
+    /// Resolve one pointer, focused, or explicit-path input below a selected root.
+    ///
+    /// No-target and route errors occur before the endpoint assigns a native
+    /// event sequence or reserves subscription/cue storage.
+    pub fn resolve_root_dispatch(
+        &self,
+        root_id: ObjectId,
+        input: DispatchInput,
+    ) -> Result<ResolvedStageDispatch, StageDispatchError> {
+        self.record(root_id)?;
+        let root = self
+            .roots
+            .iter()
+            .find(|root| {
+                root.node
+                    .actor_identity()
+                    .is_some_and(|identity| identity.object_id == root_id)
+            })
+            .ok_or(RegistryError::InvalidParent)?;
+        Ok(ResolvedStageDispatch {
+            stage_id: self.stage_id,
+            stage_revision: self.revision,
+            root_id,
+            resolved: resolve_object_dispatch(&root.node, input)?,
+        })
+    }
+
+    /// Resolve a direct object event by actor identity and derive its owning root/path.
+    pub fn resolve_actor_dispatch(
+        &self,
+        target: ActorIdentity,
+        event: ObjectEvent,
+    ) -> Result<ResolvedStageDispatch, StageDispatchError> {
+        let actor = self.actor_info(target.object_id)?;
+        if actor.type_id != target.type_id {
+            return Err(StageDispatchError::Registry(RegistryError::StaleObject {
+                object_id: target.object_id,
+            }));
+        }
+        let mut path = Vec::new();
+        path.try_reserve_exact(self.limits.max_tree_depth.saturating_sub(1))
+            .map_err(|_| StageDispatchError::Object(ObjectDispatchError::AllocationFailed))?;
+        for root in &self.roots {
+            path.clear();
+            if find_path_to_object(&root.node, target.object_id, &mut path) {
+                let root_id = root
+                    .node
+                    .actor_identity()
+                    .ok_or(RegistryError::Internal)?
+                    .object_id;
+                return Ok(ResolvedStageDispatch {
+                    stage_id: self.stage_id,
+                    stage_revision: self.revision,
+                    root_id,
+                    resolved: resolve_object_dispatch(
+                        &root.node,
+                        DispatchInput::Container { path, event },
+                    )?,
+                });
+            }
+        }
+        Err(RegistryError::Internal.into())
+    }
+
+    /// Run a previously resolved route without exposing mutable Stage roots.
+    ///
+    /// This is the final fallible route freshness/borrow check. Success runs
+    /// the allocation-free native traversal and returns all route storage for
+    /// explicit release after publication.
+    pub fn dispatch_resolved_native<O: NativeEventObserver + ?Sized>(
+        &mut self,
+        route: ResolvedStageDispatch,
+        observer: &mut O,
+    ) -> Result<CompletedObjectDispatch, StageDispatchError> {
+        if route.stage_id != self.stage_id {
+            return Err(StageDispatchError::StageMismatch);
+        }
+        self.ensure_active()?;
+        if route.stage_revision != self.revision {
+            return Err(StageDispatchError::StaleStage);
+        }
+        let root = self
+            .roots
+            .iter_mut()
+            .find(|root| {
+                root.node
+                    .actor_identity()
+                    .is_some_and(|identity| identity.object_id == route.root_id)
+            })
+            .ok_or(StageDispatchError::StaleStage)?;
+        let prepared = route.resolved.prepare(&mut root.node)?;
+        Ok(prepared.dispatch_observed(observer))
+    }
+
+    /// Allocate and validate Stage-side storage for one complete native traversal.
+    pub fn prepare_native_publications(
+        &mut self,
+        targets: &[NativePublicationTarget],
+        maximum_publications: usize,
+        possible_effects: MutationEffects,
+    ) -> Result<PreparedNativePublications, RegistryError> {
+        self.ensure_active()?;
+        for target in targets {
+            let actor = self.actor_info(target.actor_identity.object_id)?;
+            if actor.type_id != target.actor_identity.type_id {
+                return Err(RegistryError::StaleObject {
+                    object_id: target.actor_identity.object_id,
+                });
+            }
+            self.node(target.actor_identity.object_id)?
+                .try_effective_bounds()
+                .ok_or(RegistryError::DispatchBusy)?;
+        }
+        self.last_invalidations
+            .try_reserve_exact(maximum_publications)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::NativeEventPublications,
+            })?;
+        let mut owned_targets = Vec::new();
+        owned_targets
+            .try_reserve_exact(targets.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::NativeEventPublications,
+            })?;
+        owned_targets.extend_from_slice(targets);
+        Ok(PreparedNativePublications {
+            stage_id: self.stage_id,
+            starting_revision: self.revision,
+            next_revision: if possible_effects == MutationEffects::NONE {
+                None
+            } else {
+                Some(self.next_revision()?)
+            },
+            maximum_publications,
+            possible_effects,
+            targets: owned_targets,
+        })
+    }
+
+    /// Perform the final allocation-free Stage freshness and actor-borrow guard.
+    pub fn arm_native_publications(
+        &self,
+        prepared: PreparedNativePublications,
+    ) -> Result<NativePublicationCommit, RegistryError> {
+        self.ensure_active()?;
+        if prepared.stage_id != self.stage_id || prepared.starting_revision != self.revision {
+            return Err(RegistryError::Internal);
+        }
+        if prepared.maximum_publications > self.last_invalidations.capacity() {
+            return Err(RegistryError::Capacity {
+                kind: CapacityKind::NativeEventPublications,
+            });
+        }
+        for target in &prepared.targets {
+            let actor = self.actor_info(target.actor_identity.object_id)?;
+            if actor.type_id != target.actor_identity.type_id {
+                return Err(RegistryError::StaleObject {
+                    object_id: target.actor_identity.object_id,
+                });
+            }
+            let bounds = self
+                .node(target.actor_identity.object_id)?
+                .try_effective_bounds()
+                .ok_or(RegistryError::DispatchBusy)?;
+            if bounds != target.pre_dispatch_bounds {
+                return Err(RegistryError::Internal);
+            }
+        }
+        Ok(NativePublicationCommit { prepared })
+    }
+
+    /// Infallibly publish one armed traversal and retain all preparation scratch.
+    ///
+    /// A descriptor publication set with nonempty aggregate Stage effects
+    /// advances the revision once. Event-only publications and unchanged
+    /// transitions retain the current revision; native sequencing still
+    /// distinguishes their causality.
+    pub fn commit_native_publications(
+        &mut self,
+        commit: NativePublicationCommit,
+        publications: &[NativeDispatchPublication],
+    ) -> (StageRevision, CompletedNativePublications) {
+        let prepared = commit.prepared;
+        assert!(self.active, "armed native publication Stage remains active");
+        assert_eq!(prepared.stage_id, self.stage_id);
+        assert_eq!(prepared.starting_revision, self.revision);
+        assert!(publications.len() <= prepared.maximum_publications);
+        assert!(
+            publications
+                .iter()
+                .all(|publication| prepared.possible_effects.contains(publication.effects))
+        );
+        assert!(publications.iter().all(|publication| {
+            prepared
+                .targets
+                .iter()
+                .any(|target| target.actor_identity == publication.actor_identity)
+        }));
+
+        let effects = publications
+            .iter()
+            .fold(MutationEffects::NONE, |effects, publication| {
+                effects.union(publication.effects)
+            });
+        if effects != MutationEffects::NONE {
+            self.snapshot = None;
+            self.last_effects = effects;
+            self.last_invalidations.clear();
+            for publication in publications {
+                if publication.effects.contains(MutationEffects::DRAW)
+                    && !self
+                        .last_invalidations
+                        .contains(&publication.invalidation_bounds)
+                {
+                    debug_assert!(
+                        self.last_invalidations.len() < self.last_invalidations.capacity()
+                    );
+                    self.last_invalidations
+                        .push(publication.invalidation_bounds);
+                }
+            }
+            self.revision = prepared
+                .next_revision
+                .expect("a native mutation preflighted its next revision");
+        }
+        (self.revision, CompletedNativePublications { prepared })
+    }
+
+    /// Release an uncommitted native publication preparation outside dispatch.
+    pub fn release_prepared_native_publications(&self, prepared: PreparedNativePublications) {
+        drop(prepared);
+    }
+
+    /// Release an armed publication transaction outside dispatch.
+    pub fn release_native_publication_commit(&self, commit: NativePublicationCommit) {
+        drop(commit);
+    }
+
+    /// Release committed publication scratch after cue enqueue completes.
+    pub fn release_completed_native_publications(&self, completed: CompletedNativePublications) {
+        drop(completed);
     }
 
     /// Reserve invalidation storage for post-dispatch native publications.
@@ -3876,6 +4282,23 @@ fn find_node_mut(node: &mut ObjectNode, object_id: ObjectId) -> Option<&mut Obje
     node.children_mut()
         .iter_mut()
         .find_map(|child| find_node_mut(child, object_id))
+}
+
+fn find_path_to_object(node: &ObjectNode, object_id: ObjectId, path: &mut Vec<usize>) -> bool {
+    if node
+        .actor_identity()
+        .is_some_and(|identity| identity.object_id == object_id)
+    {
+        return true;
+    }
+    for (index, child) in node.children().iter().enumerate() {
+        path.push(index);
+        if find_path_to_object(child, object_id, path) {
+            return true;
+        }
+        path.pop();
+    }
+    false
 }
 
 fn collect_postorder_ids(node: &ObjectNode, ids: &mut Vec<ObjectId>) -> Result<(), RegistryError> {

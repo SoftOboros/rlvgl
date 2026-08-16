@@ -15,7 +15,10 @@ use rlvgl_core::{
     },
     cue::{CallbackId, CueDelivery, EventId, NativeEventSequence},
     event::Event,
-    object::{DispatchPhase, NativeObserverControl, ObjectEvent},
+    object::{
+        DispatchInput, DispatchPhase, EventContext, NativeEventObservation, NativeEventObserver,
+        NativeObserverControl, ObjectEvent,
+    },
     renderer::Renderer,
     subscription::{
         EndpointEpoch, NativeEventCompletion, NativeEventReservation, PropagationPolicy,
@@ -24,7 +27,10 @@ use rlvgl_core::{
     },
     widget::{Rect, Widget},
 };
-use rlvgl_core::{direction::ActorDirection, direction::OwnedValue};
+use rlvgl_core::{
+    direction::ActorDirection, direction::OwnedValue, direction::RuntimeFlag,
+    direction::StageDirection,
+};
 use rlvgl_widgets::{button, container, label, list, mpy::CATALOG, slider};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -980,7 +986,7 @@ const ORDER_EVENTS: [EventDescriptor; 2] = [
         native_event: NativeEventKind::Clicked,
         phases: EventPhaseSet::TARGET,
         filters: EventFilterSet::ANY,
-        requires_widget_invocation: true,
+        requires_widget_invocation: false,
         requires_native_consumed: false,
         allow_consume_at_target: true,
         allow_stop_after_phase: false,
@@ -996,7 +1002,7 @@ const ORDER_EVENTS: [EventDescriptor; 2] = [
         native_event: NativeEventKind::Clicked,
         phases: EventPhaseSet::TARGET,
         filters: EventFilterSet::ANY,
-        requires_widget_invocation: true,
+        requires_widget_invocation: false,
         requires_native_consumed: false,
         allow_consume_at_target: true,
         allow_stop_after_phase: false,
@@ -1092,4 +1098,251 @@ fn descriptor_order_precedes_per_descriptor_registration_order() {
     );
     assert_eq!(EVENT_ONE_CALLS.load(Ordering::SeqCst), 1);
     assert_eq!(EVENT_TWO_CALLS.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn dispatch_wide_workspace_is_allocation_free_and_preserves_descriptor_fanout_order() {
+    EVENT_ONE_CALLS.store(0, Ordering::SeqCst);
+    EVENT_TWO_CALLS.store(0, Ordering::SeqCst);
+    let mut stage = StageRegistry::new(
+        StageId::new(11).unwrap(),
+        &ORDERED_ACTOR_CATALOG,
+        registry_limits(),
+    )
+    .unwrap();
+    let object_id = stage
+        .create(
+            ORDERED_ACTOR_TYPE,
+            CreateDestination::Root { name: "ordered" },
+            &[],
+        )
+        .unwrap();
+    let actor = ActorIdentity {
+        object_id,
+        type_id: ORDERED_ACTOR_TYPE,
+    };
+    let mut subscriptions =
+        SubscriptionRegistry::new(EndpointEpoch::new(11).unwrap(), subscription_limits(4, 4))
+            .unwrap();
+    for (event_id, callback) in [
+        (ORDER_EVENT_TWO, 1),
+        (ORDER_EVENT_ONE, 2),
+        (ORDER_EVENT_TWO, 3),
+    ] {
+        subscriptions
+            .subscribe(
+                &stage,
+                request(
+                    stage.stage_id(),
+                    actor,
+                    event_id,
+                    callback,
+                    PropagationPolicy::Observe,
+                ),
+            )
+            .unwrap();
+    }
+
+    let starting_revision = stage.revision();
+    let route = stage
+        .resolve_actor_dispatch(actor, ObjectEvent::Clicked { x: 8, y: 9 })
+        .unwrap();
+    let prepared = subscriptions
+        .reserve_native_dispatch(&mut stage, &route, NativeEventSequence::new(41).unwrap())
+        .unwrap();
+    assert_eq!(prepared.cue_admission_counts().critical, 1);
+    assert_eq!(prepared.cue_admission_counts().latest_value_coalescible, 2);
+    assert_eq!(prepared.maximum_payload_bytes(), 5);
+    assert_eq!(prepared.possible_observation_count(), 2);
+    let mut observer = subscriptions.arm_native_dispatch(&stage, prepared).unwrap();
+
+    let ((completed, published), allocations, deallocations) = count_allocator_operations(|| {
+        let completed = stage
+            .dispatch_resolved_native(route, &mut observer)
+            .unwrap();
+        let observed = match observer.finish() {
+            Ok(observed) => observed,
+            Err(failed) => panic!("native adapter failed: {:?}", failed.cause()),
+        };
+        let published = subscriptions.publish_native_dispatch(&mut stage, observed);
+        (completed, published)
+    });
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(published.stage_revision(), starting_revision);
+    assert_eq!(published.native_event_sequence().get(), 41);
+    assert_eq!(EVENT_ONE_CALLS.load(Ordering::SeqCst), 1);
+    assert_eq!(EVENT_TWO_CALLS.load(Ordering::SeqCst), 1);
+
+    let mut published = published;
+    let (cues, allocations, deallocations) = count_allocator_operations(|| published.take_cues());
+    assert_eq!((allocations, deallocations), (0, 0));
+    let order: Vec<_> = cues
+        .iter()
+        .map(|cue| (cue.event_id().get(), cue.callback_id().get()))
+        .collect();
+    assert_eq!(
+        order,
+        [
+            (ORDER_EVENT_ONE, 2),
+            (ORDER_EVENT_TWO, 1),
+            (ORDER_EVENT_TWO, 3),
+        ]
+    );
+    assert!(
+        cues.iter()
+            .all(|cue| cue.stage_revision() == starting_revision)
+    );
+    completed.release();
+    published.release();
+}
+
+#[test]
+fn dispatch_wide_mutation_advances_once_and_unchanged_transition_does_not() {
+    let mut stage = stage();
+    let actor = create_slider(&mut stage);
+    stage
+        .apply_batch(&[StageDirection::SetFlag {
+            object_id: actor.object_id,
+            flag: RuntimeFlag::Clickable,
+            enabled: true,
+        }])
+        .unwrap();
+    let subscriptions =
+        SubscriptionRegistry::new(EndpointEpoch::new(12).unwrap(), subscription_limits(4, 4))
+            .unwrap();
+    let root_id = stage.root_id("main").unwrap();
+    let before = stage.revision();
+
+    for (sequence, expected_revision) in [(1, before.get() + 1), (2, before.get() + 1)] {
+        let route = stage
+            .resolve_root_dispatch(
+                root_id,
+                DispatchInput::Pointer {
+                    x: 75,
+                    y: 10,
+                    event: Event::PressRelease { x: 75, y: 10 },
+                },
+            )
+            .unwrap();
+        let prepared = subscriptions
+            .reserve_native_dispatch(
+                &mut stage,
+                &route,
+                NativeEventSequence::new(sequence).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(prepared.possible_observation_count(), 4);
+        let mut observer = subscriptions.arm_native_dispatch(&stage, prepared).unwrap();
+        let completed = stage
+            .dispatch_resolved_native(route, &mut observer)
+            .unwrap();
+        let observed = match observer.finish() {
+            Ok(observed) => observed,
+            Err(failed) => panic!("native adapter failed: {:?}", failed.cause()),
+        };
+        let published = subscriptions.publish_native_dispatch(&mut stage, observed);
+        assert_eq!(published.stage_revision().get(), expected_revision);
+        assert!(stage.last_invalidations().contains(&BOUNDS));
+        completed.release();
+        published.release();
+    }
+}
+
+#[test]
+fn dispatch_wide_workspace_matches_the_full_non_clicked_event() {
+    let mut stage = stage();
+    let root_id = create_root(&mut stage);
+    let root_info = stage.actor_info(root_id).unwrap();
+    let root = ActorIdentity {
+        object_id: root_id,
+        type_id: root_info.type_id,
+    };
+    let subscriptions =
+        SubscriptionRegistry::new(EndpointEpoch::new(13).unwrap(), subscription_limits(2, 2))
+            .unwrap();
+    let route = stage
+        .resolve_actor_dispatch(root, ObjectEvent::Focused)
+        .unwrap();
+    let planned = route.possible_observations().next().unwrap();
+    let prepared = subscriptions
+        .reserve_native_dispatch(&mut stage, &route, NativeEventSequence::new(1).unwrap())
+        .unwrap();
+    let mut observer = subscriptions.arm_native_dispatch(&stage, prepared).unwrap();
+    let wrong_event = ObjectEvent::Defocused;
+    assert_eq!(
+        observer.observe(NativeEventObservation {
+            phase: planned.phase,
+            node: planned.node,
+            event: &wrong_event,
+            context: EventContext {
+                target_tag: None,
+                current_tag: None,
+            },
+            native_consumed: false,
+            widget_invoked: false,
+        }),
+        NativeObserverControl::ConsumePredeclared
+    );
+    let failed = match observer.finish() {
+        Ok(observed) => {
+            observed.release();
+            panic!("mismatched non-clicked event unexpectedly completed")
+        }
+        Err(failed) => failed,
+    };
+    assert_eq!(failed.cause(), SubscriptionError::WorkspaceMismatch);
+    failed.release();
+}
+
+#[test]
+fn stage_dispatch_routes_direct_actors_to_their_owning_root() {
+    let mut stage = stage();
+    let first_root = create_root(&mut stage);
+    let container = descriptor("container::Container");
+    let second_root = stage
+        .create(
+            container.type_id,
+            CreateDestination::Root { name: "second" },
+            &[rect_input(field(container, "bounds"))],
+        )
+        .unwrap();
+    let button = descriptor("button::Button");
+    let target_id = stage
+        .create(
+            button.type_id,
+            CreateDestination::Child {
+                parent: second_root,
+            },
+            &[
+                rect_input(field(button, "bounds")),
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(button, "text"),
+                    value: ValueRef::Text("Second"),
+                },
+            ],
+        )
+        .unwrap();
+    let target = ActorIdentity {
+        object_id: target_id,
+        type_id: button.type_id,
+    };
+
+    let route = stage
+        .resolve_actor_dispatch(target, ObjectEvent::Clicked { x: 1, y: 1 })
+        .unwrap();
+    assert_eq!(route.root_id(), second_root);
+    assert_eq!(route.target_identity(), Some(target));
+    assert_eq!(route.possible_observations().len(), 4);
+    assert!(matches!(
+        stage.resolve_root_dispatch(
+            first_root,
+            DispatchInput::Container {
+                path: vec![0],
+                event: ObjectEvent::Clicked { x: 1, y: 1 },
+            },
+        ),
+        Err(rlvgl_core::actor::StageDispatchError::Object(
+            rlvgl_core::object::ObjectDispatchError::InvalidPath
+        ))
+    ));
 }

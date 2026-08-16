@@ -9,15 +9,20 @@ use alloc::vec::Vec;
 
 use crate::{
     actor::{
-        ActorEventHandle, ActorIdentity, EventDelivery, EventDescriptor, EventFilterSet,
-        NativeMutationPublication, ObjectId, RegistryError, StageId, StageRegistry,
+        ActorEventHandle, ActorIdentity, CompletedNativePublications, EventDelivery,
+        EventDescriptor, EventFilterSet, MutationEffects, NativeDispatchPublication,
+        NativeMutationPublication, NativePublicationCommit, NativePublicationTarget, ObjectId,
+        PreparedNativePublications, RegistryError, ResolvedStageDispatch, StageId, StageRegistry,
     },
     cue::{
         CallbackId, CoalescingKey, CueAdmission, CueDelivery, CueIdentity, CueInput, EventId,
         NativeEventSequence, SubscriptionId,
     },
     direction::StageRevision,
-    object::{DispatchPhase, NativeObserverControl, ObjectEvent},
+    object::{
+        DispatchPhase, NativeEventObservation, NativeEventObserver, NativeObserverControl,
+        ObjectEvent,
+    },
     widget::Rect,
 };
 
@@ -61,7 +66,6 @@ impl SubscriptionLimits {
             || max_tombstones == 0
             || max_tombstones > max_subscriptions
             || max_observation_emissions == 0
-            || max_observation_emissions > max_subscriptions
         {
             return Err(SubscriptionError::InvalidLimits);
         }
@@ -88,7 +92,7 @@ impl SubscriptionLimits {
         self.max_tombstones
     }
 
-    /// Return the largest preflight workspace for one native observation.
+    /// Return the largest descriptor/cue preflight for one native traversal.
     pub const fn max_observation_emissions(self) -> usize {
         self.max_observation_emissions
     }
@@ -230,7 +234,7 @@ pub struct SubscriptionObservation {
     pub control: NativeObserverControl,
 }
 
-/// Exact pre-dispatch cue admissions reserved for one native observation.
+/// Exact pre-dispatch cue admissions reserved for native observation work.
 ///
 /// Counts include every descriptor-qualified subscription that can emit from
 /// the reserved observation. Post-widget semantic gates may reduce the actual
@@ -257,6 +261,11 @@ impl CueAdmissionCounts {
     }
 
     fn add(&mut self, delivery: EventDelivery, count: usize) -> Result<(), SubscriptionError> {
+        self.critical
+            .checked_add(self.ordered)
+            .and_then(|total| total.checked_add(self.latest_value_coalescible))
+            .and_then(|total| total.checked_add(count))
+            .ok_or(SubscriptionError::ObservationCapacity)?;
         let destination = match delivery {
             EventDelivery::Critical => &mut self.critical,
             EventDelivery::Ordered => &mut self.ordered,
@@ -382,7 +391,7 @@ pub enum SubscriptionError {
     AllocationFailed,
     /// The negotiated simultaneous-subscription capacity is full.
     Capacity,
-    /// Possible emissions exceed the negotiated per-observation workspace.
+    /// Possible emissions exceed the negotiated per-traversal workspace.
     ObservationCapacity,
     /// The endpoint exhausted a non-reusable identifier or revision space.
     IdentifierExhausted,
@@ -496,21 +505,6 @@ enum ObservationWorkspaceState {
     Completed,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum NativeEventFingerprint {
-    Clicked { x: i32, y: i32 },
-    Other,
-}
-
-impl NativeEventFingerprint {
-    fn capture(event: &ObjectEvent) -> Self {
-        match event {
-            ObjectEvent::Clicked { x, y } => Self::Clicked { x: *x, y: *y },
-            _ => Self::Other,
-        }
-    }
-}
-
 /// Fully allocated one-observation workspace produced before native dispatch.
 ///
 /// Fields are private so completion cannot be attempted with an unreserved or
@@ -521,7 +515,7 @@ pub struct ObservationWorkspace {
     stage_revision: StageRevision,
     actor_identity: ActorIdentity,
     phase: DispatchPhase,
-    event: NativeEventFingerprint,
+    event: ObjectEvent,
     native_event_sequence: NativeEventSequence,
     event_handle: ActorEventHandle,
     cue_admission_counts: CueAdmissionCounts,
@@ -550,6 +544,213 @@ impl ObservationWorkspace {
             ordinary_slots: self.cue_admission_counts.ordinary(),
             critical_slots: self.cue_admission_counts.critical,
         }
+    }
+}
+
+struct ReservedNativeObservation {
+    actor_identity: ActorIdentity,
+    phase: DispatchPhase,
+    pre_dispatch_bounds: Rect,
+    event_handle: ActorEventHandle,
+    emissions: Vec<ReservedDescriptorEmission>,
+}
+
+struct NativeDispatchWorkspace {
+    registry_revision: u64,
+    stage_id: StageId,
+    event: ObjectEvent,
+    native_event_sequence: NativeEventSequence,
+    cue_admission_counts: CueAdmissionCounts,
+    maximum_payload_bytes: usize,
+    observations: Vec<ReservedNativeObservation>,
+    publications: Vec<NativeDispatchPublication>,
+    ready_cues: Vec<ReservedReadyCue>,
+    cues: Vec<CueInput>,
+    position: usize,
+    control: NativeObserverControl,
+}
+
+/// Fully allocated subscription and Stage publication workspace for one traversal.
+#[must_use = "native dispatch preparation must be armed or explicitly released"]
+pub struct PreparedNativeDispatch {
+    workspace: NativeDispatchWorkspace,
+    stage_publications: PreparedNativePublications,
+}
+
+impl PreparedNativeDispatch {
+    /// Return exact worst-case cue counts across every possible phase/node observation.
+    pub const fn cue_admission_counts(&self) -> CueAdmissionCounts {
+        self.workspace.cue_admission_counts
+    }
+
+    /// Return the largest possible descriptor event payload, excluding envelopes.
+    pub const fn maximum_payload_bytes(&self) -> usize {
+        self.workspace.maximum_payload_bytes
+    }
+
+    /// Return the selected Stage.
+    pub const fn stage_id(&self) -> StageId {
+        self.workspace.stage_id
+    }
+
+    /// Return the endpoint-assigned sequence retained for every emitted cue.
+    pub const fn native_event_sequence(&self) -> NativeEventSequence {
+        self.workspace.native_event_sequence
+    }
+
+    /// Return the conservative phase/node slots retained for this traversal.
+    pub fn possible_observation_count(&self) -> usize {
+        self.workspace.observations.len()
+    }
+}
+
+/// Allocation-free observer armed by final Stage and subscription freshness checks.
+#[must_use = "armed native dispatch must be completed or explicitly released"]
+pub struct NativeDispatchObserver<'a> {
+    registry: &'a SubscriptionRegistry,
+    workspace: NativeDispatchWorkspace,
+    stage_publications: NativePublicationCommit,
+    error: Option<SubscriptionError>,
+}
+
+impl NativeEventObserver for NativeDispatchObserver<'_> {
+    fn observe(&mut self, observation: NativeEventObservation<'_>) -> NativeObserverControl {
+        if self.error.is_some() {
+            return NativeObserverControl::ConsumePredeclared;
+        }
+        match self
+            .registry
+            .complete_native_dispatch_observation(&mut self.workspace, observation)
+        {
+            Ok(control) => control,
+            Err(error) => {
+                self.error = Some(error);
+                NativeObserverControl::ConsumePredeclared
+            }
+        }
+    }
+}
+
+impl<'a> NativeDispatchObserver<'a> {
+    /// Finish observation without allocating or releasing any retained storage.
+    ///
+    /// The intentionally owned error retains all preallocated scratch; boxing
+    /// it here would violate the allocation-free completion contract.
+    #[allow(clippy::result_large_err)]
+    pub fn finish(self) -> Result<ObservedNativeDispatch<'a>, FailedNativeDispatch<'a>> {
+        let Self {
+            registry,
+            workspace,
+            stage_publications,
+            error,
+        } = self;
+        if let Some(cause) = error {
+            Err(FailedNativeDispatch {
+                registry,
+                workspace,
+                stage_publications,
+                cause,
+            })
+        } else {
+            Ok(ObservedNativeDispatch {
+                registry,
+                workspace,
+                stage_publications,
+            })
+        }
+    }
+
+    /// Release an armed but undispatched workspace outside native dispatch.
+    pub fn release(self) {}
+}
+
+/// Successfully observed traversal ready for infallible Stage publication.
+#[must_use = "observed native dispatch must be published or explicitly released"]
+pub struct ObservedNativeDispatch<'a> {
+    registry: &'a SubscriptionRegistry,
+    workspace: NativeDispatchWorkspace,
+    stage_publications: NativePublicationCommit,
+}
+
+impl ObservedNativeDispatch<'_> {
+    /// Release a successfully observed but unpublished traversal.
+    pub fn release(self) {}
+}
+
+/// Terminal post-widget adapter failure retaining all dispatch scratch.
+///
+/// This is not a recoverable input rejection: the endpoint must fault its
+/// epoch, expose `cause`, and release the retained storage outside dispatch.
+#[must_use = "failed native dispatch scratch must be explicitly released"]
+pub struct FailedNativeDispatch<'a> {
+    registry: &'a SubscriptionRegistry,
+    workspace: NativeDispatchWorkspace,
+    stage_publications: NativePublicationCommit,
+    cause: SubscriptionError,
+}
+
+impl FailedNativeDispatch<'_> {
+    /// Return the exact terminal completion failure.
+    pub const fn cause(&self) -> SubscriptionError {
+        self.cause
+    }
+
+    /// Release all retained route-adjacent scratch outside native dispatch.
+    pub fn release(self) {
+        let _ = self.registry;
+        drop(self.workspace);
+        drop(self.stage_publications);
+    }
+}
+
+/// Published cue handoff retaining Stage/subscription scratch until queue acceptance.
+#[must_use = "published native dispatch scratch must be explicitly released"]
+pub struct PublishedNativeDispatch<'a> {
+    registry: &'a SubscriptionRegistry,
+    workspace: NativeDispatchWorkspace,
+    stage_publications: CompletedNativePublications,
+    stage_revision: StageRevision,
+}
+
+impl PublishedNativeDispatch<'_> {
+    /// Return the revision shared by every cue from this traversal.
+    pub const fn stage_revision(&self) -> StageRevision {
+        self.stage_revision
+    }
+
+    /// Return the shared native traversal sequence.
+    pub const fn native_event_sequence(&self) -> NativeEventSequence {
+        self.workspace.native_event_sequence
+    }
+
+    /// Return the aggregate predeclared native propagation decision.
+    pub const fn control(&self) -> NativeObserverControl {
+        self.workspace.control
+    }
+
+    /// Return exact worst-case counts used for pre-dispatch queue admission.
+    pub const fn cue_admission_counts(&self) -> CueAdmissionCounts {
+        self.workspace.cue_admission_counts
+    }
+
+    /// Return the largest possible descriptor event payload, excluding envelopes.
+    pub const fn maximum_payload_bytes(&self) -> usize {
+        self.workspace.maximum_payload_bytes
+    }
+
+    /// Move the preallocated cue vector into the queue reservation.
+    ///
+    /// The surrounding workspace and Stage scratch remain retained; this move
+    /// allocates and deallocates nothing.
+    pub fn take_cues(&mut self) -> Vec<CueInput> {
+        core::mem::take(&mut self.workspace.cues)
+    }
+
+    /// Release all retained completion storage after queue acceptance.
+    pub fn release(self) {
+        let _ = self.registry;
+        drop(self.workspace);
+        drop(self.stage_publications);
     }
 }
 
@@ -616,6 +817,328 @@ impl SubscriptionRegistry {
     ) -> impl Iterator<Item = SubscriptionInfo> + '_ {
         self.subscriptions()
             .filter(move |info| info.stage_id == stage_id)
+    }
+
+    /// Reserve one complete descriptor-first native traversal.
+    ///
+    /// The route was already resolved against one explicit Stage root (or
+    /// derived from one exact actor). This pass allocates every observation,
+    /// adapter payload, subscriber fanout, cue, and Stage publication buffer
+    /// before native dispatch begins.
+    pub fn reserve_native_dispatch(
+        &self,
+        stage: &mut StageRegistry,
+        route: &ResolvedStageDispatch,
+        native_event_sequence: NativeEventSequence,
+    ) -> Result<PreparedNativeDispatch, SubscriptionError> {
+        if route.stage_id() != stage.stage_id() {
+            return Err(SubscriptionError::StageMismatch);
+        }
+        let event = route.event();
+        let plan_count = route.possible_observations().len();
+        let mut observations = Vec::new();
+        observations
+            .try_reserve_exact(plan_count)
+            .map_err(|_| SubscriptionError::AllocationFailed)?;
+        let mut targets = Vec::new();
+        targets
+            .try_reserve_exact(plan_count)
+            .map_err(|_| SubscriptionError::AllocationFailed)?;
+        let mut cue_admission_counts = CueAdmissionCounts::default();
+        let mut descriptor_count = 0usize;
+        let mut possible_effects = MutationEffects::NONE;
+        let mut maximum_payload_bytes = 0usize;
+
+        for plan in route.possible_observations() {
+            let actor_identity = plan
+                .node
+                .actor_identity
+                .ok_or(SubscriptionError::ActorIdentityMismatch)?;
+            self.validate_actor(stage, actor_identity)?;
+            let actor_descriptor = stage
+                .descriptor(actor_identity.type_id)
+                .ok_or(SubscriptionError::ActorIdentityMismatch)?;
+            let matching_descriptors = actor_descriptor
+                .events
+                .iter()
+                .filter(|descriptor| {
+                    descriptor.phases.allows(plan.phase) && descriptor.native_event.matches(event)
+                })
+                .count();
+            descriptor_count = descriptor_count
+                .checked_add(matching_descriptors)
+                .ok_or(SubscriptionError::ObservationCapacity)?;
+            if descriptor_count > self.limits.max_observation_emissions {
+                return Err(SubscriptionError::ObservationCapacity);
+            }
+
+            let event_handle = stage.actor_event_handle(actor_identity.object_id)?;
+            let mut emissions = Vec::new();
+            emissions
+                .try_reserve_exact(matching_descriptors)
+                .map_err(|_| SubscriptionError::AllocationFailed)?;
+            for descriptor in actor_descriptor.events.iter().filter(|descriptor| {
+                descriptor.phases.allows(plan.phase) && descriptor.native_event.matches(event)
+            }) {
+                possible_effects = possible_effects.union(descriptor.native_effects);
+                let payload_capacity = descriptor.max_payload_bytes as usize;
+                let mut payload = Vec::new();
+                payload
+                    .try_reserve_exact(payload_capacity)
+                    .map_err(|_| SubscriptionError::AllocationFailed)?;
+                payload.resize(payload_capacity, 0);
+                let matching_subscribers = self
+                    .records
+                    .iter()
+                    .filter(|record| {
+                        descriptor_reservation_matches(
+                            record,
+                            descriptor,
+                            stage.stage_id(),
+                            actor_identity,
+                            plan.phase,
+                            event,
+                        )
+                    })
+                    .count();
+                cue_admission_counts.add(descriptor.delivery, matching_subscribers)?;
+                if cue_admission_counts.total() > self.limits.max_observation_emissions {
+                    return Err(SubscriptionError::ObservationCapacity);
+                }
+                if matching_subscribers != 0 {
+                    maximum_payload_bytes = maximum_payload_bytes.max(payload_capacity);
+                }
+                let mut subscribers = Vec::new();
+                subscribers
+                    .try_reserve_exact(matching_subscribers)
+                    .map_err(|_| SubscriptionError::AllocationFailed)?;
+                for record in self.records.iter().filter(|record| {
+                    descriptor_reservation_matches(
+                        record,
+                        descriptor,
+                        stage.stage_id(),
+                        actor_identity,
+                        plan.phase,
+                        event,
+                    )
+                }) {
+                    let mut subscriber_payload = Vec::new();
+                    subscriber_payload
+                        .try_reserve_exact(payload_capacity)
+                        .map_err(|_| SubscriptionError::AllocationFailed)?;
+                    subscriber_payload.resize(payload_capacity, 0);
+                    subscribers.push(ReservedSubscriber {
+                        stage_id: record.stage_id,
+                        actor_identity: record.actor_identity,
+                        subscription_id: record.subscription_id,
+                        callback_id: record.callback_id,
+                        event_id: record.event_id,
+                        propagation: record.propagation,
+                        payload: subscriber_payload,
+                    });
+                }
+                emissions.push(ReservedDescriptorEmission {
+                    descriptor,
+                    payload,
+                    subscribers,
+                });
+            }
+            targets.push(NativePublicationTarget {
+                actor_identity,
+                pre_dispatch_bounds: plan.node.effective_bounds,
+            });
+            observations.push(ReservedNativeObservation {
+                actor_identity,
+                phase: plan.phase,
+                pre_dispatch_bounds: plan.node.effective_bounds,
+                event_handle,
+                emissions,
+            });
+        }
+
+        let possible_cues = cue_admission_counts.total();
+        let mut publications = Vec::new();
+        publications
+            .try_reserve_exact(descriptor_count)
+            .map_err(|_| SubscriptionError::AllocationFailed)?;
+        let mut ready_cues = Vec::new();
+        ready_cues
+            .try_reserve_exact(possible_cues)
+            .map_err(|_| SubscriptionError::AllocationFailed)?;
+        let mut cues = Vec::new();
+        cues.try_reserve_exact(possible_cues)
+            .map_err(|_| SubscriptionError::AllocationFailed)?;
+        let stage_publications =
+            stage.prepare_native_publications(&targets, descriptor_count, possible_effects)?;
+
+        Ok(PreparedNativeDispatch {
+            workspace: NativeDispatchWorkspace {
+                registry_revision: self.revision,
+                stage_id: stage.stage_id(),
+                event: event.clone(),
+                native_event_sequence,
+                cue_admission_counts,
+                maximum_payload_bytes,
+                observations,
+                publications,
+                ready_cues,
+                cues,
+                position: 0,
+                control: NativeObserverControl::Continue,
+            },
+            stage_publications,
+        })
+    }
+
+    /// Acquire final subscription freshness and Stage publication borrow guards.
+    pub fn arm_native_dispatch<'a>(
+        &'a self,
+        stage: &StageRegistry,
+        prepared: PreparedNativeDispatch,
+    ) -> Result<NativeDispatchObserver<'a>, SubscriptionError> {
+        if prepared.workspace.registry_revision != self.revision {
+            return Err(SubscriptionError::StaleWorkspace);
+        }
+        if prepared.workspace.stage_id != stage.stage_id() {
+            return Err(SubscriptionError::StageMismatch);
+        }
+        let stage_publications = stage.arm_native_publications(prepared.stage_publications)?;
+        Ok(NativeDispatchObserver {
+            registry: self,
+            workspace: prepared.workspace,
+            stage_publications,
+            error: None,
+        })
+    }
+
+    /// Publish a successfully observed traversal without allocation or failure.
+    pub fn publish_native_dispatch<'a>(
+        &'a self,
+        stage: &mut StageRegistry,
+        observed: ObservedNativeDispatch<'a>,
+    ) -> PublishedNativeDispatch<'a> {
+        let ObservedNativeDispatch {
+            registry,
+            mut workspace,
+            stage_publications,
+        } = observed;
+        debug_assert!(core::ptr::eq(registry, self));
+        let (stage_revision, stage_publications) =
+            stage.commit_native_publications(stage_publications, &workspace.publications);
+        debug_assert!(workspace.ready_cues.len() <= workspace.cues.capacity());
+        for ready in &mut workspace.ready_cues {
+            let identity = CueIdentity::new(
+                ready.stage_id,
+                ready.actor_identity.object_id,
+                ready.subscription_id,
+                ready.callback_id,
+                ready.event_id,
+            );
+            let mut cue = CueInput::new(
+                identity,
+                stage_revision,
+                workspace.native_event_sequence,
+                ready.delivery,
+                core::mem::take(&mut ready.payload),
+            );
+            if let Some(key) = ready.coalescing_key {
+                cue = cue.with_coalescing_key(key);
+            }
+            workspace.cues.push(cue);
+        }
+        PublishedNativeDispatch {
+            registry: self,
+            workspace,
+            stage_publications,
+            stage_revision,
+        }
+    }
+
+    /// Explicitly release a preflighted traversal before it is armed.
+    pub fn release_native_dispatch(&self, prepared: PreparedNativeDispatch) {
+        drop(prepared);
+    }
+
+    fn complete_native_dispatch_observation(
+        &self,
+        workspace: &mut NativeDispatchWorkspace,
+        input: NativeEventObservation<'_>,
+    ) -> Result<NativeObserverControl, SubscriptionError> {
+        if workspace.registry_revision != self.revision {
+            return Err(SubscriptionError::StaleWorkspace);
+        }
+        let reserved = workspace
+            .observations
+            .get_mut(workspace.position)
+            .ok_or(SubscriptionError::WorkspaceMismatch)?;
+        let actor_identity = input
+            .node
+            .actor_identity
+            .ok_or(SubscriptionError::WorkspaceMismatch)?;
+        if actor_identity != reserved.actor_identity
+            || input.phase != reserved.phase
+            || input.event != &workspace.event
+            || reserved.event_handle.actor_identity() != actor_identity
+        {
+            return Err(SubscriptionError::WorkspaceMismatch);
+        }
+
+        let mut control = NativeObserverControl::Continue;
+        for emission in &mut reserved.emissions {
+            if !emission.descriptor.matches_native(
+                input.phase,
+                input.event,
+                input.widget_invoked,
+                input.native_consumed,
+            ) {
+                continue;
+            }
+            let Some(payload_bytes) = reserved.event_handle.event_payload(
+                emission.descriptor,
+                input.event,
+                &mut emission.payload,
+            )?
+            else {
+                continue;
+            };
+            debug_assert!(workspace.publications.len() < workspace.publications.capacity());
+            workspace.publications.push(NativeDispatchPublication::new(
+                actor_identity,
+                emission.descriptor.native_effects,
+                reserved
+                    .pre_dispatch_bounds
+                    .union(input.node.effective_bounds),
+            ));
+            let payload = &emission.payload[..payload_bytes];
+            for subscriber in &mut emission.subscribers {
+                subscriber.payload[..payload_bytes].copy_from_slice(payload);
+                subscriber.payload.truncate(payload_bytes);
+                let delivery = match emission.descriptor.delivery {
+                    EventDelivery::Critical => CueDelivery::Critical,
+                    EventDelivery::Ordered => CueDelivery::Ordered,
+                    EventDelivery::LatestValueCoalescible => CueDelivery::LatestValueCoalescible,
+                };
+                debug_assert!(workspace.ready_cues.len() < workspace.ready_cues.capacity());
+                workspace.ready_cues.push(ReservedReadyCue {
+                    stage_id: subscriber.stage_id,
+                    actor_identity: subscriber.actor_identity,
+                    subscription_id: subscriber.subscription_id,
+                    callback_id: subscriber.callback_id,
+                    event_id: subscriber.event_id,
+                    delivery,
+                    coalescing_key: emission.descriptor.coalescing_key.map(CoalescingKey::new),
+                    payload: core::mem::take(&mut subscriber.payload),
+                });
+                if !matches!(subscriber.propagation, PropagationPolicy::Observe) {
+                    control = NativeObserverControl::ConsumePredeclared;
+                }
+            }
+        }
+        workspace.position += 1;
+        if control == NativeObserverControl::ConsumePredeclared {
+            workspace.control = control;
+        }
+        Ok(control)
     }
 
     /// Validate and install one descriptor-qualified subscription.
@@ -790,7 +1313,7 @@ impl SubscriptionRegistry {
             stage_revision: stage.revision(),
             actor_identity: input.actor_identity,
             phase: input.phase,
-            event: NativeEventFingerprint::capture(input.event),
+            event: input.event.clone(),
             native_event_sequence: input.native_event_sequence,
             event_handle,
             cue_admission_counts,
@@ -822,7 +1345,7 @@ impl SubscriptionRegistry {
         }
         if workspace.actor_identity != input.actor_identity
             || workspace.phase != input.phase
-            || workspace.event != NativeEventFingerprint::capture(input.event)
+            || workspace.event != *input.event
         {
             return Err(SubscriptionError::WorkspaceMismatch);
         }
