@@ -1,21 +1,25 @@
 //! Bounded MPY Safe Turn endpoint for actor-directed Stage requests.
 //!
 //! The endpoint owns Stage, subscription, cue, request, completion, and drain
-//! authority. This slice implements callback-free actor batches, full-Stage
-//! teardown, and exact subscription-release cue publication. Native input
-//! dispatch remains deliberately excluded. No distinct Stage-teardown
-//! RuntimeNotice is synthesized because the queue has no registered typed
-//! surface for one; the request completion is the authoritative teardown result.
+//! authority. It implements callback-free actor batches, full-Stage teardown,
+//! exact subscription-release publication, and preflighted native input that
+//! emits descriptor-derived cues without entering a language runtime. No
+//! distinct Stage-teardown RuntimeNotice is synthesized because the queue has
+//! no registered typed surface for one; the request completion is the
+//! authoritative teardown result.
 
 use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
 
 use crate::{
-    actor::{RegistryError, StageId, StageRegistry},
+    actor::{ActorIdentity, ObjectId, RegistryError, StageDispatchError, StageId, StageRegistry},
     cue::{
-        CueDelivery, CueIdentity, CueInput, CueLimits, CueQueue, CueQueueError, DrainBudget,
-        DrainedEndpointRecords, EndpointRecord, NativeEventSequence,
+        CueDelivery, CueIdentity, CueInput, CueLimits, CueQueue, CueQueueError, CueSequence,
+        DrainBudget, DrainedEndpointRecords, EndpointRecord, InputClass, InputSequence,
+        NativeCueAdmission, NativeEventSequence,
     },
     direction::{StageDirection, StageRevision},
+    event::Event,
+    object::{DispatchInput, Disposition, ObjectDispatchError, ObjectEvent},
     subscription::{
         EndpointEpoch, SubscribeRequest, SubscriptionError, SubscriptionLimits,
         SubscriptionRegistry,
@@ -116,6 +120,89 @@ pub enum EndpointFault {
     PostCommitStageRelease(RegistryError),
     /// Cue causality retirement failed after a committed Stage teardown.
     PostCommitCueFinalize(CueQueueError),
+    /// A descriptor payload adapter failed after native widget mutation.
+    PostDispatchAdapter(SubscriptionError),
+    /// Actual cue output violated its pre-dispatch reservation contract.
+    PostDispatchCueContract(CueQueueError),
+    /// Subscription or Stage ingress invariants failed before native dispatch.
+    PreDispatchSubscription(SubscriptionError),
+    /// A resolved native route failed its final pre-dispatch invariant guard.
+    PreDispatchNative(StageDispatchError),
+    /// A permanent cue health or descriptor contract failure blocked dispatch.
+    PreDispatchCue(CueQueueError),
+    /// Required Critical raw-input loss accounting or notice publication failed.
+    InputOverflowNotice(CueQueueError),
+}
+
+/// One endpoint-scoped native input routed through an explicit Stage root or actor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EndpointNativeInput {
+    /// Translate and hit-test a native pointer stream below one selected root.
+    Pointer {
+        /// Exact Stage root constraining hit-test resolution.
+        root_id: ObjectId,
+        /// Pointer horizontal coordinate.
+        x: i32,
+        /// Pointer vertical coordinate.
+        y: i32,
+        /// Native stream event translated before traversal.
+        event: Event,
+    },
+    /// Hit-test an already translated object event below one selected root.
+    PointerObject {
+        /// Exact Stage root constraining hit-test resolution.
+        root_id: ObjectId,
+        /// Pointer horizontal coordinate.
+        x: i32,
+        /// Pointer vertical coordinate.
+        y: i32,
+        /// Object-semantic event delivered to the resolved target.
+        event: ObjectEvent,
+    },
+    /// Route an object event to the focused actor below one selected root.
+    Focused {
+        /// Exact Stage root constraining focus resolution.
+        root_id: ObjectId,
+        /// Object-semantic event delivered to the focused target.
+        event: ObjectEvent,
+    },
+    /// Deliver an object event directly to one generation-checked actor.
+    Actor {
+        /// Exact actor identity; its owning root and path are derived natively.
+        target: ActorIdentity,
+        /// Object-semantic event delivered to the actor.
+        event: ObjectEvent,
+    },
+}
+
+/// Observable result of one raw-input admission attempt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeInputOutcome {
+    /// The explicit root had no hit-test or focused target, so no traversal began.
+    NoTarget {
+        /// Endpoint-wide raw-input sequence consumed by this attempt.
+        input_sequence: InputSequence,
+    },
+    /// Cue saturation rejected the raw event before native mutation.
+    RejectedBeforeDispatch {
+        /// Endpoint-wide raw-input sequence reported as lost.
+        input_sequence: InputSequence,
+        /// Global record sequence assigned to the Critical overflow notice.
+        notice_sequence: CueSequence,
+    },
+    /// Native traversal completed and any semantic cues were committed.
+    Dispatched {
+        /// Endpoint-wide raw-input sequence consumed by this attempt.
+        input_sequence: InputSequence,
+        /// Native traversal sequence shared by every emitted cue.
+        native_event_sequence: NativeEventSequence,
+        /// Stage Revision visible after native semantic publication.
+        stage_revision: StageRevision,
+        /// Native propagation result.
+        disposition: Disposition,
+        /// Number of actual descriptor/subscription cues committed.
+        cue_count: usize,
+    },
 }
 
 /// Pre-mutation reason one accepted batch or Stage teardown was rejected.
@@ -198,6 +285,8 @@ pub enum EndpointError {
     Subscription(SubscriptionError),
     /// Endpoint construction or drain failed in the cue queue.
     Cue(CueQueueError),
+    /// Stage route resolution or its final pre-dispatch guard failed.
+    NativeDispatch(StageDispatchError),
     /// The endpoint is terminally faulted.
     Faulted(EndpointFault),
     /// Another global record drain still awaits acknowledgment.
@@ -222,6 +311,8 @@ pub enum EndpointError {
     CompletionCapacity,
     /// Safe Turn identity or drain identity space was exhausted.
     IdentifierExhausted,
+    /// Endpoint-wide raw-input identity space was exhausted.
+    InputSequenceExhausted,
 }
 
 enum QueuedRequestKind {
@@ -314,6 +405,7 @@ pub struct Endpoint {
     current_turn: u64,
     last_request_id: Option<RequestId>,
     last_stage_id: Option<StageId>,
+    next_input_sequence: u64,
     next_native_event_sequence: u64,
     next_drain_id: u64,
     outstanding_drain_id: Option<u64>,
@@ -367,6 +459,7 @@ impl Endpoint {
             current_turn: 0,
             last_request_id: None,
             last_stage_id: None,
+            next_input_sequence: 1,
             next_native_event_sequence: 1,
             next_drain_id: 1,
             outstanding_drain_id: None,
@@ -450,6 +543,191 @@ impl Endpoint {
         self.subscriptions
             .subscribe(&self.stages[index], request)
             .map_err(EndpointError::Subscription)
+    }
+
+    /// Admit and synchronously traverse one raw native input.
+    ///
+    /// Target resolution happens before a native-event sequence is assigned.
+    /// Subscription, Stage-publication, and cue storage are then fully
+    /// reserved before handlers or widget semantics run. Queue saturation
+    /// rejects the raw event before mutation and appends a Critical typed
+    /// overflow notice. A payload-adapter or cue-contract error discovered
+    /// after widget mutation terminally faults the endpoint epoch.
+    ///
+    /// A VM record drain does not pause native input: the remaining bounded
+    /// queue capacity and the MPY-05 backpressure policy continue to govern
+    /// admission while the opaque drain awaits acknowledgment.
+    pub fn dispatch_native_event(
+        &mut self,
+        stage_id: StageId,
+        input_class: InputClass,
+        input: EndpointNativeInput,
+    ) -> Result<NativeInputOutcome, EndpointError> {
+        self.ensure_not_faulted()?;
+        let stage_index = self
+            .stage_index(stage_id)
+            .ok_or(EndpointError::StageNotFound)?;
+        if self.pending_teardown_stages.contains(&stage_id) {
+            return Err(EndpointError::StageTeardownPending);
+        }
+        let input_sequence = InputSequence::new(self.next_input_sequence)
+            .ok_or(EndpointError::InputSequenceExhausted)?;
+        self.next_input_sequence = self.next_input_sequence.checked_add(1).unwrap_or(0);
+
+        let route = match input {
+            EndpointNativeInput::Pointer {
+                root_id,
+                x,
+                y,
+                event,
+            } => self.stages[stage_index]
+                .resolve_root_dispatch(root_id, DispatchInput::Pointer { x, y, event }),
+            EndpointNativeInput::PointerObject {
+                root_id,
+                x,
+                y,
+                event,
+            } => self.stages[stage_index]
+                .resolve_root_dispatch(root_id, DispatchInput::PointerObject { x, y, event }),
+            EndpointNativeInput::Focused { root_id, event } => self.stages[stage_index]
+                .resolve_root_dispatch(root_id, DispatchInput::Focused { event }),
+            EndpointNativeInput::Actor { target, event } => {
+                self.stages[stage_index].resolve_actor_dispatch(target, event)
+            }
+        };
+        let route = match route {
+            Ok(route) => route,
+            Err(StageDispatchError::Object(ObjectDispatchError::NoTarget)) => {
+                return Ok(NativeInputOutcome::NoTarget { input_sequence });
+            }
+            Err(error) if is_raw_input_stage_dispatch_rejection(error) => {
+                return self.reject_raw_input(stage_id, input_class, input_sequence);
+            }
+            Err(error) => return Err(EndpointError::NativeDispatch(error)),
+        };
+
+        let native_event_sequence = NativeEventSequence::new(self.next_native_event_sequence)
+            .ok_or(EndpointError::IdentifierExhausted)?;
+        let prepared_dispatch = match self.subscriptions.reserve_native_dispatch(
+            &mut self.stages[stage_index],
+            &route,
+            native_event_sequence,
+        ) {
+            Ok(prepared) => prepared,
+            Err(error) if is_raw_input_subscription_rejection(error) => {
+                return self.reject_raw_input(stage_id, input_class, input_sequence);
+            }
+            Err(error) => {
+                return Err(
+                    self.record_terminal_fault(EndpointFault::PreDispatchSubscription(error))
+                );
+            }
+        };
+        let counts = prepared_dispatch.cue_admission_counts();
+        let admission = NativeCueAdmission {
+            stage_id,
+            critical_slots: counts.critical,
+            ordered_slots: counts.ordered,
+            latest_value_coalescible_slots: counts.latest_value_coalescible,
+            maximum_payload_bytes: prepared_dispatch.maximum_payload_bytes(),
+        };
+        let mut prepared_cues = match self.cues.prepare_native_cues(admission) {
+            Ok(prepared) => prepared,
+            Err(error) if is_raw_input_admission_rejection(error) => {
+                self.subscriptions
+                    .release_native_dispatch(prepared_dispatch);
+                return self.reject_raw_input(stage_id, input_class, input_sequence);
+            }
+            Err(error) => {
+                self.subscriptions
+                    .release_native_dispatch(prepared_dispatch);
+                return Err(self.record_terminal_fault(EndpointFault::PreDispatchCue(error)));
+            }
+        };
+        let mut observer = match self
+            .subscriptions
+            .arm_native_dispatch(&self.stages[stage_index], prepared_dispatch)
+        {
+            Ok(observer) => observer,
+            Err(error) => {
+                self.cues.release_native_cues(prepared_cues);
+                return if is_raw_input_subscription_rejection(error) {
+                    self.reject_raw_input(stage_id, input_class, input_sequence)
+                } else {
+                    Err(self.record_terminal_fault(EndpointFault::PreDispatchSubscription(error)))
+                };
+            }
+        };
+        let cue_reservation = match self.cues.acquire_native_cue_reservation(&mut prepared_cues) {
+            Ok(reservation) => reservation,
+            Err(error) => {
+                observer.release();
+                self.cues.release_native_cues(prepared_cues);
+                return if is_raw_input_admission_rejection(error) {
+                    self.reject_raw_input(stage_id, input_class, input_sequence)
+                } else {
+                    Err(self.record_terminal_fault(EndpointFault::PreDispatchCue(error)))
+                };
+            }
+        };
+
+        let completed =
+            match self.stages[stage_index].dispatch_resolved_native(route, &mut observer) {
+                Ok(completed) => completed,
+                Err(error) => {
+                    cue_reservation.rollback();
+                    observer.release();
+                    self.cues.release_native_cues(prepared_cues);
+                    return if is_raw_input_stage_dispatch_rejection(error) {
+                        self.reject_raw_input(stage_id, input_class, input_sequence)
+                    } else {
+                        Err(self.record_terminal_fault(EndpointFault::PreDispatchNative(error)))
+                    };
+                }
+            };
+        self.next_native_event_sequence =
+            self.next_native_event_sequence.checked_add(1).unwrap_or(0);
+        let disposition = completed.disposition();
+        let observed = match observer.finish() {
+            Ok(observed) => observed,
+            Err(failed) => {
+                let cause = failed.cause();
+                failed.release();
+                completed.release();
+                cue_reservation.rollback();
+                self.cues.release_native_cues(prepared_cues);
+                return Err(self.record_terminal_fault(EndpointFault::PostDispatchAdapter(cause)));
+            }
+        };
+        let mut published = self
+            .subscriptions
+            .publish_native_dispatch(&mut self.stages[stage_index], observed);
+        let stage_revision = published.stage_revision();
+        let cues = published.take_cues();
+        let cue_count = cues.len();
+        let cue_commit = match cue_reservation.accept(stage_revision, native_event_sequence, cues) {
+            Ok(commit) => commit,
+            Err(error) => {
+                completed.release();
+                published.release();
+                self.cues.release_native_cues(prepared_cues);
+                return Err(
+                    self.record_terminal_fault(EndpointFault::PostDispatchCueContract(error))
+                );
+            }
+        };
+        cue_commit.commit();
+        completed.release();
+        published.release();
+        self.cues.release_native_cues(prepared_cues);
+
+        Ok(NativeInputOutcome::Dispatched {
+            input_sequence,
+            native_event_sequence,
+            stage_revision,
+            disposition,
+            cue_count,
+        })
     }
 
     /// Queue one owned atomic Stage batch and reserve exactly one completion credit.
@@ -1072,6 +1350,35 @@ impl Endpoint {
         self.completions.push_back(completion);
     }
 
+    fn reject_raw_input(
+        &mut self,
+        stage_id: StageId,
+        input_class: InputClass,
+        input_sequence: InputSequence,
+    ) -> Result<NativeInputOutcome, EndpointError> {
+        if let Err(error) = self
+            .cues
+            .record_input_overflow(stage_id, input_class, input_sequence)
+        {
+            return Err(self.record_terminal_fault(EndpointFault::InputOverflowNotice(error)));
+        }
+        match self.cues.enqueue_pending_input_overflow_notice(Vec::new()) {
+            Ok(notice) => Ok(NativeInputOutcome::RejectedBeforeDispatch {
+                input_sequence,
+                notice_sequence: notice.notice_sequence,
+            }),
+            Err(error) => {
+                Err(self.record_terminal_fault(EndpointFault::InputOverflowNotice(error)))
+            }
+        }
+    }
+
+    fn record_terminal_fault(&mut self, fault: EndpointFault) -> EndpointError {
+        self.fault = Some(fault);
+        self.state = EndpointState::Faulted;
+        EndpointError::Faulted(fault)
+    }
+
     fn stage_index(&self, stage_id: StageId) -> Option<usize> {
         self.stages
             .iter()
@@ -1090,4 +1397,36 @@ impl From<RegistryError> for BatchRejection {
     fn from(value: RegistryError) -> Self {
         Self::Registry(value)
     }
+}
+
+fn is_raw_input_admission_rejection(error: CueQueueError) -> bool {
+    matches!(
+        error,
+        CueQueueError::AllocationFailed
+            | CueQueueError::AdmissionBackpressured
+            | CueQueueError::AdmissionCapacity
+            | CueQueueError::AdmissionStageQuota { .. }
+            | CueQueueError::StageCausalityCapacityExhausted { .. }
+            | CueQueueError::SequenceExhausted
+    )
+}
+
+fn is_raw_input_subscription_rejection(error: SubscriptionError) -> bool {
+    matches!(
+        error,
+        SubscriptionError::AllocationFailed
+            | SubscriptionError::ObservationCapacity
+            | SubscriptionError::Registry(
+                RegistryError::Capacity { .. } | RegistryError::DispatchBusy
+            )
+    )
+}
+
+fn is_raw_input_stage_dispatch_rejection(error: StageDispatchError) -> bool {
+    matches!(
+        error,
+        StageDispatchError::Object(
+            ObjectDispatchError::AllocationFailed | ObjectDispatchError::DispatchBusy
+        )
+    )
 }
