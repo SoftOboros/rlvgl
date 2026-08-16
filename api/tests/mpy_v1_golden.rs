@@ -1,12 +1,18 @@
 // mpy_v1_golden.rs - Conformance tests for committed MPY v1 canonical byte vectors.
 
 use rlvgl_api::protocol::{
-    Batch, BatchBudget, Capabilities, CodecError, Command, Completion, CompletionStatus, Cue,
-    DiscriminantDomain, ErrorClass, FrameRef, Hello, Limits, MPY_V1, OpcodeList, OperationList,
-    OperationRef, ProtocolVersion, RuntimeNotice, ValueRef, decode_frame, decode_frame_with_limits,
-    decode_operation_list, decode_operation_list_with_limit, decode_value, encode_frame,
-    encode_frame_with_limits, encode_operation_list, encode_operation_list_with_limit,
-    encode_value, opcode,
+    Batch, BatchBudget, BatchSuccess, Capabilities, CodecError, Command, Completion,
+    CompletionStatus, Cue, DiscriminantDomain, ErrorClass, FieldList, FieldRef, FrameRef, Hello,
+    Limits, MPY_V1, ObjectReference, ObjectReferenceError, OpcodeList, OperationList, OperationRef,
+    OperationResultList, OperationResultRef, ProtocolVersion, RuntimeNotice, ValueList, ValueRef,
+    ValueTag, decode_batch_success, decode_batch_success_with_limits, decode_field_list,
+    decode_field_list_with_limits, decode_frame, decode_frame_with_limits, decode_object_reference,
+    decode_operation_list, decode_operation_list_with_limit, decode_value, decode_value_list,
+    decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
+    encode_batch_success_with_limits, encode_field_list, encode_field_list_with_limit,
+    encode_field_list_with_limits, encode_frame, encode_frame_with_limits, encode_object_reference,
+    encode_operation_list, encode_operation_list_with_limit, encode_value, encode_value_list,
+    encode_value_list_with_limit, encode_value_list_with_limits, opcode,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -34,6 +40,38 @@ const REGISTRY_OPERATIONS: &[OperationRef<'static>] = &[
     empty_operation(opcode::REORDER),
     empty_operation(opcode::DELETE),
     empty_operation(opcode::SET_LOCAL_STYLE),
+];
+const LIST_VALUES: &[ValueRef<'static>] = &[
+    ValueRef::Bool(true),
+    ValueRef::I32(-2),
+    ValueRef::BatchObject(7),
+];
+const TYPED_FIELDS: &[FieldRef<'static>] = &[
+    FieldRef {
+        id: 1,
+        value: ValueRef::U32(0x1234_5678),
+    },
+    FieldRef {
+        id: 9,
+        value: ValueRef::Text("Hi"),
+    },
+    FieldRef {
+        id: 10,
+        value: ValueRef::Object(0x0000_0002_0000_0001),
+    },
+];
+const FIRST_RESULT_VALUES: &[ValueRef<'static>] =
+    &[ValueRef::U32(7), ValueRef::Object(0x0000_0002_0000_0001)];
+const MUTATION_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Bool(true)];
+const BATCH_RESULTS: &[OperationResultRef<'static>] = &[
+    OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(FIRST_RESULT_VALUES),
+    },
+    OperationResultRef {
+        operation_index: 2,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    },
 ];
 
 const fn empty_operation(opcode: u32) -> OperationRef<'static> {
@@ -235,6 +273,321 @@ fn every_value_tag_matches_committed_golden_bytes() {
         assert_eq!(decoded, value, "{name}");
         assert_eq!(consumed, length, "{name}");
     }
+}
+
+#[test]
+fn counted_typed_lists_match_golden_bytes_and_round_trip_zero_copy() {
+    let mut encoded = [0u8; 256];
+
+    let value_length = encode_value_list(ValueList::from_slice(LIST_VALUES), &mut encoded).unwrap();
+    assert_eq!(&encoded[..value_length], fixture("payload.value_list"));
+    let decoded_values = decode_value_list(&encoded[..value_length]).unwrap();
+    assert_eq!(decoded_values, ValueList::from_slice(LIST_VALUES));
+    assert_eq!(decoded_values.iter().collect::<Vec<_>>(), LIST_VALUES);
+
+    let field_length =
+        encode_field_list(FieldList::from_slice(TYPED_FIELDS), &mut encoded).unwrap();
+    assert_eq!(&encoded[..field_length], fixture("payload.field_list"));
+    let decoded_fields = decode_field_list(&encoded[..field_length]).unwrap();
+    assert_eq!(decoded_fields, FieldList::from_slice(TYPED_FIELDS));
+    assert_eq!(decoded_fields.iter().collect::<Vec<_>>(), TYPED_FIELDS);
+    let borrowed_text = match decoded_fields.iter().nth(1).unwrap().value {
+        ValueRef::Text(value) => value,
+        value => panic!("expected text, got {value:?}"),
+    };
+    let encoded_start = encoded.as_ptr() as usize;
+    let encoded_end = encoded_start + field_length;
+    assert!((encoded_start..encoded_end).contains(&(borrowed_text.as_ptr() as usize)));
+}
+
+#[test]
+fn contextual_object_references_reuse_value_tags_and_preserve_error_classification() {
+    for (reference, fixture_name) in [
+        (
+            ObjectReference::Object(0x0000_0002_0000_0001),
+            "value.object",
+        ),
+        (ObjectReference::BatchObject(7), "value.batch_object"),
+    ] {
+        let mut encoded = [0u8; 16];
+        let length = encode_object_reference(reference, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(
+            decode_object_reference(&encoded[..length]),
+            Ok((reference, length))
+        );
+    }
+
+    assert_eq!(
+        decode_object_reference(&[ValueTag::Bool as u8, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        decode_object_reference(&[ValueTag::Object as u8, 1, 0, 0, 0, 0, 0, 0, 0]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_object_reference(&[ValueTag::Object as u8]),
+        Err(ObjectReferenceError::Codec(CodecError::Truncated))
+    );
+}
+
+#[test]
+fn successful_batch_payload_matches_golden_bytes_and_correlates_results() {
+    let success = BatchSuccess {
+        result_revision: 9,
+        results: OperationResultList::from_slice(BATCH_RESULTS),
+    };
+    let mut encoded = [0u8; 256];
+    let length = encode_batch_success(success, 3, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.batch_success"));
+    let decoded = decode_batch_success(&encoded[..length], 3).unwrap();
+    assert_eq!(decoded, success);
+    assert_eq!(decoded.results.iter().collect::<Vec<_>>(), BATCH_RESULTS);
+
+    let empty = BatchSuccess {
+        result_revision: 5,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let empty_length = encode_batch_success(empty, 3, &mut encoded).unwrap();
+    assert_eq!(
+        &encoded[..empty_length],
+        fixture("payload.batch_success_empty")
+    );
+    assert_eq!(decode_batch_success(&encoded[..empty_length], 3), Ok(empty));
+}
+
+#[test]
+fn typed_payloads_reject_malformed_order_counts_and_trailing_bytes() {
+    let duplicate_fields = [
+        FieldRef {
+            id: 1,
+            value: ValueRef::None,
+        },
+        FieldRef {
+            id: 1,
+            value: ValueRef::None,
+        },
+    ];
+    assert_eq!(
+        encode_field_list(FieldList::from_slice(&duplicate_fields), &mut [0; 32]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        encode_field_list_with_limit(FieldList::from_slice(&duplicate_fields), 1, &mut [0; 32],),
+        Err(CodecError::InvalidFrame),
+        "structural errors precede negotiated limits"
+    );
+    assert_eq!(
+        decode_field_list(&[2, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        decode_field_list(&[1, 0, 0, 0, 0, 0, 0]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        decode_field_list(&[2, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        decode_field_list(&[1, 0, 1, 0, 0, 0]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(decode_field_list(&[0, 0, 0]), Err(CodecError::InvalidFrame));
+
+    let malformed_values = [ValueRef::Object(1), ValueRef::None];
+    assert_eq!(
+        encode_value_list_with_limit(ValueList::from_slice(&malformed_values), 1, &mut [0; 32],),
+        Err(CodecError::InvalidFrame),
+        "structural errors precede negotiated limits"
+    );
+    assert_eq!(decode_value_list(&[1, 0]), Err(CodecError::InvalidFrame));
+    assert_eq!(decode_value_list(&[0, 0, 0]), Err(CodecError::InvalidFrame));
+}
+
+#[test]
+fn typed_payload_limits_apply_per_request_list_and_across_the_batch_result() {
+    let mut encoded = [0u8; 256];
+    let mut two_items = limits();
+    two_items.max_items_per_command = 2;
+    assert_eq!(
+        encode_value_list_with_limits(ValueList::from_slice(LIST_VALUES), two_items, &mut encoded,),
+        Err(CodecError::LimitExceeded)
+    );
+    let value_length = encode_value_list(ValueList::from_slice(LIST_VALUES), &mut encoded).unwrap();
+    assert_eq!(
+        decode_value_list_with_limits(&encoded[..value_length], two_items),
+        Err(CodecError::LimitExceeded)
+    );
+
+    assert_eq!(
+        encode_field_list_with_limits(FieldList::from_slice(TYPED_FIELDS), two_items, &mut encoded,),
+        Err(CodecError::LimitExceeded)
+    );
+    let field_length =
+        encode_field_list(FieldList::from_slice(TYPED_FIELDS), &mut encoded).unwrap();
+    assert_eq!(
+        decode_field_list_with_limits(&encoded[..field_length], two_items),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let success = BatchSuccess {
+        result_revision: 9,
+        results: OperationResultList::from_slice(BATCH_RESULTS),
+    };
+    let mut two_result_values = limits();
+    two_result_values.max_values_per_result = 2;
+    assert_eq!(
+        encode_batch_success_with_limits(success, 3, two_result_values, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    let success_length = encode_batch_success(success, 3, &mut encoded).unwrap();
+    assert_eq!(
+        decode_batch_success_with_limits(&encoded[..success_length], 3, two_result_values,),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let mut tiny_payloads = limits();
+    tiny_payloads.max_text_bytes = 1;
+    tiny_payloads.max_byte_payload = 1;
+    let text_values = [ValueRef::Text("Hi")];
+    assert_eq!(
+        encode_value_list_with_limits(
+            ValueList::from_slice(&text_values),
+            tiny_payloads,
+            &mut encoded,
+        ),
+        Err(CodecError::LimitExceeded)
+    );
+    let text_length = encode_value_list(ValueList::from_slice(&text_values), &mut encoded).unwrap();
+    assert_eq!(
+        decode_value_list_with_limits(&encoded[..text_length], tiny_payloads),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let byte_fields = [FieldRef {
+        id: 1,
+        value: ValueRef::Bytes(&[1, 2]),
+    }];
+    assert_eq!(
+        encode_field_list_with_limits(
+            FieldList::from_slice(&byte_fields),
+            tiny_payloads,
+            &mut encoded,
+        ),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let text_result = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&text_values),
+    }];
+    assert_eq!(
+        encode_batch_success_with_limits(
+            BatchSuccess {
+                result_revision: 1,
+                results: OperationResultList::from_slice(&text_result),
+            },
+            1,
+            tiny_payloads,
+            &mut encoded,
+        ),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn batch_success_rejects_zero_value_order_range_and_byte_failures() {
+    let empty_values = OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&[]),
+    };
+    assert_eq!(
+        encode_batch_success(
+            BatchSuccess {
+                result_revision: 1,
+                results: OperationResultList::from_slice(&[empty_values]),
+            },
+            1,
+            &mut [0; 32],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let duplicate_results = [BATCH_RESULTS[0], BATCH_RESULTS[0]];
+    assert_eq!(
+        encode_batch_success_with_limit(
+            BatchSuccess {
+                result_revision: 1,
+                results: OperationResultList::from_slice(&duplicate_results),
+            },
+            3,
+            1,
+            &mut [0; 64],
+        ),
+        Err(CodecError::InvalidFrame),
+        "structural errors precede aggregate result limits"
+    );
+    let decreasing_results = [BATCH_RESULTS[1], BATCH_RESULTS[0]];
+    assert_eq!(
+        encode_batch_success(
+            BatchSuccess {
+                result_revision: 1,
+                results: OperationResultList::from_slice(&decreasing_results),
+            },
+            3,
+            &mut [0; 64],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    let out_of_range = OperationResultRef {
+        operation_index: 3,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    };
+    assert_eq!(
+        encode_batch_success(
+            BatchSuccess {
+                result_revision: 1,
+                results: OperationResultList::from_slice(&[out_of_range]),
+            },
+            3,
+            &mut [0; 32],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let zero_value_record = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0];
+    assert_eq!(
+        decode_batch_success(&zero_value_record, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    let duplicate_wire = [
+        0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
+    ];
+    assert_eq!(
+        decode_batch_success(&duplicate_wire, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    let out_of_range_wire = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 3, 0, 1, 0, 0];
+    assert_eq!(
+        decode_batch_success(&out_of_range_wire, 3),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let valid = fixture("payload.batch_success");
+    assert_eq!(
+        decode_batch_success(&valid[..valid.len() - 1], 3),
+        Err(CodecError::InvalidFrame)
+    );
+    let mut trailing = valid;
+    trailing.push(0);
+    assert_eq!(
+        decode_batch_success(&trailing, 3),
+        Err(CodecError::InvalidFrame)
+    );
 }
 
 #[test]

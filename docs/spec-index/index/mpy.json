@@ -1,5 +1,5 @@
 {
-  "edge_count": 513,
+  "edge_count": 520,
   "edges": [
     {
       "edge_type": "defines",
@@ -1005,366 +1005,142 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 12,
+      "line": 13,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-005"
+      "target": "PCDN-MPY-02-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 91,
+      "line": 95,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 97,
+      "line": 101,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 202,
+      "line": 212,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-004"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 386,
+      "line": 486,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 387,
+      "line": 487,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 388,
+      "line": 488,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 389,
+      "line": 489,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 390,
+      "line": 490,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 391,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 416,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 419,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 420,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 424,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 425,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 429,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 430,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 436,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-005"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 445,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 445,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 446,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 447,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 448,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 449,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 450,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 451,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 451,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 452,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-7"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 452,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 452,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 453,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 454,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 454,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 455,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 455,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 455,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-005"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
       "line": 491,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-7"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 491,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 512,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 512,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 516,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 543,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 544,
+      "line": 519,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 520,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 524,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 525,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 529,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 530,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 536,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 542,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 553,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-1"
     },
     {
       "edge_type": "cites",
@@ -1376,28 +1152,98 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 553,
+      "line": 554,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 555,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 556,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 557,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 558,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 559,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 559,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 553,
+      "line": 560,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 560,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 560,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 561,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 554,
+      "line": 562,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-1"
+      "target": "INV-MPY-02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 554,
+      "line": 562,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 563,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-4"
     },
@@ -1406,54 +1252,257 @@
       "kind_provenance": "inferred",
       "line": 563,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 597,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 597,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 597,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "PCDN-MPY-02-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 621,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 621,
-      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
-      "target": "INV-MPY-02-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 621,
+      "line": 563,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "PCDN-MPY-02-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 564,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 588,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 601,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 622,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 622,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 626,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 653,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 654,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 663,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 663,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 663,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 664,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 664,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 673,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 707,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 707,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 707,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 731,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 731,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 731,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 732,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 772,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 772,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "INV-MPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 772,
+      "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "target": "PCDN-MPY-02-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 773,
       "source": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "target": "INV-MPY-02-5"
     },
@@ -3595,14 +3644,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 35,
-    "gate": 81,
+    "amendment": 36,
+    "gate": 82,
     "invariant": 65,
     "nongoal": 43,
-    "rationale": 26,
-    "term": 77
+    "rationale": 27,
+    "term": 80
   },
-  "object_count": 327,
+  "object_count": 333,
   "objects": [
     {
       "attrs": {
@@ -5098,7 +5147,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 51,
+      "line": 52,
       "obj_id": "mpy:term:wire id",
       "text": "Fixed-width integer token with an explicitly serialized meaning; zero is reserved as invalid unless a field says otherwise."
     },
@@ -5110,7 +5159,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 52,
+      "line": 53,
       "obj_id": "mpy:term:batch reference",
       "text": "Temporary identifier for an actor created within the current batch and not yet assigned to the caller as a stable `ObjectId`."
     },
@@ -5122,7 +5171,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 53,
+      "line": 54,
       "obj_id": "mpy:term:completion result",
       "text": "Exactly one success or failure response correlated to a command or committed batch by `RequestId`."
     },
@@ -5134,7 +5183,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 55,
       "obj_id": "mpy:term:endpoint epoch",
       "text": "One initialized lifetime of a protocol endpoint pair. Stage IDs are unique within it; a restart, reset, or reinitialization establishes a new epoch and invalidates prior handles."
     },
@@ -5146,7 +5195,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 55,
+      "line": 56,
       "obj_id": "mpy:term:protocol capability",
       "text": "Versioned declaration of supported opcodes, value tags, actor/schema version, and bounded capacities for one target profile."
     },
@@ -5158,7 +5207,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 57,
       "obj_id": "mpy:term:value envelope",
       "text": "Explicit tag, length where applicable, and payload encoding for one protocol value."
     },
@@ -5170,9 +5219,45 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 57,
+      "line": 58,
       "obj_id": "mpy:term:operation record",
       "text": "One counted Batch member carrying an explicit opcode, flags, and length-delimited opcode-owned payload. Its operation index is its zero-based list position."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02; field meanings belong to the opcode or descriptor.",
+        "term": "Typed Field List"
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 59,
+      "obj_id": "mpy:term:typed field list",
+      "text": "Counted, strictly ID-ordered keyed fields whose values use the canonical Value Envelope."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02; schema meaning belongs to later phases.",
+        "term": "Typed Value List"
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 60,
+      "obj_id": "mpy:term:typed value list",
+      "text": "Counted positional values whose order and tags are declared by the owning opcode or descriptor."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by MPY-02; declared output schemas belong to each opcode.",
+        "term": "Batch Success Payload"
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "term",
+      "line": 61,
+      "obj_id": "mpy:term:batch success payload",
+      "text": "Final/current Stage Revision followed by strictly operation-index-ordered output records for operations declaring results."
     },
     {
       "attrs": {
@@ -5182,7 +5267,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "term",
-      "line": 58,
+      "line": 62,
       "obj_id": "mpy:term:transport endpoint",
       "text": "Ordered send/receive boundary for command, result, and cue frames without runtime semantics of its own."
     },
@@ -5201,7 +5286,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 386,
+      "line": 486,
       "obj_id": "INV-MPY-02-1",
       "text": "A `StageId` MUST be nonzero and MUST NOT be reused within an Endpoint Epoch. An `ObjectId` MUST encode a nonzero slot and generation, and a retired generation MUST NOT resolve after slot reuse."
     },
@@ -5220,7 +5305,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 387,
+      "line": 487,
       "obj_id": "INV-MPY-02-2",
       "text": "Protocol frames MUST use canonical explicit encoding and MUST NOT depend on Rust/C layout, pointer width, alignment, or host endianness."
     },
@@ -5239,7 +5324,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 388,
+      "line": 488,
       "obj_id": "INV-MPY-02-3",
       "text": "Every nonzero `RequestId` accepted by the runtime MUST produce exactly one correlated Result and MUST NOT execute twice."
     },
@@ -5257,7 +5342,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 389,
+      "line": 489,
       "obj_id": "INV-MPY-02-4",
       "text": "A rejected Batch MUST expose no operation and identify its first failing operation when the failure is operation-scoped, while an accepted Batch MUST become visible as one stage transition and return ordered records only for operations declaring outputs."
     },
@@ -5275,7 +5360,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 390,
+      "line": 490,
       "obj_id": "INV-MPY-02-5",
       "text": "Variable-sized values and queues MUST reject or explicitly truncate at advertised bounds; silent truncation or loss is forbidden. Every MPY v1 profile MUST support a 256-byte canonical logical frame and a 128-byte `Text` value."
     },
@@ -5293,7 +5378,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 391,
+      "line": 491,
       "obj_id": "INV-MPY-02-6",
       "text": "In-process and shared-memory transports MUST pass identical logical trace vectors for supported capabilities."
     },
@@ -5302,7 +5387,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 407,
+      "line": 507,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:nongoal:1",
       "text": "No transport implementation. MPY-02 defines traits and vectors;"
     },
@@ -5311,7 +5396,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 409,
+      "line": 509,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:nongoal:2",
       "text": "No actor storage. Slot ownership and tree resolution belong to MPY-03."
     },
@@ -5320,7 +5405,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 410,
+      "line": 510,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:nongoal:3",
       "text": "No Python object conversion. MPY-06 maps Python values after the neutral"
     },
@@ -5329,7 +5414,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 412,
+      "line": 512,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:nongoal:4",
       "text": "No arbitrary serialization framework requirement. An implementation may"
     },
@@ -5343,8 +5428,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 445,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:445",
+      "line": 553,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:553",
       "text": "`INV-MPY-02-1` and the ID table resolve parent `PCDN-MPY-001`."
     },
     {
@@ -5357,8 +5442,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 446,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:446",
+      "line": 554,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:554",
       "text": "`INV-MPY-02-2` canonical encoding and the v1 ValueTag set are accepted."
     },
     {
@@ -5371,8 +5456,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 447,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:447",
+      "line": 555,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:555",
       "text": "`INV-MPY-02-3` result correlation and retry behavior are accepted."
     },
     {
@@ -5385,8 +5470,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 448,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:448",
+      "line": 556,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:556",
       "text": "`INV-MPY-02-4` batch validation, reservation, visibility, and Result shape are accepted."
     },
     {
@@ -5399,8 +5484,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 449,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:449",
+      "line": 557,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:557",
       "text": "`INV-MPY-02-5` capability limits and overflow behavior are accepted."
     },
     {
@@ -5413,8 +5498,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 450,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:450",
+      "line": 558,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:558",
       "text": "`INV-MPY-02-6` establishes the shared MPY-07/08 trace corpus."
     },
     {
@@ -5427,8 +5512,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 451,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:451",
+      "line": 559,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:559",
       "text": "`PCDN-MPY-02-001` is resolved without weakening `INV-MPY-2`."
     },
     {
@@ -5442,8 +5527,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 452,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:452",
+      "line": 560,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:560",
       "text": "`PCDN-MPY-02-002` adopts negotiated profile limits plus the §6.1 MPY v1 floors without weakening `INV-MPY-7` or `INV-MPY-8`."
     },
     {
@@ -5454,8 +5539,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 453,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:453",
+      "line": 561,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:561",
       "text": "`PCDN-MPY-02-003` is resolved without weakening atomic batches or bounded Results."
     },
     {
@@ -5468,8 +5553,8 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 454,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:454",
+      "line": 562,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:562",
       "text": "`PCDN-MPY-02-004` fixes an allocation-free canonical byte layout and committed golden corpus without weakening `INV-MPY-02-2` or the 256-byte floor."
     },
     {
@@ -5483,9 +5568,21 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 455,
-      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:455",
+      "line": 563,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:563",
       "text": "`PCDN-MPY-02-005` fixes bounded Batch operation records and non-reusable opcode assignments without changing the established Hello field positions or weakening `INV-MPY-02-4`/`INV-MPY-02-5`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "gate",
+      "line": 564,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md:gate:564",
+      "text": "`PCDN-MPY-02-006` fixes canonical typed payload lists, contextual object references, and bounded correlated Batch-success records without preempting Create or MPY-04 opcode schemas."
     },
     {
       "attrs": {
@@ -5493,7 +5590,7 @@
         "change_kind": "semantic",
         "chronological_rank": 1,
         "commits": [
-          "pending"
+          "`35f5e5c`"
         ],
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -5524,7 +5621,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 485,
+      "line": 595,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.1.0",
       "text": "Proposes stable ID widths, a nonrecursive tagged value set,"
     },
@@ -5548,7 +5645,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 485,
+      "line": 595,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.1.0-rationale",
       "text": "Object creation, reads, callbacks, and dual-core transport need one explicit\ncontract before storage or binding code can choose convenient local layouts.\nSeparating logical frames from Rust/C layout prevents pointers, padding, and\nadapter-specific errors from becoming accidental cross-core ABI."
     },
@@ -5558,7 +5655,7 @@
         "change_kind": "semantic",
         "chronological_rank": 2,
         "commits": [
-          "pending"
+          "`99aebdc`"
         ],
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -5583,7 +5680,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 506,
+      "line": 616,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.2.0",
       "text": "Resolves `PCDN-MPY-02-002` with capability-negotiated limits, a"
     },
@@ -5601,7 +5698,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 506,
+      "line": 616,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.2.0-rationale",
       "text": "The draft made MPY-02 ratification depend on an MPY-08 SRAM budget even though\nMPY-08 consumes the protocol only after the same-core phases are stable. That\nforward dependency could deadlock the phase order. A protocol-owned minimum\nand profile-owned measured maxima preserve one command meaning across\ntransports while allowing constrained targets to expose honest limits.\n\nThe selected floors are deliberately small powers of two: a 128-byte label or\ndiagnostic leaves half of the 256-byte logical frame for canonical command and\nvalue metadata, while larger strings, batches, and snapshots remain available\nwhen both endpoints advertise more capacity. MPY-02 golden vectors must prove\nthat a command carrying one maximum-floor `Text` value fits the frame floor.\n\nConsidered and rejected: leaving all limits to MPY-08, which creates the phase\ncycle; freezing the current 1 KiB demonstration mailbox as the protocol\ncapacity, which would turn unreviewed board placement into a language-neutral\nABI; and allowing targets below the floor to claim MPY v1, which would remove\nthe common interoperability baseline.\n\nWhat deliberately did not change: MPY-08 still owns shared-memory placement,\nslot geometry, fragmentation, cache policy, and measured board capacity;\nMPY-07 may advertise larger host limits; `PCDN-MPY-02-001` and\n`PCDN-MPY-02-003` remain open; and MPY-02 remains Draft with no behavior\nimplementation authorized."
     },
@@ -5611,7 +5708,7 @@
         "change_kind": "semantic",
         "chronological_rank": 3,
         "commits": [
-          "pending"
+          "`99aebdc`"
         ],
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -5633,7 +5730,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 547,
+      "line": 657,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.3.0",
       "text": "Owner ratified MPY-02 after resolving the remaining identity and"
     },
@@ -5648,7 +5745,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 547,
+      "line": 657,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.3.0-rationale",
       "text": "Stage lifetime needs stale-handle protection without carrying an additional\ngeneration word in every protocol frame. The endpoint epoch already separates\nruntime lifetimes, while monotonic non-reuse makes a `u32` StageId sufficient\ninside one lifetime. Object reuse remains independently protected by the\n`ObjectId` generation.\n\nBatch completion needs to remain deterministic and bounded. Returning one\nrecord for every void operation spends capacity without adding information;\nreturning only declared outputs preserves operation correlation through the\nexplicit index. A rejected Batch cannot truthfully report partial successes\nbecause validation and reservation guarantee that none become visible.\n\nConsidered and rejected: a `u64` generation/slot `StageId`, which duplicates\nepoch protection and enlarges every stage-scoped frame; StageId reuse within an\nepoch, which permits stale aliasing; success records for every void Batch\noperation, which consume bounded Result capacity; and reporting successes\nbefore the first Batch failure, which contradicts atomic rejection.\n\nWhat deliberately did not change: `ObjectId` remains a `u64` generation/slot\nidentity; MPY-08 still owns the concrete Boot Epoch transport mechanism; the\ncapacity floors adopted at 0.2.0 remain unchanged; golden protocol vectors are\nstill required before MPY-03 implementation; and MPY-03 through MPY-09 remain\nseparately gated Draft phases."
     },
@@ -5658,7 +5755,7 @@
         "change_kind": "semantic and implementation",
         "chronological_rank": 4,
         "commits": [
-          "pending"
+          "`0d6cea9`"
         ],
         "conformant_change_kind": false,
         "conformant_status": true,
@@ -5683,7 +5780,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 591,
+      "line": 701,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.4.0",
       "text": "Fixes the eight-byte frame header, stable discriminants, scalar"
     },
@@ -5701,7 +5798,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 591,
+      "line": 701,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.4.0-rationale",
       "text": "The ratified semantic field set was insufficient to produce canonical bytes:\nframe/value/error discriminants, optional-field representation, and exact field\nordering were still undefined. A fixed-order caller-buffer codec is the\nsmallest implementation that meets the 256-byte floor and remains practical on\nboth MicroPython and shared-memory targets. TLV and general serialization\nframeworks were rejected for v1 because they add overhead and decoder surface\nwithout a demonstrated compatibility requirement."
     },
@@ -5711,7 +5808,7 @@
         "change_kind": "semantic and implementation",
         "chronological_rank": 5,
         "commits": [
-          "pending"
+          "`5616610`"
         ],
         "conformant_change_kind": false,
         "conformant_status": true,
@@ -5733,7 +5830,7 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 615,
+      "line": 725,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.5.0",
       "text": "Freezes the counted fixed Batch-operation envelope, generalizes"
     },
@@ -5748,9 +5845,56 @@
       "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 615,
+      "line": 725,
       "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.5.0-rationale",
       "text": "The outer Batch frame previously length-delimited an opaque byte sequence, so\nthe host binding could not determine record boundaries, enforce a negotiated\noperation count, report the first failing operation, or distinguish a stable\nopcode from payload bytes. A counted fixed record header is the smallest\nbounded representation that preserves opcode-owned payload evolution and\nzero-copy decode.\n\nReusing the existing `u16` fields-capacity wire position as a general item\nlimit avoids changing Hello/Capabilities byte positions. Eight empty operation\nrecords plus the complete Batch envelope fit comfortably within the 256-byte\nlogical-frame floor, while every real payload remains independently subject to\nthe frame limit. Explicit non-reusable opcode assignment prevents phase-local\nor adapter-local discriminants from becoming competing wire authorities.\n\nConsidered and rejected: keeping the operation blob opaque, which cannot\nsupport bounded structural validation; deriving opcodes from Rust enum order or\nnames, which makes refactoring a wire break; adding a second Hello limit, which\nwould move established fields; and interpreting numeric opcode ranges as\nsemantics, which would constrain later standards action unnecessarily."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott with OpenAI Codex implementation",
+        "change_kind": "semantic and implementation",
+        "chronological_rank": 6,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": true,
+        "date": "2026-08-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": false,
+        "rev": "0.6.0",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Freezes allocation-free counted Field and Value Lists,",
+        "touches": [
+          "PCDN-MPY-02-006",
+          "INV-MPY-02-2",
+          "INV-MPY-02-4"
+        ]
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 766,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.6.0",
+      "text": "Freezes allocation-free counted Field and Value Lists,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "PCDN-MPY-02-006",
+          "INV-MPY-02-2",
+          "INV-MPY-02-4"
+        ]
+      },
+      "doc": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 766,
+      "obj_id": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md#0.6.0-rationale",
+      "text": "The operation envelope deliberately left each payload opaque, but Create and\nMPY-04 cannot independently invent keyed fields, positional values, actor\nreference unions, or Result record framing without creating competing ABIs.\nCounted self-delimiting Values give the embedded decoder exact bounds and\nzero-copy iteration while strict field/result ordering provides one canonical\nrepresentation without allocation.\n\nReusing the existing `Object` and `BatchObject` tags avoids another reference\ndiscriminant. Structural decoding distinguishes malformed bytes from a\ncanonical tag mismatch, while Batch graph validation retains authority over\nunknown, forward, self, and multiply bound references. The fixed Result\nrevision records the state actually visible after acceptance without claiming\nthat every nonmutating success advances it.\n\nWhat deliberately remains open: Create destination encoding, constructor and\ninitial-state grouping, BatchRef binding placement, exact Create output order,\nand every MPY-04 opcode-owned field schema. Those decisions may reuse these\ncommon records but cannot reinterpret them."
     },
     {
       "attrs": {

@@ -9,7 +9,8 @@ frames, atomic batches, errors, capability negotiation, and transport traits.
 MPY-03 behavior remains separately gated. Its golden-vector prerequisite is
 satisfied by `api/tests/fixtures/mpy_v1_vectors.txt` and the conformance tests
 in `api/tests/mpy_v1_golden.rs`. The same corpus now includes the counted Batch
-operation envelope and initial opcode registry accepted in `PCDN-MPY-02-005`.
+operation envelope, typed field/value lists, contextual object references, and
+successful Batch payload accepted through `PCDN-MPY-02-006`.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependency:
 MPY-01 was ratified and committed at `74dc28a` before this phase's ratification.
@@ -55,6 +56,9 @@ part of an accidental ABI.
 | **Protocol Capability** | Versioned declaration of supported opcodes, value tags, actor/schema version, and bounded capacities for one target profile. | Owned by MPY-02; populated by later phases. |
 | **Value Envelope** | Explicit tag, length where applicable, and payload encoding for one protocol value. | Owned by MPY-02. |
 | **Operation Record** | One counted Batch member carrying an explicit opcode, flags, and length-delimited opcode-owned payload. Its operation index is its zero-based list position. | Owned by MPY-02; payload schema owned by the opcode's phase. |
+| **Typed Field List** | Counted, strictly ID-ordered keyed fields whose values use the canonical Value Envelope. | Owned by MPY-02; field meanings belong to the opcode or descriptor. |
+| **Typed Value List** | Counted positional values whose order and tags are declared by the owning opcode or descriptor. | Owned by MPY-02; schema meaning belongs to later phases. |
+| **Batch Success Payload** | Final/current Stage Revision followed by strictly operation-index-ordered output records for operations declaring results. | Owned by MPY-02; declared output schemas belong to each opcode. |
 | **Transport Endpoint** | Ordered send/receive boundary for command, result, and cue frames without runtime semantics of its own. | Owned jointly by MPY-02 traits and MPY-07/08 implementations. |
 
 ## 4. Source-of-Truth Map
@@ -128,7 +132,7 @@ The MPY v1 `ValueTag` set is Standards Action:
 | `Bytes` | `u32` length plus bytes | Used only when the descriptor permits opaque data. |
 | `Object` | `ObjectId` | The enclosing command supplies `StageId`. |
 | `Resource` | resource-kind `u32` plus resource ID `u64` | Assets, fonts, images, and future registries use named kinds. |
-| `BatchObject` | `BatchRef` | Legal only inside a batch payload. |
+| `BatchObject` | `BatchRef` | Legal only in Batch-scoped object-reference positions and Batch-correlated results whose owning schema permits it. |
 
 Recursive arbitrary dictionaries/lists are not protocol values in v1. Commands
 and descriptors carry typed field sequences so embedded decoders can validate
@@ -137,7 +141,12 @@ depth and capacity without a general object graph.
 Text/bytes are owned by the frame while decoding and copied or interned by the
 accepting command before the frame is released. No `Value` contains a borrowed
 pointer. Capabilities publish maximum frame size, text bytes, byte payload,
-fields per command, and values per result.
+request-list items, top-level Batch operations, and values per result.
+
+`BatchObject` is a transport-local provisional reference, not a durable actor
+descriptor type. Actor descriptors declare durable references as `Object`.
+Opcode validation resolves a permitted `BatchObject` to an `ObjectId` before a
+value reaches stage state, snapshots, or cues.
 
 ### 6.1 Negotiated capacity floor
 
@@ -148,7 +157,7 @@ profile to advertise larger limits:
 |---|---:|
 | `max_frame_bytes` | 256 bytes |
 | `max_text_bytes` | 128 UTF-8 bytes |
-| `max_items_per_command` | 8 typed fields or Batch operations |
+| `max_items_per_command` | 8 typed request-list items (keyed fields or positional arguments) or top-level Batch operations |
 
 `max_frame_bytes` counts one complete canonical logical frame after any
 transport-local reassembly; transport headers and fragment metadata do not
@@ -159,7 +168,8 @@ Each endpoint advertises the maxima it can encode and receive. The active limit
 in each direction is the component-wise minimum of the two endpoints'
 advertised maxima. The `max_items_per_command:u16` wire position generalizes
 the earlier fields-only name without moving or enlarging the field; it bounds
-both typed fields in one command and top-level operation records in one Batch.
+each typed request list (keyed fields or positional arguments) and, separately,
+the top-level operation records in one Batch.
 An endpoint advertising less than any MPY v1 minimum is not an MPY
 v1-compatible profile and MUST reject activation with a structured
 `Unsupported` result. A value, item count, or frame above the negotiated
@@ -245,6 +255,40 @@ One value is its `u8` tag followed immediately by the §6 payload:
 `Resource.kind`, `Resource.id`, and `BatchObject` are nonzero. Unknown tags are
 `Unsupported`; malformed known tags are `InvalidFrame`.
 
+#### 7.2.1 Counted typed lists and contextual object references
+
+A Typed Value List is `value_count:u16` followed immediately by that many
+canonical §7.2 Values. Values are positional; the owning opcode or descriptor
+declares their order and required tags. A request argument list independently
+obeys `max_items_per_command`.
+
+A Typed Field List is `field_count:u16` followed by exactly that many records:
+
+| Field | Encoding |
+|---|---|
+| field ID | nonzero `u32` strictly greater than the preceding field ID |
+| value | one canonical §7.2 Value |
+
+Strict ordering provides one byte representation and rejects duplicates without
+allocation. Every field list independently obeys `max_items_per_command`; the
+outer Batch operation list separately obeys that same negotiated limit. Extra
+bytes, fewer values or fields than declared, zero/duplicate/decreasing field
+IDs, and malformed Values are `InvalidFrame`. Exceeding a negotiated count or
+per-value `max_text_bytes`/`max_byte_payload` is `Capacity` at the protocol
+boundary (`LimitExceeded` in the reference codec).
+
+An opcode field declared as an object reference carries one existing tagged
+Value: `Object` for a stable `ObjectId`, or `BatchObject` for a provisional
+`BatchRef`. No third discriminant or raw pointer is introduced. A canonical
+value with any other tag in that field is `TypeMismatch`; malformed bytes remain
+`InvalidFrame`. `Object` is valid in Command and Batch contexts.
+`BatchObject` is valid only where the Batch opcode/result schema explicitly
+permits it. Zero is structurally `InvalidFrame`. The owning Batch validator,
+not this structural codec, rejects unknown, forward, self, or multiply bound
+nonzero references as `BatchInvalid` at the applicable operation/field. Exact
+Create binding, destination, constructor, and result mapping remain the
+following Create-specific decision.
+
 ### 7.3 Class payloads
 
 Fields appear in the following order without alignment gaps:
@@ -310,6 +354,40 @@ endpoint. Reserving a standards value here does not let a profile advertise an
 unimplemented operation. The owning MPY-03/04 payload schemas are the next
 separate decision and cannot reinterpret this envelope or reuse these values.
 
+#### 7.3.2 Successful Batch payload
+
+The length-delimited payload of a successful Result correlated to a Batch is:
+
+| Field | Encoding |
+|---|---|
+| result revision | final/current `StageRevision:u64` after the accepted Batch |
+| record count | `u16` number of output-bearing operation records |
+| records | exactly `record_count` records in the format below |
+
+Each output-bearing record is:
+
+| Field | Encoding |
+|---|---|
+| operation index | `u16`, strictly increasing and less than the submitted operation count |
+| value count | nonzero `u16` |
+| values | exactly `value_count` canonical §7.2 Values in opcode-declared order |
+
+The revision records the state visible after the accepted Batch. A mutating
+Batch advances it according to MPY-04; this common layout does not claim that a
+nonmutating success advances it. Operations with no declared output contribute
+no record, and `record_count == 0` is canonical. A zero-value record,
+duplicate/decreasing/out-of-range operation index, truncated Value, or trailing
+byte is `InvalidFrame`. Correlation to an operation that does not declare that
+output schema is rejected by opcode validation before Result publication; the
+structural codec cannot infer it from the index alone.
+
+`max_values_per_result` applies to the sum of value counts across the complete
+Batch success payload, while `max_text_bytes` and `max_byte_payload` apply to
+each contained Value. The declared `result_bytes` budget and negotiated frame
+limit reserve the complete encoded Result before mutation. The codec is
+allocation-free and writes into caller-owned storage, so no capacity or encode
+failure may first occur after commit.
+
 ### 7.4 Canonical implementation and vectors
 
 `api/src/protocol.rs` is the allocation-free reference codec. It writes into a
@@ -319,14 +397,19 @@ hex corpus; `api/tests/mpy_v1_golden.rs` proves encode equality, decode equality
 and byte-identical re-encoding for every §7.2 value and §7.1 frame class. C and
 MicroPython consumers must pass the same corpus rather than copying Rust layout.
 The corpus also contains `operation.initial_registry`, a counted empty-payload
-record for every opcode assigned in §7.3.1. Structural Hello/Capabilities
-parsing uses `encode_frame`/`decode_frame`; after negotiation, adapters MUST use
-`encode_frame_with_limits`/`decode_frame_with_limits` (or the corresponding
-operation-list limit functions) so `max_items_per_command` and complete-frame
-capacity are enforced before request acceptance. These envelope codecs do not
-interpret opcode-owned payloads; the owning payload codec MUST separately
-enforce `max_text_bytes`, `max_byte_payload`, Command field counts, and Result
-value counts before request acceptance.
+record for every opcode assigned in §7.3.1, plus canonical Value List, Field
+List, nonempty Batch success, and empty Batch success payloads. Structural
+Hello/Capabilities parsing uses `encode_frame`/`decode_frame`.
+
+After negotiation, `encode_frame_with_limits`/`decode_frame_with_limits`
+enforce only complete-frame bytes plus the outer Batch operation count; they do
+not inspect opaque opcode/result payloads. Operation-list limit functions
+enforce that outer count. Field/Value List and Batch-success `*_with_limits`
+functions separately enforce their applicable negotiated item/value count and
+each contained `Text`/`Bytes` bound. Endpoint adapters MUST apply both the
+payload-specific function and the frame wrapper before request acceptance or
+Result publication. Count-only `*_with_limit` helpers are not sufficient for a
+post-negotiation payload containing variable-sized Values.
 
 ## 8. Frozen Decisions — Atomic Batches
 
@@ -349,11 +432,13 @@ commits.
 
 ### 8.1 Batch Result shape
 
-One accepted Batch produces one Result. On success, its payload contains an
-ordered sequence of operation records only for operations whose protocol
-definition declares an output. Every record carries its zero-based operation
-index. Create records additionally map `BatchRef` to the allocated `ObjectId`;
-read and result-bearing action records carry their declared typed values. A
+One accepted Batch produces one Result. On success, its payload carries the
+§7.3.2 final/current Stage Revision and then an ordered sequence of operation
+records only for operations whose protocol definition declares an output.
+Every record carries its correlated zero-based operation index and a nonempty
+Typed Value List. Create must map its `BatchRef` to the allocated `ObjectId`,
+but the exact value order remains the following Create-specific PCDN. Read and
+result-bearing action records carry their separately declared typed values. A
 successful operation with no declared output contributes no record, and an
 empty success sequence is valid.
 
@@ -378,6 +463,21 @@ The initial stable error classes are: `InvalidFrame`, `VersionMismatch`,
 Errors carry the stable class, operation index where applicable, field or
 descriptor ID where applicable, and an optional bounded diagnostic string.
 Python exception text is adapter policy; the stable class is authoritative.
+
+#### 9.1.1 Typed payload and reference error boundary
+
+| Condition | Stable result |
+|---|---|
+| Truncated/trailing payload, count mismatch, zero/duplicate/decreasing field ID, zero `BatchRef`, zero-value result record, or duplicate/decreasing/out-of-range result index | `InvalidFrame` |
+| Negotiated field/value count, `Text`, `Bytes`, declared Result buffer, or complete frame exceeded | `Capacity` (`LimitExceeded` in the codec) |
+| Canonical value tag does not match the opcode/descriptor field schema, including a non-Object/BatchObject tag in an object-reference field | `TypeMismatch` with field attribution when available |
+| Nonzero `BatchRef` is unknown, forward/self-referential, multiply bound, or otherwise illegal in the validated Batch graph | `BatchInvalid` with operation/field attribution |
+| Stable `ObjectId` is deleted, generation-stale, or outside the enclosing Stage | `StaleObject` |
+
+Structural errors take precedence over negotiated-count errors. All rows are
+checked before mutation. The reference codec distinguishes malformed bytes from
+the semantic object-reference TypeMismatch, while Create-specific graph
+resolution remains outside the structural decoder.
 
 ### 9.2 Phase invariants
 
@@ -439,6 +539,14 @@ Python exception text is adapter policy; the stable class is authoritative.
   to `max_items_per_command`, with an MPY v1 floor of eight items. The first
   eleven standards opcodes are assigned to the accepted Create and MPY-04
   mutation families; capability advertisement remains implementation-truthful.
+- **PCDN-MPY-02-006 — Resolved by owner direction 2026-08-16:** Typed Field and
+  Value Lists use allocation-free counted §7.2 Values; object-reference fields
+  contextually reuse `Object`/`BatchObject`; and successful Batch Results carry
+  the final/current Stage Revision plus strictly operation-index-ordered,
+  nonempty output records. Field lists, positional request Value Lists, and
+  outer Batch operation lists are independently bounded; Result values are
+  aggregate-bounded, and exact Create payload/mapping remains a following
+  Create-specific decision.
 
 ## 12. Acceptance Checklist
 
@@ -453,6 +561,7 @@ Python exception text is adapter policy; the stable class is authoritative.
 - [x] `PCDN-MPY-02-003` is resolved without weakening atomic batches or bounded Results.
 - [x] `PCDN-MPY-02-004` fixes an allocation-free canonical byte layout and committed golden corpus without weakening `INV-MPY-02-2` or the 256-byte floor.
 - [x] `PCDN-MPY-02-005` fixes bounded Batch operation records and non-reusable opcode assignments without changing the established Hello field positions or weakening `INV-MPY-02-4`/`INV-MPY-02-5`.
+- [x] `PCDN-MPY-02-006` fixes canonical typed payload lists, contextual object references, and bounded correlated Batch-success records without preempting Create or MPY-04 opcode schemas.
 
 ## 13. Files Cited
 
@@ -475,10 +584,11 @@ transport prototypes to consume the same neutral frames. It does not ratify
 MPY-03 or authorize registry behavior before that phase closes its own PCDNs
 and §12 gate.
 
-The canonical vectors and reference codec are now committed with these
-amendments. The counted operation iterator unblocks opcode-owned Create and
-mutation payload codecs without authorizing either schema to change the common
-record envelope.
+The canonical vectors and reference codec are now committed through
+`PCDN-MPY-02-005`. The accepted typed-list, contextual-reference, and
+Batch-success common codec now unblocks the following Create-specific payload
+decision and later MPY-04 opcode payloads. It does not choose Create destination,
+constructor grouping, binding placement, or exact result mapping.
 
 ## 15. Change Log
 
@@ -490,7 +600,7 @@ record envelope.
 
 **Touches:** INV-MPY-02-1, INV-MPY-02-2, INV-MPY-02-3, INV-MPY-02-4, INV-MPY-02-5, INV-MPY-02-6, INV-MPY-2, INV-MPY-6, INV-MPY-7, INV-MPY-8, PCDN-MPY-001, §0–§14
 
-**Commits:** pending
+**Commits:** `35f5e5c`
 
 **Summary:** Proposes stable ID widths, a nonrecursive tagged value set,
 canonical command/result/cue frames, atomic batch references, structured
@@ -511,7 +621,7 @@ adapter-specific errors from becoming accidental cross-core ABI.
 
 **Touches:** PCDN-MPY-02-002, INV-MPY-02-5, §0, §6.1, §11, §12
 
-**Commits:** pending
+**Commits:** `99aebdc`
 
 **Summary:** Resolves `PCDN-MPY-02-002` with capability-negotiated limits, a
 256-byte canonical-frame floor, and a 128-byte UTF-8 text floor. MPY-08 must
@@ -553,7 +663,7 @@ implementation authorized.
 **Touches:** PCDN-MPY-001, PCDN-MPY-02-001, PCDN-MPY-02-003,
 INV-MPY-02-1, INV-MPY-02-4, §0, §3, §5.1, §8.1, §11, §12, §14
 
-**Commits:** pending
+**Commits:** `99aebdc`
 
 **Summary:** Owner ratified MPY-02 after resolving the remaining identity and
 Batch Result decisions. `StageId` is a non-reused `u32` within an Endpoint
@@ -596,7 +706,7 @@ separately gated Draft phases.
 
 **Touches:** PCDN-MPY-02-004, INV-MPY-02-2, INV-MPY-02-5, §0, §7, §11–§15
 
-**Commits:** pending
+**Commits:** `0d6cea9`
 
 **Summary:** Fixes the eight-byte frame header, stable discriminants, scalar
 widths, class payload ordering, and allocation-free codec; commits golden bytes
@@ -621,7 +731,7 @@ without a demonstrated compatibility requirement.
 **Touches:** PCDN-MPY-02-005, INV-MPY-02-2, INV-MPY-02-4,
 INV-MPY-02-5, §3, §6.1, §7.3, §11–§15
 
-**Commits:** pending
+**Commits:** `5616610`
 
 **Summary:** Freezes the counted fixed Batch-operation envelope, generalizes
 the existing fields-only capacity slot to `max_items_per_command`, establishes
@@ -652,3 +762,42 @@ support bounded structural validation; deriving opcodes from Rust enum order or
 names, which makes refactoring a wire break; adding a second Hello limit, which
 would move established fields; and interpreting numeric opcode ranges as
 semantics, which would constrain later standards action unnecessarily.
+
+### 0.6.0 — 2026-08-16 — Amended
+
+**Author:** Ira Abbott with OpenAI Codex implementation
+
+**Change kind:** semantic and implementation
+
+**Touches:** PCDN-MPY-02-006, INV-MPY-02-2, INV-MPY-02-4,
+INV-MPY-02-5, §3, §6, §7.2–§9.1, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes allocation-free counted Field and Value Lists,
+contextual `Object`/`BatchObject` references, and the successful Batch payload
+carrying final/current Stage Revision plus ordered output records. The golden
+corpus covers nonempty and empty results, exact list bytes, malformed order and
+counts, submitted-operation correlation, aggregate result limits, and
+per-value Text/Bytes limits.
+
+#### Rationale
+
+The operation envelope deliberately left each payload opaque, but Create and
+MPY-04 cannot independently invent keyed fields, positional values, actor
+reference unions, or Result record framing without creating competing ABIs.
+Counted self-delimiting Values give the embedded decoder exact bounds and
+zero-copy iteration while strict field/result ordering provides one canonical
+representation without allocation.
+
+Reusing the existing `Object` and `BatchObject` tags avoids another reference
+discriminant. Structural decoding distinguishes malformed bytes from a
+canonical tag mismatch, while Batch graph validation retains authority over
+unknown, forward, self, and multiply bound references. The fixed Result
+revision records the state actually visible after acceptance without claiming
+that every nonmutating success advances it.
+
+What deliberately remains open: Create destination encoding, constructor and
+initial-state grouping, BatchRef binding placement, exact Create output order,
+and every MPY-04 opcode-owned field schema. Those decisions may reuse these
+common records but cannot reinterpret them.

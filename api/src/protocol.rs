@@ -373,6 +373,448 @@ pub enum ValueRef<'a> {
     BatchObject(u16),
 }
 
+impl ValueRef<'_> {
+    /// Return the stable tag carried by this value.
+    pub const fn tag(self) -> ValueTag {
+        match self {
+            Self::None => ValueTag::None,
+            Self::Bool(_) => ValueTag::Bool,
+            Self::I32(_) => ValueTag::I32,
+            Self::U32(_) => ValueTag::U32,
+            Self::I64(_) => ValueTag::I64,
+            Self::U64(_) => ValueTag::U64,
+            Self::Precise(_) => ValueTag::Precise,
+            Self::Color(_) => ValueTag::Color,
+            Self::Point { .. } => ValueTag::Point,
+            Self::Size { .. } => ValueTag::Size,
+            Self::Rect { .. } => ValueTag::Rect,
+            Self::Enum { .. } => ValueTag::Enum,
+            Self::Text(_) => ValueTag::Text,
+            Self::Bytes(_) => ValueTag::Bytes,
+            Self::Object(_) => ValueTag::Object,
+            Self::Resource { .. } => ValueTag::Resource,
+            Self::BatchObject(_) => ValueTag::BatchObject,
+        }
+    }
+}
+
+/// Contextual object reference carried by an existing MPY value tag.
+///
+/// This is a semantic view over [`ValueRef::Object`] and
+/// [`ValueRef::BatchObject`], not a new wire discriminant. Opcode-owned codecs
+/// use it only in fields whose schema declares an object reference. Resolving
+/// one batch-local reference to an earlier unique Create remains a semantic
+/// Batch-validation step rather than part of this structural codec.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObjectReference {
+    /// Stable generation-checked object identity.
+    Object(u64),
+    /// Nonzero reference bound by an earlier Create in the same Batch.
+    BatchObject(u16),
+}
+
+/// Failure to decode or semantically classify an object-reference field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ObjectReferenceError {
+    /// The underlying tagged value was malformed or unsupported.
+    Codec(CodecError),
+    /// A canonical value carried a tag not permitted by an object-reference field.
+    TypeMismatch {
+        /// Canonical tag supplied by the field.
+        actual: ValueTag,
+    },
+}
+
+impl From<CodecError> for ObjectReferenceError {
+    fn from(error: CodecError) -> Self {
+        Self::Codec(error)
+    }
+}
+
+impl ObjectReference {
+    /// Return the existing tagged value used to encode this reference.
+    pub const fn as_value(self) -> ValueRef<'static> {
+        match self {
+            Self::Object(value) => ValueRef::Object(value),
+            Self::BatchObject(value) => ValueRef::BatchObject(value),
+        }
+    }
+}
+
+impl TryFrom<ValueRef<'_>> for ObjectReference {
+    type Error = ObjectReferenceError;
+
+    fn try_from(value: ValueRef<'_>) -> Result<Self, Self::Error> {
+        match value {
+            ValueRef::Object(value) => Ok(Self::Object(value)),
+            ValueRef::BatchObject(value) => Ok(Self::BatchObject(value)),
+            value => Err(ObjectReferenceError::TypeMismatch {
+                actual: value.tag(),
+            }),
+        }
+    }
+}
+
+/// One nonzero keyed field in a canonical typed field list.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FieldRef<'a> {
+    /// Stable descriptor- or opcode-owned field identifier.
+    pub id: u32,
+    /// Canonical tagged field value.
+    pub value: ValueRef<'a>,
+}
+
+#[derive(Clone, Copy)]
+enum ValueSource<'a> {
+    Native(&'a [ValueRef<'a>]),
+    Wire { count: usize, values: &'a [u8] },
+}
+
+/// Borrowed counted list of canonical tagged values.
+#[derive(Clone, Copy)]
+pub struct ValueList<'a> {
+    source: ValueSource<'a>,
+}
+
+impl<'a> ValueList<'a> {
+    /// Build a value list from native borrowed values for encoding.
+    pub const fn from_slice(values: &'a [ValueRef<'a>]) -> Self {
+        Self {
+            source: ValueSource::Native(values),
+        }
+    }
+
+    fn from_wire(count: usize, values: &'a [u8]) -> Self {
+        Self {
+            source: ValueSource::Wire { count, values },
+        }
+    }
+
+    /// Return the exact value count.
+    pub fn len(self) -> usize {
+        match self.source {
+            ValueSource::Native(values) => values.len(),
+            ValueSource::Wire { count, .. } => count,
+        }
+    }
+
+    /// Return whether the list contains no values.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterate values in their canonical positional order.
+    pub fn iter(self) -> ValueIter<'a> {
+        let source = match self.source {
+            ValueSource::Native(values) => ValueIterSource::Native(values.iter()),
+            ValueSource::Wire { count, values } => ValueIterSource::Wire {
+                remaining: count,
+                reader: Reader::new(values),
+            },
+        };
+        ValueIter { source }
+    }
+}
+
+impl fmt::Debug for ValueList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for ValueList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+enum ValueIterSource<'a> {
+    Native(core::slice::Iter<'a, ValueRef<'a>>),
+    Wire {
+        remaining: usize,
+        reader: Reader<'a>,
+    },
+}
+
+/// Iterator over a native or zero-copy wire-backed value list.
+pub struct ValueIter<'a> {
+    source: ValueIterSource<'a>,
+}
+
+impl<'a> Iterator for ValueIter<'a> {
+    type Item = ValueRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.source {
+            ValueIterSource::Native(values) => values.next().copied(),
+            ValueIterSource::Wire { remaining, reader } => {
+                if *remaining == 0 {
+                    return None;
+                }
+                *remaining -= 1;
+                Some(decode_value_from_reader(reader).expect("wire value list was validated"))
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match &self.source {
+            ValueIterSource::Native(values) => values.len(),
+            ValueIterSource::Wire { remaining, .. } => *remaining,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for ValueIter<'_> {}
+
+#[derive(Clone, Copy)]
+enum FieldSource<'a> {
+    Native(&'a [FieldRef<'a>]),
+    Wire { count: usize, fields: &'a [u8] },
+}
+
+/// Borrowed keyed list of strictly increasing canonical typed fields.
+#[derive(Clone, Copy)]
+pub struct FieldList<'a> {
+    source: FieldSource<'a>,
+}
+
+impl<'a> FieldList<'a> {
+    /// Build a field list from native borrowed fields for encoding.
+    pub const fn from_slice(fields: &'a [FieldRef<'a>]) -> Self {
+        Self {
+            source: FieldSource::Native(fields),
+        }
+    }
+
+    fn from_wire(count: usize, fields: &'a [u8]) -> Self {
+        Self {
+            source: FieldSource::Wire { count, fields },
+        }
+    }
+
+    /// Return the exact field count.
+    pub fn len(self) -> usize {
+        match self.source {
+            FieldSource::Native(fields) => fields.len(),
+            FieldSource::Wire { count, .. } => count,
+        }
+    }
+
+    /// Return whether the list contains no fields.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterate fields in strictly increasing identifier order.
+    pub fn iter(self) -> FieldIter<'a> {
+        let source = match self.source {
+            FieldSource::Native(fields) => FieldIterSource::Native(fields.iter()),
+            FieldSource::Wire { count, fields } => FieldIterSource::Wire {
+                remaining: count,
+                reader: Reader::new(fields),
+            },
+        };
+        FieldIter { source }
+    }
+}
+
+impl fmt::Debug for FieldList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for FieldList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+enum FieldIterSource<'a> {
+    Native(core::slice::Iter<'a, FieldRef<'a>>),
+    Wire {
+        remaining: usize,
+        reader: Reader<'a>,
+    },
+}
+
+/// Iterator over a native or zero-copy wire-backed field list.
+pub struct FieldIter<'a> {
+    source: FieldIterSource<'a>,
+}
+
+impl<'a> Iterator for FieldIter<'a> {
+    type Item = FieldRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.source {
+            FieldIterSource::Native(fields) => fields.next().copied(),
+            FieldIterSource::Wire { remaining, reader } => {
+                if *remaining == 0 {
+                    return None;
+                }
+                *remaining -= 1;
+                Some(FieldRef {
+                    id: reader.u32().expect("wire field list was validated"),
+                    value: decode_value_from_reader(reader).expect("wire field list was validated"),
+                })
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match &self.source {
+            FieldIterSource::Native(fields) => fields.len(),
+            FieldIterSource::Wire { remaining, .. } => *remaining,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for FieldIter<'_> {}
+
+/// One output-bearing operation in a successful Batch result.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OperationResultRef<'a> {
+    /// Zero-based index of the submitted operation.
+    pub operation_index: u16,
+    /// Nonempty ordered values declared by that operation's schema.
+    pub values: ValueList<'a>,
+}
+
+#[derive(Clone, Copy)]
+enum OperationResultSource<'a> {
+    Native(&'a [OperationResultRef<'a>]),
+    Wire { count: usize, records: &'a [u8] },
+}
+
+/// Borrowed list of strictly increasing successful Batch operation results.
+#[derive(Clone, Copy)]
+pub struct OperationResultList<'a> {
+    source: OperationResultSource<'a>,
+}
+
+impl<'a> OperationResultList<'a> {
+    /// Build a result list from native borrowed records for encoding.
+    pub const fn from_slice(results: &'a [OperationResultRef<'a>]) -> Self {
+        Self {
+            source: OperationResultSource::Native(results),
+        }
+    }
+
+    fn from_wire(count: usize, records: &'a [u8]) -> Self {
+        Self {
+            source: OperationResultSource::Wire { count, records },
+        }
+    }
+
+    /// Return the exact output-bearing operation count.
+    pub fn len(self) -> usize {
+        match self.source {
+            OperationResultSource::Native(results) => results.len(),
+            OperationResultSource::Wire { count, .. } => count,
+        }
+    }
+
+    /// Return whether the accepted Batch produced no operation outputs.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterate result records in strictly increasing operation-index order.
+    pub fn iter(self) -> OperationResultIter<'a> {
+        let source = match self.source {
+            OperationResultSource::Native(results) => {
+                OperationResultIterSource::Native(results.iter())
+            }
+            OperationResultSource::Wire { count, records } => OperationResultIterSource::Wire {
+                remaining: count,
+                reader: Reader::new(records),
+            },
+        };
+        OperationResultIter { source }
+    }
+}
+
+impl fmt::Debug for OperationResultList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for OperationResultList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+enum OperationResultIterSource<'a> {
+    Native(core::slice::Iter<'a, OperationResultRef<'a>>),
+    Wire {
+        remaining: usize,
+        reader: Reader<'a>,
+    },
+}
+
+/// Iterator over native or zero-copy wire-backed Batch operation results.
+pub struct OperationResultIter<'a> {
+    source: OperationResultIterSource<'a>,
+}
+
+impl<'a> Iterator for OperationResultIter<'a> {
+    type Item = OperationResultRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.source {
+            OperationResultIterSource::Native(results) => results.next().copied(),
+            OperationResultIterSource::Wire { remaining, reader } => {
+                if *remaining == 0 {
+                    return None;
+                }
+                *remaining -= 1;
+                let operation_index = reader
+                    .u16()
+                    .expect("wire operation result list was validated");
+                let value_count = reader
+                    .u16()
+                    .expect("wire operation result list was validated")
+                    as usize;
+                let values_start = reader.position;
+                for _ in 0..value_count {
+                    let _ = decode_value_from_reader(reader)
+                        .expect("wire operation result list was validated");
+                }
+                let values = &reader.input[values_start..reader.position];
+                Some(OperationResultRef {
+                    operation_index,
+                    values: ValueList::from_wire(value_count, values),
+                })
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match &self.source {
+            OperationResultIterSource::Native(results) => results.len(),
+            OperationResultIterSource::Wire { remaining, .. } => *remaining,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for OperationResultIter<'_> {}
+
+/// Canonical payload of one successful Batch Result frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BatchSuccess<'a> {
+    /// Stage revision visible after the accepted Batch.
+    pub result_revision: u64,
+    /// Output-bearing operations in submitted operation order.
+    pub results: OperationResultList<'a>,
+}
+
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionStatus {
@@ -764,14 +1206,19 @@ pub struct DecodedFrame<'a> {
 /// Encodes one tagged value into a caller-provided buffer.
 pub fn encode_value(value: ValueRef<'_>, output: &mut [u8]) -> Result<usize, CodecError> {
     let mut writer = Writer::new(output);
+    encode_value_into(value, &mut writer)?;
+    Ok(writer.position)
+}
+
+fn encode_value_into(value: ValueRef<'_>, writer: &mut Writer<'_>) -> Result<(), CodecError> {
     match value {
         ValueRef::None => writer.u8(ValueTag::None as u8)?,
         ValueRef::Bool(value) => {
             writer.u8(ValueTag::Bool as u8)?;
             writer.u8(u8::from(value))?;
         }
-        ValueRef::I32(value) => tagged_i32(&mut writer, ValueTag::I32, value)?,
-        ValueRef::U32(value) => tagged_u32(&mut writer, ValueTag::U32, value)?,
+        ValueRef::I32(value) => tagged_i32(writer, ValueTag::I32, value)?,
+        ValueRef::U32(value) => tagged_u32(writer, ValueTag::U32, value)?,
         ValueRef::I64(value) => {
             writer.u8(ValueTag::I64 as u8)?;
             writer.i64(value)?;
@@ -780,8 +1227,8 @@ pub fn encode_value(value: ValueRef<'_>, output: &mut [u8]) -> Result<usize, Cod
             writer.u8(ValueTag::U64 as u8)?;
             writer.u64(value)?;
         }
-        ValueRef::Precise(value) => tagged_i32(&mut writer, ValueTag::Precise, value)?,
-        ValueRef::Color(value) => tagged_u32(&mut writer, ValueTag::Color, value)?,
+        ValueRef::Precise(value) => tagged_i32(writer, ValueTag::Precise, value)?,
+        ValueRef::Color(value) => tagged_u32(writer, ValueTag::Color, value)?,
         ValueRef::Point { x, y } => {
             writer.u8(ValueTag::Point as u8)?;
             writer.i32(x)?;
@@ -838,12 +1285,17 @@ pub fn encode_value(value: ValueRef<'_>, output: &mut [u8]) -> Result<usize, Cod
             writer.u16(value)?;
         }
     }
-    Ok(writer.position)
+    Ok(())
 }
 
 /// Decodes one tagged value and returns the number of consumed bytes.
 pub fn decode_value(input: &[u8]) -> Result<(ValueRef<'_>, usize), CodecError> {
     let mut reader = Reader::new(input);
+    let value = decode_value_from_reader(&mut reader)?;
+    Ok((value, reader.position))
+}
+
+fn decode_value_from_reader<'a>(reader: &mut Reader<'a>) -> Result<ValueRef<'a>, CodecError> {
     let tag = ValueTag::decode(reader.u8()?)?;
     let value = match tag {
         ValueTag::None => ValueRef::None,
@@ -904,7 +1356,293 @@ pub fn decode_value(input: &[u8]) -> Result<(ValueRef<'_>, usize), CodecError> {
             ValueRef::BatchObject(value)
         }
     };
-    Ok((value, reader.position))
+    Ok(value)
+}
+
+/// Encode one contextual object reference using an existing MPY value tag.
+pub fn encode_object_reference(
+    reference: ObjectReference,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    encode_value(reference.as_value(), output)
+}
+
+/// Decode one contextual object reference and return the consumed byte count.
+///
+/// A canonical value carrying any tag other than [`ValueTag::Object`] or
+/// [`ValueTag::BatchObject`] reports [`ObjectReferenceError::TypeMismatch`].
+/// Batch ordering and uniqueness are validated by the owning opcode.
+pub fn decode_object_reference(
+    input: &[u8],
+) -> Result<(ObjectReference, usize), ObjectReferenceError> {
+    let (value, consumed) = decode_value(input)?;
+    Ok((ObjectReference::try_from(value)?, consumed))
+}
+
+/// Encode a complete counted canonical value list.
+pub fn encode_value_list(values: ValueList<'_>, output: &mut [u8]) -> Result<usize, CodecError> {
+    validate_value_list_structure(values)?;
+    let mut writer = Writer::new(output);
+    encode_value_list_into(values, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode a value list under one explicit count limit.
+///
+/// This count-only helper is useful to opcode tooling. Post-negotiation request
+/// adapters use [`encode_value_list_with_limits`] to enforce value payload
+/// bounds as well as `max_items_per_command`.
+pub fn encode_value_list_with_limit(
+    values: ValueList<'_>,
+    maximum_values: u16,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_value_list_structure(values)?;
+    validate_value_count(values, maximum_values)?;
+    encode_value_list(values, output)
+}
+
+/// Encode a request argument list under active negotiated payload limits.
+pub fn encode_value_list_with_limits(
+    values: ValueList<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_value_list_structure(values)?;
+    validate_value_count(values, limits.max_items_per_command)?;
+    validate_value_list_payload_limits(values, limits)?;
+    encode_value_list(values, output)
+}
+
+/// Decode and structurally validate one complete counted value list.
+pub fn decode_value_list(input: &[u8]) -> Result<ValueList<'_>, CodecError> {
+    decode_value_list_inner(input).map_err(nested_frame_error)
+}
+
+/// Decode a value list under one explicit count limit.
+///
+/// Post-negotiation request adapters use [`decode_value_list_with_limits`].
+pub fn decode_value_list_with_limit(
+    input: &[u8],
+    maximum_values: u16,
+) -> Result<ValueList<'_>, CodecError> {
+    let values = decode_value_list(input)?;
+    validate_value_count(values, maximum_values)?;
+    Ok(values)
+}
+
+/// Decode a request argument list under active negotiated payload limits.
+pub fn decode_value_list_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<ValueList<'_>, CodecError> {
+    let values = decode_value_list(input)?;
+    validate_value_count(values, limits.max_items_per_command)?;
+    validate_value_list_payload_limits(values, limits)?;
+    Ok(values)
+}
+
+fn decode_value_list_inner(input: &[u8]) -> Result<ValueList<'_>, CodecError> {
+    let mut reader = Reader::new(input);
+    let count = reader.u16()? as usize;
+    let values_start = reader.position;
+    for _ in 0..count {
+        let _ = decode_value_from_reader(&mut reader)?;
+    }
+    if reader.position != input.len() {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(ValueList::from_wire(count, &input[values_start..]))
+}
+
+/// Encode a complete counted canonical typed field list.
+pub fn encode_field_list(fields: FieldList<'_>, output: &mut [u8]) -> Result<usize, CodecError> {
+    validate_field_list_structure(fields)?;
+    let mut writer = Writer::new(output);
+    encode_field_list_into(fields, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode a typed field list under one explicit count limit.
+///
+/// Post-negotiation opcode adapters use [`encode_field_list_with_limits`] to
+/// enforce value payload bounds as well as `max_items_per_command`.
+pub fn encode_field_list_with_limit(
+    fields: FieldList<'_>,
+    maximum_items: u16,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_field_list_structure(fields)?;
+    validate_field_count(fields, maximum_items)?;
+    encode_field_list(fields, output)
+}
+
+/// Encode a typed field list under active negotiated payload limits.
+pub fn encode_field_list_with_limits(
+    fields: FieldList<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_field_list_structure(fields)?;
+    validate_field_count(fields, limits.max_items_per_command)?;
+    validate_field_list_payload_limits(fields, limits)?;
+    encode_field_list(fields, output)
+}
+
+/// Decode and structurally validate one complete canonical typed field list.
+pub fn decode_field_list(input: &[u8]) -> Result<FieldList<'_>, CodecError> {
+    decode_field_list_inner(input).map_err(nested_frame_error)
+}
+
+/// Decode a typed field list under one explicit count limit.
+///
+/// Post-negotiation opcode adapters use [`decode_field_list_with_limits`].
+pub fn decode_field_list_with_limit(
+    input: &[u8],
+    maximum_items: u16,
+) -> Result<FieldList<'_>, CodecError> {
+    let fields = decode_field_list(input)?;
+    validate_field_count(fields, maximum_items)?;
+    Ok(fields)
+}
+
+/// Decode a typed field list under active negotiated payload limits.
+pub fn decode_field_list_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<FieldList<'_>, CodecError> {
+    let fields = decode_field_list(input)?;
+    validate_field_count(fields, limits.max_items_per_command)?;
+    validate_field_list_payload_limits(fields, limits)?;
+    Ok(fields)
+}
+
+fn decode_field_list_inner(input: &[u8]) -> Result<FieldList<'_>, CodecError> {
+    let mut reader = Reader::new(input);
+    let count = reader.u16()? as usize;
+    let fields_start = reader.position;
+    let mut previous = None;
+    for _ in 0..count {
+        let id = reader.u32()?;
+        require_increasing_id(previous, id)?;
+        previous = Some(id);
+        let _ = decode_value_from_reader(&mut reader)?;
+    }
+    if reader.position != input.len() {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(FieldList::from_wire(count, &input[fields_start..]))
+}
+
+/// Encode one canonical successful Batch payload.
+///
+/// `submitted_operation_count` correlates every output record to the submitted
+/// operation list. Whether a correlated operation's opcode actually declares
+/// output is an opcode-schema validation performed by the caller.
+pub fn encode_batch_success(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    let mut writer = Writer::new(output);
+    encode_batch_success_into(success, submitted_operation_count, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode a successful Batch payload under one explicit aggregate value limit.
+///
+/// Post-negotiation endpoint adapters use [`encode_batch_success_with_limits`]
+/// to enforce result value payload bounds as well.
+pub fn encode_batch_success_with_limit(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    maximum_values: u16,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    validate_batch_success_value_count(success, maximum_values)?;
+    encode_batch_success(success, submitted_operation_count, output)
+}
+
+/// Encode a successful Batch payload under active negotiated payload limits.
+pub fn encode_batch_success_with_limits(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    validate_batch_success_value_count(success, limits.max_values_per_result)?;
+    validate_batch_success_payload_limits(success, limits)?;
+    encode_batch_success(success, submitted_operation_count, output)
+}
+
+/// Decode and structurally validate one complete successful Batch payload.
+///
+/// Output records are correlated to `submitted_operation_count`. The caller
+/// separately checks that each referenced opcode declares the decoded output
+/// schema before publishing the Result.
+pub fn decode_batch_success(
+    input: &[u8],
+    submitted_operation_count: u16,
+) -> Result<BatchSuccess<'_>, CodecError> {
+    decode_batch_success_inner(input, submitted_operation_count).map_err(nested_frame_error)
+}
+
+/// Decode a successful Batch payload under one explicit aggregate value limit.
+///
+/// Post-negotiation endpoint adapters use [`decode_batch_success_with_limits`].
+pub fn decode_batch_success_with_limit(
+    input: &[u8],
+    submitted_operation_count: u16,
+    maximum_values: u16,
+) -> Result<BatchSuccess<'_>, CodecError> {
+    let success = decode_batch_success(input, submitted_operation_count)?;
+    validate_batch_success_value_count(success, maximum_values)?;
+    Ok(success)
+}
+
+/// Decode a successful Batch payload under active negotiated payload limits.
+pub fn decode_batch_success_with_limits(
+    input: &[u8],
+    submitted_operation_count: u16,
+    limits: Limits,
+) -> Result<BatchSuccess<'_>, CodecError> {
+    let success = decode_batch_success(input, submitted_operation_count)?;
+    validate_batch_success_value_count(success, limits.max_values_per_result)?;
+    validate_batch_success_payload_limits(success, limits)?;
+    Ok(success)
+}
+
+fn decode_batch_success_inner(
+    input: &[u8],
+    submitted_operation_count: u16,
+) -> Result<BatchSuccess<'_>, CodecError> {
+    let mut reader = Reader::new(input);
+    let result_revision = reader.u64()?;
+    let count = reader.u16()? as usize;
+    let records_start = reader.position;
+    let mut previous = None;
+    for _ in 0..count {
+        let operation_index = reader.u16()?;
+        require_operation_result_index(previous, operation_index, submitted_operation_count)?;
+        previous = Some(operation_index);
+        let value_count = reader.u16()? as usize;
+        if value_count == 0 {
+            return Err(CodecError::InvalidFrame);
+        }
+        for _ in 0..value_count {
+            let _ = decode_value_from_reader(&mut reader)?;
+        }
+    }
+    if reader.position != input.len() {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(BatchSuccess {
+        result_revision,
+        results: OperationResultList::from_wire(count, &input[records_start..]),
+    })
 }
 
 /// Encode a counted canonical Batch operation list into caller-provided storage.
@@ -1301,6 +2039,232 @@ fn tagged_i32(writer: &mut Writer<'_>, tag: ValueTag, value: i32) -> Result<(), 
 fn tagged_u32(writer: &mut Writer<'_>, tag: ValueTag, value: u32) -> Result<(), CodecError> {
     writer.u8(tag as u8)?;
     writer.u32(value)
+}
+
+fn encode_value_list_into(
+    values: ValueList<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    let count = u16::try_from(values.len()).map_err(|_| CodecError::InvalidFrame)?;
+    writer.u16(count)?;
+    for value in values.iter() {
+        encode_value_into(value, writer)?;
+    }
+    Ok(())
+}
+
+fn encode_field_list_into(
+    fields: FieldList<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    let count = u16::try_from(fields.len()).map_err(|_| CodecError::InvalidFrame)?;
+    writer.u16(count)?;
+    let mut previous = None;
+    for field in fields.iter() {
+        require_increasing_id(previous, field.id)?;
+        previous = Some(field.id);
+        writer.u32(field.id)?;
+        encode_value_into(field.value, writer)?;
+    }
+    Ok(())
+}
+
+fn encode_batch_success_into(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    let count = u16::try_from(success.results.len()).map_err(|_| CodecError::InvalidFrame)?;
+    writer.u64(success.result_revision)?;
+    writer.u16(count)?;
+    let mut previous = None;
+    for result in success.results.iter() {
+        require_operation_result_index(
+            previous,
+            result.operation_index,
+            submitted_operation_count,
+        )?;
+        previous = Some(result.operation_index);
+        let value_count =
+            u16::try_from(result.values.len()).map_err(|_| CodecError::InvalidFrame)?;
+        if value_count == 0 {
+            return Err(CodecError::InvalidFrame);
+        }
+        writer.u16(result.operation_index)?;
+        writer.u16(value_count)?;
+        for value in result.values.iter() {
+            encode_value_into(value, writer)?;
+        }
+    }
+    Ok(())
+}
+
+fn require_increasing_id(previous: Option<u32>, id: u32) -> Result<(), CodecError> {
+    if id == 0 || previous.is_some_and(|previous| id <= previous) {
+        Err(CodecError::InvalidFrame)
+    } else {
+        Ok(())
+    }
+}
+
+fn require_operation_result_index(
+    previous: Option<u16>,
+    operation_index: u16,
+    submitted_operation_count: u16,
+) -> Result<(), CodecError> {
+    if operation_index >= submitted_operation_count
+        || previous.is_some_and(|previous| operation_index <= previous)
+    {
+        Err(CodecError::InvalidFrame)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_value_structure(value: ValueRef<'_>) -> Result<(), CodecError> {
+    match value {
+        ValueRef::Enum { domain, .. } => require_nonzero(domain),
+        ValueRef::Text(value) => {
+            let _ = u32::try_from(value.len()).map_err(|_| CodecError::InvalidFrame)?;
+            Ok(())
+        }
+        ValueRef::Bytes(value) => {
+            let _ = u32::try_from(value.len()).map_err(|_| CodecError::InvalidFrame)?;
+            Ok(())
+        }
+        ValueRef::Object(value) => require_object_id(value),
+        ValueRef::Resource { kind, id } => {
+            require_nonzero(kind)?;
+            require_nonzero_u64(id)
+        }
+        ValueRef::BatchObject(0) => Err(CodecError::InvalidFrame),
+        ValueRef::None
+        | ValueRef::Bool(_)
+        | ValueRef::I32(_)
+        | ValueRef::U32(_)
+        | ValueRef::I64(_)
+        | ValueRef::U64(_)
+        | ValueRef::Precise(_)
+        | ValueRef::Color(_)
+        | ValueRef::Point { .. }
+        | ValueRef::Size { .. }
+        | ValueRef::Rect { .. }
+        | ValueRef::BatchObject(_) => Ok(()),
+    }
+}
+
+fn validate_value_list_structure(values: ValueList<'_>) -> Result<(), CodecError> {
+    let _ = u16::try_from(values.len()).map_err(|_| CodecError::InvalidFrame)?;
+    for value in values.iter() {
+        validate_value_structure(value)?;
+    }
+    Ok(())
+}
+
+fn validate_field_list_structure(fields: FieldList<'_>) -> Result<(), CodecError> {
+    let _ = u16::try_from(fields.len()).map_err(|_| CodecError::InvalidFrame)?;
+    let mut previous = None;
+    for field in fields.iter() {
+        require_increasing_id(previous, field.id)?;
+        previous = Some(field.id);
+        validate_value_structure(field.value)?;
+    }
+    Ok(())
+}
+
+fn validate_value_payload_limits(value: ValueRef<'_>, limits: Limits) -> Result<(), CodecError> {
+    match value {
+        ValueRef::Text(value) if value.len() > limits.max_text_bytes as usize => {
+            Err(CodecError::LimitExceeded)
+        }
+        ValueRef::Bytes(value) if value.len() > limits.max_byte_payload as usize => {
+            Err(CodecError::LimitExceeded)
+        }
+        _ => Ok(()),
+    }
+}
+
+fn validate_value_list_payload_limits(
+    values: ValueList<'_>,
+    limits: Limits,
+) -> Result<(), CodecError> {
+    for value in values.iter() {
+        validate_value_payload_limits(value, limits)?;
+    }
+    Ok(())
+}
+
+fn validate_field_list_payload_limits(
+    fields: FieldList<'_>,
+    limits: Limits,
+) -> Result<(), CodecError> {
+    for field in fields.iter() {
+        validate_value_payload_limits(field.value, limits)?;
+    }
+    Ok(())
+}
+
+fn validate_batch_success_structure(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+) -> Result<(), CodecError> {
+    let _ = u16::try_from(success.results.len()).map_err(|_| CodecError::InvalidFrame)?;
+    let mut previous = None;
+    for result in success.results.iter() {
+        require_operation_result_index(
+            previous,
+            result.operation_index,
+            submitted_operation_count,
+        )?;
+        previous = Some(result.operation_index);
+        if result.values.is_empty() {
+            return Err(CodecError::InvalidFrame);
+        }
+        validate_value_list_structure(result.values)?;
+    }
+    Ok(())
+}
+
+fn validate_batch_success_payload_limits(
+    success: BatchSuccess<'_>,
+    limits: Limits,
+) -> Result<(), CodecError> {
+    for result in success.results.iter() {
+        validate_value_list_payload_limits(result.values, limits)?;
+    }
+    Ok(())
+}
+
+fn validate_value_count(values: ValueList<'_>, maximum_values: u16) -> Result<(), CodecError> {
+    if values.len() > maximum_values as usize {
+        Err(CodecError::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_field_count(fields: FieldList<'_>, maximum_items: u16) -> Result<(), CodecError> {
+    if fields.len() > maximum_items as usize {
+        Err(CodecError::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_batch_success_value_count(
+    success: BatchSuccess<'_>,
+    maximum_values: u16,
+) -> Result<(), CodecError> {
+    let mut total = 0usize;
+    for result in success.results.iter() {
+        total = total
+            .checked_add(result.values.len())
+            .ok_or(CodecError::InvalidFrame)?;
+        if total > maximum_values as usize {
+            return Err(CodecError::LimitExceeded);
+        }
+    }
+    Ok(())
 }
 
 fn encoded_operation_list_length(operations: OperationList<'_>) -> Result<u32, CodecError> {
