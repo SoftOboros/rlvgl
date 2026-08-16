@@ -163,6 +163,7 @@ mpy-host-test:
 		BUILD=$(MPY_HOST_BUILD) VARIANT=standard CC=$(MPY_HOST_CC) \
 		USER_C_MODULES="$(CURDIR)/micropython" RLVGL_RUST_TARGET=$(HOST_TRIPLE)
 	$(MPY_HOST_BIN) micropython/tests/test_module_imports.py
+	$(MPY_HOST_BIN) micropython/tests/test_exception_hook.py
 	@shasum -a 256 $(MPY_HOST_BIN)
 
 # ── Build ─────────────────────────────────────────────────────────
