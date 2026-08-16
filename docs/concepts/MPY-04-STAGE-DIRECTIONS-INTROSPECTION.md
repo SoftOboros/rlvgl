@@ -9,7 +9,8 @@ metadata, local-style, requested-layout, computed-geometry, atomic-commit, and
 snapshot semantics. The in-process direction, revision, tree, requested-layout,
 geometry, invalidation, and snapshot substrate has focused implementation
 evidence. Local-style projection, subscription metadata in snapshots, and the
-complete cross-driver conformance gate remain open.
+complete cross-driver conformance gate remain open. The common Batch mutation-
+target envelope has an allocation-free codec and golden protocol evidence.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -84,6 +85,56 @@ to the MPY-02 registry.
 
 Unknown or inapplicable IDs produce structured errors. A command MUST NOT fall
 back to probing string methods on the adapter.
+
+### 5.1 Common Batch mutation target envelope
+
+Every MPY v1 mutation opcode from `SET_PROPERTIES` (`0x0000_0002`) through
+`SET_LOCAL_STYLE` (`0x0000_000b`) is Batch-only and carries flags `0`. A Command
+frame carrying one of these opcodes is semantically `Unsupported`. Within its
+Batch operation payload, the first field is exactly one contextual MPY-02
+`ObjectReference` encoded with the existing `ValueTag::Object` or
+`ValueTag::BatchObject`. Every byte after that one canonical value is the
+opcode-owned remainder, which may be empty where the later opcode schema allows
+it.
+
+The common decoder consumes exactly the target value and returns a zero-copy
+view of the complete remainder. It does not interpret, length-prefix, discard,
+or normalize remainder bytes. The following table freezes the target context
+only; the exact remainder fields and successful result schema remain deferred
+to operation-specific PCDNs.
+
+| Opcode | Common target context | Deferred opcode-owned schema |
+|---|---|---|
+| `SET_PROPERTIES` | Actor whose properties are collectively set | Property fields and success values |
+| `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values |
+| `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values |
+| `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values |
+| `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo |
+| `REPARENT` | Actor subtree being moved | Destination, exact index, and success values |
+| `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values |
+| `REORDER` | Actor moving within its current owner | Exact index and success values |
+| `DELETE` | Root of the subtree being deleted | Any reserved options and success values |
+| `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values |
+
+This shared envelope does not resolve references. A structurally valid stable
+target is generation-checked later and can return `StaleObject`. A nonzero
+`BatchObject` must resolve to an earlier unique Create binding in the same
+Batch; forward or unbound use returns `BatchInvalid` at the target field. A
+zero `BatchObject`, malformed/truncated `Object`, missing target, nonzero flags,
+or invocation of the common codec for an opcode outside this table is
+`InvalidFrame`. A canonical target value with another known value tag is
+`TypeMismatch`. An unknown value tag remains `Unsupported`.
+
+No separate `with_limits` function applies to the common prefix: `Object` and
+`BatchObject` have fixed wire sizes, while the opaque remainder cannot be
+validated without its opcode schema. Each operation-specific remainder codec
+MUST apply every relevant negotiated Text, Bytes, item, and result limit before
+dispatch. The enclosing Batch codec independently enforces
+`max_items_per_command` and `max_frame_bytes`. At the minimum profile, a Batch
+with eight operation records carrying the largest nine-byte stable-Object
+prefix and empty remainders is 206 bytes, leaving the shared 256-byte frame
+floor intact. This is a common-envelope size proof, not a claim that any
+operation-specific empty remainder is valid.
 
 ## 6. Frozen Decisions — Properties and Actions
 
@@ -266,6 +317,11 @@ material, but they MUST preserve the same ordering and visible semantics.
   one starting revision token, traversal state, and one bounded page workspace
   per Stage. Mutations invalidate rather than block the cursor; no historical
   tree retention is required.
+- **PCDN-MPY-04-004 — Closed by owner acceptance 2026-08-16:** §5.1 freezes one
+  zero-flag Batch-only target prefix for all ten v1 mutation opcodes. It reuses
+  contextual `Object`/`BatchObject` values, preserves the protocol error split,
+  and leaves every opcode-owned remainder and successful result schema for its
+  following decision.
 
 ## 12. Acceptance Checklist
 
@@ -275,7 +331,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-003 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-004 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -294,7 +350,9 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-After ratification and implementation, MPY-04 provides the complete stage
+The common mutation-target envelope now unblocks operation-specific payload and
+result PCDNs without authorizing guessed remainder schemas. After those codecs
+and endpoint integration are implemented, MPY-04 provides the complete stage
 mutation/introspection surface consumed by MPY-06 and the deterministic
 snapshot oracle consumed by MPY-07/09.
 
@@ -308,7 +366,7 @@ snapshot oracle consumed by MPY-07/09.
 
 **Touches:** INV-MPY-04-1, INV-MPY-04-2, INV-MPY-04-3, INV-MPY-04-4, INV-MPY-04-5, INV-MPY-04-6, INV-MPY-4, INV-MPY-6, INV-MPY-8, §0–§14
 
-**Commits:** pending
+**Commits:** `35f5e5c`
 
 **Summary:** Drafts generic tree/property/action/style/state/layout directions,
 requested-versus-computed geometry, atomic Stage Revisions, invalidation, and
@@ -329,7 +387,7 @@ authoritative view without transferring runtime ownership.
 
 **Touches:** §0, §14, §15
 
-**Commits:** pending
+**Commits:** `e37710e`
 
 **Summary:** Records the completed MPY-03 production registry, actor-local
 catalog, generic Create, stable lookup, and deletion substrate. MPY-04 may now
@@ -345,7 +403,7 @@ MPY-04 behavior before owner ratification.
 
 **Touches:** INV-MPY-04-1, INV-MPY-04-2, INV-MPY-04-3, INV-MPY-04-4, INV-MPY-04-5, INV-MPY-04-6, PCDN-MPY-04-001, PCDN-MPY-04-002, PCDN-MPY-04-003, §0, §5–§12, §14, §15
 
-**Commits:** pending
+**Commits:** `056bc66`
 
 **Summary:** Ratifies the MPY-04 command, transaction, layout, geometry, and
 snapshot model. It closes all three phase PCDNs with a conservative metadata
@@ -388,3 +446,29 @@ library suites and strict Clippy for the affected targets.
 What deliberately did not change: local-style directions still return
 structured `Unsupported`; snapshots do not yet project MPY-05 subscription
 metadata; and this evidence does not claim the MPY-07 byte-equivalence corpus.
+
+### 0.3.0 — 2026-08-16 — Mutation target wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-004, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes one allocation-free contextual object-reference prefix for
+all ten zero-flag Batch-only MPY v1 mutation opcodes. The codec returns the
+complete opcode-owned remainder as a borrowed slice, preserves
+`InvalidFrame`/`TypeMismatch`/`Unsupported` classification, and does not invent
+operation-specific payload or result layouts. Adds a language-neutral vector,
+malformed/context tests, and a 206-byte minimum-profile envelope proof.
+
+#### Rationale
+
+All MPY-04 mutations need identical stable-or-same-Batch targeting. Defining
+that prefix once prevents ten subtly different reference decoders while
+keeping property, action, flag, layout, tree, delete, and style schema authority
+with their own PCDNs. Returning the untouched remainder also lets those later
+codecs remain zero-copy and apply their negotiated limits with full semantic
+context.

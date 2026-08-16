@@ -3,19 +3,20 @@
 use rlvgl_api::protocol::{
     Batch, BatchBudget, BatchSuccess, Capabilities, CodecError, Command, Completion,
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
-    FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, ObjectReference, ObjectReferenceError,
-    OpcodeList, OperationList, OperationRef, OperationResultList, OperationResultRef,
-    ProtocolVersion, RuntimeNotice, ValueList, ValueRef, ValueTag, create_result_object,
-    decode_batch_success, decode_batch_success_with_limits, decode_create_operation_with_limits,
-    decode_create_payload, decode_create_payload_with_limits, decode_field_list,
-    decode_field_list_with_limits, decode_frame, decode_frame_with_limits, decode_object_reference,
+    FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
+    ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
+    OperationResultRef, ProtocolVersion, RuntimeNotice, ValueList, ValueRef, ValueTag,
+    create_result_object, decode_batch_success, decode_batch_success_with_limits,
+    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
+    decode_field_list, decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
     decode_operation_list, decode_operation_list_with_limit, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
     encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
     encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
-    encode_frame_with_limits, encode_object_reference, encode_operation_list,
-    encode_operation_list_with_limit, encode_value, encode_value_list,
-    encode_value_list_with_limit, encode_value_list_with_limits, opcode,
+    encode_frame_with_limits, encode_mutation_target_envelope, encode_object_reference,
+    encode_operation_list, encode_operation_list_with_limit, encode_value, encode_value_list,
+    encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -87,6 +88,18 @@ const CREATE_FIELDS: &[FieldRef<'static>] = &[
     },
 ];
 const CREATE_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Object(0x0000_0002_0000_0001)];
+const MUTATION_OPCODES: &[u32] = &[
+    opcode::SET_PROPERTIES,
+    opcode::RESET_PROPERTIES,
+    opcode::INVOKE_ACTION,
+    opcode::SET_FLAG,
+    opcode::SET_REQUESTED_LAYOUT,
+    opcode::REPARENT,
+    opcode::PROMOTE_ROOT,
+    opcode::REORDER,
+    opcode::DELETE,
+    opcode::SET_LOCAL_STYLE,
+];
 
 const fn empty_operation(opcode: u32) -> OperationRef<'static> {
     OperationRef {
@@ -648,6 +661,112 @@ fn create_success_is_exactly_one_correlated_stable_object() {
 }
 
 #[test]
+fn mutation_target_envelope_matches_golden_bytes_and_borrows_remainder() {
+    let envelope = MutationTargetEnvelope {
+        target: ObjectReference::BatchObject(7),
+        remainder: &[0xaa, 0x55, 0x00],
+    };
+    let mut encoded = [0u8; 32];
+    let length = encode_mutation_target_envelope(envelope, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.mutation_target"));
+    let decoded = decode_mutation_target_envelope(&encoded[..length]).unwrap();
+    assert_eq!(decoded, envelope);
+    assert_eq!(decoded.remainder.as_ptr(), encoded[3..].as_ptr());
+
+    for operation_opcode in MUTATION_OPCODES {
+        assert!(is_batch_mutation_opcode(*operation_opcode));
+        let operation_length = encode_mutation_target_envelope(envelope, &mut encoded).unwrap();
+        let operation = OperationRef {
+            opcode: *operation_opcode,
+            flags: 0,
+            payload: &encoded[..operation_length],
+        };
+        assert_eq!(decode_mutation_operation_target(operation), Ok(envelope));
+    }
+
+    let stable = MutationTargetEnvelope {
+        target: ObjectReference::Object(0x0000_0002_0000_0001),
+        remainder: &[],
+    };
+    let stable_length = encode_mutation_target_envelope(stable, &mut encoded).unwrap();
+    assert_eq!(
+        decode_mutation_target_envelope(&encoded[..stable_length]),
+        Ok(stable)
+    );
+}
+
+#[test]
+fn mutation_target_preserves_object_reference_error_boundaries_and_context() {
+    assert_eq!(
+        decode_mutation_target_envelope(&[]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_mutation_target_envelope(&[ValueTag::Object as u8, 1]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_mutation_target_envelope(&[ValueTag::BatchObject as u8, 0, 0]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_mutation_target_envelope(&[ValueTag::Bool as u8, 1, 0xaa]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        decode_mutation_target_envelope(&[0xff]),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+
+    for target in [ObjectReference::Object(1), ObjectReference::BatchObject(0)] {
+        assert_eq!(
+            encode_mutation_target_envelope(
+                MutationTargetEnvelope {
+                    target,
+                    remainder: &[0xaa],
+                },
+                &mut [0; 16],
+            ),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_mutation_target_envelope(
+            MutationTargetEnvelope {
+                target: ObjectReference::BatchObject(7),
+                remainder: &[0xaa],
+            },
+            &mut [0; 3],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.mutation_target");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::EXPERIMENTAL_FIRST, 0),
+        (opcode::SET_PROPERTIES, 1),
+    ] {
+        assert_eq!(
+            decode_mutation_operation_target(OperationRef {
+                opcode: operation_opcode,
+                flags,
+                payload: &valid,
+            }),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+    assert!(!is_batch_mutation_opcode(opcode::CREATE));
+}
+
+#[test]
 fn successful_batch_payload_matches_golden_bytes_and_correlates_results() {
     let success = BatchSuccess {
         result_revision: 9,
@@ -1138,6 +1257,104 @@ fn interoperability_floor_values_fit_the_floor_frame() {
     let batch_length = encode_frame(MPY_V1, batch, &mut frame).expect("eight-operation floor");
     assert!(batch_length <= frame.len());
     assert_eq!(limits().max_fields_per_command(), 8);
+}
+
+#[test]
+fn eight_worst_case_mutation_target_prefixes_fit_the_floor_frame() {
+    let mut payloads = [[0u8; 9]; 8];
+    let mut lengths = [0usize; 8];
+    for (index, output) in payloads.iter_mut().enumerate() {
+        lengths[index] = encode_mutation_target_envelope(
+            MutationTargetEnvelope {
+                target: ObjectReference::Object((2u64 << 32) | u64::try_from(index + 1).unwrap()),
+                remainder: &[],
+            },
+            output,
+        )
+        .unwrap();
+        assert_eq!(lengths[index], 9);
+    }
+    let operations = [
+        OperationRef {
+            opcode: MUTATION_OPCODES[0],
+            flags: 0,
+            payload: &payloads[0][..lengths[0]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[1],
+            flags: 0,
+            payload: &payloads[1][..lengths[1]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[2],
+            flags: 0,
+            payload: &payloads[2][..lengths[2]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[3],
+            flags: 0,
+            payload: &payloads[3][..lengths[3]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[4],
+            flags: 0,
+            payload: &payloads[4][..lengths[4]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[5],
+            flags: 0,
+            payload: &payloads[5][..lengths[5]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[6],
+            flags: 0,
+            payload: &payloads[6][..lengths[6]],
+        },
+        OperationRef {
+            opcode: MUTATION_OPCODES[7],
+            flags: 0,
+            payload: &payloads[7][..lengths[7]],
+        },
+    ];
+    let batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&operations),
+    });
+    let mut encoded = [0u8; 256];
+    let length = encode_frame_with_limits(MPY_V1, batch, limits(), &mut encoded).unwrap();
+    assert_eq!(length, 206);
+
+    let decoded = decode_frame_with_limits(&encoded[..length], limits()).unwrap();
+    let FrameRef::Batch(decoded_batch) = decoded.frame else {
+        panic!("expected Batch");
+    };
+    for operation in decoded_batch.operations.iter() {
+        assert!(
+            decode_mutation_operation_target(operation)
+                .unwrap()
+                .remainder
+                .is_empty()
+        );
+    }
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 205;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_frame_with_limits(&encoded[..length], too_small),
+        Err(CodecError::LimitExceeded)
+    );
 }
 
 #[test]

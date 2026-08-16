@@ -872,6 +872,21 @@ pub struct CreatePayload<'a> {
 /// remains distinguishable from malformed bytes.
 pub type CreatePayloadError = ObjectReferenceError;
 
+/// Common Batch-only target prefix for MPY v1 mutation operations.
+///
+/// The target is one contextual object reference. The remainder belongs to the
+/// selected opcode and is intentionally opaque to this common codec.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MutationTargetEnvelope<'a> {
+    /// Stable or earlier-created actor targeted by the operation.
+    pub target: ObjectReference,
+    /// Complete borrowed bytes after the target prefix.
+    pub remainder: &'a [u8],
+}
+
+/// Structural or contextual failure while decoding a mutation target.
+pub type MutationTargetError = ObjectReferenceError;
+
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionStatus {
@@ -1660,6 +1675,63 @@ pub fn create_result_object(values: ValueList<'_>) -> Result<u64, CreatePayloadE
             actual: value.tag(),
         }),
     }
+}
+
+/// Return whether an opcode uses the common MPY v1 mutation-target envelope.
+pub const fn is_batch_mutation_opcode(value: u32) -> bool {
+    matches!(
+        value,
+        opcode::SET_PROPERTIES
+            | opcode::RESET_PROPERTIES
+            | opcode::INVOKE_ACTION
+            | opcode::SET_FLAG
+            | opcode::SET_REQUESTED_LAYOUT
+            | opcode::REPARENT
+            | opcode::PROMOTE_ROOT
+            | opcode::REORDER
+            | opcode::DELETE
+            | opcode::SET_LOCAL_STYLE
+    )
+}
+
+/// Encode one common mutation target followed by its opaque opcode remainder.
+///
+/// No negotiated count or variable-value limit belongs to this prefix. The
+/// opcode-owned remainder codec applies its own full [`Limits`], and the
+/// enclosing frame codec applies `max_frame_bytes`.
+pub fn encode_mutation_target_envelope(
+    envelope: MutationTargetEnvelope<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_value_structure(envelope.target.as_value())?;
+    let mut writer = Writer::new(output);
+    encode_value_into(envelope.target.as_value(), &mut writer)?;
+    writer.bytes(envelope.remainder)?;
+    Ok(writer.position)
+}
+
+/// Decode one common mutation target and borrow all remaining opcode bytes.
+pub fn decode_mutation_target_envelope(
+    input: &[u8],
+) -> Result<MutationTargetEnvelope<'_>, MutationTargetError> {
+    let (target, consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    Ok(MutationTargetEnvelope {
+        target,
+        remainder: &input[consumed..],
+    })
+}
+
+/// Decode only the common target prefix of a registered Batch mutation.
+///
+/// Success validates the opcode, flags, and contextual target prefix. The
+/// returned remainder is still opaque and MUST be validated by the selected
+/// opcode's complete payload codec before request acceptance.
+pub fn decode_mutation_operation_target(
+    operation: OperationRef<'_>,
+) -> Result<MutationTargetEnvelope<'_>, MutationTargetError> {
+    require_mutation_operation(operation.opcode, operation.flags)?;
+    decode_mutation_target_envelope(operation.payload)
 }
 
 fn decode_create_payload_inner(input: &[u8]) -> Result<CreatePayload<'_>, CreatePayloadError> {
@@ -2553,6 +2625,23 @@ fn nested_create_payload_error(error: CreatePayloadError) -> CreatePayloadError 
             ObjectReferenceError::Codec(CodecError::InvalidFrame)
         }
         other => other,
+    }
+}
+
+fn nested_mutation_target_error(error: MutationTargetError) -> MutationTargetError {
+    match error {
+        ObjectReferenceError::Codec(CodecError::Truncated) => {
+            ObjectReferenceError::Codec(CodecError::InvalidFrame)
+        }
+        other => other,
+    }
+}
+
+fn require_mutation_operation(value: u32, flags: u32) -> Result<(), CodecError> {
+    if is_batch_mutation_opcode(value) && flags == 0 {
+        Ok(())
+    } else {
+        Err(CodecError::InvalidFrame)
     }
 }
 
