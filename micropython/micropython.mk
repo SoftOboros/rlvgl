@@ -13,6 +13,8 @@
 # Variables:
 #   RLVGL_MOD_DIR - Set by the descriptor, or overridden by its forwarder.
 #   RLVGL_CARGO - Optional Cargo executable override.
+#   RLVGL_RUSTC - Optional rustc executable override.
+#   RLVGL_RUST_TARGET - Explicit Rust target triple. Defaults to rustc's host.
 #   RLVGL_CARGO_TARGET_DIR - Optional Cargo target-directory override.
 #
 # This file follows the conventions used by MicroPython's user module
@@ -20,8 +22,10 @@
 
 RLVGL_MOD_DIR ?= $(USERMOD_DIR)
 RLVGL_CARGO ?= cargo
+RLVGL_RUSTC ?= rustc
+RLVGL_RUST_TARGET ?= $(shell $(RLVGL_RUSTC) -vV | sed -n 's/^host: //p')
 RLVGL_CARGO_TARGET_DIR ?= $(BUILD)/rlvgl-cargo
-RLVGL_STATICLIB := $(RLVGL_CARGO_TARGET_DIR)/release/librlvgl_micropython.a
+RLVGL_STATICLIB := $(RLVGL_CARGO_TARGET_DIR)/$(RLVGL_RUST_TARGET)/release/librlvgl_micropython.a
 RLVGL_RUST_INPUTS := $(RLVGL_MOD_DIR)/Cargo.toml \
                      $(wildcard $(RLVGL_MOD_DIR)/src/*.rs) \
                      $(RLVGL_MOD_DIR)/staticlib/Cargo.toml \
@@ -41,9 +45,10 @@ CFLAGS_USERMOD += -I$(RLVGL_MOD_DIR)
 $(RLVGL_STATICLIB): $(RLVGL_RUST_INPUTS)
 	$(RLVGL_CARGO) build --locked --release \
 		--manifest-path $(RLVGL_MOD_DIR)/staticlib/Cargo.toml \
+		--target $(RLVGL_RUST_TARGET) \
 		--target-dir $(abspath $(RLVGL_CARGO_TARGET_DIR))
 	$(TOUCH) $(RLVGL_STATICLIB)
 
+# MicroPython's Unix link rule consumes normal prerequisites through `$^`, so
+# the archive is listed exactly once here rather than duplicated in LDFLAGS.
 $(BUILD)/$(PROG): $(RLVGL_STATICLIB)
-
-LDFLAGS_USERMOD += $(RLVGL_STATICLIB)

@@ -30,6 +30,13 @@ UEFI_BIN           := rlvgl-uefi-disco
 # Host triple — detected from rustc, used for locating host binaries.
 HOST_TRIPLE := $(shell rustc -vV | sed -n 's/^host: //p')
 
+# Pinned MPY-07 host proof.
+MPY_MICROPYTHON_COMMIT := e0e9fbb17ed6fd06bb76e266ae554784c9c80804
+MPY_UNIX_DIR := vendor/micropython/ports/unix
+MPY_HOST_BUILD := build-rlvgl-standard
+MPY_HOST_BIN := $(MPY_UNIX_DIR)/$(MPY_HOST_BUILD)/micropython
+MPY_HOST_CC ?= cc
+
 # Derived paths
 ELF_CM7       := target/$(TARGET)/debug/$(BIN_CM7)
 ELF_CM7_REL   := target/$(TARGET)/release/$(BIN_CM7)
@@ -48,6 +55,8 @@ DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 	test-disco-demo test-disco-sim-rust \
 	translate-all-i18n translate-all-i18n-force translate-all-i18n-dry-run \
 	extract-i18n-keys extract-icons import-icons
+
+.PHONY: mpy-host-test
 
 help:
 	@echo "STM32H747I-DISCO firmware:"
@@ -112,6 +121,9 @@ help:
 	@echo "  make spec-index-check          # Verify regeneration is a no-op"
 	@echo "  make spec-index-report         # Print diagnostic corpus findings"
 	@echo "  make spec-test                 # Run local index unit/regression tests"
+	@echo ""
+	@echo "MicroPython proof:"
+	@echo "  make mpy-host-test             # Clean pinned v1.28 Unix host build + import proof"
 
 # ── Documentation object index ───────────────────────────────────
 # This is subrepo-owned. The parent softoboros scanner intentionally excludes
@@ -133,6 +145,25 @@ spec-suspect:
 spec-test:
 	python3 scripts/specidx/test_scan.py
 	python3 scripts/specidx/test_suspect.py
+
+# ── MicroPython host proof ────────────────────────────────────────
+# A dedicated build directory keeps the proof isolated from ordinary Unix-port
+# development. Cleaning it on every invocation makes compiler flags, toolchain
+# changes, and Rust target configuration part of the rebuilt evidence.
+mpy-host-test:
+	@test "$$(git -C vendor/micropython rev-parse HEAD)" = "$(MPY_MICROPYTHON_COMMIT)"
+	@test -z "$$(git -C vendor/micropython status --porcelain --untracked-files=no)"
+	@echo "micropython_commit=$(MPY_MICROPYTHON_COMMIT)"
+	@echo "micropython_variant=standard"
+	@echo "rust_target=$(HOST_TRIPLE)"
+	@rustc -vV
+	@$(MPY_HOST_CC) --version | head -1
+	$(MAKE) -C $(MPY_UNIX_DIR) BUILD=$(MPY_HOST_BUILD) clean
+	$(MAKE) -C $(MPY_UNIX_DIR) -j2 \
+		BUILD=$(MPY_HOST_BUILD) VARIANT=standard CC=$(MPY_HOST_CC) \
+		USER_C_MODULES="$(CURDIR)/micropython" RLVGL_RUST_TARGET=$(HOST_TRIPLE)
+	$(MPY_HOST_BIN) micropython/tests/test_module_imports.py
+	@shasum -a 256 $(MPY_HOST_BIN)
 
 # ── Build ─────────────────────────────────────────────────────────
 build-disco:
