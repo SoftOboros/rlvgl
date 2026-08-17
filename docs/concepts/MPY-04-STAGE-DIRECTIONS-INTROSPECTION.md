@@ -12,7 +12,8 @@ evidence. Local-style projection, subscription metadata in snapshots, and the
 complete cross-driver conformance gate remain open. The common Batch mutation-
 target envelope and exact Delete payload have allocation-free codecs and golden
 protocol evidence. The exact Reorder payload has the same API/golden proof;
-complete Endpoint dispatch remains deferred.
+the exact Reparent payload now has all four contextual-reference pair vectors.
+Complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -112,7 +113,7 @@ to operation-specific PCDNs.
 | `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
 | `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values deferred |
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
-| `REPARENT` | Actor subtree being moved | Destination, exact index, and success values deferred |
+| `REPARENT` | Actor subtree being moved | Exact parent plus `u32` index and outputless success; §5.4 |
 | `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values deferred |
 | `REORDER` | Actor moving within its current owner | Exact `u32` index and outputless success; §5.3 |
 | `DELETE` | Root of the subtree being deleted | Exact empty remainder and outputless success; §5.2 |
@@ -240,6 +241,84 @@ profile. Complete Endpoint integration remains responsible for Batch-reference
 resolution, shadow-order validation, Range completion attribution, prepared
 allocation-free commit, lifecycle/cue ordering, revision/result correlation,
 and retained-storage release.
+
+### 5.4 Reparent payload, result, and detach-first semantics
+
+Reparent specializes the common target envelope with a second contextual
+reference and one raw four-byte little-endian index:
+
+```text
+reparent_payload = target:ObjectReference |
+                   new_parent:ObjectReference |
+                   index:u32
+```
+
+The operation opcode is exactly `REPARENT` (`0x0000_0007`), flags are `0`, and
+the index consumes the complete remainder. The decoder parses and classifies
+`target` first, then `new_parent`, then requires exactly four index bytes. A
+missing/truncated reference or index, or any trailing byte, is `InvalidFrame`.
+A canonical known non-object tag is `TypeMismatch` at that positional context;
+an unknown value tag is `Unsupported`. There is no Reparent `with_limits`
+payload helper because both references and the index have fixed wire sizes. A
+Command carrying Reparent is `Unsupported`.
+
+Both references may independently be a stable `Object` or an earlier unique
+`BatchObject`, producing canonical payload sizes of 22 bytes for Object/Object,
+16 bytes for either mixed pair, and 10 bytes for BatchObject/BatchObject.
+Forward or unbound Batch references are `BatchInvalid`; a stale stable
+reference is `StaleObject`. Structural parsing and contextual resolution are
+target-first: if both references fail, the target error is reported before the
+destination-parent error.
+
+The destination index uses detach-first semantics:
+
+1. resolve `target`, then `new_parent`, without mutation;
+2. detach the target subtree in the prepared shadow tree;
+3. validate `index` as the final zero-based position in `new_parent`'s child
+   order after that detach; and
+4. insert the subtree at that exact position.
+
+This rule applies when the old and new parent are identical, so same-parent
+movement is unambiguous and detaching first frees the target's existing child
+slot. A same-parent Reparent can therefore succeed even when that parent is
+already at `max_children_per_actor`. Valid insertion positions run from zero
+through the post-detach child count; a larger value returns `Range`.
+
+Reparenting a named root to a child position removes it from root order and
+discards its root name. The prepared accounting decreases text usage by the
+exact root-name byte length, and that name is available for a later operation
+in the same shadow Batch. Reparent never carries or preserves a root name; a
+later root transition uses PromoteRoot.
+
+Self-parenting, making a descendant the new parent, or violating the parent's
+descriptor child policy returns `InvalidParent`. Exceeding the destination
+child limit or resulting maximum tree depth returns `Capacity`. `Range`,
+`InvalidParent`, and `Capacity` are attributed to the Reparent operation index
+with no `field_id`: this positional payload declares no keyed field ID, and an
+adapter MUST NOT invent one.
+
+A same-parent move to the current final index is a valid no-op direction. It is
+still part of the accepted mutation Batch, whose visible commit advances
+`StageRevision` once for the complete Batch, including when this no-op Reparent
+is its only direction.
+
+Reparent is outputless. BatchSuccess carries the final/current
+`result_revision` but no `OperationResult` at the Reparent operation index.
+Other output-bearing operations retain their increasing records. A record
+correlated to Reparent is `InvalidFrame` under its result schema. The narrow API
+absence validator requires prior caller correlation to opcode Reparent and does
+not validate other opcode schemas, negotiated limits, or the complete success
+envelope.
+
+The fixed common envelope does not imply that eight largest Reparent operations
+fit every minimum frame. Eight shortest BatchObject/BatchObject records are 214
+bytes structurally, although their graph validity still requires earlier
+bindings. Eight Object/Object records are 310 bytes and correctly exceed the
+256-byte frame floor; `max_items_per_command = 8` limits record count
+independently of `max_frame_bytes`. Endpoint integration remains responsible
+for Batch-reference resolution, detach-first shadow validation, root-name and
+capacity accounting, prepared allocation-free commit, error/result
+attribution, lifecycle/cue ordering, and retained-storage release.
 
 ## 6. Frozen Decisions — Properties and Actions
 
@@ -437,6 +516,12 @@ material, but they MUST preserve the same ordering and visible semantics.
   same-owner/name semantics and outputless success. It admits earlier-created
   BatchObject targets, assigns Range to the operation without a fabricated
   field ID, retains no-op revision semantics, and defers Endpoint evidence.
+- **PCDN-MPY-04-007 — Closed by owner acceptance 2026-08-17:** §5.4 freezes
+  Reparent as target, new parent, and raw little-endian `u32` index with
+  target-first contextual errors and detach-first placement. It defines root-
+  name release, same-parent behavior, stable/earlier-Batch reference pairs,
+  structured tree/capacity/range errors, outputless no-op revision semantics,
+  and the remaining Endpoint evidence boundary.
 
 ## 12. Acceptance Checklist
 
@@ -446,7 +531,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-006 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-007 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -465,12 +550,12 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-The common mutation-target envelope plus exact Delete and Reorder schemas now
-unblock the remaining operation-specific payload/result PCDNs and Endpoint
-orchestration without authorizing guessed remainder schemas. After those codecs
-and endpoint integration are implemented, MPY-04 provides the complete stage
-mutation/introspection surface consumed by MPY-06 and the deterministic
-snapshot oracle consumed by MPY-07/09.
+The common mutation-target envelope plus exact Delete, Reorder, and Reparent
+schemas now unblock the remaining operation-specific payload/result PCDNs and
+Endpoint orchestration without authorizing guessed remainder schemas. After
+those codecs and endpoint integration are implemented, MPY-04 provides the
+complete stage mutation/introspection surface consumed by MPY-06 and the
+deterministic snapshot oracle consumed by MPY-07/09.
 
 ## 15. Change Log
 
@@ -624,7 +709,7 @@ reuse preserves bounded capacity without ever reviving an old `ObjectId`.
 
 **Touches:** PCDN-MPY-04-006, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `c6fa2a9`
 
 **Summary:** Freezes Reorder as the common contextual target followed by one
 little-endian `u32` final index, with exact zero-flag Batch admission and
@@ -641,3 +726,29 @@ changes only order, so preserving the current parent or root name prevents it
 from becoming a second reparent/promote path. Outputless success and one common
 Batch revision report the committed state without redundant per-operation
 values, including for a valid same-position no-op.
+
+### 0.6.0 — 2026-08-17 — Reparent wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-007, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes Reparent as target reference, new-parent reference, and
+raw little-endian `u32` final index with zero-flag Batch admission and
+outputless success. Adds allocation-free payload/operation codecs, a narrow
+result-absence validator, all four reference-pair vectors, target-first
+malformed/error precedence, operation-attributed Range/InvalidParent/Capacity
+results without field IDs, and truthful minimum-frame size evidence.
+
+#### Rationale
+
+Resolving target before destination makes failures deterministic, while
+detach-first indexing gives same-parent and cross-parent moves one definition.
+Dropping a root's name and budget on detach preserves a single child identity
+model and makes bounded text accounting reversible. Fixed positional fields
+need no negotiated payload limit; the outer Batch frame remains the authority
+when eight large stable-reference operations do not fit 256 bytes.

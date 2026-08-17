@@ -5,22 +5,23 @@ use rlvgl_api::protocol::{
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
     FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
     ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
-    OperationResultRef, ProtocolVersion, ReorderPayload, RuntimeNotice, ValueList, ValueRef,
-    ValueTag, create_result_object, decode_batch_success, decode_batch_success_with_limits,
-    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
-    decode_delete_operation, decode_delete_payload, decode_field_list,
-    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    OperationResultRef, ProtocolVersion, ReorderPayload, ReparentPayload, RuntimeNotice, ValueList,
+    ValueRef, ValueTag, create_result_object, decode_batch_success,
+    decode_batch_success_with_limits, decode_create_operation_with_limits, decode_create_payload,
+    decode_create_payload_with_limits, decode_delete_operation, decode_delete_payload,
+    decode_field_list, decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
     decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
     decode_operation_list, decode_operation_list_with_limit, decode_reorder_operation,
-    decode_reorder_payload, decode_value, decode_value_list, decode_value_list_with_limits,
-    encode_batch_success, encode_batch_success_with_limit, encode_batch_success_with_limits,
-    encode_create_payload, encode_create_payload_with_limits, encode_delete_payload,
-    encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
+    decode_reorder_payload, decode_reparent_operation, decode_reparent_payload, decode_value,
+    decode_value_list, decode_value_list_with_limits, encode_batch_success,
+    encode_batch_success_with_limit, encode_batch_success_with_limits, encode_create_payload,
+    encode_create_payload_with_limits, encode_delete_payload, encode_field_list,
+    encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
     encode_frame_with_limits, encode_mutation_target_envelope, encode_object_reference,
-    encode_operation_list, encode_operation_list_with_limit, encode_reorder_payload, encode_value,
-    encode_value_list, encode_value_list_with_limit, encode_value_list_with_limits,
-    is_batch_mutation_opcode, opcode, validate_delete_result_absent,
-    validate_reorder_result_absent,
+    encode_operation_list, encode_operation_list_with_limit, encode_reorder_payload,
+    encode_reparent_payload, encode_value, encode_value_list, encode_value_list_with_limit,
+    encode_value_list_with_limits, is_batch_mutation_opcode, opcode, validate_delete_result_absent,
+    validate_reorder_result_absent, validate_reparent_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -1059,6 +1060,267 @@ fn reorder_rejects_bad_lengths_context_and_output_records() {
 }
 
 #[test]
+fn reparent_payloads_cover_all_contextual_reference_pairs() {
+    let cases = [
+        (
+            ReparentPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                new_parent: ObjectReference::Object(0x0000_0003_0000_0002),
+                index: 5,
+            },
+            "payload.reparent_object_object",
+            22,
+        ),
+        (
+            ReparentPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                new_parent: ObjectReference::BatchObject(7),
+                index: 5,
+            },
+            "payload.reparent_object_batch",
+            16,
+        ),
+        (
+            ReparentPayload {
+                target: ObjectReference::BatchObject(7),
+                new_parent: ObjectReference::Object(0x0000_0003_0000_0002),
+                index: 5,
+            },
+            "payload.reparent_batch_object",
+            16,
+        ),
+        (
+            ReparentPayload {
+                target: ObjectReference::BatchObject(7),
+                new_parent: ObjectReference::BatchObject(8),
+                index: 5,
+            },
+            "payload.reparent_batch_batch",
+            10,
+        ),
+    ];
+    for (payload, fixture_name, expected_length) in cases {
+        let mut encoded = [0u8; 32];
+        let length = encode_reparent_payload(payload, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_reparent_payload(&encoded[..length]), Ok(payload));
+        assert_eq!(
+            decode_reparent_operation(OperationRef {
+                opcode: opcode::REPARENT,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+    }
+
+    let maximum = ReparentPayload {
+        target: ObjectReference::BatchObject(7),
+        new_parent: ObjectReference::BatchObject(8),
+        index: u32::MAX,
+    };
+    let mut encoded = [0u8; 16];
+    let length = encode_reparent_payload(maximum, &mut encoded).unwrap();
+    assert_eq!(decode_reparent_payload(&encoded[..length]), Ok(maximum));
+}
+
+#[test]
+fn reparent_rejects_malformed_fields_in_target_first_order() {
+    let target_type_mismatch_before_bad_parent = [
+        ValueTag::Bool as u8,
+        1,
+        ValueTag::BatchObject as u8,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ];
+    assert_eq!(
+        decode_reparent_payload(&target_type_mismatch_before_bad_parent),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    let target_invalid_before_parent_type = [
+        ValueTag::BatchObject as u8,
+        0,
+        0,
+        ValueTag::Bool as u8,
+        1,
+        0,
+        0,
+        0,
+        0,
+    ];
+    assert_eq!(
+        decode_reparent_payload(&target_invalid_before_parent_type),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    let parent_type_mismatch = [
+        ValueTag::BatchObject as u8,
+        7,
+        0,
+        ValueTag::Bool as u8,
+        1,
+        0,
+        0,
+        0,
+        0,
+    ];
+    assert_eq!(
+        decode_reparent_payload(&parent_type_mismatch),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    let parent_truncated = [ValueTag::BatchObject as u8, 7, 0, ValueTag::Object as u8, 1];
+    assert_eq!(
+        decode_reparent_payload(&parent_truncated),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    let pair = [
+        ValueTag::BatchObject as u8,
+        7,
+        0,
+        ValueTag::BatchObject as u8,
+        8,
+        0,
+    ];
+    for index_bytes in [
+        &[][..],
+        &[0][..],
+        &[0, 0][..],
+        &[0, 0, 0][..],
+        &[0, 0, 0, 0, 0][..],
+    ] {
+        let mut malformed = pair.to_vec();
+        malformed.extend_from_slice(index_bytes);
+        assert_eq!(
+            decode_reparent_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    for payload in [
+        ReparentPayload {
+            target: ObjectReference::Object(1),
+            new_parent: ObjectReference::BatchObject(8),
+            index: 0,
+        },
+        ReparentPayload {
+            target: ObjectReference::BatchObject(7),
+            new_parent: ObjectReference::BatchObject(0),
+            index: 0,
+        },
+    ] {
+        assert_eq!(
+            encode_reparent_payload(payload, &mut [0; 32]),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_reparent_payload(
+            ReparentPayload {
+                target: ObjectReference::BatchObject(7),
+                new_parent: ObjectReference::BatchObject(8),
+                index: 0,
+            },
+            &mut [0; 9],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.reparent_object_object");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::REORDER, 0),
+        (opcode::REPARENT, 1),
+    ] {
+        assert_eq!(
+            decode_reparent_operation(OperationRef {
+                opcode: operation_opcode,
+                flags,
+                payload: &valid,
+            }),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn reparent_is_outputless_and_errors_are_operation_attributed() {
+    let outputless = BatchSuccess {
+        result_revision: 15,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 128];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.reparent_success"));
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(validate_reparent_result_absent(decoded, 1, 0), Ok(()));
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 16,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_reparent_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_reparent_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_reparent_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_reparent_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_reparent_result_absent(
+            BatchSuccess {
+                result_revision: 16,
+                results: OperationResultList::from_slice(&forbidden_reparent_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    for (status, diagnostic, fixture_name) in [
+        (ErrorClass::Range, "index", "frame.reparent_range"),
+        (
+            ErrorClass::InvalidParent,
+            "parent",
+            "frame.reparent_invalid_parent",
+        ),
+        (ErrorClass::Capacity, "children", "frame.reparent_capacity"),
+    ] {
+        let error = FrameRef::Result(Completion {
+            request_id: 1,
+            status: CompletionStatus::Error(status),
+            operation_index: Some(0),
+            field_id: None,
+            diagnostic,
+            payload: &[],
+        });
+        let length = encode_frame(MPY_V1, error, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, error);
+    }
+}
+
+#[test]
 fn successful_batch_payload_matches_golden_bytes_and_correlates_results() {
     let success = BatchSuccess {
         result_revision: 9,
@@ -1738,6 +2000,78 @@ fn eight_worst_case_reorder_operations_fit_the_floor_frame() {
     );
     assert_eq!(
         decode_frame_with_limits(&encoded[..length], too_small),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn reparent_floor_proof_distinguishes_smallest_and_largest_reference_pairs() {
+    let mut smallest_payload = [0u8; 10];
+    let smallest_length = encode_reparent_payload(
+        ReparentPayload {
+            target: ObjectReference::BatchObject(7),
+            new_parent: ObjectReference::BatchObject(8),
+            index: 0,
+        },
+        &mut smallest_payload,
+    )
+    .unwrap();
+    let smallest_operation = OperationRef {
+        opcode: opcode::REPARENT,
+        flags: 0,
+        payload: &smallest_payload[..smallest_length],
+    };
+    let smallest_operations = [smallest_operation; 8];
+    let smallest_batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&smallest_operations),
+    });
+    let mut floor_frame = [0u8; 256];
+    let smallest_frame_length =
+        encode_frame_with_limits(MPY_V1, smallest_batch, limits(), &mut floor_frame).unwrap();
+    assert_eq!(smallest_frame_length, 214);
+
+    let mut largest_payload = [0u8; 22];
+    let largest_length = encode_reparent_payload(
+        ReparentPayload {
+            target: ObjectReference::Object(0x0000_0002_0000_0001),
+            new_parent: ObjectReference::Object(0x0000_0003_0000_0002),
+            index: 0,
+        },
+        &mut largest_payload,
+    )
+    .unwrap();
+    let largest_operation = OperationRef {
+        opcode: opcode::REPARENT,
+        flags: 0,
+        payload: &largest_payload[..largest_length],
+    };
+    let largest_operations = [largest_operation; 8];
+    let largest_batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&largest_operations),
+    });
+    let mut oversized_frame = [0u8; 320];
+    let largest_frame_length = encode_frame(MPY_V1, largest_batch, &mut oversized_frame).unwrap();
+    assert_eq!(largest_frame_length, 310);
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, largest_batch, limits(), &mut oversized_frame),
         Err(CodecError::LimitExceeded)
     );
 }
