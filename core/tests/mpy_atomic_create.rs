@@ -735,6 +735,179 @@ fn stable_subtree_delete_commits_child_first_without_create_outputs() {
     registry.release_committed_batch(committed).unwrap();
 }
 
+#[test]
+fn earlier_created_reorders_use_final_indices_and_preserve_ownership() {
+    let container = descriptor("container::Container");
+    let mut registry = registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let first = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let second = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let alpha = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "alpha" },
+    );
+    let omega = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "omega" },
+    );
+    let starting_revision = registry.revision();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(parent),
+                },
+                vec![],
+            ),
+            BatchStageDirection::Reorder {
+                object: BatchObjectReference::EarlierBatch(1),
+                index: 1,
+            },
+            create(
+                2,
+                container,
+                BatchCreateDestination::Root {
+                    name: "created".into(),
+                },
+                vec![],
+            ),
+            BatchStageDirection::Reorder {
+                object: BatchObjectReference::EarlierBatch(2),
+                index: 1,
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(committed.create_outputs().len(), 2);
+    assert_eq!(committed.create_outputs()[0].operation_index, 0);
+    assert_eq!(committed.create_outputs()[0].batch_ref, 1);
+    assert_eq!(committed.create_outputs()[1].operation_index, 2);
+    assert_eq!(committed.create_outputs()[1].batch_ref, 2);
+    let outputs = committed.take_create_outputs();
+    let created_child = outputs[0].object_id;
+    let created_root = outputs[1].object_id;
+
+    assert_eq!(
+        registry.children(parent).unwrap(),
+        [first, created_child, second]
+    );
+    assert_eq!(
+        registry.actor_info(created_child).unwrap().parent,
+        Some(parent)
+    );
+    assert_eq!(registry.root_id("created"), Some(created_root));
+    let token = registry.snapshot_begin().unwrap();
+    let page = registry
+        .snapshot_read(
+            token,
+            limits().max_actors,
+            usize::try_from(limits().max_text_bytes).unwrap(),
+        )
+        .unwrap();
+    assert!(page.ended);
+    assert_eq!(
+        page.records
+            .iter()
+            .filter(|record| record.parent.is_none())
+            .map(|record| record.object_id)
+            .collect::<Vec<_>>(),
+        [parent, created_root, alpha, omega]
+    );
+
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn valid_noop_reorder_commits_once_without_outputs() {
+    let mut registry = registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let first = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let second = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::Reorder {
+            object: BatchObjectReference::Stable(second),
+            index: 1,
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.children(parent).unwrap(), [first, second]);
+    assert_eq!(registry.actor_info(second).unwrap().parent, Some(parent));
+    assert_eq!(registry.usage(), starting_usage);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn out_of_range_earlier_created_reorder_rejects_without_publication() {
+    let container = descriptor("container::Container");
+    let mut registry = registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let first = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let second = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_order = registry.children(parent).unwrap();
+
+    let error = registry
+        .prepare_atomic_batch(vec![
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(parent),
+                },
+                vec![],
+            ),
+            BatchStageDirection::Reorder {
+                object: BatchObjectReference::EarlierBatch(1),
+                index: 3,
+            },
+        ])
+        .unwrap_err();
+
+    assert_eq!(error, RegistryError::Range { field_id: 0 });
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.children(parent).unwrap(), starting_order);
+    assert_eq!(registry.children(parent).unwrap(), [first, second]);
+}
+
 const REFERENCE_TYPE: TypeId = TypeId::registered(0x0001_ff01);
 const REFERENCE_FIELD: u32 = 77;
 const REFERENCE_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {

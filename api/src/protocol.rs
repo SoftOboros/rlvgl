@@ -890,6 +890,18 @@ pub type MutationTargetError = ObjectReferenceError;
 /// Structural or contextual failure while decoding a Delete payload.
 pub type DeletePayloadError = ObjectReferenceError;
 
+/// Complete Batch-only Reorder payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReorderPayload {
+    /// Stable or earlier-created actor moved within its current owner.
+    pub target: ObjectReference,
+    /// Final zero-based position after removing the target from its owner.
+    pub index: u32,
+}
+
+/// Structural or contextual failure while decoding a Reorder payload.
+pub type ReorderPayloadError = ObjectReferenceError;
+
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionStatus {
@@ -1775,6 +1787,46 @@ pub fn decode_delete_operation(
     decode_delete_payload(operation.payload)
 }
 
+/// Encode one complete Reorder payload.
+///
+/// No negotiated variable-size limit applies to this fixed-size payload. The
+/// enclosing Batch remains responsible for operation-count and frame limits.
+pub fn encode_reorder_payload(
+    payload: ReorderPayload,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    let index = payload.index.to_le_bytes();
+    encode_mutation_target_envelope(
+        MutationTargetEnvelope {
+            target: payload.target,
+            remainder: &index,
+        },
+        output,
+    )
+}
+
+/// Decode one complete Reorder payload and reject truncation or trailing bytes.
+pub fn decode_reorder_payload(input: &[u8]) -> Result<ReorderPayload, ReorderPayloadError> {
+    let envelope = decode_mutation_target_envelope(input)?;
+    let index = <[u8; 4]>::try_from(envelope.remainder).map_err(|_| CodecError::InvalidFrame)?;
+    Ok(ReorderPayload {
+        target: envelope.target,
+        index: u32::from_le_bytes(index),
+    })
+}
+
+/// Decode one zero-flag Reorder operation from a counted Batch operation list.
+///
+/// There is deliberately no Command counterpart: MPY v1 Reorder is Batch-only.
+pub fn decode_reorder_operation(
+    operation: OperationRef<'_>,
+) -> Result<ReorderPayload, ReorderPayloadError> {
+    if operation.opcode != opcode::REORDER || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_reorder_payload(operation.payload)
+}
+
 /// Validate that one correlated Delete emitted no operation-result record.
 ///
 /// The caller MUST already have correlated `delete_operation_index` to a
@@ -1794,6 +1846,31 @@ pub fn validate_delete_result_absent(
             .results
             .iter()
             .any(|result| result.operation_index == delete_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+/// Validate that one correlated Reorder emitted no operation-result record.
+///
+/// The caller MUST already have correlated `reorder_operation_index` to a
+/// submitted opcode [`opcode::REORDER`]. This helper validates the structural
+/// [`BatchSuccess`] shape and the absence of that one index only. It does not
+/// validate other opcode result schemas, negotiated Limits, or the complete
+/// success envelope. Other output-bearing operations may still contribute
+/// records.
+pub fn validate_reorder_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    reorder_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if reorder_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == reorder_operation_index)
     {
         return Err(CodecError::InvalidFrame);
     }

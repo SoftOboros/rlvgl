@@ -11,7 +11,8 @@ geometry, invalidation, and snapshot substrate has focused implementation
 evidence. Local-style projection, subscription metadata in snapshots, and the
 complete cross-driver conformance gate remain open. The common Batch mutation-
 target envelope and exact Delete payload have allocation-free codecs and golden
-protocol evidence; complete Endpoint dispatch remains deferred.
+protocol evidence. The exact Reorder payload has the same API/golden proof;
+complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -113,7 +114,7 @@ to operation-specific PCDNs.
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
 | `REPARENT` | Actor subtree being moved | Destination, exact index, and success values deferred |
 | `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values deferred |
-| `REORDER` | Actor moving within its current owner | Exact index and success values deferred |
+| `REORDER` | Actor moving within its current owner | Exact `u32` index and outputless success; §5.3 |
 | `DELETE` | Root of the subtree being deleted | Exact empty remainder and outputless success; §5.2 |
 | `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values deferred |
 
@@ -187,6 +188,58 @@ resolving Batch references, reserving all subtree subscription-release notices
 and cue capacity before mutation, committing without callback reentry, ordering
 child-first release publication, correlating the outputless result, and
 releasing retained transaction storage after commit.
+
+### 5.3 Reorder payload, result, and owner semantics
+
+Reorder specializes the common target envelope with exactly one four-byte
+little-endian index:
+
+```text
+reorder_payload = target:ObjectReference | index:u32
+```
+
+The operation opcode is exactly `REORDER` (`0x0000_0009`), flags are `0`, and
+the index consumes the complete remainder. A missing/truncated index or any
+trailing byte is `InvalidFrame`; target tag classification remains §5.1. There
+is no Reorder `with_limits` payload helper because both fields have fixed wire
+sizes. The enclosing Batch applies operation-count and complete-frame limits.
+A Command carrying Reorder is `Unsupported`.
+
+`index` is the final zero-based position after first removing `target` from its
+current ordered owner. For a child, Reorder preserves the same parent. For a
+named root, it preserves root status and the same root name while changing only
+the named-root order. It never reparents, promotes, demotes, or renames; those
+transitions use their dedicated operations. After removal, insertion positions
+from zero through the remaining collection length are valid. A larger index
+returns `Range`, attributed to the Reorder operation index with no `field_id`:
+this payload has no registered keyed field ID, and adapters MUST NOT invent one.
+
+Both stable `Object` and `BatchObject` targets are permitted. A BatchObject lets
+a later Reorder place an actor appended by an earlier Create in the same Batch.
+It must resolve to that earlier unique binding; forward or unbound use is
+`BatchInvalid`. A stale stable target is `StaleObject`. Parent/root ownership,
+child policy, capacity, and the complete shadow-tree sequence are validated
+before native mutation.
+
+Reordering an actor to its current final position is a valid no-op direction,
+not an error. It remains part of the accepted mutation Batch, whose visible
+commit advances `StageRevision` exactly once for the complete Batch, including
+when Reorder is the only direction and the order bytes are unchanged.
+
+Reorder is outputless. BatchSuccess carries the final/current
+`result_revision`, but contains no `OperationResult` at the Reorder operation
+index. Other output-bearing operations in a mixed Batch retain their strictly
+increasing records. A record correlated to Reorder is `InvalidFrame` under the
+Reorder result schema. The API's narrowly named result-absence validator
+requires its caller to have already correlated the operation index to opcode
+Reorder; it validates neither other opcode schemas nor negotiated limits.
+
+Eight Reorder operation records using the largest nine-byte stable target and
+the four-byte index produce a 238-byte Batch frame, within the 256-byte minimum
+profile. Complete Endpoint integration remains responsible for Batch-reference
+resolution, shadow-order validation, Range completion attribution, prepared
+allocation-free commit, lifecycle/cue ordering, revision/result correlation,
+and retained-storage release.
 
 ## 6. Frozen Decisions — Properties and Actions
 
@@ -379,6 +432,11 @@ material, but they MUST preserve the same ordering and visible semantics.
   record. It preserves stable child-first subtree retirement, rejects same-
   Batch-created targets or descendants, permits generation-advancing slot reuse
   by a later Create, and keeps final Endpoint orchestration evidence-gated.
+- **PCDN-MPY-04-006 — Closed by owner acceptance 2026-08-16:** §5.3 freezes
+  Reorder as the common target plus one little-endian `u32` final index, with
+  same-owner/name semantics and outputless success. It admits earlier-created
+  BatchObject targets, assigns Range to the operation without a fabricated
+  field ID, retains no-op revision semantics, and defers Endpoint evidence.
 
 ## 12. Acceptance Checklist
 
@@ -388,7 +446,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-005 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-006 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -407,8 +465,8 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-The common mutation-target envelope and exact Delete schema now unblock the
-remaining operation-specific payload/result PCDNs and Endpoint Delete
+The common mutation-target envelope plus exact Delete and Reorder schemas now
+unblock the remaining operation-specific payload/result PCDNs and Endpoint
 orchestration without authorizing guessed remainder schemas. After those codecs
 and endpoint integration are implemented, MPY-04 provides the complete stage
 mutation/introspection surface consumed by MPY-06 and the deterministic
@@ -539,7 +597,7 @@ context.
 
 **Touches:** PCDN-MPY-04-005, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `823dd78`
 
 **Summary:** Freezes Delete as a zero-flag Batch-only operation whose complete
 payload is exactly the common contextual target. Success is outputless: only
@@ -557,3 +615,29 @@ keeps the response proportional while the shared Batch revision reports the
 committed state. Rejecting same-Batch-created members avoids ambiguous
 create/delete identity and lifecycle accounting, while delete-then-Create slot
 reuse preserves bounded capacity without ever reviving an old `ObjectId`.
+
+### 0.5.0 — 2026-08-16 — Reorder wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-006, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes Reorder as the common contextual target followed by one
+little-endian `u32` final index, with exact zero-flag Batch admission and
+outputless success. Adds allocation-free payload/operation codecs, a narrow
+structural result-absence validator, stable and BatchObject golden vectors,
+Range completion proof without a field ID, malformed/trailing coverage, and an
+exact 238-byte eight-operation minimum-profile fixture.
+
+#### Rationale
+
+Defining the index after conceptual removal eliminates forward/backward move
+ambiguity and maps directly to the prepared shadow-tree operation. Reorder
+changes only order, so preserving the current parent or root name prevents it
+from becoming a second reparent/promote path. Outputless success and one common
+Batch revision report the committed state without redundant per-operation
+values, including for a valid same-position no-op.

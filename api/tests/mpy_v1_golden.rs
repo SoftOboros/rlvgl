@@ -5,21 +5,22 @@ use rlvgl_api::protocol::{
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
     FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
     ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
-    OperationResultRef, ProtocolVersion, RuntimeNotice, ValueList, ValueRef, ValueTag,
-    create_result_object, decode_batch_success, decode_batch_success_with_limits,
+    OperationResultRef, ProtocolVersion, ReorderPayload, RuntimeNotice, ValueList, ValueRef,
+    ValueTag, create_result_object, decode_batch_success, decode_batch_success_with_limits,
     decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
     decode_delete_operation, decode_delete_payload, decode_field_list,
     decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
     decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
-    decode_operation_list, decode_operation_list_with_limit, decode_value, decode_value_list,
-    decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
-    encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
-    encode_delete_payload, encode_field_list, encode_field_list_with_limit,
-    encode_field_list_with_limits, encode_frame, encode_frame_with_limits,
-    encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
-    encode_operation_list_with_limit, encode_value, encode_value_list,
-    encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
-    validate_delete_result_absent,
+    decode_operation_list, decode_operation_list_with_limit, decode_reorder_operation,
+    decode_reorder_payload, decode_value, decode_value_list, decode_value_list_with_limits,
+    encode_batch_success, encode_batch_success_with_limit, encode_batch_success_with_limits,
+    encode_create_payload, encode_create_payload_with_limits, encode_delete_payload,
+    encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
+    encode_frame_with_limits, encode_mutation_target_envelope, encode_object_reference,
+    encode_operation_list, encode_operation_list_with_limit, encode_reorder_payload, encode_value,
+    encode_value_list, encode_value_list_with_limit, encode_value_list_with_limits,
+    is_batch_mutation_opcode, opcode, validate_delete_result_absent,
+    validate_reorder_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -895,6 +896,169 @@ fn delete_rejects_remainders_bad_context_and_output_records() {
 }
 
 #[test]
+fn reorder_payloads_are_exact_target_plus_little_endian_index_vectors() {
+    for (target, fixture_name) in [
+        (
+            ObjectReference::Object(0x0000_0002_0000_0001),
+            "payload.reorder_object",
+        ),
+        (
+            ObjectReference::BatchObject(7),
+            "payload.reorder_batch_object",
+        ),
+    ] {
+        let payload = ReorderPayload { target, index: 3 };
+        let mut encoded = [0u8; 16];
+        let length = encode_reorder_payload(payload, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_reorder_payload(&encoded[..length]), Ok(payload));
+        assert_eq!(
+            decode_reorder_operation(OperationRef {
+                opcode: opcode::REORDER,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+    }
+
+    let maximum = ReorderPayload {
+        target: ObjectReference::BatchObject(7),
+        index: u32::MAX,
+    };
+    let mut encoded = [0u8; 16];
+    let length = encode_reorder_payload(maximum, &mut encoded).unwrap();
+    assert_eq!(decode_reorder_payload(&encoded[..length]), Ok(maximum));
+}
+
+#[test]
+fn reorder_rejects_bad_lengths_context_and_output_records() {
+    for malformed_target in [
+        &[][..],
+        &[ValueTag::Object as u8, 1][..],
+        &[ValueTag::BatchObject as u8, 0, 0, 0, 0, 0, 0][..],
+    ] {
+        assert_eq!(
+            decode_reorder_payload(malformed_target),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+    let target = fixture("payload.delete_batch_object");
+    for remainder in [
+        &[][..],
+        &[0][..],
+        &[0, 0][..],
+        &[0, 0, 0][..],
+        &[0, 0, 0, 0, 0][..],
+    ] {
+        let mut malformed = target.clone();
+        malformed.extend_from_slice(remainder);
+        assert_eq!(
+            decode_reorder_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+    assert_eq!(
+        decode_reorder_payload(&[ValueTag::Bool as u8, 1, 0, 0, 0, 0]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        encode_reorder_payload(
+            ReorderPayload {
+                target: ObjectReference::Object(1),
+                index: 0,
+            },
+            &mut [0; 16],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        encode_reorder_payload(
+            ReorderPayload {
+                target: ObjectReference::BatchObject(7),
+                index: 0,
+            },
+            &mut [0; 6],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.reorder_object");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::DELETE, 0),
+        (opcode::REORDER, 1),
+    ] {
+        assert_eq!(
+            decode_reorder_operation(OperationRef {
+                opcode: operation_opcode,
+                flags,
+                payload: &valid,
+            }),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let outputless = BatchSuccess {
+        result_revision: 13,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 64];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.reorder_success"));
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(validate_reorder_result_absent(decoded, 1, 0), Ok(()));
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 14,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_reorder_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_reorder_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_reorder_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_reorder_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_reorder_result_absent(
+            BatchSuccess {
+                result_revision: 14,
+                results: OperationResultList::from_slice(&forbidden_reorder_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let range_error = FrameRef::Result(Completion {
+        request_id: 1,
+        status: CompletionStatus::Error(ErrorClass::Range),
+        operation_index: Some(0),
+        field_id: None,
+        diagnostic: "index",
+        payload: &[],
+    });
+    let length = encode_frame(MPY_V1, range_error, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("frame.reorder_range"));
+    assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, range_error);
+}
+
+#[test]
 fn successful_batch_payload_matches_golden_bytes_and_correlates_results() {
     let success = BatchSuccess {
         result_revision: 9,
@@ -1475,6 +1639,99 @@ fn eight_worst_case_mutation_target_prefixes_fit_the_floor_frame() {
 
     let mut too_small = limits();
     too_small.max_frame_bytes = 205;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_frame_with_limits(&encoded[..length], too_small),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_worst_case_reorder_operations_fit_the_floor_frame() {
+    let mut payloads = [[0u8; 13]; 8];
+    let mut lengths = [0usize; 8];
+    for (index, output) in payloads.iter_mut().enumerate() {
+        lengths[index] = encode_reorder_payload(
+            ReorderPayload {
+                target: ObjectReference::Object((2u64 << 32) | u64::try_from(index + 1).unwrap()),
+                index: u32::try_from(index).unwrap(),
+            },
+            output,
+        )
+        .unwrap();
+        assert_eq!(lengths[index], 13);
+    }
+    let operations = [
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[0][..lengths[0]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[1][..lengths[1]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[2][..lengths[2]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[3][..lengths[3]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[4][..lengths[4]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[5][..lengths[5]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[6][..lengths[6]],
+        },
+        OperationRef {
+            opcode: opcode::REORDER,
+            flags: 0,
+            payload: &payloads[7][..lengths[7]],
+        },
+    ];
+    let batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&operations),
+    });
+    let mut encoded = [0u8; 256];
+    let length = encode_frame_with_limits(MPY_V1, batch, limits(), &mut encoded).unwrap();
+    assert_eq!(length, 238);
+
+    let decoded = decode_frame_with_limits(&encoded[..length], limits()).unwrap();
+    let FrameRef::Batch(decoded_batch) = decoded.frame else {
+        panic!("expected Batch");
+    };
+    for operation in decoded_batch.operations.iter() {
+        assert!(decode_reorder_operation(operation).is_ok());
+    }
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 237;
     assert_eq!(
         encode_frame_with_limits(MPY_V1, batch, too_small, &mut encoded),
         Err(CodecError::LimitExceeded)
