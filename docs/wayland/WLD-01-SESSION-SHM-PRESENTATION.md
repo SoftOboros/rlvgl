@@ -4,9 +4,9 @@ WLD-01-SESSION-SHM-PRESENTATION.md - Wayland session and SHM presenter phase.
 
 # WLD-01 — Session and SHM Presentation
 
-**Status:** Draft 2026-08-18. `PCDN-WLD-001` through `PCDN-WLD-003` are
-resolved and the WLD-00 parent prerequisite is satisfied. Phase ratification
-is pending; no implementation is authorized.
+**Status:** **Ratified 2026-08-18.** Normative for the WLD session and SHM
+presentation phase. Implementation is authorized only within this phase's
+ownership boundary; exit evidence remains open.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md).
 
@@ -59,7 +59,9 @@ compatible for v0.2.7.
 | **Slot State** | `Free`, `Busy`, or `Retired`. Busy storage is immutable; Retired storage is destroyed after release or terminal teardown. |
 | **Submit Attempt** | Nonblocking operation that commits only when configured, frame-permitted, and holding a Free slot. |
 | **Accepted Configure** | Latest acknowledged XDG configure whose logical size/scale has been adopted by the renderer and SHM allocation handshake. |
+| **Configure Token** | Opaque, monotonically ordered session value identifying one published configure; only the latest applicable token may be accepted. |
 | **Canvas Region** | The surface-local rectangle containing Fixed Canvas content; any surrounding area is opaque letterbox and is not input-active. |
+| **WLD Limits** | Caller-supplied nonzero bounds for aggregate allocation bytes, retained damage rectangles, and lifecycle notices. |
 
 ## 4. Source-of-Truth Map
 
@@ -73,23 +75,30 @@ compatible for v0.2.7.
 | Current flattened color source | `rlvgl_core::widget::Color` and caller-provided row-major frames |
 | Wayland core lifecycle | `wl_display`, `wl_registry`, `wl_compositor`, `wl_surface`, `wl_shm`, `wl_buffer`, `wl_callback` protocol definitions |
 | Window lifecycle | stable `xdg_wm_base`, `xdg_surface`, and `xdg_toplevel` protocol definitions |
-| Rust substrate | `smithay-client-toolkit` plus `wayland-client`, versions frozen in the implementation change |
+| Rust substrate | `smithay-client-toolkit` 0.21.1 with default features disabled plus `wayland-client` 0.31.15; the implementation lockfile freezes exact transitive versions |
 
 ## 5. Proposed Feature and Module Shape
 
-The proposed Cargo surface is additive:
+The ratified Cargo surface is additive:
 
 ```text
 wayland = [
   "dep:smithay-client-toolkit",
   "dep:wayland-client",
-  "dep:calloop",
 ]
 ```
 
-Exact dependency features and versions ratify with the phase. Dependencies
-MUST be optional and target-gated. The platform crate remains `#![no_std]`
-with `extern crate std` enabled only for host features, including `wayland`.
+`smithay-client-toolkit` is selected at 0.21.1 with
+`default-features = false`; WLD-01 therefore does not enable SCTK's default
+`calloop` or `xkbcommon` features. `wayland-client` is selected at 0.31.15
+with default features disabled. WLD-02 may add the admitted keyboard feature,
+but no external event-loop framework becomes mandatory. The `wayland` feature
+has a Rust 1.86 minimum and is available only on Unix hosts with file-descriptor
+readiness; this host-only minimum does not change default or embedded builds.
+
+Dependencies MUST be optional and target-gated. The platform crate remains
+`#![no_std]` with `extern crate std` enabled only for host features, including
+`wayland`.
 
 ```text
 platform/src/wayland/
@@ -108,6 +117,13 @@ This sketch identifies responsibilities, not final Rust spelling:
 ```rust,ignore
 pub struct WaylandSession { /* protocol and backend state */ }
 pub struct WaylandDisplay { /* session-owned display adapter */ }
+pub struct ConfigureToken(/* opaque */);
+
+pub struct WaylandLimits {
+    pub max_allocation_bytes: NonZeroUsize,
+    pub max_damage_rects: NonZeroUsize,
+    pub lifecycle_capacity: NonZeroUsize,
+}
 
 pub struct WaylandConfig {
     pub title: String,
@@ -116,6 +132,7 @@ pub struct WaylandConfig {
     pub size_policy: SizePolicy,
     pub fullscreen: bool,
     pub buffer_count: NonZeroU8,
+    pub limits: WaylandLimits,
 }
 
 pub enum SizePolicy {
@@ -124,25 +141,47 @@ pub enum SizePolicy {
 }
 
 pub enum WaylandLifecycleEvent {
-    Configure { width: u32, height: u32, scale: u32 },
+    Configure {
+        token: ConfigureToken,
+        width: u32,
+        height: u32,
+        scale: u32,
+    },
     CloseRequested,
     ConnectionFailed(WaylandError),
 }
 
 impl WaylandSession {
     pub fn connect(config: WaylandConfig) -> Result<Self, WaylandError>;
-    pub fn dispatch_pending(&mut self) -> Result<(), WaylandError>;
+    pub fn io_interest(&self) -> WaylandIoInterest;
+    pub fn dispatch_ready(
+        &mut self,
+        readiness: WaylandIoReadiness,
+    ) -> Result<DispatchProgress, WaylandError>;
+    pub fn accept_configure(
+        &mut self,
+        token: ConfigureToken,
+    ) -> Result<(), WaylandError>;
     pub fn poll_lifecycle(&mut self) -> Option<WaylandLifecycleEvent>;
     pub fn display_mut(&mut self) -> &mut WaylandDisplay;
     pub fn as_fd(&self) -> BorrowedFd<'_>;
 }
 ```
 
-`connect` may perform bounded registry setup, but it MUST NOT hide an
-unbounded wait for the initial configure. A convenience wait/run helper must
-accept a timeout or explicit exit condition. File-descriptor readiness does
-not let external code read the socket directly: the session retains
-prepare-read/read-or-cancel/dispatch/outbound-flush ordering.
+`connect` may perform bounded registry setup, but it MUST NOT hide an unbounded
+wait for the initial configure. `dispatch_ready` is the only public protocol-I/O
+step: it consumes caller-reported readiness and retains pending dispatch,
+prepare-read, read-or-cancel, and outbound-flush ordering inside the session.
+`io_interest` reports whether read and/or write readiness is currently needed.
+A convenience wait/run helper must accept a timeout or explicit exit
+condition. File-descriptor readiness does not let external code read or write
+the socket directly.
+
+WLD Limits have no silent growth path. Construction rejects zero limits,
+slot counts other than two or three, or initial geometry that cannot fit the
+aggregate allocation budget. Damage-set overflow promotes to full damage.
+Configure notices may coalesce to the latest applicable token, but close and
+terminal failure remain observable even when lifecycle capacity is exhausted.
 
 Only the owning thread may mutate a session unless a later amendment defines
 a safe command channel. `WaylandDisplay` cannot outlive or dispatch separately
@@ -153,8 +192,10 @@ from its session.
 ### 7.1 Construction
 
 1. Connect to the compositor and initialize the registry/event queue.
-2. Require `wl_compositor`, `wl_shm`, and stable `xdg_wm_base`; absence is a
-   typed constructor error.
+2. Require `wl_compositor` version 4 or later, `wl_shm` version 1 or later with
+   `XRGB8888`, and stable `xdg_wm_base` version 1 or later; absence is a typed
+   constructor error. Bind `wl_compositor` no higher than version 6 for the
+   admitted surface behavior.
 3. Create `wl_surface`, `xdg_surface`, and `xdg_toplevel`; set title, app ID,
    and admitted size/fullscreen requests.
 4. Install `xdg_wm_base` ping handling.
@@ -166,9 +207,10 @@ from its session.
 The session acknowledges the configure serial. A zero width or height means
 that the client retains its requested or current size for that dimension; it
 does not mean a zero-sized allocation. The session publishes a lifecycle
-Configure event and waits for the runtime to adopt compatible renderer
-geometry. The first buffer attaches only after that handshake makes the
-session `Ready`.
+Configure event with a Configure Token and waits for the runtime to adopt
+compatible renderer geometry. Only the latest applicable token may be
+accepted; accepting a superseded token returns a typed stale-configure error.
+The first buffer attaches only after that handshake makes the session `Ready`.
 
 ### 7.3 Resize
 
@@ -183,9 +225,8 @@ On later configure:
 - rebuild or resize the Shadow Frame deterministically; and
 - require full invalidation before the first new-size present.
 
-The final API may use an explicit `accept_configure` call or an equivalent
-runtime handshake. Implicitly changing `screen()` in the middle of
-`present_plan` is forbidden.
+`accept_configure` is the explicit runtime handshake. Implicitly changing
+`screen()` in the middle of `present_plan` is forbidden.
 
 ### 7.4 Geometry profiles
 
@@ -226,9 +267,10 @@ attempt remains gated and this distinction must be explicit in the final API.
 
 ## 9. SHM Slot Ownership
 
-The reference implementation uses a pool abstraction equivalent to SCTK
-`SlotPool`. Each slot records buffer identity, offset/stride/size, generation,
-and state.
+The reference implementation wraps SCTK `SlotPool` while enforcing WLD's
+stricter bounds. Each slot records buffer identity, offset/stride/size,
+generation, and state. Writable access uses the release-aware canvas path;
+unconditional raw access is forbidden.
 
 | State | Client may write? | May attach? | Transition |
 |---|---:|---:|---|
@@ -246,9 +288,11 @@ silently clamped. The backend never allocates a dynamic additional
 presentation slot when all configured slots are Busy.
 
 Checked byte accounting covers the complete Shadow Frame, active slots, and
-Retired slots from older resize generations. Geometry whose steady-state
-allocation exceeds the configured budget is rejected with a typed error. If
-new slots would exceed the budget only because old Busy slots remain Retired,
+Retired slots from older resize generations. Width, height, scale, stride,
+offset, per-slot bytes, and aggregate bytes are checked before conversion to
+Wayland's signed 32-bit protocol fields. Geometry whose steady-state allocation
+exceeds the configured budget is rejected with a typed error. If new slots
+would exceed the budget only because old Busy slots remain Retired,
 presentation stays nonblocking and gated until matching release events reduce
 the temporary peak; repeated configure events cannot grow storage without
 bound.
@@ -271,9 +315,8 @@ On commit:
 
 1. Copy the complete Shadow Frame into the Free slot while converting to the
    admitted `XRGB8888` memory representation.
-2. Emit buffer-coordinate damage for the bounded Damage Set. If protocol
-   version does not support `damage_buffer`, use a specified correct
-   surface-coordinate fallback or fail minimum-version admission.
+2. Emit `wl_surface.damage_buffer` for the bounded Damage Set; the required
+   `wl_compositor` version 4 makes buffer-coordinate damage available.
 3. Request the next one-shot frame callback.
 4. Attach the slot and commit the surface.
 5. Mark the slot Busy, close the Frame Gate, and clear only the submitted
@@ -305,6 +348,10 @@ more presents than the slot count.
   dimensions and scale. A size or scale change starts a release-tracked slot
   generation and forces full invalidation. Logical damage is converted to
   buffer coordinates exactly once.
+- On `wl_surface` version 6, its positive preferred buffer scale is
+  authoritative. On versions 4 or 5, WLD uses the greatest positive
+  `wl_output.scale` among outputs currently entered by the surface, binding
+  `wl_output` version 2 when offered; no output or no scale event means 1.
 - Wayland input is already surface-local. WLD-02 subtracts a Fixed Canvas
   origin once and rejects letterbox input; it does not divide input by the
   integer buffer scale again.
@@ -316,14 +363,18 @@ more presents than the slot count.
 ## 12. Acceptance and Evidence
 
 WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary,
-`PCDN-WLD-002` presentation policy, and `PCDN-WLD-003` geometry policy. It may
-be ratified only after its parent WLD-00 is ratified. Implementation exit
-requires:
+`PCDN-WLD-002` presentation policy, and `PCDN-WLD-003` geometry policy. Its
+parent WLD-00 and this phase are ratified. Implementation exit requires:
 
 - [ ] Optional dependency and target gating is explicit in `Cargo.toml`.
+- [ ] The manifest selects SCTK 0.21.1 without default features and
+      `wayland-client` 0.31.15, records Rust 1.86 for the host feature, and
+      contains no mandatory calloop dependency.
 - [ ] Default and representative embedded/no-std feature checks are unchanged.
 - [ ] Constructor failures cover missing required globals and unsupported
       formats/versions.
+- [ ] Readiness tests cover pending dispatch, read preparation cancellation,
+      read and write readiness, outbound backpressure, and bounded timeout.
 - [ ] Pure state-machine tests cover initial configure, configure supersession,
       frame-before-release, release-before-frame, all-slots-busy, resize with
       Busy slots, disconnect, and clean teardown.
@@ -343,6 +394,8 @@ requires:
       generations, release-driven allocation progress, and repeated configure.
 - [ ] Backpressure tests prove latest-state coalescing, bounded memory, damage
       overflow promotion, and no blocking wait in `vsync()`.
+- [ ] Configure-token and lifecycle-capacity tests prove stale rejection,
+      latest-configure coalescing, and observable close/terminal failure.
 - [ ] A minimal headless-compositor test maps one window and presents at least
       one frame without protocol errors.
 - [ ] Public items satisfy `#![deny(missing_docs)]`; strict Clippy and rustdoc
@@ -381,6 +434,29 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — Ratified
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-1, INV-WLD-2, INV-WLD-3, INV-WLD-4, INV-WLD-5, INV-WLD-6, PCDN-WLD-001, PCDN-WLD-002, PCDN-WLD-003, §0–§14
+
+**Commits:** pending
+
+**Summary:** Ratifies the session and SHM presentation definition with a
+framework-neutral readiness boundary, current dependency baseline, explicit
+protocol minimums, configure tokens, caller-supplied hard limits, checked
+protocol dimensions, and deterministic scale selection.
+
+#### Rationale
+
+Disabling SCTK defaults prevents calloop and keyboard dependencies from
+becoming accidental WLD-01 requirements. Configure tokens and one
+session-owned readiness operation close lifecycle and protocol-ordering races,
+while explicit limits and protocol versions turn the accepted boundedness and
+damage policies into implementable gates.
 
 ### 0.1.3 — 2026-08-18 — Consumed PCDN-WLD-003 resolution
 

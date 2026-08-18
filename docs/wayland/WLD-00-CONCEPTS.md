@@ -352,16 +352,28 @@ Ratification additionally confirms:
 
 ## 14. Unblocks
 
-WLD-01 may now be reviewed for phase ratification. WLD-00 ratification alone
-does not authorize implementation. WLD-02 remains blocked until WLD-01 is
-ratified and supplies its specified session, ownership, resize, and
-presentation evidence.
+WLD-01 is ratified and may proceed within its phase ownership boundary. WLD-02
+remains blocked until WLD-01 supplies its specified session, ownership, resize,
+and presentation evidence.
 
 The v0.2.7 release claim remains blocked until both implementation phases are
 ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — Recorded WLD-01 phase ratification
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** §14
+
+**Commits:** pending
+
+**Summary:** Updates the initiative's unblock record after WLD-01 phase
+ratification without changing WLD-00 authority or scope.
 
 ### 0.2.0 — 2026-08-18 — Ratified
 
