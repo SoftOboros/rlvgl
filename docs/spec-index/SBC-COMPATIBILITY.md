@@ -35,6 +35,7 @@ legacy document cannot be used as a shortcut around that gate.
 | Family prefix allocation | [PREFIX-REGISTRY.md](PREFIX-REGISTRY.md) |
 | Deterministic local projection | [README.md](README.md), `make spec-index`, and `make spec-index-check` |
 | MPY family errata | [`docs/concepts/ERRATA.md`](../concepts/ERRATA.md) |
+| WLD family errata | [`docs/wayland/ERRATA.md`](../wayland/ERRATA.md) |
 | Existing family errata | `docs/beetle-esp32p4/ERRATA.md` and `docs/disco-test-and-debug/ERRATA.md` |
 
 Before a family without a current errata log receives its next behavior change
@@ -60,6 +61,7 @@ an empty or absent historical log is not evidence that no prior issue existed.
 | MPY | `docs/concepts/MPY-00-CONCEPTS.md` | MPY-01 and MPY-02 are ratified with their phase PCDNs resolved; golden protocol vectors remain required before MPY-03, and MPY-03 through MPY-09 remain separately gated Draft phases. |
 | QT | `docs/qt-support/00-concepts.md` | Current-shape family; create family errata before the next material amendment. |
 | RATATUI / SCTD | Their respective `docs/concepts/*-00-CONCEPTS.md` roots | Current-shape family documents; create a family errata log before the next material amendment. |
+| WLD | `docs/wayland/WLD-00-CONCEPTS.md` | Current-shape Draft family with local errata; five PCDNs remain open and no implementation is authorized. |
 | CHIPS-* / DISCO-* | Their canonical `chipdb/` and `docs/disco-*/` roots | Existing local documentation remains a legacy baseline until each family activates its current-SBC errata and amendment workflow. |
 
 ## Explicit Legacy Bridges
@@ -89,6 +91,10 @@ new behavior change.
 - **MPY:** Later phase ratification remains blocked by their own PCDNs and,
   where specified, compile, exception, cache/shared-memory, measured-budget,
   or board evidence.
+- **WLD:** WLD-00 remains Draft until `PCDN-WLD-001` through
+  `PCDN-WLD-005` are resolved. WLD-01 and WLD-02 cannot authorize code before
+  their parent and prerequisite gates close, and release parity still requires
+  compositor evidence.
 - **KI2C-07:** Physical-board facts and read-only probe evidence are missing;
   hardware-blocked is not a conformance result.
 - **Legacy bridges:** The four documents above require their §15 bridge before

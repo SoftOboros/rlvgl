@@ -40,6 +40,7 @@ See crate overviews for:
 - [BACKEND-ARCHITECTURE.md](./rendering/BACKEND-ARCHITECTURE.md) — Pluggable blitter backends (CPU, DMA2D, wgpu).
 - [ALPHA-BLENDING.md](./rendering/ALPHA-BLENDING.md) — Alpha-blending and layered widget rendering.
 - [Ratatui on rlvgl](./ratatui-tutorial/README.md) — Retained cell backend, rlvgl-hosted pane, hybrid composition, and bare-metal proof.
+- [WLD native Wayland backend initiative](./wayland/README.md) — Draft v0.2.7 SBC family for XDG-shell lifecycle, SHM presentation, seat input, and compositor evidence; no implementation is authorized while its PCDNs remain open.
 - [IMAGE-COMPRESSION-FORMAT.md](./assets/IMAGE-COMPRESSION-FORMAT.md) — Palette + RLE codec for embedded assets.
 - [PLUGIN-ECOSYSTEM.md](./PLUGIN-ECOSYSTEM.md) — Media plugins: PNG, JPEG, GIF, Lottie, QR, fonts.
 

@@ -39,6 +39,7 @@ not redefine identifier grammar or canonicalization.
 | REND | Ira Abbott | `docs/concepts/REND-00-CONCEPTS.md` | `docs/concepts/` |
 | SCTD | Ira Abbott | `docs/concepts/SCTD-00-CONCEPTS.md` | `docs/concepts/` |
 | WID | Ira Abbott | `docs/concepts/WID-00-CONCEPTS.md` | `docs/concepts/` |
+| WLD | Ira Abbott | `docs/wayland/WLD-00-CONCEPTS.md` | `docs/wayland/` |
 
 ## Historical Identifier Aliases
 
