@@ -5335,7 +5335,9 @@ mod prepared_geometry_tests {
         stable_name: "rlvgl_core::actor::tests::PreparedGeometryActor",
         schema_revision: 1,
         family: ActorFamily::Container,
-        capabilities: ActorCapabilities::STAGE_ROOT.union(ActorCapabilities::CHILDREN),
+        capabilities: ActorCapabilities::STAGE_ROOT
+            .union(ActorCapabilities::CHILDREN)
+            .union(ActorCapabilities::CONTROL),
         targets: TargetSet::ALL,
         constructor_fields: &[ConstructorFieldDescriptor {
             id: 1,
@@ -5459,6 +5461,66 @@ mod prepared_geometry_tests {
                 }],
             )
             .unwrap()
+    }
+
+    #[test]
+    fn enabled_false_clears_seeded_focus_press_and_edit_states() {
+        let mut registry = registry();
+        let root = create_container(&mut registry);
+        {
+            let node = registry.node_mut(root).unwrap();
+            node.set_state(ObjectStates::FOCUSED, true);
+            node.set_state(ObjectStates::PRESSED, true);
+            node.set_state(ObjectStates::EDITED, true);
+        }
+        let starting_revision = registry.revision();
+
+        let prepared = registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(root),
+                flag: RuntimeFlag::Enabled,
+                enabled: false,
+            }])
+            .unwrap();
+        let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+        assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+        assert!(committed.create_outputs().is_empty());
+        assert_eq!(registry.node(root).unwrap().flags(), ObjectFlags::DISABLED);
+        assert_eq!(
+            registry.node(root).unwrap().states(),
+            ObjectStates::DISABLED
+        );
+        registry.release_committed_batch(committed).unwrap();
+    }
+
+    #[test]
+    fn focusable_false_clears_seeded_focus_and_edit_but_preserves_press() {
+        let mut registry = registry();
+        let root = create_container(&mut registry);
+        {
+            let node = registry.node_mut(root).unwrap();
+            node.set_flag(ObjectFlags::FOCUSABLE, true);
+            node.set_state(ObjectStates::FOCUSED, true);
+            node.set_state(ObjectStates::PRESSED, true);
+            node.set_state(ObjectStates::EDITED, true);
+        }
+        let starting_revision = registry.revision();
+
+        let prepared = registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(root),
+                flag: RuntimeFlag::Focusable,
+                enabled: false,
+            }])
+            .unwrap();
+        let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+        assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+        assert!(committed.create_outputs().is_empty());
+        assert_eq!(registry.node(root).unwrap().flags(), ObjectFlags::EMPTY);
+        assert_eq!(registry.node(root).unwrap().states(), ObjectStates::PRESSED);
+        registry.release_committed_batch(committed).unwrap();
     }
 
     #[test]

@@ -14,7 +14,9 @@ target envelope and exact Delete payload have allocation-free codecs and golden
 protocol evidence. The exact Reorder and Reparent payloads have the same proof,
 including all four Reparent reference pairs. PromoteRoot now has an exact
 target/name/index codec, negotiated text-limit enforcement, and stable/Batch
-reference vectors. Complete Endpoint dispatch remains deferred.
+reference vectors. SetFlag now has exact stable flag IDs, canonical Boolean
+encoding, stable/Batch target vectors, and outputless result proof. Complete
+Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -112,7 +114,7 @@ to operation-specific PCDNs.
 | `SET_PROPERTIES` | Actor whose properties are collectively set | Property fields and success values deferred |
 | `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values deferred |
 | `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
-| `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values deferred |
+| `SET_FLAG` | Actor owning runtime metadata | Exact flag ID plus canonical Boolean and outputless success; §5.6 |
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
 | `REPARENT` | Actor subtree being moved | Exact parent plus `u32` index and outputless success; §5.4 |
 | `PROMOTE_ROOT` | Actor becoming or moving as a named root | Exact UTF-8 name plus `u32` index and outputless success; §5.5 |
@@ -414,6 +416,72 @@ for Batch-reference resolution, post-detach shadow validation, root-name and
 capacity accounting, prepared allocation-free commit, error/result
 attribution, lifecycle/cue ordering, and retained-storage release.
 
+### 5.6 SetFlag payload, result, and metadata semantics
+
+SetFlag specializes the common target envelope with one stable one-byte flag
+ID and one canonical one-byte Boolean:
+
+```text
+set_flag_payload = target:ObjectReference | flag:u8 | enabled:u8
+```
+
+The operation opcode is exactly `SET_FLAG` (`0x0000_0005`), flags are `0`, and
+the Boolean consumes the complete remainder. The stable flag registry is:
+
+| ID | Flag | Write policy |
+|---:|---|---|
+| `1` | `Hidden` | Every actor |
+| `2` | `Enabled` | Every actor |
+| `3` | `Clickable` | Actor descriptor requires `CONTROL` |
+| `4` | `Focusable` | Actor descriptor requires `CONTROL` |
+
+Flag ID zero is `InvalidFrame`; an unknown nonzero ID is `Unsupported` rather
+than being truncated or treated as a raw native bit. `enabled` is exactly `0`
+for false or `1` for true. Any other byte, a missing/truncated field, or a
+trailing byte is `InvalidFrame`. Target tag classification remains §5.1. A
+Command carrying SetFlag is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+An unbound or forward Batch reference is `BatchInvalid`; a stale stable target
+is `StaleObject`. Payload decoding classifies the target before the flag and
+Boolean bytes. There is no SetFlag `with_limits` payload helper because all
+three fields have fixed wire sizes. The enclosing Batch independently applies
+operation-count and complete-frame limits.
+
+`Hidden` and `Enabled` are writable for every actor. `Clickable` and
+`Focusable` are accepted only when the actor descriptor declares `CONTROL`;
+otherwise the operation returns `Unsupported` before commit. Setting `Enabled`
+false atomically installs the native disabled flag and state and clears
+focused, pressed, and edited state. Setting it true atomically clears the
+native disabled flag and state. Setting `Focusable` false clears focused and
+edited state while removing focus eligibility. Raw state writes remain
+forbidden, so these synchronized paths cannot leave native flags and projected
+states divergent.
+
+SetFlag success is outputless. BatchSuccess carries the final/current
+`result_revision` but no `OperationResult` at the SetFlag operation index.
+Other output-bearing operations retain their increasing records. A record
+correlated to SetFlag is `InvalidFrame` under its result schema. Unknown flags
+and descriptor capability failures are attributed to the SetFlag operation
+with no invented `field_id`; the payload has positional fields, not registered
+keyed fields. The narrow API absence validator requires prior caller
+correlation to opcode SetFlag and does not validate other opcode schemas,
+negotiated limits, or the complete success envelope.
+
+Setting a flag to its already-current value is a valid no-op direction. It
+remains part of the accepted mutation Batch, whose visible commit advances
+`StageRevision` exactly once for the complete Batch, including when that no-op
+SetFlag is its only direction. Snapshots remain the authoritative readback for
+the resulting flags and synchronized states.
+
+The allocation-free payload is five bytes with a BatchObject target and eleven
+bytes with a stable Object target. Eight largest stable-target operation
+records produce a 222-byte Batch frame, within the 256-byte minimum profile.
+Complete Endpoint integration remains responsible for contextual reference
+resolution, descriptor capability validation, prepared atomic commit,
+revision/result attribution, native state/event ordering, and retained-storage
+release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -623,6 +691,12 @@ material, but they MUST preserve the same ordering and visible semantics.
   `max_text_bytes`, admits stable/earlier-Batch targets, defines outputless
   success and operation-attributed tree errors, and leaves Endpoint execution
   evidence-gated.
+- **PCDN-MPY-04-009 — Closed by owner acceptance 2026-08-18:** §5.6 freezes
+  SetFlag as a contextual target, stable one-byte flag ID, and canonical
+  one-byte Boolean. It admits stable/earlier-Batch targets, makes Hidden and
+  Enabled universal, gates Clickable and Focusable on `CONTROL`, preserves
+  synchronized disabled/focus/edit state cleanup, defines outputless no-op
+  revision semantics, and leaves Endpoint execution evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -632,7 +706,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-008 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-009 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -651,12 +725,12 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-The common mutation-target envelope plus exact Delete, Reorder, Reparent, and
-PromoteRoot schemas now unblock the remaining operation-specific payload/result
-PCDNs and Endpoint orchestration without authorizing guessed remainder schemas.
-After those codecs and endpoint integration are implemented, MPY-04 provides
-the complete stage mutation/introspection surface consumed by MPY-06 and the
-deterministic snapshot oracle consumed by MPY-07/09.
+The common mutation-target envelope plus exact Delete, Reorder, Reparent,
+PromoteRoot, and SetFlag schemas now unblock the remaining operation-specific
+payload/result PCDNs and Endpoint orchestration without authorizing guessed
+remainder schemas. After those codecs and endpoint integration are implemented,
+MPY-04 provides the complete stage mutation/introspection surface consumed by
+MPY-06 and the deterministic snapshot oracle consumed by MPY-07/09.
 
 ## 15. Change Log
 
@@ -862,7 +936,7 @@ when eight large stable-reference operations do not fit 256 bytes.
 
 **Touches:** PCDN-MPY-04-008, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `23d0416`
 
 **Summary:** Freezes PromoteRoot as a contextual target followed by one
 length-delimited byte-exact UTF-8 root name and raw little-endian `u32`
@@ -879,3 +953,29 @@ keeps structure separate from Stage name policy, while the negotiated decoder
 enforces the per-name byte limit before Endpoint dispatch. Outputless success
 uses the common Batch revision without redundant identity data; independent
 text, item-count, and complete-frame bounds remain explicit.
+
+### 0.8.0 — 2026-08-18 — SetFlag wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-009, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes SetFlag as a contextual target followed by one stable
+runtime-flag byte and one canonical Boolean byte. Adds allocation-free
+payload/operation codecs, stable and BatchObject vectors for all four flag IDs,
+strict invalid/unsupported discriminant coverage, outputless result validation,
+descriptor-gated `Unsupported` proof, and a 222-byte eight-operation floor
+fixture.
+
+#### Rationale
+
+Stable semantic flag IDs prevent exposure of raw native bit positions while
+preserving the runtime-owned Hidden, Enabled, Clickable, and Focusable paths.
+Canonical Boolean bytes remove alternate encodings, and descriptor-gating the
+control flags prevents unsupported actors from accepting inert metadata.
+Outputless success and one Batch revision report the synchronized flag/state
+commit without redundant result values, including for a valid no-op.

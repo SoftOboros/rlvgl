@@ -259,6 +259,8 @@ pub enum DiscriminantDomain {
     ErrorClass,
     /// Create destination kind.
     CreateDestination,
+    /// Runtime-owned flag selected by SetFlag.
+    RuntimeFlag,
 }
 
 /// Canonical codec failure.
@@ -929,6 +931,50 @@ pub struct PromoteRootPayload<'a> {
 
 /// Structural or contextual failure while decoding a PromoteRoot payload.
 pub type PromoteRootPayloadError = ObjectReferenceError;
+
+/// Stable runtime-owned object metadata flags writable through SetFlag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum RuntimeFlag {
+    /// Visibility and target eligibility.
+    Hidden = 0x01,
+    /// Inverse of the native disabled flag and state.
+    Enabled = 0x02,
+    /// Pointer target eligibility.
+    Clickable = 0x03,
+    /// Focus traversal eligibility.
+    Focusable = 0x04,
+}
+
+impl RuntimeFlag {
+    fn decode(value: u8) -> Result<Self, CodecError> {
+        match value {
+            0x00 => Err(CodecError::InvalidFrame),
+            0x01 => Ok(Self::Hidden),
+            0x02 => Ok(Self::Enabled),
+            0x03 => Ok(Self::Clickable),
+            0x04 => Ok(Self::Focusable),
+            value => Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::RuntimeFlag,
+                value,
+            }),
+        }
+    }
+}
+
+/// Complete Batch-only SetFlag payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SetFlagPayload {
+    /// Stable or earlier-created actor whose runtime flag is changed.
+    pub target: ObjectReference,
+    /// Stable runtime-owned flag identifier.
+    pub flag: RuntimeFlag,
+    /// Canonical requested flag state.
+    pub enabled: bool,
+}
+
+/// Structural or contextual failure while decoding a SetFlag payload.
+pub type SetFlagPayloadError = ObjectReferenceError;
 
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2012,6 +2058,65 @@ pub fn decode_promote_root_operation_with_limits(
     decode_promote_root_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete SetFlag payload.
+///
+/// No negotiated variable-size limit applies to this fixed-size payload. The
+/// enclosing Batch remains responsible for operation-count and frame limits.
+pub fn encode_set_flag_payload(
+    payload: SetFlagPayload,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    writer.u8(payload.flag as u8)?;
+    writer.u8(u8::from(payload.enabled))?;
+    Ok(writer.position)
+}
+
+/// Decode one complete SetFlag payload in target, flag, enabled order.
+///
+/// Flag zero and noncanonical Boolean bytes are invalid. Unknown nonzero flag
+/// IDs remain unsupported so a v1 peer never silently truncates future flags.
+pub fn decode_set_flag_payload(input: &[u8]) -> Result<SetFlagPayload, SetFlagPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let mut reader = Reader::new(&input[target_consumed..]);
+    let flag = RuntimeFlag::decode(
+        reader
+            .u8()
+            .map_err(|error| nested_mutation_target_error(error.into()))?,
+    )?;
+    let enabled = match reader
+        .u8()
+        .map_err(|error| nested_mutation_target_error(error.into()))?
+    {
+        0 => false,
+        1 => true,
+        _ => return Err(CodecError::InvalidFrame.into()),
+    };
+    if reader.position != reader.input.len() {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    Ok(SetFlagPayload {
+        target,
+        flag,
+        enabled,
+    })
+}
+
+/// Decode one zero-flag SetFlag operation from a counted Batch operation list.
+///
+/// There is deliberately no Command counterpart: MPY v1 SetFlag is Batch-only.
+pub fn decode_set_flag_operation(
+    operation: OperationRef<'_>,
+) -> Result<SetFlagPayload, SetFlagPayloadError> {
+    if operation.opcode != opcode::SET_FLAG || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_flag_payload(operation.payload)
+}
+
 /// Validate that one correlated Delete emitted no operation-result record.
 ///
 /// The caller MUST already have correlated `delete_operation_index` to a
@@ -2106,6 +2211,31 @@ pub fn validate_promote_root_result_absent(
             .results
             .iter()
             .any(|result| result.operation_index == promote_root_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+/// Validate that one correlated SetFlag emitted no operation-result record.
+///
+/// The caller MUST already have correlated `set_flag_operation_index` to a
+/// submitted opcode [`opcode::SET_FLAG`]. This helper validates the structural
+/// [`BatchSuccess`] shape and the absence of that one index only. It does not
+/// validate other opcode result schemas, negotiated Limits, or the complete
+/// success envelope. Other output-bearing operations may still contribute
+/// records.
+pub fn validate_set_flag_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    set_flag_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if set_flag_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == set_flag_operation_index)
     {
         return Err(CodecError::InvalidFrame);
     }

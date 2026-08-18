@@ -6,26 +6,27 @@ use rlvgl_api::protocol::{
     FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
     ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
     OperationResultRef, PromoteRootPayload, ProtocolVersion, ReorderPayload, ReparentPayload,
-    RuntimeNotice, ValueList, ValueRef, ValueTag, create_result_object, decode_batch_success,
-    decode_batch_success_with_limits, decode_create_operation_with_limits, decode_create_payload,
-    decode_create_payload_with_limits, decode_delete_operation, decode_delete_payload,
-    decode_field_list, decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    RuntimeFlag, RuntimeNotice, SetFlagPayload, ValueList, ValueRef, ValueTag,
+    create_result_object, decode_batch_success, decode_batch_success_with_limits,
+    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
+    decode_delete_operation, decode_delete_payload, decode_field_list,
+    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
     decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
     decode_operation_list, decode_operation_list_with_limit, decode_promote_root_operation,
     decode_promote_root_operation_with_limits, decode_promote_root_payload,
     decode_promote_root_payload_with_limits, decode_reorder_operation, decode_reorder_payload,
-    decode_reparent_operation, decode_reparent_payload, decode_value, decode_value_list,
-    decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
-    encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
-    encode_delete_payload, encode_field_list, encode_field_list_with_limit,
-    encode_field_list_with_limits, encode_frame, encode_frame_with_limits,
-    encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
-    encode_operation_list_with_limit, encode_promote_root_payload,
+    decode_reparent_operation, decode_reparent_payload, decode_set_flag_operation,
+    decode_set_flag_payload, decode_value, decode_value_list, decode_value_list_with_limits,
+    encode_batch_success, encode_batch_success_with_limit, encode_batch_success_with_limits,
+    encode_create_payload, encode_create_payload_with_limits, encode_delete_payload,
+    encode_field_list, encode_field_list_with_limit, encode_field_list_with_limits, encode_frame,
+    encode_frame_with_limits, encode_mutation_target_envelope, encode_object_reference,
+    encode_operation_list, encode_operation_list_with_limit, encode_promote_root_payload,
     encode_promote_root_payload_with_limits, encode_reorder_payload, encode_reparent_payload,
-    encode_value, encode_value_list, encode_value_list_with_limit, encode_value_list_with_limits,
-    is_batch_mutation_opcode, opcode, validate_delete_result_absent,
+    encode_set_flag_payload, encode_value, encode_value_list, encode_value_list_with_limit,
+    encode_value_list_with_limits, is_batch_mutation_opcode, opcode, validate_delete_result_absent,
     validate_promote_root_result_absent, validate_reorder_result_absent,
-    validate_reparent_result_absent,
+    validate_reparent_result_absent, validate_set_flag_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -1630,6 +1631,207 @@ fn promote_root_is_outputless_and_errors_are_operation_attributed() {
 }
 
 #[test]
+fn set_flag_payloads_freeze_ids_boolean_bytes_and_reference_forms() {
+    let cases = [
+        (
+            SetFlagPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                flag: RuntimeFlag::Hidden,
+                enabled: false,
+            },
+            "payload.set_flag_hidden_object",
+            11,
+        ),
+        (
+            SetFlagPayload {
+                target: ObjectReference::BatchObject(7),
+                flag: RuntimeFlag::Enabled,
+                enabled: true,
+            },
+            "payload.set_flag_enabled_batch_object",
+            5,
+        ),
+        (
+            SetFlagPayload {
+                target: ObjectReference::BatchObject(7),
+                flag: RuntimeFlag::Clickable,
+                enabled: true,
+            },
+            "payload.set_flag_clickable_batch_object",
+            5,
+        ),
+        (
+            SetFlagPayload {
+                target: ObjectReference::BatchObject(7),
+                flag: RuntimeFlag::Focusable,
+                enabled: false,
+            },
+            "payload.set_flag_focusable_batch_object",
+            5,
+        ),
+    ];
+
+    for (payload, fixture_name, expected_length) in cases {
+        let mut encoded = [0u8; 16];
+        let length = encode_set_flag_payload(payload, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_set_flag_payload(&encoded[..length]), Ok(payload));
+        assert_eq!(
+            decode_set_flag_operation(OperationRef {
+                opcode: opcode::SET_FLAG,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+    }
+}
+
+#[test]
+fn set_flag_rejects_bad_target_flag_boolean_and_operation_envelope() {
+    assert_eq!(
+        decode_set_flag_payload(&[]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_set_flag_payload(&[ValueTag::Bool as u8, 1, 1, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        decode_set_flag_payload(&[0xff, 1, 1]),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+
+    let target = [ValueTag::BatchObject as u8, 7, 0];
+    for remainder in [&[][..], &[0][..], &[0, 1][..], &[1, 2][..], &[1, 1, 0][..]] {
+        let mut malformed = target.to_vec();
+        malformed.extend_from_slice(remainder);
+        assert_eq!(
+            decode_set_flag_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let mut unsupported = target.to_vec();
+    unsupported.extend_from_slice(&[5, 1]);
+    assert_eq!(
+        decode_set_flag_payload(&unsupported),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::RuntimeFlag,
+                value: 5,
+            }
+        ))
+    );
+
+    assert_eq!(
+        encode_set_flag_payload(
+            SetFlagPayload {
+                target: ObjectReference::Object(1),
+                flag: RuntimeFlag::Hidden,
+                enabled: true,
+            },
+            &mut [0; 16],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        encode_set_flag_payload(
+            SetFlagPayload {
+                target: ObjectReference::BatchObject(7),
+                flag: RuntimeFlag::Hidden,
+                enabled: true,
+            },
+            &mut [0; 4],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.set_flag_hidden_object");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::SET_PROPERTIES, 0),
+        (opcode::SET_FLAG, 1),
+    ] {
+        assert_eq!(
+            decode_set_flag_operation(OperationRef {
+                opcode: operation_opcode,
+                flags,
+                payload: &valid,
+            }),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn set_flag_is_outputless_and_control_rejection_is_operation_attributed() {
+    let outputless = BatchSuccess {
+        result_revision: 19,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 128];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.set_flag_success"));
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(validate_set_flag_result_absent(decoded, 1, 0), Ok(()));
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 20,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_set_flag_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_set_flag_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_set_flag_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_set_flag_result_absent(
+            BatchSuccess {
+                result_revision: 20,
+                results: OperationResultList::from_slice(&forbidden_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let unsupported = FrameRef::Result(Completion {
+        request_id: 1,
+        status: CompletionStatus::Error(ErrorClass::Unsupported),
+        operation_index: Some(0),
+        field_id: None,
+        diagnostic: "control",
+        payload: &[],
+    });
+    let length = encode_frame(MPY_V1, unsupported, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("frame.set_flag_unsupported"));
+    assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, unsupported);
+}
+
+#[test]
 fn successful_batch_payload_matches_golden_bytes_and_correlates_results() {
     let success = BatchSuccess {
         result_revision: 9,
@@ -2381,6 +2583,63 @@ fn reparent_floor_proof_distinguishes_smallest_and_largest_reference_pairs() {
     assert_eq!(largest_frame_length, 310);
     assert_eq!(
         encode_frame_with_limits(MPY_V1, largest_batch, limits(), &mut oversized_frame),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_largest_set_flag_operations_fit_the_floor_frame() {
+    let mut payloads = [[0u8; 11]; 8];
+    let mut lengths = [0usize; 8];
+    for (index, output) in payloads.iter_mut().enumerate() {
+        lengths[index] = encode_set_flag_payload(
+            SetFlagPayload {
+                target: ObjectReference::Object((2u64 << 32) | u64::try_from(index + 1).unwrap()),
+                flag: RuntimeFlag::Focusable,
+                enabled: index % 2 == 0,
+            },
+            output,
+        )
+        .unwrap();
+        assert_eq!(lengths[index], 11);
+    }
+    let operations: [OperationRef<'_>; 8] = core::array::from_fn(|index| OperationRef {
+        opcode: opcode::SET_FLAG,
+        flags: 0,
+        payload: &payloads[index][..lengths[index]],
+    });
+    let batch = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&operations),
+    });
+    let mut encoded = [0u8; 256];
+    let length = encode_frame_with_limits(MPY_V1, batch, limits(), &mut encoded).unwrap();
+    assert_eq!(length, 222);
+
+    let decoded = decode_frame_with_limits(&encoded[..length], limits()).unwrap();
+    let FrameRef::Batch(decoded_batch) = decoded.frame else {
+        panic!("expected Batch");
+    };
+    for operation in decoded_batch.operations.iter() {
+        assert!(decode_set_flag_operation(operation).is_ok());
+    }
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 221;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_frame_with_limits(&encoded[..length], too_small),
         Err(CodecError::LimitExceeded)
     );
 }

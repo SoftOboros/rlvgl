@@ -15,9 +15,10 @@ use rlvgl_core::{
     },
     direction::{
         ActorDirection, BatchCreateDestination, BatchObjectReference, BatchStageDirection,
-        CreateDirection, CreateField, OwnedValue,
+        CreateDirection, CreateField, OwnedValue, RuntimeFlag,
     },
     event::Event,
+    object::{ObjectFlags, ObjectStates},
     renderer::Renderer,
     widget::{Rect, Widget},
 };
@@ -231,6 +232,34 @@ fn create_stable_label(
                 rlvgl_core::actor::ConstructorInput {
                     id: field(label, "text"),
                     value: ValueRef::Text("leaf"),
+                },
+            ],
+        )
+        .unwrap()
+}
+
+fn create_stable_button(
+    registry: &mut StageRegistry,
+    parent: rlvgl_core::actor::ObjectId,
+) -> rlvgl_core::actor::ObjectId {
+    let button = descriptor("button::Button");
+    registry
+        .create(
+            button.type_id,
+            rlvgl_core::actor::CreateDestination::Child { parent },
+            &[
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(button, "bounds"),
+                    value: ValueRef::Rect {
+                        x: BOUNDS.x,
+                        y: BOUNDS.y,
+                        width: BOUNDS.width,
+                        height: BOUNDS.height,
+                    },
+                },
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(button, "text"),
+                    value: ValueRef::Text("control"),
                 },
             ],
         )
@@ -1769,6 +1798,364 @@ fn saturated_root_capacity_distinguishes_reorder_from_child_promotion() {
     assert_eq!(registry.children(alpha).unwrap(), [child]);
     assert_eq!(registry.actor_info(child).unwrap().parent, Some(alpha));
     assert_eq!(registry.root_id("child"), None);
+}
+
+#[test]
+fn stable_non_control_target_accepts_hidden_and_enabled_with_exact_native_state() {
+    let mut registry = registry();
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    assert_eq!(registry.node(target).unwrap().flags(), ObjectFlags::EMPTY);
+    assert_eq!(
+        registry.node(target).unwrap().states(),
+        ObjectStates::DEFAULT
+    );
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(target),
+                flag: RuntimeFlag::Hidden,
+                enabled: true,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(target),
+                flag: RuntimeFlag::Enabled,
+                enabled: false,
+            },
+        ])
+        .unwrap();
+    assert_eq!(registry.node(target).unwrap().flags(), ObjectFlags::EMPTY);
+    assert_eq!(
+        registry.node(target).unwrap().states(),
+        ObjectStates::DEFAULT
+    );
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(
+        registry.node(target).unwrap().flags().bits(),
+        ObjectFlags::HIDDEN.bits() | ObjectFlags::DISABLED.bits()
+    );
+    assert_eq!(
+        registry.node(target).unwrap().states(),
+        ObjectStates::DISABLED
+    );
+    assert!(
+        !registry
+            .node(target)
+            .unwrap()
+            .states()
+            .contains(ObjectStates::FOCUSED)
+    );
+    assert!(
+        !registry
+            .node(target)
+            .unwrap()
+            .states()
+            .contains(ObjectStates::PRESSED)
+    );
+    assert!(
+        !registry
+            .node(target)
+            .unwrap()
+            .states()
+            .contains(ObjectStates::EDITED)
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::FOCUS)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(target),
+                flag: RuntimeFlag::Hidden,
+                enabled: false,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(target),
+                flag: RuntimeFlag::Enabled,
+                enabled: true,
+            },
+        ])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 2);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.node(target).unwrap().flags(), ObjectFlags::EMPTY);
+    assert_eq!(
+        registry.node(target).unwrap().states(),
+        ObjectStates::DEFAULT
+    );
+    assert_eq!(registry.usage(), starting_usage);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn earlier_created_control_flags_emit_only_the_exact_create_mapping() {
+    let button = descriptor("button::Button");
+    let mut registry = registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let starting_revision = registry.revision();
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            create(
+                7,
+                button,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(parent),
+                },
+                vec![CreateField {
+                    id: field(button, "text"),
+                    value: OwnedValue::Text("control".into()),
+                }],
+            ),
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::EarlierBatch(7),
+                flag: RuntimeFlag::Hidden,
+                enabled: true,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::EarlierBatch(7),
+                flag: RuntimeFlag::Enabled,
+                enabled: true,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::EarlierBatch(7),
+                flag: RuntimeFlag::Clickable,
+                enabled: true,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::EarlierBatch(7),
+                flag: RuntimeFlag::Focusable,
+                enabled: true,
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(committed.create_outputs().len(), 1);
+    assert_eq!(committed.create_outputs()[0].operation_index, 0);
+    assert_eq!(committed.create_outputs()[0].batch_ref, 7);
+    let control = committed.take_create_outputs().pop().unwrap().object_id;
+    assert_eq!(registry.children(parent).unwrap(), [control]);
+    assert_eq!(
+        registry.node(control).unwrap().flags().bits(),
+        ObjectFlags::HIDDEN.bits() | ObjectFlags::CLICKABLE.bits() | ObjectFlags::FOCUSABLE.bits()
+    );
+    assert_eq!(
+        registry.node(control).unwrap().states(),
+        ObjectStates::DEFAULT
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::FOCUS)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(control),
+                flag: RuntimeFlag::Enabled,
+                enabled: false,
+            },
+            BatchStageDirection::SetFlag {
+                object: BatchObjectReference::Stable(control),
+                flag: RuntimeFlag::Focusable,
+                enabled: false,
+            },
+        ])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 2);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(
+        registry.node(control).unwrap().flags().bits(),
+        ObjectFlags::HIDDEN.bits() | ObjectFlags::DISABLED.bits() | ObjectFlags::CLICKABLE.bits()
+    );
+    assert_eq!(
+        registry.node(control).unwrap().states(),
+        ObjectStates::DISABLED
+    );
+    for state in [
+        ObjectStates::FOCUSED,
+        ObjectStates::PRESSED,
+        ObjectStates::EDITED,
+    ] {
+        assert!(!registry.node(control).unwrap().states().contains(state));
+    }
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn control_gating_and_target_resolution_fail_before_atomic_publication() {
+    for flag in [RuntimeFlag::Clickable, RuntimeFlag::Focusable] {
+        let mut stable_registry = registry();
+        let target = create_stable_container(
+            &mut stable_registry,
+            rlvgl_core::actor::CreateDestination::Root { name: "target" },
+        );
+        let starting_revision = stable_registry.revision();
+        let starting_usage = stable_registry.usage();
+        assert_eq!(
+            stable_registry
+                .prepare_atomic_batch(vec![
+                    BatchStageDirection::SetFlag {
+                        object: BatchObjectReference::Stable(target),
+                        flag: RuntimeFlag::Hidden,
+                        enabled: true,
+                    },
+                    BatchStageDirection::SetFlag {
+                        object: BatchObjectReference::Stable(target),
+                        flag,
+                        enabled: true,
+                    },
+                ])
+                .unwrap_err(),
+            RegistryError::Unsupported
+        );
+        assert_eq!(stable_registry.revision(), starting_revision);
+        assert_eq!(stable_registry.usage(), starting_usage);
+        assert_eq!(
+            stable_registry.node(target).unwrap().flags(),
+            ObjectFlags::EMPTY
+        );
+        assert_eq!(
+            stable_registry.node(target).unwrap().states(),
+            ObjectStates::DEFAULT
+        );
+
+        let mut created_registry = registry();
+        assert_eq!(
+            created_registry
+                .prepare_atomic_batch(vec![
+                    create(
+                        1,
+                        descriptor("container::Container"),
+                        BatchCreateDestination::Root {
+                            name: "created".into(),
+                        },
+                        vec![],
+                    ),
+                    BatchStageDirection::SetFlag {
+                        object: BatchObjectReference::EarlierBatch(1),
+                        flag: RuntimeFlag::Enabled,
+                        enabled: false,
+                    },
+                    BatchStageDirection::SetFlag {
+                        object: BatchObjectReference::EarlierBatch(1),
+                        flag,
+                        enabled: true,
+                    },
+                ])
+                .unwrap_err(),
+            RegistryError::Unsupported
+        );
+        assert_eq!(created_registry.revision().get(), 0);
+        assert_eq!(created_registry.usage().actors, 0);
+        assert_eq!(created_registry.root_id("created"), None);
+    }
+
+    let mut registry = registry();
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::Delete {
+                    object: BatchObjectReference::Stable(target),
+                },
+                BatchStageDirection::SetFlag {
+                    object: BatchObjectReference::Stable(target),
+                    flag: RuntimeFlag::Clickable,
+                    enabled: true,
+                },
+            ])
+            .unwrap_err(),
+        RegistryError::StaleObject { object_id: target }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.root_id("target"), Some(target));
+    assert_eq!(registry.node(target).unwrap().flags(), ObjectFlags::EMPTY);
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetFlag {
+                object: BatchObjectReference::EarlierBatch(0),
+                flag: RuntimeFlag::Clickable,
+                enabled: true,
+            }])
+            .unwrap_err(),
+        RegistryError::BatchInvalid
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.root_id("target"), Some(target));
+}
+
+#[test]
+fn semantic_noop_set_flag_still_commits_once_with_outputless_effects() {
+    let mut registry = registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let control = create_stable_button(&mut registry, parent);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_flags = registry.node(control).unwrap().flags();
+    let starting_states = registry.node(control).unwrap().states();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::SetFlag {
+            object: BatchObjectReference::Stable(control),
+            flag: RuntimeFlag::Clickable,
+            enabled: false,
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.node(control).unwrap().flags(), starting_flags);
+    assert_eq!(registry.node(control).unwrap().states(), starting_states);
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW.union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
 }
 
 const REFERENCE_TYPE: TypeId = TypeId::registered(0x0001_ff01);
