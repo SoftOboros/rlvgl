@@ -6,9 +6,10 @@ CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md - Full-host proof, presenter, event-loo
 
 **Document ID:** CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Three policy PCDNs resolved 2026-08-18;
+window topology and asyncio drain capacity remain evidence-gated. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -95,6 +96,14 @@ Windowed Session MUST expose the same Runtime/Stage/Actor API and neutral
 semantics as Headless Session. Window lifecycle records are profile records,
 not widget cues unless an owning LPAR/backend contract defines a mapping.
 
+The initial `host-windowed-portable-v1` presenter is the existing
+`rlvgl-platform` simulator stack using its winit/wgpu window, native input, and
+presentation path. It is a presentation/integration profile; exact frame
+conformance continues to use the CPY-05 software-reference Headless Session.
+A WLD-backed Linux profile is additive and separately qualified against the
+ratified WLD lifecycle; it does not replace the portable profile or become a
+CPython-owned backend.
+
 The process topology MUST be selected per backend/operating system:
 
 - use Extension-Owned Process when the backend can run correctly with the
@@ -106,10 +115,27 @@ The launcher MUST initialize the same Python package surface and MUST NOT add a
 second semantic implementation. Static CPython embedding remains outside the
 initial profile unless CPY-08 separately ratifies it.
 
+Extension-Owned Process remains the default artifact assumption, but it is not
+a windowed conformance claim. Each operating-system/backend row MUST prove that
+event-loop construction, window creation, event dispatch, close, and Python
+Binding Turns run on their required threads when the extension is imported by
+ordinary `python`. A row that cannot satisfy the backend's main-thread rule
+MUST use a separately packaged Launcher-Owned Process. This selection remains
+`PCDN-CPY-07-002`; headless and embedded progress do not borrow a result from a
+different host/backend row.
+
 ## 7. Frozen Decisions — Asyncio
 
 Asyncio integration MUST register the CPY-03 Readiness Signal where the event
 loop supports it and schedule the same bounded Binding Turn used by `poll()`.
+
+On Linux the adapter registers CPY-03's `eventfd`; on macOS it registers the
+CPY-03 nonblocking self-pipe read end. A Unix event loop supporting
+`add_reader()` schedules the bounded drain directly. If an admitted loop lacks
+fd-reader registration, one adapter-owned waiter thread may wait on that same
+readiness fd and use `call_soon_threadsafe()` only as a wake notification. The
+waiter carries no semantic record, owns no callback, and never drains egress.
+Timer polling and a second Python record queue are not first-release fallbacks.
 
 It MUST:
 
@@ -123,6 +149,14 @@ It MUST:
 
 An `asyncio.Queue` MAY be an application convenience built above records. It is
 not the binding's semantic egress owner.
+
+The per-turn policy is a configurable positive record-count budget. After one
+budget, the adapter returns control to the loop; if records or a terminal state
+remain drainable it uses immediate `call_soon()` rescheduling, preserving at
+least one loop scheduling boundary between batches. It never loops until empty
+inside one callback. The exact default/maximum count remains
+`PCDN-CPY-07-004` and must be selected with CPY-03 queue and CPY-09 starvation/
+latency measurements.
 
 ## 8. Frozen Decisions — Host Input and Capture
 
@@ -150,13 +184,13 @@ MUST NOT replace canonical headless frame evidence.
 
 | Existing surface | CPY-07 treatment |
 |---|---|
-| `rlvgl-platform/simulator` | Candidate portable window backend; retains its owning implementation and dependencies. |
+| `rlvgl-platform/simulator` | Selected first portable window presenter; retains its owning implementation and dependencies. |
 | WLD | Optional native Linux window/kiosk backend after ratification; not a CPY frame API. |
 | Existing simulator apps | Evidence and reusable composition patterns, not the Python module API. |
 | `poll()` | Canonical drain surface; asyncio adapts readiness to it. |
 | Window screenshots | Diagnostic/integration evidence only; exact software frames remain conformance authority. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Decisions
 
 ### 11.1 Non-goals
 
@@ -166,19 +200,31 @@ MUST NOT replace canonical headless frame evidence.
 - Equating compositor-scaled pixels with canonical renderer bytes.
 - Supporting every GUI event-loop framework through custom adapters.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
+- **PCDN-CPY-07-001 — Initial presenter — Accepted as amended
+  2026-08-18.** Use the existing portable simulator/winit/wgpu stack for
+  `host-windowed-portable-v1`. Add WLD only as a separately qualified Linux
+  native profile under WLD authority.
+- **PCDN-CPY-07-003 — Readiness and fallback — Accepted as amended
+  2026-08-18.** Register CPY-03 `eventfd` on Linux and the self-pipe on macOS
+  with `add_reader()` when supported. The only fallback is a signal-only waiter
+  thread using `call_soon_threadsafe()`; it does not carry or drain records.
+- **PCDN-CPY-07-005 — First release scope — Accepted as amended
+  2026-08-18.** An embedded-focused prerelease requires embedded-direct plus
+  host-headless and may omit host-windowed explicitly. The later full-host
+  Release Level requires both host-headless and host-windowed.
+
+### 11.3 Open Decisions
+
+| PCDN | Question | Current disposition | Blocks |
 |---|---|---|---|
-| `PCDN-CPY-07-001` | Which presenter closes the initial host-windowed profile? | Use the existing portable simulator first; add ratified WLD as a Linux-native profile, not a replacement. | CPY-07 ratification |
-| `PCDN-CPY-07-002` | Is a Launcher-Owned Process required on macOS or any selected backend? | Decide from actual main-thread integration proof; extension topology remains default. | Windowed claim/CPY-08 artifact set |
-| `PCDN-CPY-07-003` | What readiness primitive and portable fallback are required? | Unix pollable fd for Linux; select tested platform fallback without a second queue. | CPY-03/07 ratification |
-| `PCDN-CPY-07-004` | What per-turn asyncio drain budget and starvation policy apply? | Configurable bounded budget with immediate reschedule while work remains; close final values with measurement. | CPY-07 ratification/CPY-09 |
-| `PCDN-CPY-07-005` | Is host-windowed required for the first embedded-focused release? | Follow `PCDN-CPY-00-003`; allow embedded prerelease while preserving the later full-host gate. | CPY-07/09 claim set |
+| `PCDN-CPY-07-002` | Is a Launcher-Owned Process required on macOS or any selected backend? | Remains open per operating-system/backend row. First prove ordinary extension import plus main-thread window create/run/close and Binding Turns; require a launcher for each row that cannot pass. No row inherits another row's result. | Windowed claim/CPY-08 artifact set |
+| `PCDN-CPY-07-004` | What exact per-turn asyncio drain count applies? | Remains open. Use the frozen positive-count/immediate-reschedule policy, then measure callback latency, loop starvation, wakeups, queue depth, close latency, and host throughput to select defaults/maxima with CPY-03/09. | CPY-07 ratification/CPY-09 budgets |
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [ ] Every PCDN in §§11.2–11.3 is resolved; two evidence PCDNs remain open.
 - [ ] Headless Session is hermetic and deterministic.
 - [ ] Window topology is proven for every claimed host platform.
 - [ ] Asyncio and `poll()` share one drain path and ordering.
@@ -199,10 +245,50 @@ MUST NOT replace canonical headless frame evidence.
 
 ## 14. Unblocks
 
-Ratification unblocks headless and windowed host implementation once CPY-03/04/05
-are ready. Packaging and release claims remain CPY-08/09 gates.
+Three policy PCDNs are resolved, but CPY-07 remains Draft. Ratification is
+blocked by CPY-03/04/05, a hermetic Headless Session, per-host window topology
+in `PCDN-CPY-07-002`, measured drain counts in `PCDN-CPY-07-004`, and the
+remaining thread/input/frame/finalization evidence. Ratification would unblock
+headless and windowed host implementation. Packaging and release claims remain
+CPY-08/09 gates.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — host policy PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-07-1, INV-CPY-07-2, INV-CPY-07-3, INV-CPY-07-4,
+INV-CPY-07-5, INV-CPY-07-6, INV-CPY-07-7, PCDN-CPY-07-001,
+PCDN-CPY-07-003, PCDN-CPY-07-005, §6, §7, §10, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Selects the portable simulator presenter, fixes Unix asyncio
+readiness and its signal-only fallback, and permits an embedded-focused release
+to precede host-windowed closure while retaining topology and drain-count gates.
+
+#### Rationale
+
+The existing simulator is the shortest portable integration path, while the
+software Headless Session remains the deterministic pixel oracle. Reusing the
+one CPY-03 readiness descriptor preserves egress ordering; a waiter thread may
+bridge event-loop APIs without becoming another semantic queue. Main-thread
+window constraints and fair drain counts are empirical integration properties,
+so selecting them without host measurements would create false portability.
+
+Considered and rejected: making WLD the only host presenter, treating a window
+screenshot as canonical frame evidence, copying records into an asyncio queue,
+timer polling as the first fallback, draining until empty in one loop callback,
+assuming extension ownership works on every host, and blocking the primary
+embedded release on an unfinished interactive window profile.
+
+What deliberately did not change: no Headless Session, Python readiness
+adapter, waiter thread, window integration, launcher, drain constant, or host
+result is implemented. Backend lifecycle remains platform/WLD-owned, CPY-07
+remains Draft, and the two measured/topology PCDNs stay open.
 
 ### 0.1.0 — 2026-08-18 — drafted
 

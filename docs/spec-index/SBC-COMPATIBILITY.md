@@ -96,7 +96,9 @@ new behavior change.
   resolved, CPY-03 has resolved four runtime-policy decisions, CPY-04 has
   resolved all six director-binding policy decisions, and CPY-05 has resolved
   five frame-policy decisions while retaining measured slot capacities.
-  CPY-06 has resolved all six embedded-Linux policy decisions. The exact
+  CPY-06 has resolved all six embedded-Linux policy decisions, and CPY-07 has
+  resolved three host policies while retaining two measured/topology gates.
+  The exact
   manifest/rootfs/board artifacts, an actual MPY Handoff Record, measured
   queue/performance budgets, binding implementation/conformance evidence, and
   per-phase ratification remain open. CPY planning leads the future shared
