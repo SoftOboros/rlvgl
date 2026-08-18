@@ -6,9 +6,10 @@ CPY-06-EMBEDDED-LINUX-RUNTIME.md - Primary embedded-Linux device, presentation, 
 
 **Document ID:** CPY-06-EMBEDDED-LINUX-RUNTIME
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Six policy PCDNs resolved 2026-08-18;
+rootfs, implementation, and physical-board evidence remain open. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -81,14 +82,33 @@ profiles rather than an implicit security promise.
 
 ## 5. Frozen Decisions — Direct Deployment
 
+The first primary profile is `embedded-linux-direct-fbdev-evdev-v1`:
+
+- BeagleBone Black plus NHD-7.0CTP-CAPE-P;
+- Debian 13 (`trixie`) `armhf` rootfs under CPY-01;
+- kernel `tilcdc` framebuffer presentation through configured `/dev/fb0`;
+- kernel `edt-ft5x06` touch input through a manifest-selected evdev node; and
+- ordinary process-owned software render/frame storage copied to fbdev by the
+  admitted platform backend, with no reserved-memory/EDMA scratch dependency.
+
+The exact rootfs digest, kernel release, node identities, geometry, channel
+bitfields, stride, touch ranges, and permission observations belong to the
+Baseline/Device Manifest and physical evidence; naming the profile does not
+assert those observations.
+
 The trusted Direct Deployment uses one Director Process. Importing/starting
 `rlvgl` creates a Native Runtime Service that opens only devices declared in the
 Device Manifest. Native code performs device I/O, input translation, render,
 and presentation. Python receives handles, records, and optional Frame Leases.
 
-The deployment MUST run under a dedicated non-root account where the selected
-backend permits it. Its Privilege Envelope MUST be explicit and minimal. Python
-code in this process is trusted equivalently to the process's device access.
+The base profile MUST run under a dedicated non-root account. Its Privilege
+Envelope has no Linux capabilities, no `/dev/mem`, and no device access beyond
+the manifest-selected framebuffer and input nodes. Access is granted through
+explicit ownership/group/udev policy recorded by the manifest, not by running
+Python as root. A kernel/rootfs that cannot satisfy this envelope cannot close
+base conformance and must use a separately named high-privilege or Hardened
+profile. Python code in Direct Deployment is trusted equivalently to the
+process's device access.
 
 The Direct Deployment MUST NOT be advertised as a sandbox for third-party
 Python. If the required backend exposes broad physical-memory or arbitrary
@@ -96,6 +116,11 @@ device authority, the deployment is high-privilege and either moves to the
 Hardened Deployment or states the trusted-appliance limitation prominently.
 
 ## 6. Frozen Decisions — Hardened Deployment
+
+Hardened Deployment is not required for the first trusted-appliance release.
+It is mandatory for any claim that admits untrusted Python or requires broad
+device/physical-memory privilege in the runtime. Such a deployment cannot be
+relabeled as base Direct Deployment.
 
 The Runtime Daemon owns the Native Runtime Service and every privileged device.
 The Director Process is unprivileged and receives no raw device descriptors,
@@ -110,15 +135,68 @@ The Local Service Transport MUST provide:
 - resource ownership cleanup when either process exits; and
 - a separately specified frame-transfer policy.
 
-An initial daemon MAY copy flattened frames. Shared `memfd`/descriptor passing
-is admitted only after CPY-05 lifetime and peer-ownership evidence. Network
-transport is outside this phase.
+The initial Local Service Transport is a filesystem-permissioned Linux Unix-
+domain stream socket. The daemon authenticates the connecting Director with
+`SO_PEERCRED`, checks the admitted uid/gid policy, then negotiates the neutral
+protocol version, descriptor fingerprint, limits, and profile before accepting
+application operations. Messages are length-delimited under declared maxima;
+the transport may fragment bytes but cannot alter neutral record ordering.
+
+Disconnect faults the current service connection. Reconnect constructs a new
+Service Epoch; no Actor, Request, Subscription, Resource, or Frame handle is
+resumed across it. The daemon closes client-owned resources and continues or
+closes devices only under its configured no-client policy.
+
+The first daemon frame carrier is a bounded copy of the complete CPY-05 Frame
+Descriptor and canonical `BGRA8888_LE_STRAIGHT` bytes into Director-owned
+immutable storage. It passes no framebuffer, scanout, render-slot, `memfd`, or
+other file descriptor. The Director-side immutable allocation owns every
+Python export lifetime. Shared memory/descriptor passing is Standards Action
+after CPY-05 peer-ownership, sealing, revocation, and held-lease evidence.
+Network transport is outside this phase.
 
 ## 7. Frozen Decisions — Device and Backend Lifecycle
 
 The Device Manifest MUST identify display, input, optional readiness/timing,
 and any high-privilege mapping separately. Device selection MUST NOT be a
 hard-coded ambient `/dev/input/eventN` guess in release artifacts.
+
+### 7.1 Device Manifest selection schema
+
+The machine-readable Device Manifest contains one profile identity, its
+Baseline Manifest id, expected kernel release/range, and a closed array of
+device rows. Every device row contains:
+
+| Field | Required meaning |
+|---|---|
+| `role` | Stable logical name and one class: `display`, `input`, `readiness`, or `timing`. |
+| `backend` | Exact admitted platform backend and expected kernel driver. |
+| `required` | Whether absence/loss faults the profile. |
+| `configured_path` | Absolute configured device path; stable `/dev/input/by-path` or `/dev/input/by-id` names are preferred for evdev. |
+| `resolved_path`, `major`, `minor` | Actual character-device identity captured after symlink resolution and `fstat`. |
+| `identity` | Kernel-reported device name/id fields and the subset that MUST match. |
+| `capabilities` | Exact access mode and required ioctl/event capabilities. |
+| `observed` | Startup facts such as geometry/stride/bitfields or absolute-axis ranges. |
+| `loss_policy` | One of the phase-admitted `fault-close`, `reacquire`, or `headless` policies. |
+
+The top-level Privilege Envelope records uid, gid, supplementary groups, Linux
+capabilities, each permitted device and access mode, writable filesystem paths,
+and any forbidden high-privilege path checked by the profile. The base profile
+requires an empty capability list, exactly the selected fbdev/evdev node
+permissions, and `uses_devmem == false`.
+
+For evdev, startup MUST query kernel identity and capability/axis bitmaps and
+require the declared touch event types/codes. A configured raw `eventN` path is
+accepted only when those checks match. An optional Linux discovery adapter may
+enumerate candidates or consume udev, but it must select exactly one manifest
+match; zero or multiple matches fail startup. `open_first_available()` is a
+diagnostic helper and is forbidden in a release profile.
+
+For fbdev, startup MUST query fixed and variable screen information and match
+the declared driver/id, geometry, stride, bits per pixel, and red/green/blue/
+transparency bitfields before `Running`. CPY-05 publication layout does not
+permit assuming that arbitrary fbdev memory already has the canonical Python
+layout.
 
 Startup MUST validate geometry, pixel layout, stride, input capabilities, and
 required permissions before publishing `Running`. Partial startup closes every
@@ -128,9 +206,19 @@ Device Loss MUST produce a typed lifecycle/fault record. The selected profile
 MUST declare whether it can reacquire, degrade to headless, or close. It MUST
 NOT continue reporting successful presentation after the display path fails.
 
+The first primary profile marks both display and touch input required and uses
+`fault-close`; it performs no automatic hot reacquisition or silent headless
+degradation. Loss or permission revocation enters `Faulted`, stops new
+presentation/input, completes ordered resource teardown, and publishes the
+terminal cause before `Closed` where transport remains available.
+
 Shutdown MUST stop new frames/input, release presenter/backend resources in the
 required protocol order, restore any terminal/session state it changed, close
 devices, and only then publish `Closed`.
+
+`SIGTERM` and `SIGINT` request the same idempotent Close Fence as the adapter;
+they do not bypass result/cue/frame and device teardown ordering. Evidence MUST
+distinguish this graceful path from uncatchable process termination.
 
 ## 8. Frozen Decisions — Cadence and Input
 
@@ -163,14 +251,14 @@ path even when native acceleration/presentation is used.
 
 | Existing surface | CPY-06 treatment |
 |---|---|
-| `LinuxFbdevDisplay` | Candidate first direct-console presenter; geometry/format/present behavior must satisfy Device Manifest evidence. |
-| `LinuxEvdevInput` | Candidate native input; release configuration needs stable device discovery/capability matching above event-number guessing. |
-| BeagleBone `/dev/mem` mapping | High-privilege evidence, not a default safety pattern. Admission depends on `PCDN-CPY-06-003`. |
+| `LinuxFbdevDisplay` | Selected first direct-console presenter; panic/error behavior and geometry/format/present paths still require release implementation and Device Manifest evidence. |
+| `LinuxEvdevInput` | Selected native input backend; `open_first_available()` is diagnostic-only and release selection uses §7.1 identity/capability matching. |
+| BeagleBone `/dev/mem` mapping | High-privilege historical evidence excluded from base conformance; it cannot satisfy the selected ordinary-owned-memory profile. |
 | WLD | Optional compositor backend after WLD phase ratification; CPY owns only integration/profile selection. |
 | Simulator | Deterministic/reference companion, not physical device proof. |
 | systemd/other init | Packaging/deployment mechanism owned by CPY-08; lifecycle obligations remain here. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -181,26 +269,41 @@ path even when native acceleration/presentation is used.
 - Replacing WLD, LPAR, or platform backend specifications.
 - Requiring zero-copy process-to-process frames before correctness evidence.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-06-001` | Which backend closes the first primary profile: fbdev/evdev, DRM/KMS, or ratified WLD kiosk? | Start with the existing direct-console path for proof; track DRM/KMS separately and consume WLD only after ratification. | CPY-06 ratification |
-| `PCDN-CPY-06-002` | Which Reference Board/rootfs closes physical conformance? | Resolve with CPY-01; prefer an existing supported path, adding AArch64 if BBB alone is not representative. | CPY-01/06 ratification |
-| `PCDN-CPY-06-003` | May the base Direct Deployment require `/dev/mem`? | No for general base conformance; classify any such target as trusted high-privilege and prefer daemon or a kernel/backend replacement. | CPY-06 ratification/security claim |
-| `PCDN-CPY-06-004` | Is Hardened Deployment required in the first release? | Follow `PCDN-CPY-00-001`; specify now, qualify separately if deferred. | CPY-06/09 claim set |
-| `PCDN-CPY-06-005` | What exact device discovery/selection schema replaces ambient event-number configuration? | Stable configured paths plus capability/vendor identity checks; optional udev integration stays outside neutral crates. | CPY-06 ratification |
-| `PCDN-CPY-06-006` | What frame carrier is used by the initial daemon? | Copy first unless measured bandwidth requires shared memory; never share live scanout. | Hardened implementation only |
+- **PCDN-CPY-06-001 — First backend — Accepted as amended 2026-08-18.** The
+  first primary profile is direct-console kernel `tilcdc` fbdev plus kernel
+  `edt-ft5x06` evdev on the CPY-01 Reference Board. DRM/KMS is a later backend;
+  WLD is a separately qualified compositor profile under WLD authority.
+- **PCDN-CPY-06-002 — Reference Board/rootfs — Accepted as amended
+  2026-08-18.** Use BeagleBone Black plus NHD-7.0CTP-CAPE-P and Debian 13
+  (`trixie`) `armhf`. Exact rootfs/kernel/device observations and physical
+  results remain evidence gates, not unresolved target selection.
+- **PCDN-CPY-06-003 — `/dev/mem` — Accepted as amended 2026-08-18.** Base
+  Direct Deployment forbids `/dev/mem`, root execution, and Linux capabilities.
+  A target requiring them is separately labeled high-privilege and requires
+  trusted-appliance disclosure or Hardened Deployment.
+- **PCDN-CPY-06-004 — Hardened first-release scope — Accepted as amended
+  2026-08-18.** Hardened Deployment is optional for the first trusted Direct
+  release and mandatory for untrusted Python or broad-privilege claims.
+- **PCDN-CPY-06-005 — Device selection — Accepted as amended 2026-08-18.** Use
+  the §7.1 manifest schema, configured/stable paths plus kernel identity and
+  capability matching, and exactly-one-match discovery. Ambient first-event
+  selection is forbidden in release artifacts.
+- **PCDN-CPY-06-006 — Initial daemon frame carrier — Accepted as amended
+  2026-08-18.** Copy complete canonical frames into bounded Director-owned
+  immutable storage. No descriptor passing or shared/live scanout memory is in
+  the initial Hardened profile.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
-- [ ] Direct and hardened process/privilege boundaries are explicit.
-- [ ] Device Manifest, startup, Device Loss, and shutdown are complete.
-- [ ] The selected backend remains under its owning authority.
+- [x] Every PCDN in §11.2 is resolved.
+- [x] Direct and hardened process/privilege boundaries are explicit.
+- [x] Device Manifest, startup, Device Loss, and shutdown policy is complete.
+- [x] The selected backend remains under its owning authority.
 - [ ] Native cadence is independent of Python and held observer leases.
 - [ ] The Reference Board/rootfs and physical evidence procedure are fixed.
-- [ ] High-privilege `/dev/mem` behavior cannot be mistaken for a sandbox.
+- [x] High-privilege `/dev/mem` behavior cannot be mistaken for a sandbox.
 - [ ] The owner records ratification in §15.
 
 ## 13. Files Cited
@@ -210,17 +313,60 @@ path even when native acceleration/presentation is used.
 | `platform/src/linux_fbdev.rs` | Existing direct framebuffer adapter |
 | `platform/src/linux_evdev.rs` | Existing Linux input adapter |
 | `examples/beaglebone-black/src/main.rs` | Existing device/render/present integration evidence |
+| `docs/cpython/CPY-BASELINE-MANIFEST.schema.json` | Selected board/rootfs/device evidence grammar |
 | `docs/wayland/` | WLD backend authority |
 | `docs/concepts/LPAR-03-INVALIDATION-DISPLAY.md` | Display/presentation semantics |
 | `docs/concepts/LPAR-04-EVENT-FOCUS-INPUT.md` | Input/event semantics |
 
 ## 14. Unblocks
 
-Ratification unblocks the physical embedded-Linux implementation after the
-selected backend and lower CPY phases are ready. Physical conformance and
-release claims remain CPY-09 gates.
+All six policy PCDNs are resolved, but CPY-06 remains Draft. Ratification is
+blocked by CPY-01 through CPY-05, an exact rootfs/Baseline/Device Manifest,
+ordinary-owned-memory implementation, target import, physical input/render/
+present/shutdown evidence, and native-cadence/held-lease measurements.
+Ratification would unblock the physical embedded-Linux implementation after
+the lower phases are ready. Physical conformance and release claims remain
+CPY-09 gates.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — embedded-Linux PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-06-1, INV-CPY-06-2, INV-CPY-06-3, INV-CPY-06-4,
+INV-CPY-06-5, INV-CPY-06-6, INV-CPY-06-7, INV-CPY-06-8,
+PCDN-CPY-06-001, PCDN-CPY-06-002, PCDN-CPY-06-003, PCDN-CPY-06-004,
+PCDN-CPY-06-005, PCDN-CPY-06-006, §5, §6, §7, §11, §12, §13, §14
+
+**Commits:** pending
+
+**Summary:** Selects the BBB fbdev/evdev base profile and Debian rootfs family,
+forbids `/dev/mem` in base conformance, makes hardening claim-conditional,
+defines exact device selection and loss policy, and selects copied immutable
+frames for the initial daemon carrier.
+
+#### Rationale
+
+The repository already has the closest physical path on BBB, but its current
+reserved-memory scratch and ambient input selection are not suitable release
+contracts. Kernel-owned fbdev/evdev nodes, ordinary frame storage, and strict
+identity/capability checks establish a minimal non-root appliance envelope.
+Copy-first daemon frames cost bandwidth but give each process an auditable
+ownership boundary before shared-memory revocation and sealing are proven.
+
+Considered and rejected: choosing a new DRM/KMS path before the existing board
+proof, treating WLD as CPY-owned, allowing base conformance to inherit
+`/dev/mem`, scanning for the first event node, advertising Direct Deployment as
+a sandbox, silently reacquiring required devices, and passing live scanout or
+unsealed shared memory to Python.
+
+What deliberately did not change: no rootfs, device manifest instance, udev
+rule, daemon, socket, frame copy, backend, privilege, or board result is
+implemented. Platform/WLD/LPAR semantics remain with their owners, exact
+rootfs/device facts remain evidence-gated, and CPY-06 remains Draft.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
