@@ -6,11 +6,12 @@ CPY-01-BASELINE-TARGET-PROFILES.md - Exact source, runtime, target, and capabili
 
 **Document ID:** CPY-01-BASELINE-TARGET-PROFILES
 
-**Status:** Draft 2026-08-18. Six baseline-selection PCDNs resolved
-2026-08-18. Not ratified; the exact manifest instance and target evidence are
-still required.
+**Status:** Ratified 2026-08-18. The first exact Baseline Manifest and target
+selection evidence are retained under `docs/cpython/evidence/`. Runtime,
+physical-input, artifact, and release qualification remain owned by their
+later phases.
 
-**Revision:** 0.2.1
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -88,7 +89,8 @@ ratification.
 
 The manifest MUST contain:
 
-1. rlvgl source commit and clean-worktree assertion;
+1. rlvgl source commit, clean-worktree assertion, and tracked Cargo-manifest
+   set digest;
 2. every consumed MPY/LPAR/WLD document id, revision, status, and source commit;
 3. Rust toolchain and every Rust target triple;
 4. CPython implementation, major/minor version, build flags, ABI mode, and
@@ -97,8 +99,10 @@ The manifest MUST contain:
 6. target-rootfs digest, libc family/version, dynamic loader, and architecture;
 7. board, kernel, device-node, display, input, and permission facts for the
    embedded reference target;
-8. Cargo feature sets per artifact; and
-9. scenario/evidence bundle schema versions.
+8. Cargo feature sets per artifact;
+9. exact detached resolver-lock and normalized graph evidence when repository
+   lock policy does not track the workspace lockfile; and
+10. scenario/evidence bundle schema versions.
 
 The manifest MUST be machine-readable and retained with CPY-09 evidence. A
 human-readable projection MAY accompany it but cannot replace exact fields.
@@ -108,19 +112,19 @@ human-readable projection MAY accompany it but cannot replace exact fields.
 Legend: **R** required, **O** optional, **N/A** not applicable. An unsupported
 cell is written **U(reason)** rather than omitted.
 
-| Capability | `host-headless` | `embedded-linux-direct` | `host-windowed` | `embedded-linux-daemon` |
-|---|---|---|---|---|
-| Import `rlvgl` extension | R | R | R | R in Director process |
-| Generic Stage/Actor/Transaction surface | R | R | R | R |
-| Descriptor discovery and generated typing | R | R | R | R |
-| Bounded native service and cue polling | R | R | R | R across transport |
-| Read-only flattened Frame Lease | R | O observer / R for capture tests | O observer | O observer or shared-memory lease |
-| Native presentation | N/A | R | R | R in service |
-| Native input | Synthetic R | R | R | R in service |
-| Deterministic software frame path | R | R as reference/fallback evidence | R as reference evidence | R as reference evidence |
-| Asyncio readiness | O until CPY-07 ratifies it | O | R for full host claim | O |
-| Privileged device isolation | N/A | U(trusted process only) | N/A unless device-backed | R |
-| Exact resource/performance evidence | R | R | R for full host claim | R for hardened claim |
+| Capability | Evidence owner | `host-headless` | `embedded-linux-direct` | `host-windowed` | `embedded-linux-daemon` |
+|---|---|---|---|---|---|
+| Import `rlvgl` extension | CPY-04/08 | R | R | R | R in Director process |
+| Generic Stage/Actor/Transaction surface | CPY-04/09 | R | R | R | R |
+| Descriptor discovery and generated typing | CPY-04/08/09 | R | R | R | R |
+| Bounded native service and cue polling | CPY-03/09 | R | R | R | R across transport |
+| Read-only flattened Frame Lease | CPY-05/09 | R | O observer / R for capture tests | O observer | O observer or shared-memory lease |
+| Native presentation | CPY-06/07 plus backend authority | N/A | R | R | R in service |
+| Native input | CPY-06/07 plus backend authority | Synthetic R | R | R | R in service |
+| Deterministic software frame path | CPY-07/09 | R | R as reference/fallback evidence | R as reference evidence | R as reference evidence |
+| Asyncio readiness | CPY-07/09 | O until CPY-07 ratifies it | O | R for full host claim | O |
+| Privileged device isolation | CPY-06/09 | N/A | U(trusted process only) | N/A unless device-backed | R |
+| Exact resource/performance evidence | CPY-09 | R | R | R for full host claim | R for hardened claim |
 
 Later phases MAY add detail beneath a cell but MUST NOT weaken **R** without a
 CPY-01 §15 amendment.
@@ -146,20 +150,31 @@ NHD-7.0CTP-CAPE-P path: kernel `tilcdc` `/dev/fb0` presentation and kernel
 storage and MUST NOT require the example's reserved `/dev/mem`/EDMA scratch
 buffer. The existing high-privilege path remains separately labeled evidence.
 
+The first baseline deliberately composes pinned Debian 13 userspace with the
+repository-proven `6.12.76-bone50` board kernel, modules, and device tree. It
+does not select the stock Trixie `6.19-bone` SD image: the recorded board
+evidence shows that image's modular `panel-simple` build has no matching device
+table for this panel. Display proof is retained; touch is only driver-binding
+evidence while the cape sensor RMA is open. CPY-06 owns new physical runtime
+and input qualification.
+
 ## 8. Frozen Decisions — Qualification Variants
 
 ### 8.1 Initial interpreter and tool baseline
 
 - The minimum supported CPython minor is 3.13.
-- The initial conventional-GIL test matrix is CPython 3.13 and 3.14, using the
-  latest patch release recorded in each Baseline Manifest instance.
+- The initial conventional-GIL test matrix is CPython 3.13.15 and 3.14.7.
+  A later Baseline Manifest may select newer patches only through a CPY-01
+  amendment.
 - CPython 3.15 prereleases are forward-compatibility experiments only until a
   ratified amendment adds the released minor.
 - The initial binding toolchain is PyO3 0.28.3 and maturin 1.13.0. Their exact
   Cargo/Python package checksums belong in the manifest instance.
 - The first Linux rootfs family is Debian 13 (`trixie`): `armhf` for the BBB
   physical profile and `arm64` for the AArch64 import/runtime profile. The
-  exact image/package-set digest remains a ratification artifact.
+  first Baseline Manifest pins official Python OCI manifests, their base-image
+  digests and Docker-library source revisions, glibc 2.41-12+deb13u3, and the
+  architecture dynamic loaders.
 
 These are specification pins, not floating `latest` constraints. Updating a
 minor or tool version requires a CPY-01 amendment and a new manifest instance.
@@ -190,7 +205,7 @@ buffer features are required.
 
 | Existing artifact | Decision |
 |---|---|
-| `Cargo.lock` | Compose as exact Rust dependency evidence; it does not pin CPython, rootfs, or external tools. |
+| Root `Cargo.lock` | The library workspace intentionally ignores it. Preserve the exact resolver snapshot as a checksummed detached evidence artifact and hash the tracked Cargo-manifest set; do not silently change repository lock policy. |
 | MPY coverage matrix | Reuse overlapping semantic rows by reference; CPY adds driver/profile evidence columns rather than copying row definitions. |
 | LPAR parity baseline | Inherit the exact pin and proven scope; CPY does not claim unimplemented LVGL classes. |
 | Existing BBB example | Selected physical/direct-console starting point, but its `/dev/mem` render scratch is excluded from base CPY conformance; CPY-06 must supply an ordinary-owned-memory path and physical input evidence. |
@@ -235,7 +250,7 @@ buffer features are required.
 - **PCDN-CPY-01-005 — Neutral contract frontier — Accepted as amended
   2026-08-18.** The initial consumed frontier is MPY-00 revision 0.2.5,
   MPY-01 revision 0.2.0, MPY-02 revision 0.6.0, MPY-03 revision 0.4.0,
-  MPY-04 revision 0.8.0, and MPY-05 revision 0.2.1, all ratified at the source
+  MPY-04 revision 0.10.0, and MPY-05 revision 0.2.1, all ratified at the source
   revision recorded by the manifest. MPY-06 through MPY-09 are not neutral
   authority and are not prerequisites for CPY planning; their actual
   MicroPython evidence is consumed only by the CPY-09 parity rows that name
@@ -249,19 +264,20 @@ buffer features are required.
 ## 12. Acceptance Checklist
 
 - [x] Every PCDN in §11.2 is resolved.
-- [ ] A clean source commit and exact consumed document revisions are recorded.
+- [x] A clean source commit and exact consumed document revisions are recorded.
 - [x] The Baseline Manifest schema contains every §5 field.
-- [ ] Required architecture, rootfs, and Reference Board rows are complete.
-- [ ] Every capability cell has an explicit state and evidence owner.
+- [x] Required architecture, rootfs, and Reference Board selection rows are complete.
+- [x] Every capability cell has an explicit state and evidence owner.
 - [x] Qualification variants cannot borrow evidence from one another.
-- [ ] The owner records ratification in §15.
+- [x] The owner records ratification in §15.
 
 ## 13. Files Cited
 
 | File or authority | Role |
 |---|---|
-| `Cargo.toml`, crate manifests, `Cargo.lock` | Current Rust graph and dependency pins |
+| `Cargo.toml`, crate manifests, detached resolver snapshot | Current Rust graph and dependency pins |
 | `docs/cpython/CPY-BASELINE-MANIFEST.schema.json` | Machine-readable CPY baseline grammar |
+| `docs/cpython/evidence/` | First manifest instance, graph/lock evidence, and MPY handoff |
 | `docs/concepts/MPY-COVERAGE-MATRIX.json` | Existing semantic coverage/evidence model |
 | `docs/concepts/MPY-*.md` | Neutral and MicroPython phase status frontier |
 | `docs/concepts/LPAR-*.md` | LVGL/rlvgl behavior and baseline |
@@ -270,13 +286,42 @@ buffer features are required.
 
 ## 14. Unblocks
 
-All selection PCDNs are resolved, but CPY-01 remains Draft. Ratification is
-blocked by the machine-readable schema/manifest instance, clean source pin,
-exact Debian rootfs digests/package facts, and completed board/device rows in
-§12. Once those close, ratification may unblock CPY-02 ratification review. It
-authorizes no file movement or binding code.
+CPY-01 is ratified and unblocks CPY-02 ratification review. It authorizes no
+file movement or binding code by itself. Every `selected` or `planned` row
+still requires the execution evidence owned by CPY-03 through CPY-09 before a
+runtime, wheel, target, or release claim can close.
 
 ## 15. Change Log
+
+### 0.3.0 — 2026-08-18 — ratified exact baseline
+
+**Author:** Ira Abbott
+
+**Change kind:** ratification
+
+**Touches:** §3, §5, §6, §7, §8, §10, §11, §12, §13, §14,
+`CPY-BASELINE-MANIFEST.schema.json`, `docs/cpython/evidence/`
+
+**Commits:** pending
+
+**Summary:** Ratifies the first CPY source, authority, interpreter, rootfs,
+board, capability-owner, Cargo-graph, and MPY-handoff baseline while retaining
+later runtime qualification as explicit phase work.
+
+#### Rationale
+
+The baseline now identifies a clean immutable source, exact ratified authority
+frontiers, both required CPython patch lines, all four Rust targets, exact
+Debian 13 ARM image manifests, and the proven BBB kernel/display combination.
+It also records the touch cape's driver-only/RMA state and the AArch64 runtime
+row as selected rather than verified. Because this library workspace
+intentionally ignores its root Cargo lock, the exact resolver result is
+retained as a detached checksummed artifact alongside a hash of all tracked
+Cargo manifests and a normalized graph.
+
+What deliberately did not change: no CPython build, PyO3 adapter, service,
+frame lease, board import, physical touch result, wheel, performance budget,
+or release claim is created by baseline ratification.
 
 ### 0.2.1 — 2026-08-18 — decision-label consistency
 

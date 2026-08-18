@@ -18,6 +18,7 @@
     "root_filesystems",
     "reference_board",
     "artifacts",
+    "evidence_artifacts",
     "evidence_schema_versions"
   ],
   "properties": {
@@ -159,8 +160,7 @@
           "const": "0.28.3"
         },
         "pyo3_checksum": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "$ref": "#/$defs/sha256"
         },
         "pyo3_features": {
           "type": "array",
@@ -193,6 +193,13 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/artifactProfile"
+      }
+    },
+    "evidence_artifacts": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/evidenceArtifact"
       }
     },
     "evidence_schema_versions": {
@@ -239,7 +246,8 @@
       "required": [
         "commit",
         "worktree_clean",
-        "cargo_lock_sha256"
+        "cargo_manifest_count",
+        "cargo_manifest_set_sha256"
       ],
       "properties": {
         "commit": {
@@ -248,7 +256,11 @@
         "worktree_clean": {
           "const": true
         },
-        "cargo_lock_sha256": {
+        "cargo_manifest_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cargo_manifest_set_sha256": {
           "$ref": "#/$defs/sha256"
         }
       }
@@ -258,11 +270,16 @@
       "additionalProperties": false,
       "required": [
         "name",
+        "path",
         "commit",
         "worktree_clean"
       ],
       "properties": {
         "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
           "type": "string",
           "minLength": 1
         },
@@ -280,7 +297,9 @@
       "required": [
         "family",
         "document_id",
+        "source_path",
         "revision",
+        "revision_basis",
         "status",
         "source_commit"
       ],
@@ -293,9 +312,26 @@
           "type": "string",
           "minLength": 1
         },
-        "revision": {
+        "source_path": {
           "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          "minLength": 1
+        },
+        "revision": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision_basis": {
+          "enum": [
+            "document-changelog",
+            "source-commit"
+          ]
         },
         "status": {
           "const": "Ratified"
@@ -303,7 +339,41 @@
         "source_commit": {
           "$ref": "#/$defs/gitCommit"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "revision_basis": {
+                "const": "document-changelog"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "revision": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision_basis": {
+                "const": "source-commit"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "revision": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
     },
     "cpythonBuild": {
       "type": "object",
@@ -313,7 +383,9 @@
         "target_triple",
         "gil_mode",
         "abi_mode",
-        "build_flags"
+        "build_flags",
+        "qualification_state",
+        "source_reference"
       ],
       "properties": {
         "version": {
@@ -341,6 +413,16 @@
           "items": {
             "type": "string"
           }
+        },
+        "qualification_state": {
+          "enum": [
+            "selected",
+            "verified"
+          ]
+        },
+        "source_reference": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -350,6 +432,9 @@
       "required": [
         "id",
         "digest",
+        "image_reference",
+        "base_digest",
+        "source_revision",
         "distribution",
         "release",
         "architecture",
@@ -358,6 +443,8 @@
         "libc_version",
         "dynamic_loader",
         "kernel_abi",
+        "qualification_state",
+        "libc_evidence",
         "python_packages"
       ],
       "properties": {
@@ -367,6 +454,16 @@
         },
         "digest": {
           "$ref": "#/$defs/sha256"
+        },
+        "image_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_revision": {
+          "$ref": "#/$defs/gitCommit"
         },
         "distribution": {
           "const": "Debian"
@@ -402,6 +499,28 @@
           "type": "string",
           "minLength": 1
         },
+        "qualification_state": {
+          "enum": [
+            "selected",
+            "verified"
+          ]
+        },
+        "libc_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "layer_digest"
+          ],
+          "properties": {
+            "method": {
+              "const": "OCI layer /var/lib/dpkg/status inspection"
+            },
+            "layer_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
         "python_packages": {
           "type": "array",
           "minItems": 1,
@@ -434,6 +553,8 @@
         "class",
         "driver",
         "required",
+        "evidence_state",
+        "evidence_path",
         "capabilities"
       ],
       "properties": {
@@ -456,6 +577,17 @@
         "required": {
           "type": "boolean"
         },
+        "evidence_state": {
+          "enum": [
+            "selected-unverified",
+            "observed-driver-only",
+            "observed-functional"
+          ]
+        },
+        "evidence_path": {
+          "type": "string",
+          "minLength": 1
+        },
         "capabilities": {
           "type": "array",
           "items": {
@@ -475,6 +607,8 @@
         "rust_target",
         "rootfs_id",
         "kernel_release",
+        "excluded_kernel_releases",
+        "qualification_state",
         "display_backend",
         "input_backend",
         "devices",
@@ -501,6 +635,18 @@
         "kernel_release": {
           "type": "string",
           "minLength": 1
+        },
+        "excluded_kernel_releases": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "qualification_state": {
+          "const": "selected-partially-verified"
         },
         "display_backend": {
           "const": "linux-fbdev-tilcdc"
@@ -568,6 +714,8 @@
         "profile",
         "qualification_variant",
         "rust_target",
+        "cpython_versions",
+        "qualification_state",
         "cargo_features",
         "packages"
       ],
@@ -596,6 +744,21 @@
           "type": "string",
           "minLength": 1
         },
+        "cpython_versions": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^3\\.(13|14)\\.[0-9]+$"
+          }
+        },
+        "qualification_state": {
+          "enum": [
+            "planned",
+            "verified"
+          ]
+        },
         "cargo_features": {
           "type": "array",
           "uniqueItems": true,
@@ -612,7 +775,8 @@
             "additionalProperties": false,
             "required": [
               "name",
-              "version"
+              "version",
+              "state"
             ],
             "properties": {
               "name": {
@@ -620,11 +784,49 @@
                 "minLength": 1
               },
               "version": {
-                "type": "string",
-                "minLength": 1
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "enum": [
+                  "planned",
+                  "released"
+                ]
               }
             }
           }
+        }
+      }
+    },
+    "evidenceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "cargo-lock",
+            "cargo-graph",
+            "mpy-handoff"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[^/]"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }

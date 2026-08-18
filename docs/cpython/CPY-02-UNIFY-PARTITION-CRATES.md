@@ -6,10 +6,11 @@ CPY-02-UNIFY-PARTITION-CRATES.md - Neutral-contract unification and interpreter/
 
 **Document ID:** CPY-02-UNIFY-PARTITION-CRATES
 
-**Status:** Draft 2026-08-18. Six topology PCDNs resolved 2026-08-18. Not
-ratified; no crate movement is authorized.
+**Status:** Ratified 2026-08-18. The topology, Dependency Firewall, baseline
+graph, and first MPY Handoff Record are complete. Shared migration remains
+limited to the paths named by that handoff.
 
-**Revision:** 0.2.1
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -279,8 +280,12 @@ or generated cross-family evidence MUST wait for a coordinated handoff.
   frontier; `cargo metadata` and public-path/feature snapshots; passing
   MPY-required compile/conformance suites; passing `make spec-test
   spec-index-check`; and explicit acknowledgment from the MPY task naming the
-  allowed paths and handoff commit. A later wave requires a new record. This
-  resolves the rule but does not claim that a handoff currently exists.
+  allowed paths and handoff commit. A later wave requires a new record. The
+  first acknowledged record is
+  `docs/cpython/evidence/CPY-HANDOFF-0cf406b.json`; it authorizes only root
+  `Cargo.toml`, the ignored resolver `Cargo.lock`,
+  `scripts/publish_changed.sh`, and new `runtime-std/`. It explicitly excludes
+  API, core, platform, MicroPython, widget, test, and MPY-document changes.
 
 Initial crate admission record: `rlvgl-runtime-std` satisfies §6 criteria 1,
 3, 4, and 5 through its `std` envelope, service lifecycle, host-only
@@ -292,16 +297,17 @@ publishable Python-extension responsibility. No other new crate is admitted.
 ## 12. Acceptance Checklist
 
 - [x] Every PCDN in §11.2 is resolved.
-- [ ] The current graph, features, public paths, consumers, and publish order
+- [x] The current graph, features, public paths, consumers, and publish order
       are captured at the CPY-01 baseline.
 - [x] Every proposed new crate satisfies at least two §6 criteria and names an
       independent consumer or safety boundary.
-- [ ] Prohibited dependency edges are machine-checkable.
+- [x] Prohibited dependency edges are machine-checkable.
 - [x] The MPY Safe Point/handoff rule permits CPY leadership without editing
       in-flight MPY work.
 - [x] WLD and LPAR ownership are preserved explicitly.
-- [ ] Migration slices retain no-std, MPY, host, package, and index evidence.
-- [ ] The owner records ratification in §15.
+- [x] The per-slice no-std, MPY, host, package, and index evidence gate is
+      established; each future slice remains blocked on its own results.
+- [x] The owner records ratification in §15.
 
 ## 13. Files Cited
 
@@ -317,13 +323,40 @@ publishable Python-extension responsibility. No other new crate is admitted.
 
 ## 14. Unblocks
 
-All topology PCDNs are resolved, but CPY-02 remains Draft. Ratification review
-is blocked by CPY-01's exact baseline and the unchecked acceptance items in
-§12. Once ratified, it may unblock the Dependency Firewall and CPY-only Host
-Runtime crate skeleton. Shared-file migration is separately blocked until an
-actual Handoff Record satisfying `PCDN-CPY-02-006` exists.
+CPY-02 is ratified. It unblocks the CPY-only Host Runtime crate skeleton under
+the first Handoff Record's exact path set. It does not authorize PyO3,
+interpreter bindings, neutral-semantic edits, platform relocation, or a later
+shared migration wave without a new handoff.
 
 ## 15. Change Log
+
+### 0.3.0 — 2026-08-18 — ratified topology and first handoff
+
+**Author:** Ira Abbott
+
+**Change kind:** ratification
+
+**Touches:** INV-CPY-02-2, INV-CPY-02-5, PCDN-CPY-02-006, §4, §8, §11,
+§12, §14, `docs/cpython/evidence/`, `scripts/cpy_evidence.py`
+
+**Commits:** pending
+
+**Summary:** Ratifies the target crate graph after capturing the baseline
+Cargo graph, machine-checkable Dependency Firewall, and MPY owner's first
+exact shared-path handoff.
+
+#### Rationale
+
+The initial `rlvgl-runtime-std` slice satisfies the crate-admission criteria
+and can now be added without touching MPY semantic owners. The recorded
+handoff proves the shared starting frontier and narrows the first mutation to
+the workspace manifest, resolver snapshot, publish-order script, and new crate
+directory. A synthetic PyO3-to-API negative control proves the firewall is
+capable of failing rather than merely reporting a green current graph.
+
+What deliberately did not change: no API/core/platform/MicroPython code moved,
+no Python dependency entered the graph, and no later migration wave or CPython
+adapter was authorized.
 
 ### 0.2.1 — 2026-08-18 — selected-crate label consistency
 

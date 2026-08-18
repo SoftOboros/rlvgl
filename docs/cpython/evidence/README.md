@@ -1,0 +1,82 @@
+<!--
+README.md - Provenance and verification guide for CPY baseline evidence.
+-->
+
+# CPY Baseline Evidence
+
+This directory contains the first machine-checkable CPY-01/02 baseline. It
+freezes selection and provenance; it does not claim that planned interpreter,
+wheel, frame, device, or performance rows have passed their later runtime
+gates.
+
+## Evidence set
+
+| Artifact | Role |
+|---|---|
+| [`CPY-BASELINE-2026-08-18.json`](CPY-BASELINE-2026-08-18.json) | Exact source, authority, tool, interpreter, rootfs, board, and planned-artifact selection. |
+| [`CPY-HANDOFF-0cf406b.json`](CPY-HANDOFF-0cf406b.json) | MPY owner's acknowledged Safe Point, verified MPY frontier, concurrent-work boundary, and exact paths authorized for the first shared CPY migration wave. |
+| [`_generated/CPY-CARGO-LOCK-0cf406b.lock`](_generated/CPY-CARGO-LOCK-0cf406b.lock) | Detached copy of the resolver snapshot used for the baseline. The workspace intentionally ignores its root `Cargo.lock`; this evidence file preserves the exact selection without changing that policy. |
+| [`_generated/CPY-GRAPH-0cf406b.json`](_generated/CPY-GRAPH-0cf406b.json) | Normalized workspace packages, features, local dependency edges, public-path hashes, and governed publish order. |
+
+The immutable source authority is commit
+`0cf406bb22509f1040af6a772d0476a614c7bd9c`. The baseline hashes all 53
+tracked Cargo manifests at that commit. The detached lock and normalized graph
+are evidence artifacts rather than source authority because the root lockfile
+is intentionally ignored for this library workspace.
+
+## Qualification-state rule
+
+- `selected` means the exact version, digest, target, or rootfs is frozen for a
+  later gate.
+- `planned` means the package or artifact does not exist yet.
+- `verified` is reserved for retained execution evidence from the owning
+  phase.
+- The BBB display is `observed-functional` from the existing 800x480 RGB565
+  fbdev proof. Touch remains `observed-driver-only`: `edt_ft5x06` binds and
+  registers an evdev node, but the cape's physical sensor is under RMA.
+
+CPY-01 ratification therefore freezes a reproducible matrix; it does not
+satisfy CPY-06 target import, physical touch, service lifecycle, or CPY-09
+release evidence.
+
+## External pins
+
+- CPython patch releases are 3.13.15 and 3.14.7 from the
+  [official Python downloads](https://www.python.org/downloads/).
+- ARM rootfs rows use per-platform manifests from the
+  [official Python container images](https://hub.docker.com/_/python) for
+  `3.13.15-slim-trixie` and `3.14.7-slim-trixie`.
+- The recorded glibc package version is
+  [Debian 13 `libc6` 2.41-12+deb13u3](https://packages.debian.org/trixie/arm64/libc6).
+  It was independently confirmed in each pinned OCI image by reading the last
+  layer containing `/var/lib/dpkg/status`; the exact layer digest is retained
+  in each rootfs row.
+- PyO3 0.28.3 uses the checksum recorded by
+  [crates.io](https://crates.io/crates/pyo3/0.28.3). Maturin 1.13.0 uses the
+  source-distribution SHA-256 published by
+  [PyPI](https://pypi.org/project/maturin/1.13.0/).
+
+## Verification
+
+Run the authored baseline check and current-graph firewall:
+
+```bash
+python3 scripts/cpy_evidence.py all
+python3 scripts/test_cpy_evidence.py
+```
+
+The test suite includes a negative control that injects a synthetic PyO3 edge
+into `rlvgl-api` and requires the firewall to reject it. The checker uses the
+`jsonschema` package when available and otherwise uses its dependency-free
+validator for the exact schema features used here.
+
+The generated graph and detached lock are captured only at a clean baseline
+boundary:
+
+```bash
+python3 scripts/cpy_evidence.py capture \
+  --manifest docs/cpython/evidence/CPY-BASELINE-2026-08-18.json
+```
+
+Do not edit `_generated/` by hand. A new baseline uses a new manifest and
+artifact names; it does not overwrite historical evidence.

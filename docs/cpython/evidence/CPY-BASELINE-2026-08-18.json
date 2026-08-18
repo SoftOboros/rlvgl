@@ -1,0 +1,567 @@
+{
+  "schema_version": "CPY-BASELINE-1",
+  "manifest_id": "CPY-BASELINE-2026-08-18-0cf406b",
+  "created_at": "2026-08-18T19:01:14-04:00",
+  "rlvgl_source": {
+    "commit": "0cf406bb22509f1040af6a772d0476a614c7bd9c",
+    "worktree_clean": true,
+    "cargo_manifest_count": 53,
+    "cargo_manifest_set_sha256": "sha256:afb1cf49c3dbe410cc20c37b196d117e03e023f35934e73a1ef32c3b0053608e"
+  },
+  "vendored_sources": [
+    {
+      "name": "LVGL",
+      "path": "lvgl",
+      "commit": "5a89ce8a27505389a0e74814fba79db69718512c",
+      "worktree_clean": true
+    },
+    {
+      "name": "MicroPython",
+      "path": "vendor/micropython",
+      "commit": "e0e9fbb17ed6fd06bb76e266ae554784c9c80804",
+      "worktree_clean": true
+    }
+  ],
+  "authorities": [
+    {
+      "family": "MPY",
+      "document_id": "MPY-00-CONCEPTS",
+      "source_path": "docs/concepts/MPY-00-CONCEPTS.md",
+      "revision": "0.2.5",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "056bc663ff9d765d087761ef26bdf9b0bf27c453"
+    },
+    {
+      "family": "MPY",
+      "document_id": "MPY-01-INTROSPECTION-BASELINE",
+      "source_path": "docs/concepts/MPY-01-INTROSPECTION-BASELINE.md",
+      "revision": "0.2.0",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "74dc28a45c919aafa6c3addc00fbaffff6022d36"
+    },
+    {
+      "family": "MPY",
+      "document_id": "MPY-02-IDENTITY-VALUES-PROTOCOL",
+      "source_path": "docs/concepts/MPY-02-IDENTITY-VALUES-PROTOCOL.md",
+      "revision": "0.6.0",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "b4c6a78c6dd358023b89bd8cab4d58b266e7fc4a"
+    },
+    {
+      "family": "MPY",
+      "document_id": "MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION",
+      "source_path": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md",
+      "revision": "0.4.0",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "0c9a96e1a9f01eac821ae3ecac224c32a1ca6dc5"
+    },
+    {
+      "family": "MPY",
+      "document_id": "MPY-04-STAGE-DIRECTIONS-INTROSPECTION",
+      "source_path": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "revision": "0.10.0",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "2205c2fbf04537859f1dd943e82c85f24c379566"
+    },
+    {
+      "family": "MPY",
+      "document_id": "MPY-05-CUES-SAFE-SCHEDULING",
+      "source_path": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "revision": "0.2.1",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "8fcc4419a1b6e384babe9629e1d002cd916b3bef"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-00-CONCEPTS",
+      "source_path": "docs/concepts/LPAR-00-CONCEPTS.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-01-BASELINE",
+      "source_path": "docs/concepts/LPAR-01-BASELINE.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-02-OBJECT-SUBSTRATE",
+      "source_path": "docs/concepts/LPAR-02-OBJECT-SUBSTRATE.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-03-INVALIDATION-DISPLAY",
+      "source_path": "docs/concepts/LPAR-03-INVALIDATION-DISPLAY.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-04-EVENT-FOCUS-INPUT",
+      "source_path": "docs/concepts/LPAR-04-EVENT-FOCUS-INPUT.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-07-STYLE-THEME",
+      "source_path": "docs/concepts/LPAR-07-STYLE-THEME.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-10-LAYOUT",
+      "source_path": "docs/concepts/LPAR-10-LAYOUT.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "LPAR",
+      "document_id": "LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER",
+      "source_path": "docs/concepts/LPAR-15-CANVAS-MEDIA-PROPERTY-OBSERVER.md",
+      "revision": null,
+      "revision_basis": "source-commit",
+      "status": "Ratified",
+      "source_commit": "5187ce097f18fbea04ef5c4f5622126d330f5e67"
+    },
+    {
+      "family": "WLD",
+      "document_id": "WLD-00-CONCEPTS",
+      "source_path": "docs/wayland/WLD-00-CONCEPTS.md",
+      "revision": "0.2.1",
+      "revision_basis": "document-changelog",
+      "status": "Ratified",
+      "source_commit": "9eb560ee5e0a395eddd2524f0bcafc25bc3b7991"
+    }
+  ],
+  "rust": {
+    "rustc_version": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo_version": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "host_triple": "x86_64-apple-darwin",
+    "target_triples": [
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "armv7-unknown-linux-gnueabihf"
+    ]
+  },
+  "cpython": {
+    "minimum_minor": "3.13",
+    "required_minors": [
+      "3.13",
+      "3.14"
+    ],
+    "builds": [
+      {
+        "version": "3.13.15",
+        "target_triple": "x86_64-apple-darwin",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [],
+        "qualification_state": "selected",
+        "source_reference": "https://www.python.org/downloads/release/python-31315/"
+      },
+      {
+        "version": "3.13.15",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.13.15-slim-trixie@sha256:8fef26df932191825664e4957ff488c96dfe64918327634a357a55facbc994d3"
+      },
+      {
+        "version": "3.13.15",
+        "target_triple": "aarch64-unknown-linux-gnu",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.13.15-slim-trixie@sha256:7e6269297b5711841583c4d018ca3b151f299fc8e707bd0188c1397f466f377f"
+      },
+      {
+        "version": "3.13.15",
+        "target_triple": "armv7-unknown-linux-gnueabihf",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.13.15-slim-trixie@sha256:9a367cdb4045979dae8aec1b7d2550ee4a574068441a55fab04731f292f47bdb"
+      },
+      {
+        "version": "3.14.7",
+        "target_triple": "x86_64-apple-darwin",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [],
+        "qualification_state": "selected",
+        "source_reference": "https://www.python.org/downloads/release/python-3147/"
+      },
+      {
+        "version": "3.14.7",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.14.7-slim-trixie@sha256:d6e0850f13fda0e2305d4c3c1c2f7930fe1042d34ddd958e49bba6ef685d0bb2"
+      },
+      {
+        "version": "3.14.7",
+        "target_triple": "aarch64-unknown-linux-gnu",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.14.7-slim-trixie@sha256:c65a4a1140b75416bbc7f28807f82a3746bd6567645d5848123b6a6587f86962"
+      },
+      {
+        "version": "3.14.7",
+        "target_triple": "armv7-unknown-linux-gnueabihf",
+        "gil_mode": "conventional",
+        "abi_mode": "version-specific",
+        "build_flags": [
+          "--enable-shared"
+        ],
+        "qualification_state": "selected",
+        "source_reference": "docker.io/library/python:3.14.7-slim-trixie@sha256:f63fe55edc3b4f775177545df484594f73e41d9d74b5746398b92f0a33ee2381"
+      }
+    ]
+  },
+  "binding_tools": {
+    "pyo3_version": "0.28.3",
+    "pyo3_checksum": "sha256:91fd8e38a3b50ed1167fb981cd6fd60147e091784c427b8f7183a7ee32c31c12",
+    "pyo3_features": [
+      "extension-module",
+      "macros"
+    ],
+    "maturin_version": "1.13.0",
+    "maturin_sha256": "sha256:96c7b56013137f26de67a98cac8c6e544fb640ea650d5ded53fbe5327f72108f"
+  },
+  "root_filesystems": [
+    {
+      "id": "trixie-armhf-cp31315",
+      "digest": "sha256:9a367cdb4045979dae8aec1b7d2550ee4a574068441a55fab04731f292f47bdb",
+      "image_reference": "docker.io/library/python:3.13.15-slim-trixie",
+      "base_digest": "sha256:f445f0eca2d6fa4c1525039c38dbea85a8a4149a88e2714a96e1e127bbb036ae",
+      "source_revision": "3cb2fbae63fab2184343a01e4bd63a7540462999",
+      "distribution": "Debian",
+      "release": "13",
+      "architecture": "armhf",
+      "rust_target": "armv7-unknown-linux-gnueabihf",
+      "libc_family": "glibc",
+      "libc_version": "2.41-12+deb13u3",
+      "dynamic_loader": "/lib/ld-linux-armhf.so.3",
+      "kernel_abi": "Linux 6.12 ABI; reference board pins 6.12.76-bone50",
+      "qualification_state": "selected",
+      "libc_evidence": {
+        "method": "OCI layer /var/lib/dpkg/status inspection",
+        "layer_digest": "sha256:0796f60bf891ade0dd903aaeed76066e8cb6ad06ec7534ef9bc0bbbd635b3056"
+      },
+      "python_packages": [
+        {
+          "name": "cpython",
+          "version": "3.13.15"
+        }
+      ]
+    },
+    {
+      "id": "trixie-armhf-cp3147",
+      "digest": "sha256:f63fe55edc3b4f775177545df484594f73e41d9d74b5746398b92f0a33ee2381",
+      "image_reference": "docker.io/library/python:3.14.7-slim-trixie",
+      "base_digest": "sha256:f445f0eca2d6fa4c1525039c38dbea85a8a4149a88e2714a96e1e127bbb036ae",
+      "source_revision": "228f71e70a42ba9f9a092321b971031603bb88ff",
+      "distribution": "Debian",
+      "release": "13",
+      "architecture": "armhf",
+      "rust_target": "armv7-unknown-linux-gnueabihf",
+      "libc_family": "glibc",
+      "libc_version": "2.41-12+deb13u3",
+      "dynamic_loader": "/lib/ld-linux-armhf.so.3",
+      "kernel_abi": "Linux 6.12 ABI; reference board pins 6.12.76-bone50",
+      "qualification_state": "selected",
+      "libc_evidence": {
+        "method": "OCI layer /var/lib/dpkg/status inspection",
+        "layer_digest": "sha256:e506670065ddd1ebc194c7fa9264ce5c2e922c84f548987a1298874c9aa78bf1"
+      },
+      "python_packages": [
+        {
+          "name": "cpython",
+          "version": "3.14.7"
+        }
+      ]
+    },
+    {
+      "id": "trixie-arm64-cp31315",
+      "digest": "sha256:7e6269297b5711841583c4d018ca3b151f299fc8e707bd0188c1397f466f377f",
+      "image_reference": "docker.io/library/python:3.13.15-slim-trixie",
+      "base_digest": "sha256:c94f5ddd41327aa2d4a7cfba7889056c02936182fd76a513fec6160c97181fc0",
+      "source_revision": "3cb2fbae63fab2184343a01e4bd63a7540462999",
+      "distribution": "Debian",
+      "release": "13",
+      "architecture": "arm64",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "libc_family": "glibc",
+      "libc_version": "2.41-12+deb13u3",
+      "dynamic_loader": "/lib/ld-linux-aarch64.so.1",
+      "kernel_abi": "Linux 6.12 Debian 13 arm64 ABI; exact runtime kernel is CPY-06 evidence",
+      "qualification_state": "selected",
+      "libc_evidence": {
+        "method": "OCI layer /var/lib/dpkg/status inspection",
+        "layer_digest": "sha256:9f15e7432704e5d4f6c716eb84ef4583fb55e981682deb842901876dcfe2da59"
+      },
+      "python_packages": [
+        {
+          "name": "cpython",
+          "version": "3.13.15"
+        }
+      ]
+    },
+    {
+      "id": "trixie-arm64-cp3147",
+      "digest": "sha256:c65a4a1140b75416bbc7f28807f82a3746bd6567645d5848123b6a6587f86962",
+      "image_reference": "docker.io/library/python:3.14.7-slim-trixie",
+      "base_digest": "sha256:c94f5ddd41327aa2d4a7cfba7889056c02936182fd76a513fec6160c97181fc0",
+      "source_revision": "228f71e70a42ba9f9a092321b971031603bb88ff",
+      "distribution": "Debian",
+      "release": "13",
+      "architecture": "arm64",
+      "rust_target": "aarch64-unknown-linux-gnu",
+      "libc_family": "glibc",
+      "libc_version": "2.41-12+deb13u3",
+      "dynamic_loader": "/lib/ld-linux-aarch64.so.1",
+      "kernel_abi": "Linux 6.12 Debian 13 arm64 ABI; exact runtime kernel is CPY-06 evidence",
+      "qualification_state": "selected",
+      "libc_evidence": {
+        "method": "OCI layer /var/lib/dpkg/status inspection",
+        "layer_digest": "sha256:1a300b9bb723233ae1460602ef0a7e15b9f610a17ae3d4ce18436dcf8a0a07c2"
+      },
+      "python_packages": [
+        {
+          "name": "cpython",
+          "version": "3.14.7"
+        }
+      ]
+    }
+  ],
+  "reference_board": {
+    "board_id": "beaglebone-black-nhd-7",
+    "model": "BeagleBone Black + NHD-7.0CTP-CAPE-P",
+    "architecture": "armhf",
+    "rust_target": "armv7-unknown-linux-gnueabihf",
+    "rootfs_id": "trixie-armhf-cp31315",
+    "kernel_release": "6.12.76-bone50",
+    "excluded_kernel_releases": [
+      "6.19-bone"
+    ],
+    "qualification_state": "selected-partially-verified",
+    "display_backend": "linux-fbdev-tilcdc",
+    "input_backend": "linux-evdev-edt-ft5x06",
+    "devices": [
+      {
+        "path": "/dev/fb0",
+        "class": "display",
+        "driver": "tilcdc + panel-simple",
+        "required": true,
+        "evidence_state": "observed-functional",
+        "evidence_path": "docs/beaglebone-black/README.md",
+        "capabilities": [
+          "800x480",
+          "RGB565",
+          "stride=1600",
+          "57 Hz",
+          "mmap"
+        ]
+      },
+      {
+        "path": "/dev/input/event1",
+        "class": "input",
+        "driver": "edt_ft5x06",
+        "required": true,
+        "evidence_state": "observed-driver-only",
+        "evidence_path": "examples/beaglebone-black/RMA-newhaven-2026-04-22.md",
+        "capabilities": [
+          "driver binds",
+          "evdev node registers",
+          "I2C identity verified",
+          "physical touch events hardware-blocked"
+        ]
+      }
+    ],
+    "permissions": {
+      "user": "rlvgl",
+      "groups": [
+        "video",
+        "input"
+      ],
+      "linux_capabilities": [],
+      "device_access": [
+        "/dev/fb0",
+        "/dev/input/event1"
+      ]
+    },
+    "uses_devmem": false
+  },
+  "artifacts": [
+    {
+      "artifact_id": "cpy-host-headless-darwin-x86_64",
+      "profile": "host-headless",
+      "qualification_variant": "gil-version-specific",
+      "rust_target": "x86_64-apple-darwin",
+      "cpython_versions": [
+        "3.13.15",
+        "3.14.7"
+      ],
+      "qualification_state": "planned",
+      "cargo_features": [],
+      "packages": [
+        {
+          "name": "rlvgl-runtime-std",
+          "version": null,
+          "state": "planned"
+        },
+        {
+          "name": "rlvgl-cpython",
+          "version": null,
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "artifact_id": "cpy-host-windowed-darwin-x86_64",
+      "profile": "host-windowed",
+      "qualification_variant": "gil-version-specific",
+      "rust_target": "x86_64-apple-darwin",
+      "cpython_versions": [
+        "3.13.15",
+        "3.14.7"
+      ],
+      "qualification_state": "planned",
+      "cargo_features": [
+        "rlvgl-platform/simulator"
+      ],
+      "packages": [
+        {
+          "name": "rlvgl-runtime-std",
+          "version": null,
+          "state": "planned"
+        },
+        {
+          "name": "rlvgl-cpython",
+          "version": null,
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "artifact_id": "cpy-embedded-direct-armv7",
+      "profile": "embedded-linux-direct",
+      "qualification_variant": "gil-version-specific",
+      "rust_target": "armv7-unknown-linux-gnueabihf",
+      "cpython_versions": [
+        "3.13.15",
+        "3.14.7"
+      ],
+      "qualification_state": "planned",
+      "cargo_features": [
+        "rlvgl-platform/linux_fbdev"
+      ],
+      "packages": [
+        {
+          "name": "rlvgl-runtime-std",
+          "version": null,
+          "state": "planned"
+        },
+        {
+          "name": "rlvgl-cpython",
+          "version": null,
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "artifact_id": "cpy-embedded-daemon-armv7",
+      "profile": "embedded-linux-daemon",
+      "qualification_variant": "gil-version-specific",
+      "rust_target": "armv7-unknown-linux-gnueabihf",
+      "cpython_versions": [
+        "3.13.15",
+        "3.14.7"
+      ],
+      "qualification_state": "planned",
+      "cargo_features": [
+        "rlvgl-platform/linux_fbdev"
+      ],
+      "packages": [
+        {
+          "name": "rlvgl-runtime-std",
+          "version": null,
+          "state": "planned"
+        },
+        {
+          "name": "rlvgl-cpython",
+          "version": null,
+          "state": "planned"
+        }
+      ]
+    }
+  ],
+  "evidence_artifacts": [
+    {
+      "kind": "cargo-lock",
+      "path": "docs/cpython/evidence/_generated/CPY-CARGO-LOCK-0cf406b.lock",
+      "sha256": "sha256:86447d23288e3287e54be552ee4d9c42f92caca8dff9b270ce937e41d2db6925"
+    },
+    {
+      "kind": "cargo-graph",
+      "path": "docs/cpython/evidence/_generated/CPY-GRAPH-0cf406b.json",
+      "sha256": "sha256:fcae0567223e5d90e4165a03fb750f50e014c61249238e9e6d76725ee763c74f"
+    },
+    {
+      "kind": "mpy-handoff",
+      "path": "docs/cpython/evidence/CPY-HANDOFF-0cf406b.json",
+      "sha256": "sha256:1fcb1530eeb2176addf01cbc5e0d0958d91a11ede2cdce277a81958527b9a152"
+    }
+  ],
+  "evidence_schema_versions": {
+    "scenario": "MPY-V1",
+    "trace": "CPY-TRACE-1",
+    "frame": "CPY-FRAME-1",
+    "bundle": "CPY-EVIDENCE-BUNDLE-1"
+  }
+}
