@@ -564,6 +564,34 @@ fn validate_property_constraint(
     }
 }
 
+fn validate_property_readback(
+    descriptor: &PropertyDescriptor,
+    value: OwnedValue,
+) -> Result<OwnedValue, RegistryError> {
+    let canonical_absence =
+        matches!(descriptor.default, PropertyDefault::Absent) && value.tag() == ValueTag::None;
+    if value.tag() != descriptor.value_tag && !canonical_absence {
+        return Err(RegistryError::Internal);
+    }
+    Ok(value)
+}
+
+fn property_default_satisfies_constraint(
+    default: PropertyDefault,
+    constraint: PropertyConstraint,
+) -> bool {
+    match (default, constraint) {
+        (PropertyDefault::Absent, _) | (_, PropertyConstraint::None) => true,
+        (PropertyDefault::I32(value), PropertyConstraint::I32 { min, max }) => {
+            value >= min && value <= max
+        }
+        (PropertyDefault::Text(value), PropertyConstraint::TextBytes { max }) => {
+            u32::try_from(value.len()).is_ok_and(|length| length <= max)
+        }
+        _ => false,
+    }
+}
+
 fn apply_text_delta(current: u32, delta: i64) -> Result<u32, RegistryError> {
     let final_value = i64::from(current)
         .checked_add(delta)
@@ -1390,6 +1418,9 @@ pub trait MpyActor: Widget {
     type Prepared: 'static;
 
     /// Read a descriptor-owned durable property.
+    ///
+    /// A property whose descriptor default is [`PropertyDefault::Absent`]
+    /// returns [`OwnedValue::None`] when no durable value is present.
     fn property(&self, id: u32) -> Result<OwnedValue, RegistryError>;
 
     /// Encode one descriptor-owned post-widget event payload when emitted.
@@ -2810,11 +2841,7 @@ impl StageRegistry {
             .iter()
             .find(|property| property.id == property_id)
             .ok_or(RegistryError::UnknownProperty { property_id })?;
-        let value = record.ops.property(property_id)?;
-        if value.tag() != descriptor.value_tag {
-            return Err(RegistryError::Internal);
-        }
-        Ok(value)
+        validate_property_readback(descriptor, record.ops.property(property_id)?)
     }
 
     /// Find one event descriptor declared by a live actor.
@@ -4844,7 +4871,8 @@ impl StageRegistry {
         let mut truncated = false;
         let mut properties = Vec::with_capacity(record.descriptor.properties.len());
         for descriptor in record.descriptor.properties {
-            let value = record.ops.property(descriptor.id)?;
+            let value =
+                validate_property_readback(descriptor, record.ops.property(descriptor.id)?)?;
             let next = text_bytes.saturating_add(value.text_bytes());
             if next > max_text_bytes {
                 truncated = true;
@@ -5090,6 +5118,7 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
                     .default
                     .tag()
                     .is_some_and(|tag| tag != property.value_tag)
+                || !property_default_satisfies_constraint(property.default, property.constraint)
                 || match property.constraint {
                     PropertyConstraint::None => false,
                     PropertyConstraint::I32 { min, max } => {
@@ -5551,6 +5580,81 @@ mod prepared_geometry_tests {
                 }],
             )
             .unwrap()
+    }
+
+    #[test]
+    fn catalog_rejects_invalid_executable_defaults_and_accepts_boundaries_and_absence() {
+        static INVALID_I32: [PropertyDescriptor; 1] = [PropertyDescriptor {
+            id: 1,
+            name: "value",
+            value_tag: ValueTag::I32,
+            access: PropertyAccess::ReadWrite,
+            default: PropertyDefault::I32(11),
+            constraint: PropertyConstraint::I32 { min: 0, max: 10 },
+            required_capabilities: ActorCapabilities::EMPTY,
+            effects: MutationEffects::NONE,
+        }];
+        static INVALID_TEXT: [PropertyDescriptor; 1] = [PropertyDescriptor {
+            id: 1,
+            name: "value",
+            value_tag: ValueTag::Text,
+            access: PropertyAccess::ReadWrite,
+            default: PropertyDefault::Text("éé"),
+            constraint: PropertyConstraint::TextBytes { max: 3 },
+            required_capabilities: ActorCapabilities::EMPTY,
+            effects: MutationEffects::NONE,
+        }];
+        static VALID_BOUNDARY: [PropertyDescriptor; 2] = [
+            PropertyDescriptor {
+                id: 1,
+                name: "number",
+                value_tag: ValueTag::I32,
+                access: PropertyAccess::ReadWrite,
+                default: PropertyDefault::I32(10),
+                constraint: PropertyConstraint::I32 { min: 0, max: 10 },
+                required_capabilities: ActorCapabilities::EMPTY,
+                effects: MutationEffects::NONE,
+            },
+            PropertyDescriptor {
+                id: 2,
+                name: "text",
+                value_tag: ValueTag::Text,
+                access: PropertyAccess::ReadWrite,
+                default: PropertyDefault::Text("éé"),
+                constraint: PropertyConstraint::TextBytes { max: 4 },
+                required_capabilities: ActorCapabilities::EMPTY,
+                effects: MutationEffects::NONE,
+            },
+        ];
+        static VALID_ABSENT: [PropertyDescriptor; 1] = [PropertyDescriptor {
+            id: 1,
+            name: "value",
+            value_tag: ValueTag::I32,
+            access: PropertyAccess::ReadWrite,
+            default: PropertyDefault::Absent,
+            constraint: PropertyConstraint::I32 { min: 0, max: 0 },
+            required_capabilities: ActorCapabilities::EMPTY,
+            effects: MutationEffects::NONE,
+        }];
+
+        for properties in [&INVALID_I32[..], &INVALID_TEXT[..]] {
+            assert_eq!(
+                validate_catalog(&[TypeDescriptor {
+                    properties,
+                    ..TEST_DESCRIPTOR
+                }]),
+                Err(RegistryError::InvalidCatalog)
+            );
+        }
+        for properties in [&VALID_BOUNDARY[..], &VALID_ABSENT[..]] {
+            assert_eq!(
+                validate_catalog(&[TypeDescriptor {
+                    properties,
+                    ..TEST_DESCRIPTOR
+                }]),
+                Ok(())
+            );
+        }
     }
 
     #[test]

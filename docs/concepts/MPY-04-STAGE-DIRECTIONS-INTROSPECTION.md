@@ -18,7 +18,9 @@ reference vectors. SetFlag now has exact stable flag IDs, canonical Boolean
 encoding, stable/Batch target vectors, and outputless result proof.
 SetProperties now has an exact nonempty typed-field payload, complete negotiated
 value-limit enforcement, object-reference context, and field-attributed error
-proof. Complete Endpoint dispatch remains deferred.
+proof. ResetProperties now has an exact nonempty property-ID payload,
+structural-before-limit validation, stable/Batch target vectors, and outputless
+result proof. Complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -114,7 +116,7 @@ to operation-specific PCDNs.
 | Opcode | Common target context | Remainder/result status |
 |---|---|---|
 | `SET_PROPERTIES` | Actor whose properties are collectively set | Exact nonempty typed fields and outputless success; §5.7 |
-| `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values deferred |
+| `RESET_PROPERTIES` | Actor whose properties are reset | Exact nonempty ordered property IDs and outputless success; §5.8 |
 | `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
 | `SET_FLAG` | Actor owning runtime metadata | Exact flag ID plus canonical Boolean and outputless success; §5.6 |
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
@@ -579,6 +581,87 @@ target and object-valued field resolution, descriptor lookup, collective
 prepared validation, allocation-free commit, field error/result attribution,
 lifecycle/cue ordering, and retained-storage release.
 
+### 5.8 ResetProperties payload, result, and collective validation
+
+ResetProperties specializes the common target envelope with one nonempty raw
+property-ID list:
+
+```text
+reset_properties_payload = target:ObjectReference |
+                           property_count:u16 |
+                           property_id[property_count]:u32-le
+```
+
+The operation opcode is exactly `RESET_PROPERTIES` (`0x0000_0003`), flags are
+`0`, and the counted ID list consumes the complete operation payload. At least
+one property ID is required. IDs are raw little-endian `u32` words, nonzero,
+and strictly increasing, which rejects zero, duplicate, and out-of-order IDs
+as `InvalidFrame`. A missing/truncated count or ID, or any trailing byte, is
+also `InvalidFrame`. Known non-object target tags produce `TypeMismatch`; an
+unknown target tag remains `Unsupported`. A Command carrying ResetProperties
+is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+The target is structurally classified and contextually resolved before any
+property ID. An unbound or forward Batch target is `BatchInvalid`; a stale
+stable target is `StaleObject`. These target failures are attributed to the
+operation with `field_id = None`. After the target resolves, descriptor
+existence and reset access are validated in increasing property-ID order.
+Unknown IDs produce `UnknownProperty` and descriptors that cannot be reset
+produce `ReadOnly`; both carry the actual property `field_id`. The complete
+set of IDs and resulting defaults is validated before any property changes, so
+failure leaves every property unchanged and there is no successful prefix.
+
+Reset restores each descriptor's exactly declared default. For
+`PropertyDefault::Absent`, reset removes the durable property value; canonical
+property reads and snapshots then project its absence as `None`, not as
+redaction. This readback rule does not make `None` a valid SetProperties value
+unless that descriptor's set schema explicitly accepts `None`. A non-Absent
+default whose tag, I32 constraint, or TextBytes constraint violates its declared
+schema makes catalog registration `InvalidCatalog`; ResetProperties therefore
+never surfaces `Range` for an invalid executable default. Commit installs all
+resulting defaults or absences under the Batch's one visible Stage revision and
+unions their mutation effects for invalidation and lifecycle processing.
+Aggregate Stage capacity is validated for the complete group before commit. A
+collective failure such as total `TextBytes` capacity produces `Capacity` at
+the ResetProperties operation with `field_id = None`, because no single
+property is authoritative for the aggregate.
+
+The unbounded encode/decode functions are structural and tooling helpers only.
+After negotiation, request acceptance MUST use the `with_limits` encoder or
+decoder. It applies `max_items_per_command` to the property count only after
+complete structural validation, including nonemptiness, ID ordering, and
+trailing-byte rejection. ResetProperties carries no Text or Bytes values, so
+`max_text_bytes` and `max_byte_payload` do not apply to its wire payload. The
+enclosing Batch independently enforces `max_frame_bytes`.
+
+ResetProperties success is outputless. BatchSuccess carries the final/current
+`result_revision` but no `OperationResult` at the ResetProperties operation
+index. Other output-bearing operations retain their increasing records. A
+record correlated to ResetProperties is `InvalidFrame` under its result
+schema. The narrow API absence validator requires prior caller correlation to
+opcode ResetProperties and does not validate other opcode schemas, negotiated
+limits, or the complete success envelope.
+
+Resetting properties that already equal their defaults, or that are already
+absent, is a valid collective no-op. It remains part of the accepted mutation
+Batch, whose visible commit advances `StageRevision` exactly once for the
+complete Batch, including when that no-op ResetProperties is its only
+direction. Snapshots or typed property reads remain the authoritative readback
+rather than an echoed success payload.
+
+The smallest structural payload is nine bytes with a BatchObject target and
+one ID, or fifteen bytes with a stable Object target. Semantic execution also
+requires a matching resettable property descriptor, and the BatchObject form
+additionally requires an earlier binding. Eight smallest structural
+BatchObject records produce a 206-byte Batch frame; eight stable-target records
+produce a 254-byte Batch frame. Both fit the conservative 256-byte frame floor.
+These figures are wire-size evidence, not catalog execution evidence. Complete
+Endpoint integration remains responsible for contextual target resolution,
+descriptor lookup, collective prepared validation, allocation-free commit,
+property and aggregate error attribution, lifecycle/cue ordering, canonical
+readback, and retained-storage release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -802,6 +885,14 @@ material, but they MUST preserve the same ordering and visible semantics.
   reference resolution, distinguishes property-attributed failures from
   aggregate operation-attributed Capacity, defines outputless no-op revision
   semantics, and leaves Endpoint execution evidence-gated.
+- **PCDN-MPY-04-011 — Closed by owner acceptance 2026-08-18:** §5.8 freezes
+  ResetProperties as a contextual target plus a nonempty strictly increasing
+  list of raw property IDs. It requires complete structural validation before
+  the negotiated item limit, admits stable/earlier-Batch targets, restores
+  exact declared defaults or canonical absence, distinguishes
+  property-attributed descriptor failures from aggregate operation-attributed
+  Capacity, defines outputless no-op revision semantics, and leaves Endpoint
+  execution evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -811,7 +902,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-010 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-011 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -831,9 +922,9 @@ material, but they MUST preserve the same ordering and visible semantics.
 ## 14. Unblocks
 
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
-PromoteRoot, SetFlag, and SetProperties schemas now unblock the remaining
-operation-specific payload/result PCDNs and Endpoint orchestration without
-authorizing guessed remainder schemas. After those codecs and endpoint
+PromoteRoot, SetFlag, SetProperties, and ResetProperties schemas now unblock the
+remaining operation-specific payload/result PCDNs and Endpoint orchestration
+without authorizing guessed remainder schemas. After those codecs and endpoint
 integration are implemented, MPY-04 provides the complete stage mutation/
 introspection surface consumed by MPY-06 and the deterministic snapshot oracle
 consumed by MPY-07/09.
@@ -1094,7 +1185,7 @@ commit without redundant result values, including for a valid no-op.
 
 **Touches:** PCDN-MPY-04-010, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
 
-**Commits:** pending
+**Commits:** `0bfda8d`
 
 **Summary:** Freezes SetProperties as a contextual target followed by one
 nonempty canonical typed field list. Adds allocation-free structural and
@@ -1114,3 +1205,30 @@ becoming an untyped escape. Aggregate Stage capacity remains operation-
 attributed because no one field owns the total. Outputless success uses the
 common Batch revision, and independent item, value-payload, and frame limits
 keep minimum-profile behavior explicit.
+
+### 0.10.0 — 2026-08-18 — ResetProperties wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-011, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes ResetProperties as a contextual target followed by one
+nonempty strictly increasing raw property-ID list. Adds allocation-free
+structural and negotiated-item-limit codecs, stable and BatchObject target
+vectors, structural-before-limit coverage, outputless result validation,
+property-attributed and aggregate-Capacity error fixtures, and exact 206-byte
+and 254-byte minimum-frame evidence.
+
+#### Rationale
+
+Raw property IDs avoid encoding placeholder values while retaining canonical
+ordering and deterministic descriptor-error attribution. Restoring exact
+declared defaults, including durable absence with canonical `None` readback,
+keeps reset distinct from writing inferred zeros or permitting values outside a
+descriptor's set schema. Complete validation before commit preserves collective
+atomicity; outputless success uses the common Batch revision, while the item
+and outer frame limits keep minimum-profile behavior explicit.

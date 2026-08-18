@@ -5,18 +5,20 @@ use rlvgl_api::protocol::{
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
     FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
     ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
-    OperationResultRef, PromoteRootPayload, ProtocolVersion, ReorderPayload, ReparentPayload,
-    RuntimeFlag, RuntimeNotice, SetFlagPayload, SetPropertiesPayload, ValueList, ValueRef,
-    ValueTag, create_result_object, decode_batch_success, decode_batch_success_with_limits,
-    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
-    decode_delete_operation, decode_delete_payload, decode_field_list,
-    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
-    decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
-    decode_operation_list, decode_operation_list_with_limit, decode_promote_root_operation,
-    decode_promote_root_operation_with_limits, decode_promote_root_payload,
-    decode_promote_root_payload_with_limits, decode_reorder_operation, decode_reorder_payload,
-    decode_reparent_operation, decode_reparent_payload, decode_set_flag_operation,
-    decode_set_flag_payload, decode_set_properties_operation,
+    OperationResultRef, PromoteRootPayload, PropertyIdList, ProtocolVersion, ReorderPayload,
+    ReparentPayload, ResetPropertiesPayload, RuntimeFlag, RuntimeNotice, SetFlagPayload,
+    SetPropertiesPayload, ValueList, ValueRef, ValueTag, create_result_object,
+    decode_batch_success, decode_batch_success_with_limits, decode_create_operation_with_limits,
+    decode_create_payload, decode_create_payload_with_limits, decode_delete_operation,
+    decode_delete_payload, decode_field_list, decode_field_list_with_limits, decode_frame,
+    decode_frame_with_limits, decode_mutation_operation_target, decode_mutation_target_envelope,
+    decode_object_reference, decode_operation_list, decode_operation_list_with_limit,
+    decode_promote_root_operation, decode_promote_root_operation_with_limits,
+    decode_promote_root_payload, decode_promote_root_payload_with_limits, decode_reorder_operation,
+    decode_reorder_payload, decode_reparent_operation, decode_reparent_payload,
+    decode_reset_properties_operation, decode_reset_properties_operation_with_limits,
+    decode_reset_properties_payload, decode_reset_properties_payload_with_limits,
+    decode_set_flag_operation, decode_set_flag_payload, decode_set_properties_operation,
     decode_set_properties_operation_with_limits, decode_set_properties_payload,
     decode_set_properties_payload_with_limits, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
@@ -26,12 +28,14 @@ use rlvgl_api::protocol::{
     encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
     encode_operation_list_with_limit, encode_promote_root_payload,
     encode_promote_root_payload_with_limits, encode_reorder_payload, encode_reparent_payload,
+    encode_reset_properties_payload, encode_reset_properties_payload_with_limits,
     encode_set_flag_payload, encode_set_properties_payload,
     encode_set_properties_payload_with_limits, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
     validate_delete_result_absent, validate_promote_root_result_absent,
     validate_reorder_result_absent, validate_reparent_result_absent,
-    validate_set_flag_result_absent, validate_set_properties_result_absent,
+    validate_reset_properties_result_absent, validate_set_flag_result_absent,
+    validate_set_properties_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -122,6 +126,8 @@ const SET_PROPERTIES_PRECEDENCE_FIELDS: &[FieldRef<'static>] = &[
         value: ValueRef::I32(200),
     },
 ];
+const RESET_PROPERTY_IDS: &[u32] = &[1, 9, 10];
+const BATCH_RESET_PROPERTY_IDS: &[u32] = &[1, 2];
 const CREATE_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Object(0x0000_0002_0000_0001)];
 const MUTATION_OPCODES: &[u32] = &[
     opcode::SET_PROPERTIES,
@@ -2075,6 +2081,310 @@ fn set_properties_is_outputless_and_errors_follow_two_phase_field_precedence() {
 }
 
 #[test]
+fn reset_properties_payloads_round_trip_stable_and_batch_targets() {
+    let cases = [
+        (
+            ResetPropertiesPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                property_ids: PropertyIdList::from_slice(RESET_PROPERTY_IDS),
+            },
+            "payload.reset_properties_object",
+            23,
+        ),
+        (
+            ResetPropertiesPayload {
+                target: ObjectReference::BatchObject(7),
+                property_ids: PropertyIdList::from_slice(BATCH_RESET_PROPERTY_IDS),
+            },
+            "payload.reset_properties_batch_object",
+            13,
+        ),
+    ];
+
+    for (payload, fixture_name, expected_length) in cases {
+        let mut encoded = [0u8; 32];
+        let length = encode_reset_properties_payload(payload, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(
+            decode_reset_properties_payload(&encoded[..length]),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_reset_properties_payload_with_limits(&encoded[..length], limits()),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_reset_properties_operation(OperationRef {
+                opcode: opcode::RESET_PROPERTIES,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_reset_properties_operation_with_limits(
+                OperationRef {
+                    opcode: opcode::RESET_PROPERTIES,
+                    flags: 0,
+                    payload: &encoded[..length],
+                },
+                limits(),
+            ),
+            Ok(payload)
+        );
+        let decoded = decode_reset_properties_payload(&encoded[..length]).unwrap();
+        assert_eq!(
+            decoded.property_ids.iter().collect::<Vec<_>>(),
+            payload.property_ids.iter().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            decoded.property_ids.iter().len(),
+            payload.property_ids.len()
+        );
+    }
+}
+
+#[test]
+fn reset_properties_rejects_empty_nonincreasing_truncated_and_trailing_ids() {
+    assert_eq!(
+        decode_reset_properties_payload(&[]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_reset_properties_payload(&[ValueTag::Bool as u8, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        decode_reset_properties_payload(&[0xff]),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+
+    let target = [ValueTag::BatchObject as u8, 7, 0];
+    for ids in [
+        &[][..],
+        &[0, 0][..],
+        &[1, 0, 0, 0, 0, 0][..],
+        &[2, 0, 1, 0, 0, 0, 1, 0, 0, 0][..],
+        &[2, 0, 2, 0, 0, 0, 1, 0, 0, 0][..],
+        &[1, 0, 1, 0, 0][..],
+    ] {
+        let mut malformed = target.to_vec();
+        malformed.extend_from_slice(ids);
+        assert_eq!(
+            decode_reset_properties_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let mut trailing = fixture("payload.reset_properties_batch_object");
+    trailing.push(0);
+    assert_eq!(
+        decode_reset_properties_payload(&trailing),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    for property_ids in [&[][..], &[0][..], &[1, 1][..], &[2, 1][..]] {
+        assert_eq!(
+            encode_reset_properties_payload(
+                ResetPropertiesPayload {
+                    target: ObjectReference::BatchObject(7),
+                    property_ids: PropertyIdList::from_slice(property_ids),
+                },
+                &mut [0; 32],
+            ),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_reset_properties_payload(
+            ResetPropertiesPayload {
+                target: ObjectReference::Object(1),
+                property_ids: PropertyIdList::from_slice(&[1]),
+            },
+            &mut [0; 32],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        encode_reset_properties_payload(
+            ResetPropertiesPayload {
+                target: ObjectReference::BatchObject(7),
+                property_ids: PropertyIdList::from_slice(BATCH_RESET_PROPERTY_IDS),
+            },
+            &mut [0; 12],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.reset_properties_object");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::SET_PROPERTIES, 0),
+        (opcode::RESET_PROPERTIES, 1),
+    ] {
+        let operation = OperationRef {
+            opcode: operation_opcode,
+            flags,
+            payload: &valid,
+        };
+        assert_eq!(
+            decode_reset_properties_operation(operation),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+        assert_eq!(
+            decode_reset_properties_operation_with_limits(operation, limits()),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn reset_properties_applies_item_limits_after_complete_structure() {
+    let payload = ResetPropertiesPayload {
+        target: ObjectReference::BatchObject(7),
+        property_ids: PropertyIdList::from_slice(BATCH_RESET_PROPERTY_IDS),
+    };
+    let mut encoded = [0u8; 32];
+    let length = encode_reset_properties_payload(payload, &mut encoded).unwrap();
+    let mut one_item = limits();
+    one_item.max_items_per_command = 1;
+    assert_eq!(
+        encode_reset_properties_payload_with_limits(payload, one_item, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_reset_properties_payload_with_limits(&encoded[..length], one_item),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let duplicate = ResetPropertiesPayload {
+        target: ObjectReference::BatchObject(7),
+        property_ids: PropertyIdList::from_slice(&[1, 1]),
+    };
+    let mut zero_items = limits();
+    zero_items.max_items_per_command = 0;
+    assert_eq!(
+        encode_reset_properties_payload_with_limits(duplicate, zero_items, &mut encoded),
+        Err(CodecError::InvalidFrame),
+        "ID structure precedes negotiated item limits"
+    );
+    let mut duplicate_wire = vec![ValueTag::BatchObject as u8, 7, 0, 2, 0];
+    duplicate_wire.extend_from_slice(&1u32.to_le_bytes());
+    duplicate_wire.extend_from_slice(&1u32.to_le_bytes());
+    assert_eq!(
+        decode_reset_properties_payload_with_limits(&duplicate_wire, zero_items),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame)),
+        "decoded ID structure precedes negotiated item limits"
+    );
+}
+
+#[test]
+fn reset_properties_is_outputless_and_errors_follow_target_then_property_order() {
+    let outputless = BatchSuccess {
+        result_revision: 23,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 128];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(
+        &encoded[..length],
+        fixture("payload.reset_properties_success")
+    );
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(
+        validate_reset_properties_result_absent(decoded, 1, 0),
+        Ok(())
+    );
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 24,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_reset_properties_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_reset_properties_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_reset_properties_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_reset_properties_result_absent(
+            BatchSuccess {
+                result_revision: 24,
+                results: OperationResultList::from_slice(&forbidden_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    for (status, field_id, diagnostic, fixture_name) in [
+        (
+            ErrorClass::StaleObject,
+            None,
+            "target",
+            "frame.reset_properties_stale_target",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            None,
+            "target-ref",
+            "frame.reset_properties_batch_target",
+        ),
+        (
+            ErrorClass::UnknownProperty,
+            Some(9),
+            "property",
+            "frame.reset_properties_unknown_property",
+        ),
+        (
+            ErrorClass::ReadOnly,
+            Some(9),
+            "read-only",
+            "frame.reset_properties_read_only",
+        ),
+        (
+            ErrorClass::Capacity,
+            None,
+            "defaults",
+            "frame.reset_properties_capacity",
+        ),
+    ] {
+        let error = FrameRef::Result(Completion {
+            request_id: 1,
+            status: CompletionStatus::Error(status),
+            operation_index: Some(0),
+            field_id,
+            diagnostic,
+            payload: &[],
+        });
+        let length = encode_frame(MPY_V1, error, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, error);
+    }
+}
+
+#[test]
 fn set_flag_payloads_freeze_ids_boolean_bytes_and_reference_forms() {
     let cases = [
         (
@@ -3109,6 +3419,87 @@ fn set_properties_floor_proof_distinguishes_contextual_target_sizes() {
     );
     assert_eq!(
         encode_frame_with_limits(MPY_V1, stable_target_frame, limits(), &mut oversized),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_minimal_reset_properties_operations_fit_the_floor() {
+    let one_property = [1u32];
+
+    let mut batch_payload = [0u8; 9];
+    let batch_length = encode_reset_properties_payload_with_limits(
+        ResetPropertiesPayload {
+            target: ObjectReference::BatchObject(7),
+            property_ids: PropertyIdList::from_slice(&one_property),
+        },
+        limits(),
+        &mut batch_payload,
+    )
+    .unwrap();
+    assert_eq!(batch_length, 9);
+    let batch_operation = OperationRef {
+        opcode: opcode::RESET_PROPERTIES,
+        flags: 0,
+        payload: &batch_payload[..batch_length],
+    };
+    let batch_operations = [batch_operation; 8];
+    let batch_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&batch_operations),
+    });
+    let mut encoded = [0u8; 256];
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch_target_frame, limits(), &mut encoded),
+        Ok(206)
+    );
+
+    let mut stable_payload = [0u8; 15];
+    let stable_length = encode_reset_properties_payload_with_limits(
+        ResetPropertiesPayload {
+            target: ObjectReference::Object(0x0000_0002_0000_0001),
+            property_ids: PropertyIdList::from_slice(&one_property),
+        },
+        limits(),
+        &mut stable_payload,
+    )
+    .unwrap();
+    assert_eq!(stable_length, 15);
+    let stable_operation = OperationRef {
+        opcode: opcode::RESET_PROPERTIES,
+        flags: 0,
+        payload: &stable_payload[..stable_length],
+    };
+    let stable_operations = [stable_operation; 8];
+    let stable_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&stable_operations),
+    });
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, limits(), &mut encoded),
+        Ok(254)
+    );
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 253;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, too_small, &mut encoded),
         Err(CodecError::LimitExceeded)
     );
 }

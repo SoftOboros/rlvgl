@@ -944,6 +944,18 @@ pub struct SetPropertiesPayload<'a> {
 /// Structural or contextual failure while decoding a SetProperties payload.
 pub type SetPropertiesPayloadError = ObjectReferenceError;
 
+/// Complete Batch-only ResetProperties payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResetPropertiesPayload<'a> {
+    /// Stable or earlier-created actor whose properties are collectively reset.
+    pub target: ObjectReference,
+    /// Nonempty property IDs in strictly increasing order.
+    pub property_ids: PropertyIdList<'a>,
+}
+
+/// Structural or contextual failure while decoding a ResetProperties payload.
+pub type ResetPropertiesPayloadError = ObjectReferenceError;
+
 /// Stable runtime-owned object metadata flags writable through SetFlag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -1058,6 +1070,80 @@ impl PartialEq for OpcodeList<'_> {
 }
 
 impl Eq for OpcodeList<'_> {}
+
+/// Borrowed nonzero property IDs used by ResetProperties.
+///
+/// Native slices are used for encoding, while decoded lists borrow canonical
+/// little-endian words directly from the operation payload.
+#[derive(Clone, Copy)]
+pub struct PropertyIdList<'a> {
+    words: OpcodeList<'a>,
+}
+
+impl<'a> PropertyIdList<'a> {
+    /// Build a property-ID list from native words for encoding.
+    pub const fn from_slice(property_ids: &'a [u32]) -> Self {
+        Self {
+            words: OpcodeList::from_slice(property_ids),
+        }
+    }
+
+    fn from_wire(bytes: &'a [u8]) -> Self {
+        Self {
+            words: OpcodeList::from_wire(bytes),
+        }
+    }
+
+    /// Return the number of property IDs.
+    pub fn len(self) -> usize {
+        self.words.len()
+    }
+
+    /// Return whether no property IDs are present.
+    pub fn is_empty(self) -> bool {
+        self.words.is_empty()
+    }
+
+    /// Iterate decoded property IDs.
+    pub fn iter(self) -> PropertyIdIter<'a> {
+        PropertyIdIter {
+            words: self.words.iter(),
+        }
+    }
+}
+
+impl fmt::Debug for PropertyIdList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for PropertyIdList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+impl Eq for PropertyIdList<'_> {}
+
+/// Iterator over native or wire-backed ResetProperties IDs.
+pub struct PropertyIdIter<'a> {
+    words: OpcodeIter<'a>,
+}
+
+impl Iterator for PropertyIdIter<'_> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.words.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.words.size_hint()
+    }
+}
+
+impl ExactSizeIterator for PropertyIdIter<'_> {}
 
 /// Iterator over native or wire-backed opcode IDs.
 pub enum OpcodeIter<'a> {
@@ -2156,6 +2242,110 @@ pub fn decode_set_properties_operation_with_limits(
     decode_set_properties_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete ResetProperties payload without negotiated checks.
+///
+/// This allocation-free structural helper is appropriate before negotiation
+/// or inside a caller that separately enforces [`Limits`]. Protocol request
+/// acceptance should use [`encode_reset_properties_payload_with_limits`].
+pub fn encode_reset_properties_payload(
+    payload: ResetPropertiesPayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_reset_properties_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    writer.u16(u16::try_from(payload.property_ids.len()).map_err(|_| CodecError::InvalidFrame)?)?;
+    for property_id in payload.property_ids.iter() {
+        writer.u32(property_id)?;
+    }
+    Ok(writer.position)
+}
+
+/// Encode one ResetProperties payload under the negotiated item limit.
+///
+/// Complete structural validation precedes `max_items_per_command`. The
+/// enclosing Batch separately applies `max_frame_bytes`.
+pub fn encode_reset_properties_payload_with_limits(
+    payload: ResetPropertiesPayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_reset_properties_payload_structure(payload)?;
+    validate_property_id_count(payload.property_ids, limits.max_items_per_command)?;
+    encode_reset_properties_payload(payload, output)
+}
+
+/// Decode one complete ResetProperties payload without negotiated checks.
+///
+/// The contextual target is classified first. The remainder must be exactly a
+/// nonempty count followed by strictly increasing nonzero little-endian IDs.
+pub fn decode_reset_properties_payload(
+    input: &[u8],
+) -> Result<ResetPropertiesPayload<'_>, ResetPropertiesPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let mut reader = Reader::new(&input[target_consumed..]);
+    let count = reader
+        .u16()
+        .map_err(|error| nested_mutation_target_error(error.into()))? as usize;
+    if count == 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    let property_ids_start = reader.position;
+    let mut previous = None;
+    for _ in 0..count {
+        let property_id = reader
+            .u32()
+            .map_err(|error| nested_mutation_target_error(error.into()))?;
+        require_increasing_id(previous, property_id)?;
+        previous = Some(property_id);
+    }
+    if reader.position != reader.input.len() {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    Ok(ResetPropertiesPayload {
+        target,
+        property_ids: PropertyIdList::from_wire(&reader.input[property_ids_start..reader.position]),
+    })
+}
+
+/// Decode one ResetProperties payload under the negotiated item limit.
+///
+/// Complete structural decoding precedes `max_items_per_command`.
+pub fn decode_reset_properties_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<ResetPropertiesPayload<'_>, ResetPropertiesPayloadError> {
+    let payload = decode_reset_properties_payload(input)?;
+    validate_property_id_count(payload.property_ids, limits.max_items_per_command)?;
+    Ok(payload)
+}
+
+/// Decode one zero-flag ResetProperties operation without negotiated checks.
+///
+/// There is deliberately no Command counterpart: MPY v1 ResetProperties is
+/// Batch-only. Request acceptance should use
+/// [`decode_reset_properties_operation_with_limits`].
+pub fn decode_reset_properties_operation(
+    operation: OperationRef<'_>,
+) -> Result<ResetPropertiesPayload<'_>, ResetPropertiesPayloadError> {
+    if operation.opcode != opcode::RESET_PROPERTIES || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_reset_properties_payload(operation.payload)
+}
+
+/// Decode one zero-flag ResetProperties operation under negotiated limits.
+pub fn decode_reset_properties_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<ResetPropertiesPayload<'_>, ResetPropertiesPayloadError> {
+    if operation.opcode != opcode::RESET_PROPERTIES || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_reset_properties_payload_with_limits(operation.payload, limits)
+}
+
 /// Encode one complete SetFlag payload.
 ///
 /// No negotiated variable-size limit applies to this fixed-size payload. The
@@ -2363,6 +2553,58 @@ pub fn validate_set_properties_result_absent(
         return Err(CodecError::InvalidFrame);
     }
     Ok(())
+}
+
+/// Validate that one correlated ResetProperties emitted no result record.
+///
+/// The caller MUST already have correlated `reset_properties_operation_index`
+/// to a submitted opcode [`opcode::RESET_PROPERTIES`]. This helper validates
+/// the structural [`BatchSuccess`] shape and the absence of that one index
+/// only. It does not validate other opcode result schemas, negotiated Limits,
+/// or the complete success envelope. Other output-bearing operations may still
+/// contribute records.
+pub fn validate_reset_properties_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    reset_properties_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if reset_properties_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == reset_properties_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+fn validate_reset_properties_payload_structure(
+    payload: ResetPropertiesPayload<'_>,
+) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    let _ = u16::try_from(payload.property_ids.len()).map_err(|_| CodecError::InvalidFrame)?;
+    if payload.property_ids.is_empty() {
+        return Err(CodecError::InvalidFrame);
+    }
+    let mut previous = None;
+    for property_id in payload.property_ids.iter() {
+        require_increasing_id(previous, property_id)?;
+        previous = Some(property_id);
+    }
+    Ok(())
+}
+
+fn validate_property_id_count(
+    property_ids: PropertyIdList<'_>,
+    maximum_items: u16,
+) -> Result<(), CodecError> {
+    if property_ids.len() > maximum_items as usize {
+        Err(CodecError::LimitExceeded)
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_set_properties_payload_structure(
