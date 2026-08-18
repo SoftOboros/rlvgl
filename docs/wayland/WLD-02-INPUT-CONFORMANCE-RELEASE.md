@@ -5,8 +5,8 @@ WLD-02-INPUT-CONFORMANCE-RELEASE.md - Wayland input, conformance, and release ph
 # WLD-02 — Input, Conformance, and Release
 
 **Status:** Draft 2026-08-18. `PCDN-WLD-004` and `PCDN-WLD-005` are resolved.
-This phase remains blocked by WLD-00 and WLD-01. No implementation is
-authorized.
+The WLD-00 parent prerequisite is satisfied, but this phase remains blocked by
+WLD-01. No implementation is authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md). Presentation prerequisite:
 [`WLD-01`](WLD-01-SESSION-SHM-PRESENTATION.md).

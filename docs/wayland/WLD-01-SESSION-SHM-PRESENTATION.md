@@ -5,8 +5,8 @@ WLD-01-SESSION-SHM-PRESENTATION.md - Wayland session and SHM presenter phase.
 # WLD-01 — Session and SHM Presentation
 
 **Status:** Draft 2026-08-18. `PCDN-WLD-001` through `PCDN-WLD-003` are
-resolved. This phase remains blocked by WLD-00. No implementation is
-authorized.
+resolved and the WLD-00 parent prerequisite is satisfied. Phase ratification
+is pending; no implementation is authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md).
 

@@ -4,9 +4,9 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. All five PCDNs are resolved; owner ratification
-of the remaining acceptance checklist is pending. No implementation is
-authorized. Target release line: rlvgl v0.2.7.
+**Status:** **Ratified 2026-08-18.** All five PCDNs and the acceptance checklist
+are resolved. Implementation authority remains phase-specific. Target release
+line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
 
@@ -319,11 +319,11 @@ Draft until the owner ratifies the remaining checklist:
 
 Ratification additionally confirms:
 
-- [ ] §0 authority boundaries are accepted.
-- [ ] §6 `INV-WLD-1` through `INV-WLD-10` are accepted.
-- [ ] §7 is the complete v0.2.7 capability envelope.
-- [ ] §8 keeps WLD to two implementation phases.
-- [ ] §9 concurrency boundaries preserve MPY and CPython authority.
+- [x] §0 authority boundaries are accepted.
+- [x] §6 `INV-WLD-1` through `INV-WLD-10` are accepted.
+- [x] §7 is the complete v0.2.7 capability envelope.
+- [x] §8 keeps WLD to two implementation phases.
+- [x] §9 concurrency boundaries preserve MPY and CPython authority.
 - [x] PCDN-WLD-001 is resolved as amended in this document.
 - [x] PCDN-WLD-002 is resolved as amended in this document.
 - [x] PCDN-WLD-003 is resolved as amended in this document.
@@ -352,15 +352,37 @@ Ratification additionally confirms:
 
 ## 14. Unblocks
 
-Nothing is implementation-unblocked while WLD-00 is Draft. Once ratified,
-WLD-01 may proceed. WLD-02 remains blocked until WLD-01 supplies its specified
-session, ownership, resize, and presentation evidence.
+WLD-01 may now be reviewed for phase ratification. WLD-00 ratification alone
+does not authorize implementation. WLD-02 remains blocked until WLD-01 is
+ratified and supplies its specified session, ownership, resize, and
+presentation evidence.
 
 The v0.2.7 release claim remains blocked until both implementation phases are
 ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — Ratified
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-1, INV-WLD-2, INV-WLD-3, INV-WLD-4, INV-WLD-5, INV-WLD-6, INV-WLD-7, INV-WLD-8, INV-WLD-9, INV-WLD-10, PCDN-WLD-001, PCDN-WLD-002, PCDN-WLD-003, PCDN-WLD-004, PCDN-WLD-005, §0–§14
+
+**Commits:** pending
+
+**Summary:** Ratifies the WLD authority boundaries, ten invariants, v0.2.7
+capability envelope, two-phase plan, concurrency boundaries, and all five
+owner-amended decisions.
+
+#### Rationale
+
+The accepted decision set now defines a bounded native Wayland initiative
+without preempting LPAR, MPY, or CPython authority. Separate phase ratification
+keeps implementation and release evidence gated after the concepts document
+becomes authoritative.
 
 ### 0.1.5 — 2026-08-18 — PCDN-WLD-005 accepted as amended
 
