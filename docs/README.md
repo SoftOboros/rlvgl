@@ -48,6 +48,7 @@ See crate overviews for:
 - [UI-COMPONENT-ARCHITECTURE.md](./UI-COMPONENT-ARCHITECTURE.md) — Theme, components, Chakra-inspired widgets.
 - [SVELTE-DESIGN-TOKEN-ALIGNMENT.md](./SVELTE-DESIGN-TOKEN-ALIGNMENT.md) — Svelte design tokens and component IR.
 - [MPY stage-and-actors initiative](./concepts/MPY-00-CONCEPTS.md) — Ratified runtime concepts plus MPY-01 introspection and MPY-02 protocol phases; MPY-03 through MPY-09 remain separately gated drafts listed in the [concepts index](./concepts/README.md).
+- [CPY embedded-Linux and host CPython initiative](./cpython/README.md) — Draft CPY-00 through CPY-09 family covering the PyO3 Director binding, native runtime service, flattened Frame Leases, embedded-Linux-first deployment, full-host companionship, and explicit crate unification/partition; no implementation is authorized while its phases remain unratified.
 
 ## Hardware Targets
 - [STM32H747I-DISCO hardware notes](../examples/stm32h747i-disco/HARDWARE.md) — Board reference (display, touch, pinout).

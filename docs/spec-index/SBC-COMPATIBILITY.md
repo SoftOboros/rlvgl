@@ -34,6 +34,7 @@ legacy document cannot be used as a shortcut around that gate.
 | Agent-facing authority pointer | `CLAUDE.md` “Current SBC authority and rlvgl adoption” |
 | Family prefix allocation | [PREFIX-REGISTRY.md](PREFIX-REGISTRY.md) |
 | Deterministic local projection | [README.md](README.md), `make spec-index`, and `make spec-index-check` |
+| CPY family errata | [`docs/cpython/ERRATA.md`](../cpython/ERRATA.md) |
 | MPY family errata | [`docs/concepts/ERRATA.md`](../concepts/ERRATA.md) |
 | WLD family errata | [`docs/wayland/ERRATA.md`](../wayland/ERRATA.md) |
 | Existing family errata | `docs/beetle-esp32p4/ERRATA.md` and `docs/disco-test-and-debug/ERRATA.md` |
@@ -52,6 +53,7 @@ an empty or absent historical log is not evidence that no prior issue existed.
 | BBB | `docs/beaglebone-black/README.md` and `05-zephyr-prong.md` | Current-shape phase material; the bare-metal bring-up guide is an as-built narrative, not a phase gate. |
 | BEETLE | `docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md` | Current-shape and existing family errata log. |
 | BEETLE-IDF | `docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md` | Current-shape phase material; create family errata before the next material amendment. |
+| CPY | `docs/cpython/CPY-00-CONCEPTS.md` | Current-shape Draft family with local errata. CPY leads CPython/PyO3 and crate unification/partition planning; every phase remains unratified and authorizes no implementation. |
 | CRATES-CI | `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` | Current-shape family; create family errata before the next material amendment. |
 | DCB | `docs/concepts/DCB-00-CONCEPTS.md` | Canonical root remains authoritative; `DCB-*-A` files are resolved historical analyses and MUST NOT authorize behavior. |
 | DPR | `docs/concepts/DPR-00-CONCEPTS.md` | Draft; no behavior implementation is authorized by this adoption map. |
@@ -88,6 +90,11 @@ new behavior change.
 
 ## Current Open Gates
 
+- **CPY:** CPY-00 through CPY-09 remain Draft. Their per-phase PCDNs, exact
+  runtime/tool/target selections, MPY shared-file handoff, measured budgets,
+  and owner ratification remain open. CPY planning leads the future shared
+  crate topology, but no CPY document currently authorizes code or changes the
+  active MPY/WLD authorities.
 - **MPY:** Later phase ratification remains blocked by their own PCDNs and,
   where specified, compile, exception, cache/shared-memory, measured-budget,
   or board evidence.

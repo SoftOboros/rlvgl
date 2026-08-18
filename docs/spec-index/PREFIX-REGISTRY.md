@@ -25,6 +25,7 @@ not redefine identifier grammar or canonicalization.
 | CHIPS-MICROCHIP | Ira Abbott | `chipdb/rlvgl-chips-microchip/` | `chipdb/rlvgl-chips-microchip/` |
 | CHIPS-SILABS | Ira Abbott | `chipdb/rlvgl-chips-silabs/` | `chipdb/rlvgl-chips-silabs/` |
 | CHIPS-TI | Ira Abbott | `chipdb/rlvgl-chips-ti/` | `chipdb/rlvgl-chips-ti/` |
+| CPY | Ira Abbott | `docs/cpython/CPY-00-CONCEPTS.md` | `docs/cpython/` |
 | CRATES-CI | Ira Abbott | `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` | `docs/crates-ci/` |
 | DCB | Ira Abbott | `docs/concepts/DCB-00-CONCEPTS.md` | `docs/concepts/` |
 | DISCO | Ira Abbott | `docs/disco-platform-guide/README.md` | `docs/disco-*/` |
