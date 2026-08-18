@@ -1,5 +1,5 @@
 {
-  "edge_count": 4,
+  "edge_count": 5,
   "edges": [
     {
       "edge_type": "cites",
@@ -28,6 +28,13 @@
       "line": 52,
       "source": "docs/cpython/ERRATA.md",
       "target": "SBC-INV-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/cpython/evidence/README.md",
+      "target": "PCDN-CPY-03-002"
     }
   ],
   "family": "cpython",

@@ -1,5 +1,5 @@
 {
-  "edge_count": 286,
+  "edge_count": 292,
   "edges": [
     {
       "edge_type": "cites",
@@ -599,16 +599,9 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 10,
+      "line": 11,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 94,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "PCDN-CPY-03-003"
     },
     {
       "edge_type": "cites",
@@ -620,189 +613,238 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 159,
+      "line": 98,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 161,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 188,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 189,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 190,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-3"
+      "target": "INV-CPY-03-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 191,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-4"
+      "target": "INV-CPY-03-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 192,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-5"
+      "target": "INV-CPY-03-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 193,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-6"
+      "target": "INV-CPY-03-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 194,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-7"
+      "target": "INV-CPY-03-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 195,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 196,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 197,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 220,
+      "line": 222,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 225,
+      "line": 227,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 229,
+      "line": 231,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 233,
+      "line": 235,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 243,
+      "line": 245,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 247,
+      "line": 276,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 268,
+      "line": 280,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 294,
+      "line": 307,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 320,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 294,
+      "line": 320,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 294,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 294,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 295,
+      "line": 320,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 295,
+      "line": 321,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 343,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 364,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 364,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 364,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 364,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 365,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 365,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 295,
+      "line": 365,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "INV-CPY-03-7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 295,
+      "line": 365,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 296,
+      "line": 366,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 296,
+      "line": 366,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 296,
+      "line": 366,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-005"
     },
@@ -2006,13 +2048,13 @@
   ],
   "family": "cpy",
   "kind_counts": {
-    "amendment": 25,
+    "amendment": 26,
     "gate": 80,
     "invariant": 83,
-    "rationale": 22,
+    "rationale": 23,
     "term": 77
   },
-  "object_count": 287,
+  "object_count": 289,
   "objects": [
     {
       "attrs": {
@@ -3543,7 +3585,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 63,
+      "line": 65,
       "obj_id": "cpy:term:service thread",
       "text": "Native thread that constructs and exclusively owns the Endpoint, actor registry, render state, and service state machine."
     },
@@ -3555,7 +3597,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 64,
+      "line": 66,
       "obj_id": "cpy:term:ingress queue",
       "text": "Bounded FIFO of neutral requests accepted from adapter callers."
     },
@@ -3567,7 +3609,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 65,
+      "line": 67,
       "obj_id": "cpy:term:egress queue",
       "text": "Bounded ordered records containing results, cues, frame notices, metrics, lifecycle, and faults."
     },
@@ -3579,7 +3621,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 66,
+      "line": 68,
       "obj_id": "cpy:term:readiness signal",
       "text": "Level/edge-safe operating-system primitive indicating that egress or terminal state is available without carrying semantic data."
     },
@@ -3591,7 +3633,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 67,
+      "line": 69,
       "obj_id": "cpy:term:service epoch",
       "text": "Monotonic identity of one service construction, preventing stale handles or records from binding after restart."
     },
@@ -3603,7 +3645,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 68,
+      "line": 70,
       "obj_id": "cpy:term:service turn",
       "text": "One service scheduling boundary containing admitted ingress, a neutral Safe Turn, native input/render/present work, and record publication in a frozen order."
     },
@@ -3615,7 +3657,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 69,
+      "line": 71,
       "obj_id": "cpy:term:close fence",
       "text": "State after which no new user request is accepted and all later records are lifecycle/finalization records."
     },
@@ -3633,7 +3675,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 188,
+      "line": 190,
       "obj_id": "INV-CPY-03-1",
       "text": "The Service Thread MUST exclusively construct, own, and destroy Endpoint and actor/render state."
     },
@@ -3651,7 +3693,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 189,
+      "line": 191,
       "obj_id": "INV-CPY-03-2",
       "text": "Ingress and egress MUST contain no Python objects, borrowed actor references, or callbacks into Python."
     },
@@ -3669,7 +3711,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 190,
+      "line": 192,
       "obj_id": "INV-CPY-03-3",
       "text": "Every accepted request MUST produce exactly one terminal result or a documented service-terminal cancellation record."
     },
@@ -3688,7 +3730,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 191,
+      "line": 193,
       "obj_id": "INV-CPY-03-4",
       "text": "Service Turn ordering MUST be deterministic and MUST NOT depend on Python polling or callback duration."
     },
@@ -3706,7 +3748,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 192,
+      "line": 194,
       "obj_id": "INV-CPY-03-5",
       "text": "Queue saturation, coalescing, loss, closing, and fault states MUST be observable and bounded."
     },
@@ -3724,7 +3766,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 193,
+      "line": 195,
       "obj_id": "INV-CPY-03-6",
       "text": "Readiness MUST wake consumers without becoming a second semantic queue or losing a drainable terminal state."
     },
@@ -3742,7 +3784,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 194,
+      "line": 196,
       "obj_id": "INV-CPY-03-7",
       "text": "Close MUST be idempotent and MUST destroy native state before module/interpreter finalization can invalidate adapter resources."
     },
@@ -3760,7 +3802,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 195,
+      "line": 197,
       "obj_id": "INV-CPY-03-8",
       "text": "A restarted service MUST use a new epoch and MUST reject handles and records from every prior epoch."
     },
@@ -3772,8 +3814,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 247,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:247",
+      "line": 280,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:280",
       "text": "Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open."
     },
     {
@@ -3784,8 +3826,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 248,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:248",
+      "line": 281,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:281",
       "text": "Lifecycle and Service Turn state machines are complete and deterministic."
     },
     {
@@ -3796,21 +3838,21 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 249,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:249",
+      "line": 282,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:282",
       "text": "Queue loss/reservation classes map to neutral record semantics."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 250,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:250",
-      "text": "The service has a native-only headless test consumer before PyO3 lands."
+      "line": 283,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:283",
+      "text": "The Host Runtime Crate has a native-only non-`Send` owner test and"
     },
     {
       "attrs": {
@@ -3820,21 +3862,21 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 251,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:251",
+      "line": 285,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:285",
       "text": "Close/finalization and restart/epoch rules are exact."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 252,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:252",
-      "text": "No Python dependency enters the Host Runtime Crate."
+      "line": 286,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:286",
+      "text": "The dependency firewall and runtime crate graph contain no Python or"
     },
     {
       "attrs": {
@@ -3844,15 +3886,62 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 253,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:253",
+      "line": 288,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:288",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott / OpenAI Codex",
+        "change_kind": "evidence",
+        "chronological_rank": 1,
+        "commits": [
+          "`9382b050` (probe source; the retained bundle names this authority)"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-18",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": false,
+        "rev": "0.3.0",
+        "shape": "block",
+        "status": "diagnostic host capacity matrix",
+        "summary": "Adds a clean-source native bounded-channel probe, formal evidence",
+        "touches": [
+          "INV-CPY-03-1",
+          "INV-CPY-03-2",
+          "INV-CPY-03-5"
+        ]
+      },
+      "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 314,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.3.0",
+      "text": "Adds a clean-source native bounded-channel probe, formal evidence"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-03-1",
+          "INV-CPY-03-2",
+          "INV-CPY-03-5"
+        ]
+      },
+      "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 314,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.3.0-rationale",
+      "text": "The open capacity PCDN requires measurements rather than a paper default. A\ntransport-only matrix first validates bounded admission, egress pressure,\nordering, retained bytes, and reproducible evidence mechanics before the\nservice adds representative semantic and framebuffer work.\n\nConsidered and rejected: treating one microbenchmark score as the default,\nusing unbounded channels for easier benchmarking, or relabeling macOS memory\nas constrained-board evidence.\n\nWhat deliberately did not change: no ingress, egress, or per-turn default or\nmaximum is selected; no eventfd/self-pipe readiness, lifecycle service,\nrepresentative render/frame/input workload, Python binding, or physical-board\nclaim is implemented. `PCDN-CPY-03-002` remains open and CPY-03 remains Draft."
     },
     {
       "attrs": {
         "author": "Ira Abbott",
         "change_kind": "editorial",
-        "chronological_rank": 1,
+        "chronological_rank": 2,
         "commits": [
           "pending"
         ],
@@ -3875,7 +3964,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 275,
+      "line": 345,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.2.1",
       "text": "Points the acceptance checklist at both the resolved decisions"
     },
@@ -3883,7 +3972,7 @@
       "attrs": {
         "author": "Ira Abbott",
         "change_kind": "semantic",
-        "chronological_rank": 2,
+        "chronological_rank": 3,
         "commits": [
           "pending"
         ],
@@ -3908,7 +3997,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 288,
+      "line": 358,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.2.0",
       "text": "Selects bounded Crossbeam queues and Unix readiness primitives,"
     },
@@ -3924,7 +4013,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 288,
+      "line": 358,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.2.0-rationale",
       "text": "Crossbeam supplies a small, well-tested bounded queue without imposing an\nasync runtime, while `eventfd`/self-pipe readiness integrates with the selected\nLinux/macOS host matrix and carries no semantic records. One thread preserves\nthe simplest deterministic ownership proof. Exact capacities cannot be\nselected responsibly from policy alone and therefore remain evidence-blocked.\n\nConsidered and rejected: unbounded standard channels, Tokio as a mandatory\nruntime, a separate presenter thread without a backend constraint, cancelling\nan in-progress neutral commit, silently discarding queued requests during\nclose, and advertising subinterpreter support from module initialization alone.\n\nWhat deliberately did not change: no dependency, queue, readiness descriptor,\nthread, service, backend, PyO3 module, or capacity constant is implemented.\nCPY-03 remains Draft."
     },
@@ -3932,7 +4021,7 @@
       "attrs": {
         "author": "Ira Abbott / OpenAI Codex (drafting)",
         "change_kind": "scope",
-        "chronological_rank": 3,
+        "chronological_rank": 4,
         "commits": null,
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -3950,7 +4039,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 322,
+      "line": 392,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.1.0",
       "text": "Defines Python-independent runtime-thread ownership, bounded ingress/egress, deterministic turns, readiness, epochs, faults, and shutdown."
     },
@@ -3961,7 +4050,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 322,
+      "line": 392,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.1.0-rationale",
       "text": "Native rendering and input cannot inherit Python callback latency or\nfinalization hazards. A reusable service crate also gives the future daemon and\nheadless tools the same lifecycle without importing PyO3.\n\nConsidered and rejected: letting PyO3 wrappers own actor references directly,\nand invoking callbacks from the render thread; both collapse the interpreter\nand native timing domains.\n\nWhat deliberately did not change: Endpoint, Safe Turn, actor, result, or cue\nsemantics remain owned by their MPY/core authorities."
     },
