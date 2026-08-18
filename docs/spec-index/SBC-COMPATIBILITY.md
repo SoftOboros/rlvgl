@@ -92,10 +92,11 @@ new behavior change.
 
 - **CPY:** CPY-00 is ratified with `PCDN-CPY-00-001` through
   `PCDN-CPY-00-003` accepted as amended. CPY-01 through CPY-09 remain Draft;
-  their exact runtime/tool/target selections, MPY shared-file handoff,
-  measured budgets, and per-phase ratification remain open. CPY planning leads
-  the future shared crate topology, but CPY-00 authorizes no code or changes
-  the active MPY/WLD authorities.
+  CPY-02's six topology PCDNs are resolved, but CPY-01's exact
+  runtime/tool/target selections, an actual MPY Handoff Record, measured
+  budgets, and per-phase ratification remain open. CPY planning leads the
+  future shared crate topology, but CPY-00 authorizes no code or changes the
+  active MPY/WLD authorities.
 - **MPY:** Later phase ratification remains blocked by their own PCDNs and,
   where specified, compile, exception, cache/shared-memory, measured-budget,
   or board evidence.

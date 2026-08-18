@@ -6,9 +6,10 @@ CPY-02-UNIFY-PARTITION-CRATES.md - Neutral-contract unification and interpreter/
 
 **Document ID:** CPY-02-UNIFY-PARTITION-CRATES
 
-**Status:** Draft 2026-08-18. Not ratified. No crate movement is authorized.
+**Status:** Draft 2026-08-18. Six topology PCDNs resolved 2026-08-18. Not
+ratified; no crate movement is authorized.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -217,7 +218,7 @@ or generated cross-family evidence MUST wait for a coordinated handoff.
 
 | Existing surface | CPY-02 treatment |
 |---|---|
-| `rlvgl-api` marker features `micropython`, `cpython`, `cm4`, `sim` | Audit and retire or redefine only if they produce a real compile contract; empty environment markers are not copied into new crates. |
+| `rlvgl-api` marker features `micropython`, `cpython`, `cm4`, `sim` | No in-repository consumer enables them and all four are empty. Keep them as documented deprecated no-ops on the 0.2 line, reject new consumers, and remove them in `rlvgl-api` 0.3.0 after a registry/reverse-dependency check. Interpreter and target selection belongs in adapter/platform crates. |
 | `rlvgl-api` legacy `NodeSpec` stack | Preserve until consumers and SemVer are inventoried; do not use it as CPython's LVGL-level API. |
 | `core::Endpoint` | Remains in core; Host Runtime owns it and drives it rather than wrapping it in interpreter-specific state. |
 | `platform::blit` metadata | Candidate promotion of neutral descriptor pieces only; rendering traits/storage remain platform-owned initially. |
@@ -238,28 +239,67 @@ or generated cross-family evidence MUST wait for a coordinated handoff.
   move.
 - Making the root facade or Python package a second protocol owner.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-02-001` | What is the Host Runtime Crate's package name? | `rlvgl-runtime-std`, unless publication review finds a clearer durable name. | CPY-02 ratification and workspace addition |
-| `PCDN-CPY-02-002` | Does frame metadata remain in `rlvgl-api`, or justify a new `rlvgl-frame` crate? | Metadata in `rlvgl-api`; storage in Host Runtime. Add a frame crate only after a second independent envelope proves it. | CPY-02 ratification and CPY-05 |
-| `PCDN-CPY-02-003` | Does CPY extract `rlvgl-platform-linux` now? | No initial extraction. Revisit with compile/dependency and backend-owner evidence after CPY-06/WLD integration. | CPY-02 ratification scope |
-| `PCDN-CPY-02-004` | What happens to empty environment marker features in `rlvgl-api`? | Deprecate/retire them or give each a tested compile effect; do not perpetuate empty markers. | CPY-02 ratification and compatibility plan |
-| `PCDN-CPY-02-005` | Does the root `rlvgl` crate re-export CPython types? | Keep the extension as a leaf package initially; add opt-in facade re-exports only for a proven Rust consumer. | CPY-02 ratification and CPY-04 packaging |
-| `PCDN-CPY-02-006` | What exact evidence constitutes the first MPY Safe Point and later handoffs? | Clean commit, no active shared-file staging, exact MPY tests/index, and explicit task acknowledgment. | Shared-file migration, not CPY planning |
+`PCDN-CPY-02-001` through `PCDN-CPY-02-006` are accepted as amended:
+
+- **PCDN-CPY-02-001 — Host runtime package — Accepted as amended
+  2026-08-18.** The package name is `rlvgl-runtime-std`. It is a `std`-only,
+  interpreter-neutral service crate consumed independently by
+  `rlvgl-cpython`, a native daemon, and headless/native host tools. It MUST NOT
+  contain PyO3 or MicroPython ABI types. Renaming it requires a CPY-02
+  amendment before publication.
+- **PCDN-CPY-02-002 — Frame placement — Accepted as amended 2026-08-18.**
+  Byte/lifetime-independent `FrameDescriptor` metadata belongs in
+  `rlvgl-api`; mutable slot storage, retention counts, readiness, and shutdown
+  belong in `rlvgl-runtime-std`. No `rlvgl-frame` crate is admitted initially.
+  A later split requires a second independent target envelope and the §6 crate
+  admission rule.
+- **PCDN-CPY-02-003 — Linux platform partition — Accepted as amended
+  2026-08-18.** Do not extract `rlvgl-platform-linux` in the initial CPY
+  migration. Consume feature-gated `rlvgl-platform` backends. Reconsider only
+  after CPY-06/WLD implementation evidence proves both an independent consumer
+  and a dependency or lifecycle firewall that modules/features cannot supply.
+- **PCDN-CPY-02-004 — Empty environment features — Accepted as amended
+  2026-08-18.** `rlvgl-api` features `micropython`, `cpython`, `cm4`, and `sim`
+  have no compile effect and no in-repository consumer. They remain documented
+  deprecated no-ops on the 0.2 line solely for external compatibility, MUST
+  gain no new consumers, and are removed in `rlvgl-api` 0.3.0 after a
+  registry/reverse-dependency check. Adapter/platform crates own real
+  interpreter and target features.
+- **PCDN-CPY-02-005 — Root facade — Accepted as amended 2026-08-18.** The
+  root `rlvgl` crate does not re-export CPython types in the initial release.
+  The Python extension remains the leaf `rlvgl-cpython` package. A later
+  opt-in Rust facade requires a named Rust consumer and cannot become the
+  extension lifecycle owner.
+- **PCDN-CPY-02-006 — MPY Safe Point and handoff evidence — Accepted as
+  amended 2026-08-18.** Each shared migration wave requires a recorded MPY
+  Handoff Record containing: exact clean source commit; no staged or unstaged
+  changes in the files/directories being transferred; exact MPY phase/status
+  frontier; `cargo metadata` and public-path/feature snapshots; passing
+  MPY-required compile/conformance suites; passing `make spec-test
+  spec-index-check`; and explicit acknowledgment from the MPY task naming the
+  allowed paths and handoff commit. A later wave requires a new record. This
+  resolves the rule but does not claim that a handoff currently exists.
+
+Initial crate admission record: `rlvgl-runtime-std` satisfies §6 criteria 1,
+3, 4, and 5 through its `std` envelope, service lifecycle, host-only
+dependencies, and independent extension/daemon/tool consumers.
+`rlvgl-cpython` satisfies criteria 2, 4, and 6 through its interpreter unsafe
+boundary, isolated PyO3/CPython dependency closure, and independently
+publishable Python-extension responsibility. No other new crate is admitted.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [x] Every PCDN in §11.2 is resolved.
 - [ ] The current graph, features, public paths, consumers, and publish order
       are captured at the CPY-01 baseline.
-- [ ] Every proposed new crate satisfies at least two §6 criteria and names an
+- [x] Every proposed new crate satisfies at least two §6 criteria and names an
       independent consumer or safety boundary.
 - [ ] Prohibited dependency edges are machine-checkable.
-- [ ] The MPY Safe Point/handoff rule permits CPY leadership without editing
+- [x] The MPY Safe Point/handoff rule permits CPY leadership without editing
       in-flight MPY work.
-- [ ] WLD and LPAR ownership are preserved explicitly.
+- [x] WLD and LPAR ownership are preserved explicitly.
 - [ ] Migration slices retain no-std, MPY, host, package, and index evidence.
 - [ ] The owner records ratification in §15.
 
@@ -277,11 +317,48 @@ or generated cross-family evidence MUST wait for a coordinated handoff.
 
 ## 14. Unblocks
 
-Ratification unblocks implementation of the Dependency Firewall and CPY-only
-Host Runtime crate skeleton after CPY-01 is ratified. Shared-file migration is
-separately blocked until `PCDN-CPY-02-006` has an actual handoff record.
+All topology PCDNs are resolved, but CPY-02 remains Draft. Ratification review
+is blocked by CPY-01's exact baseline and the unchecked acceptance items in
+§12. Once ratified, it may unblock the Dependency Firewall and CPY-only Host
+Runtime crate skeleton. Shared-file migration is separately blocked until an
+actual Handoff Record satisfying `PCDN-CPY-02-006` exists.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — topology PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-02-1, INV-CPY-02-2, INV-CPY-02-3, INV-CPY-02-4,
+INV-CPY-02-5, INV-CPY-02-6, INV-CPY-02-7, INV-CPY-02-8,
+PCDN-CPY-02-001, PCDN-CPY-02-002, PCDN-CPY-02-003, PCDN-CPY-02-004,
+PCDN-CPY-02-005, PCDN-CPY-02-006, §5, §7, §8, §10, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Fixes the initial crate graph around `rlvgl-runtime-std` and a
+leaf `rlvgl-cpython`, assigns frame metadata/storage, defers Linux extraction,
+retires empty API markers compatibly, and defines exact MPY handoff evidence.
+
+#### Rationale
+
+The dependency audit confirms that the four `rlvgl-api` environment features
+are empty and unused in-repository, while the proposed host service has three
+independent consumers and a distinct `std`/lifecycle boundary. These facts
+support one host-runtime partition without fragmenting frame metadata or the
+existing platform crate prematurely.
+
+Considered and rejected: merging interpreter adapters, adding a speculative
+`rlvgl-frame` crate, immediately splitting all Linux code, retaining empty
+markers indefinitely, and treating an idle MPY task or clean status snapshot
+as a migration handoff. Each either duplicates authority, multiplies packages
+without an independent boundary, or weakens concurrent-work protection.
+
+What deliberately did not change: no Cargo manifest, crate, feature, source
+path, MPY artifact, platform backend, or public API moved. CPY-02 remains Draft
+until its baseline and acceptance gates close.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
