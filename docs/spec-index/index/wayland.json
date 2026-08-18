@@ -1,0 +1,17 @@
+{
+  "edge_count": 1,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 20,
+      "source": "docs/wayland/README.md",
+      "target": "PCDN-WLD-001"
+    }
+  ],
+  "family": "wayland",
+  "kind_counts": {},
+  "object_count": 0,
+  "objects": [],
+  "schema_version": 2
+}

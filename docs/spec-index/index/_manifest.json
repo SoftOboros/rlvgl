@@ -12,6 +12,7 @@
     "chips-silabs",
     "chips-ti",
     "concepts",
+    "cpy",
     "crates-ci",
     "dcb",
     "disco-platform-guide",
@@ -25,7 +26,8 @@
     "ratatui",
     "rend",
     "sctd",
-    "wid"
+    "wid",
+    "wld"
   ],
   "family_counts": {
     "anim": 16,
@@ -40,6 +42,7 @@
     "chips-silabs": 53,
     "chips-ti": 31,
     "concepts": 5,
+    "cpy": 260,
     "crates-ci": 24,
     "dcb": 56,
     "disco-platform-guide": 1,
@@ -48,14 +51,15 @@
     "input": 13,
     "ki2c": 88,
     "lpar": 501,
-    "mpy": 345,
+    "mpy": 347,
     "qt-support": 64,
     "ratatui": 11,
     "rend": 14,
     "sctd": 48,
-    "wid": 13
+    "wid": 13,
+    "wld": 56
   },
   "schema_version": 2,
-  "total_edges": 998,
-  "total_objects": 1784
+  "total_edges": 1226,
+  "total_objects": 2102
 }

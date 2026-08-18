@@ -1,0 +1,38 @@
+{
+  "edge_count": 4,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 13,
+      "source": "docs/cpython/ERRATA.md",
+      "target": "SBC-INV-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 13,
+      "source": "docs/cpython/ERRATA.md",
+      "target": "SBC-INV-13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 13,
+      "source": "docs/cpython/ERRATA.md",
+      "target": "SBC-INV-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 52,
+      "source": "docs/cpython/ERRATA.md",
+      "target": "SBC-INV-7"
+    }
+  ],
+  "family": "cpython",
+  "kind_counts": {},
+  "object_count": 0,
+  "objects": [],
+  "schema_version": 2
+}
