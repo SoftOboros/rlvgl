@@ -39,9 +39,9 @@ through ratified phase documents and their acceptance gates.
 | Phase | Scope | Status |
 |---|---|---|
 | [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
-| [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Draft; ratification review unblocked |
+| [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Draft; six selections resolved; manifest/rootfs/board evidence open |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Draft; six topology PCDNs resolved; blocked by CPY-01 and an actual MPY Handoff Record |
-| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; blocked by CPY-02 |
+| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; four policy PCDNs resolved; capacity measurement and CPY-02 open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; blocked by CPY-03 and the consumed MPY phases |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; blocked by CPY-02/03 |
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; blocked by CPY-03/04/05 |
@@ -60,6 +60,9 @@ through ratified phase documents and their acceptance gates.
 - [WLD](../wayland/README.md) owns any native Wayland backend. CPY may consume a
   ratified WLD backend but does not relocate or redefine it during crate work.
 - [ERRATA.md](ERRATA.md) is the family-local permanent deviation log.
+- [CPY-BASELINE-MANIFEST.schema.json](CPY-BASELINE-MANIFEST.schema.json) is the
+  authored CPY-01 grammar for exact source, interpreter, rootfs, board, and
+  artifact baselines; no conforming manifest instance exists yet.
 
 Generated object-index JSON is not edited by hand. After authored CPY and any
 concurrent WLD/MPY documentation settle, regenerate the combined projection

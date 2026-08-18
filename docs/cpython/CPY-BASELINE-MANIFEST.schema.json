@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://softoboros.com/schemas/rlvgl/cpy-baseline-manifest-1.json",
+  "title": "rlvgl CPY Baseline Manifest",
+  "description": "Exact source, authority, interpreter, tool, target, rootfs, board, artifact, and evidence-schema baseline for one CPY claim set.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "created_at",
+    "rlvgl_source",
+    "vendored_sources",
+    "authorities",
+    "rust",
+    "cpython",
+    "binding_tools",
+    "root_filesystems",
+    "reference_board",
+    "artifacts",
+    "evidence_schema_versions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "CPY-BASELINE-1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rlvgl_source": {
+      "$ref": "#/$defs/rlvglSourceRevision"
+    },
+    "vendored_sources": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/vendoredSourceRevision"
+      }
+    },
+    "authorities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/authorityRevision"
+      }
+    },
+    "rust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rustc_version",
+        "cargo_version",
+        "host_triple",
+        "target_triples"
+      ],
+      "properties": {
+        "rustc_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "host_triple": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_triples": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "contains": {
+            "const": "x86_64-apple-darwin"
+          },
+          "items": {
+            "enum": [
+              "x86_64-apple-darwin",
+              "x86_64-unknown-linux-gnu",
+              "aarch64-unknown-linux-gnu",
+              "armv7-unknown-linux-gnueabihf"
+            ]
+          }
+        }
+      }
+    },
+    "cpython": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_minor",
+        "required_minors",
+        "builds"
+      ],
+      "properties": {
+        "minimum_minor": {
+          "const": "3.13"
+        },
+        "required_minors": {
+          "const": [
+            "3.13",
+            "3.14"
+          ]
+        },
+        "builds": {
+          "type": "array",
+          "minItems": 2,
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "pattern": "^3\\.13\\.[0-9]+$"
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "pattern": "^3\\.14\\.[0-9]+$"
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/cpythonBuild"
+          }
+        }
+      }
+    },
+    "binding_tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pyo3_version",
+        "pyo3_checksum",
+        "pyo3_features",
+        "maturin_version",
+        "maturin_sha256"
+      ],
+      "properties": {
+        "pyo3_version": {
+          "const": "0.28.3"
+        },
+        "pyo3_checksum": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "pyo3_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "maturin_version": {
+          "const": "1.13.0"
+        },
+        "maturin_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "root_filesystems": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/rootFilesystem"
+      }
+    },
+    "reference_board": {
+      "$ref": "#/$defs/referenceBoard"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifactProfile"
+      }
+    },
+    "evidence_schema_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "trace",
+        "frame",
+        "bundle"
+      ],
+      "properties": {
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bundle": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rlvglSourceRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "worktree_clean",
+        "cargo_lock_sha256"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "worktree_clean": {
+          "const": true
+        },
+        "cargo_lock_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "vendoredSourceRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "commit",
+        "worktree_clean"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "worktree_clean": {
+          "const": true
+        }
+      }
+    },
+    "authorityRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "document_id",
+        "revision",
+        "status",
+        "source_commit"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "const": "Ratified"
+        },
+        "source_commit": {
+          "$ref": "#/$defs/gitCommit"
+        }
+      }
+    },
+    "cpythonBuild": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "target_triple",
+        "gil_mode",
+        "abi_mode",
+        "build_flags"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^3\\.(13|14)\\.[0-9]+$"
+        },
+        "target_triple": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gil_mode": {
+          "enum": [
+            "conventional",
+            "free-threaded"
+          ]
+        },
+        "abi_mode": {
+          "enum": [
+            "version-specific",
+            "abi3"
+          ]
+        },
+        "build_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rootFilesystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "digest",
+        "distribution",
+        "release",
+        "architecture",
+        "rust_target",
+        "libc_family",
+        "libc_version",
+        "dynamic_loader",
+        "kernel_abi",
+        "python_packages"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "distribution": {
+          "const": "Debian"
+        },
+        "release": {
+          "const": "13"
+        },
+        "architecture": {
+          "enum": [
+            "armhf",
+            "arm64"
+          ]
+        },
+        "rust_target": {
+          "enum": [
+            "armv7-unknown-linux-gnueabihf",
+            "aarch64-unknown-linux-gnu"
+          ]
+        },
+        "libc_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "libc_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dynamic_loader": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernel_abi": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "deviceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "class",
+        "driver",
+        "required",
+        "capabilities"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/dev/"
+        },
+        "class": {
+          "enum": [
+            "display",
+            "input",
+            "readiness",
+            "timing"
+          ]
+        },
+        "driver": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "referenceBoard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "board_id",
+        "model",
+        "architecture",
+        "rust_target",
+        "rootfs_id",
+        "kernel_release",
+        "display_backend",
+        "input_backend",
+        "devices",
+        "permissions",
+        "uses_devmem"
+      ],
+      "properties": {
+        "board_id": {
+          "const": "beaglebone-black-nhd-7"
+        },
+        "model": {
+          "const": "BeagleBone Black + NHD-7.0CTP-CAPE-P"
+        },
+        "architecture": {
+          "const": "armhf"
+        },
+        "rust_target": {
+          "const": "armv7-unknown-linux-gnueabihf"
+        },
+        "rootfs_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernel_release": {
+          "type": "string",
+          "minLength": 1
+        },
+        "display_backend": {
+          "const": "linux-fbdev-tilcdc"
+        },
+        "input_backend": {
+          "const": "linux-evdev-edt-ft5x06"
+        },
+        "devices": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/deviceRecord"
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "user",
+            "groups",
+            "linux_capabilities",
+            "device_access"
+          ],
+          "properties": {
+            "user": {
+              "type": "string",
+              "minLength": 1
+            },
+            "groups": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "linux_capabilities": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "device_access": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "string",
+                "pattern": "^/dev/"
+              }
+            }
+          }
+        },
+        "uses_devmem": {
+          "const": false
+        }
+      }
+    },
+    "artifactProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "profile",
+        "qualification_variant",
+        "rust_target",
+        "cargo_features",
+        "packages"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile": {
+          "enum": [
+            "host-headless",
+            "host-windowed",
+            "embedded-linux-direct",
+            "embedded-linux-daemon"
+          ]
+        },
+        "qualification_variant": {
+          "enum": [
+            "gil-version-specific",
+            "gil-abi3",
+            "free-threaded-version-specific",
+            "free-threaded-abi3"
+          ]
+        },
+        "rust_target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

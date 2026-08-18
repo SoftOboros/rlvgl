@@ -6,9 +6,10 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 
 **Document ID:** CPY-03-NATIVE-RUNTIME-SERVICE
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18;
+`PCDN-CPY-03-002` remains measurement-blocked. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -92,6 +93,12 @@ borrowed Rust reference, actor pointer, or closure that enters Python.
 Native presentation MAY share the Service Thread or use a separately owned
 presenter thread only after `PCDN-CPY-03-003` freezes ordering and ownership.
 
+`PCDN-CPY-03-003` selects the one-thread topology for the first implementation:
+the Service Thread owns Endpoint turns, rendering, admitted backend dispatch,
+and native presentation. A backend that later proves an unavoidable event-loop
+thread constraint requires a CPY-03 amendment with an explicit frame/close
+handoff; it cannot split presentation opportunistically.
+
 ## 6. Frozen Decisions — Service Lifecycle
 
 The lifecycle is a closed set:
@@ -117,6 +124,14 @@ Close is idempotent at the adapter surface. Dropping the last adapter reference
 MUST request close but MUST NOT rely on arbitrary Python destructor timing to
 complete it. CPY-04/08 must expose an explicit close/context-manager path.
 
+The close linearization point is the successful transition from `Running` to
+`Closing`. The service completes the active Service Turn and any batch whose
+neutral commit has begun. It rejects every queued request whose commit has not
+begun with exactly one `ServiceClosing` terminal result, drains the resulting
+records ahead of the terminal `Closed` record, and then destroys native state.
+No request is silently abandoned, and a repeated close observes/reuses the
+same terminal outcome.
+
 ## 7. Frozen Decisions — Turn and Record Ordering
 
 One Service Turn MUST publish records in this order unless the consumed MPY
@@ -137,6 +152,13 @@ reorder already committed records.
 
 ## 8. Frozen Decisions — Backpressure and Readiness
 
+Ingress and egress use `crossbeam_channel::bounded` behind CPY-owned queue
+types. The public/runtime contract exposes admission, capacity, close, and
+accounting semantics rather than Crossbeam senders or receivers. No unbounded
+channel and no async runtime is admitted in the Host Runtime Crate. Exact
+default and maximum capacities remain `PCDN-CPY-03-002`; queue type selection
+does not resolve those measured values.
+
 Ingress admission MUST return a typed capacity/closing/fault outcome before
 claiming acceptance. Egress saturation MUST follow the record's registered
 loss class: non-droppable results/faults reserve capacity; coalescible records
@@ -147,6 +169,13 @@ The Readiness Signal carries no count or semantic payload. Draining records and
 rechecking state MUST be race-safe if readiness coalesces. An asyncio adapter
 therefore observes the same egress queue as synchronous `poll()`, not a second
 event stream.
+
+The initial `ReadySignal` is level-triggered at the abstraction boundary:
+Linux uses a nonblocking close-on-exec `eventfd`; macOS and other admitted Unix
+hosts use a nonblocking close-on-exec self-pipe. Signal bytes/counters carry no
+semantic data. Producers notify only on the empty-to-nonempty transition or a
+required re-arm, and the consumer drains the OS signal before checking the
+egress queue again. Windows readiness remains outside the first target matrix.
 
 Synchronous waits in CPY-04 MUST release/detach the calling Python thread state
 while blocked and MUST reattach only to construct Python results. The Service
@@ -186,15 +215,32 @@ Thread itself has no Python thread state.
 - Making wall-clock timing normative for neutral scenario tests.
 - Supporting `fork()` with a running inherited service in the first release.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
+- **PCDN-CPY-03-001 — Queue and readiness primitives — Accepted as amended
+  2026-08-18.** Use bounded Crossbeam channels behind CPY-owned queue types,
+  Linux `eventfd`, and a nonblocking self-pipe on other admitted Unix hosts as
+  specified in §8. No Tokio/async runtime, unbounded channel, or semantic data
+  in the readiness signal is admitted.
+- **PCDN-CPY-03-003 — Presenter topology — Accepted as amended
+  2026-08-18.** Use one Service Thread for runtime, rendering, backend
+  dispatch, and native presentation initially. A later backend-required split
+  is Standards Action and needs explicit ownership/order evidence.
+- **PCDN-CPY-03-004 — Close disposition — Accepted as amended
+  2026-08-18.** Finish the active turn and any batch whose neutral commit has
+  begun; reject queued/unbegun requests exactly once with `ServiceClosing`;
+  deliver resulting records before `Closed`; make repeated close idempotent.
+- **PCDN-CPY-03-005 — Subinterpreters — Accepted as amended 2026-08-18.** The
+  first release supports only the main interpreter and rejects subinterpreter
+  initialization/use with a stable unsupported-interpreter exception. Later
+  support is a separately qualified profile requiring per-interpreter module,
+  callback, handle, service, and finalization isolation.
+
+### 11.3 Open Decision
+
+| PCDN | Question | Current disposition | Blocks |
 |---|---|---|---|
-| `PCDN-CPY-03-001` | Which bounded channel/readiness primitives implement the Host Runtime Crate? | Select after target and dependency audit; semantics in this phase remain implementation-neutral. | CPY-03 ratification/implementation |
-| `PCDN-CPY-03-002` | What are initial ingress/egress and per-turn capacities? | Negotiate/profile them and close final values with CPY-09 measurements. | CPY-03 ratification and CPY-09 budgets |
-| `PCDN-CPY-03-003` | Is native presentation on the Service Thread or a separate presenter thread? | Same thread for deterministic first proof; split only when backend event-loop or cadence evidence requires it. | CPY-03 ratification and CPY-06/07 |
-| `PCDN-CPY-03-004` | Which accepted requests finish versus cancel during close? | Finish already committed work; reject pending/uncommitted work with exact cancellation records. | CPY-03 ratification |
-| `PCDN-CPY-03-005` | Are CPython subinterpreters admitted? | One runtime per module/interpreter state only after explicit isolation proof; otherwise reject. | CPY-03/04 ratification |
+| `PCDN-CPY-03-002` | What are initial ingress/egress and per-turn capacities? | Remains open. Record candidate values only after native scenario traces measure burst depth, retained bytes, wakeups, latency, and constrained-board memory; CPY-09 must close the selected defaults/maxima. | CPY-03 ratification and CPY-09 budgets |
 
 ## 12. Acceptance Checklist
 
@@ -218,10 +264,47 @@ Thread itself has no Python thread state.
 
 ## 14. Unblocks
 
-Ratification and a native-only implementation proof unblock CPY-04 binding and
-CPY-05 frame lease integration. It does not authorize device access.
+Four policy PCDNs are resolved, but CPY-03 remains Draft. Ratification is
+blocked by measured capacities in `PCDN-CPY-03-002`, CPY-02 ratification, and
+the remaining acceptance evidence. Ratification plus a native-only proof would
+unblock CPY-04 binding and CPY-05 frame integration; it would not authorize
+device access.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — runtime policy PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-2, INV-CPY-03-3, INV-CPY-03-4,
+INV-CPY-03-5, INV-CPY-03-6, INV-CPY-03-7, PCDN-CPY-03-001,
+PCDN-CPY-03-003, PCDN-CPY-03-004, PCDN-CPY-03-005, §5, §6, §8, §11,
+§12, §14
+
+**Commits:** pending
+
+**Summary:** Selects bounded Crossbeam queues and Unix readiness primitives,
+keeps presentation on the Service Thread, fixes close disposition, and rejects
+subinterpreters in the first release while retaining a measured capacity gate.
+
+#### Rationale
+
+Crossbeam supplies a small, well-tested bounded queue without imposing an
+async runtime, while `eventfd`/self-pipe readiness integrates with the selected
+Linux/macOS host matrix and carries no semantic records. One thread preserves
+the simplest deterministic ownership proof. Exact capacities cannot be
+selected responsibly from policy alone and therefore remain evidence-blocked.
+
+Considered and rejected: unbounded standard channels, Tokio as a mandatory
+runtime, a separate presenter thread without a backend constraint, cancelling
+an in-progress neutral commit, silently discarding queued requests during
+close, and advertising subinterpreter support from module initialization alone.
+
+What deliberately did not change: no dependency, queue, readiness descriptor,
+thread, service, backend, PyO3 module, or capacity constant is implemented.
+CPY-03 remains Draft.
 
 ### 0.1.0 — 2026-08-18 — drafted
 

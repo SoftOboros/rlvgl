@@ -6,9 +6,11 @@ CPY-01-BASELINE-TARGET-PROFILES.md - Exact source, runtime, target, and capabili
 
 **Document ID:** CPY-01-BASELINE-TARGET-PROFILES
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Six baseline-selection PCDNs resolved
+2026-08-18. Not ratified; the exact manifest instance and target evidence are
+still required.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -74,6 +76,7 @@ ratification.
 |---|---|
 | Profile names and primary/secondary relationship | CPY-00 §6 |
 | Exact source/tool/runtime pins | Baseline Manifest created under this phase |
+| Baseline Manifest grammar | [`CPY-BASELINE-MANIFEST.schema.json`](CPY-BASELINE-MANIFEST.schema.json) |
 | Current Rust crate graph | Workspace `Cargo.toml` files at the pinned source commit |
 | Neutral semantic scope | Exact ratified MPY phase revisions named by the manifest |
 | LVGL/rlvgl scope | Exact LPAR and vendored LVGL pins named by the manifest |
@@ -124,18 +127,44 @@ CPY-01 §15 amendment.
 
 ## 7. Frozen Decisions — Architecture Matrix
 
-The required initial matrix MUST include:
+The required initial matrix is:
 
-- one native development host architecture;
-- one 64-bit Linux wheel/import architecture;
-- one embedded-Linux architecture backed by a target rootfs; and
-- one physical embedded-Linux Reference Board.
+| Rust target triple | Role | Initial requirement |
+|---|---|---|
+| `x86_64-apple-darwin` | Native development host and host-headless/windowed proof | Required |
+| `x86_64-unknown-linux-gnu` | Linux host wheel/import and headless proof | Required |
+| `aarch64-unknown-linux-gnu` | 64-bit SBC/rootfs cross-build and target-side import/runtime proof | Required; physical display proof may follow the first release |
+| `armv7-unknown-linux-gnueabihf` | Minimal physical embedded-Linux Reference Board | Required on BeagleBone Black |
 
-An additional 32-bit embedded-Linux architecture is RECOMMENDED because the
-existing BeagleBone path is a useful direct-console proof. Exact triples and
-boards remain open until §11 resolves them.
+`aarch64-apple-darwin`, Windows, musl, and additional SBC triples are expansion
+rows, not first-baseline requirements. Adding one does not weaken any required
+row and requires its own target/rootfs/artifact evidence.
+
+The physical Reference Board is BeagleBone Black with the repository's
+NHD-7.0CTP-CAPE-P path: kernel `tilcdc` `/dev/fb0` presentation and kernel
+`edt-ft5x06` evdev input. Base CPY conformance MUST use ordinary owned frame
+storage and MUST NOT require the example's reserved `/dev/mem`/EDMA scratch
+buffer. The existing high-privilege path remains separately labeled evidence.
 
 ## 8. Frozen Decisions — Qualification Variants
+
+### 8.1 Initial interpreter and tool baseline
+
+- The minimum supported CPython minor is 3.13.
+- The initial conventional-GIL test matrix is CPython 3.13 and 3.14, using the
+  latest patch release recorded in each Baseline Manifest instance.
+- CPython 3.15 prereleases are forward-compatibility experiments only until a
+  ratified amendment adds the released minor.
+- The initial binding toolchain is PyO3 0.28.3 and maturin 1.13.0. Their exact
+  Cargo/Python package checksums belong in the manifest instance.
+- The first Linux rootfs family is Debian 13 (`trixie`): `armhf` for the BBB
+  physical profile and `arm64` for the AArch64 import/runtime profile. The
+  exact image/package-set digest remains a ratification artifact.
+
+These are specification pins, not floating `latest` constraints. Updating a
+minor or tool version requires a CPY-01 amendment and a new manifest instance.
+
+### 8.2 Variant isolation
 
 The conventional GIL-enabled build is the initial required variant. A
 free-threaded build MUST have its own artifact, import record, race/lifetime
@@ -164,7 +193,7 @@ buffer features are required.
 | `Cargo.lock` | Compose as exact Rust dependency evidence; it does not pin CPython, rootfs, or external tools. |
 | MPY coverage matrix | Reuse overlapping semantic rows by reference; CPY adds driver/profile evidence columns rather than copying row definitions. |
 | LPAR parity baseline | Inherit the exact pin and proven scope; CPY does not claim unimplemented LVGL classes. |
-| Existing BBB example | Candidate physical/direct-console evidence source, not automatically the selected Reference Board. |
+| Existing BBB example | Selected physical/direct-console starting point, but its `/dev/mem` render scratch is excluded from base CPY conformance; CPY-06 must supply an ordinary-owned-memory path and physical input evidence. |
 | Host simulator | Candidate host-windowed presenter, not a substitute for deterministic headless frames. |
 
 ## 11. Non-Goals and Open Decisions
@@ -178,25 +207,53 @@ buffer features are required.
   workstation.
 - Claiming PyPy, GraalPy, or another Python implementation as CPython evidence.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-01-001` | What is the minimum and initial tested CPython version set? | Select from intended embedded rootfs availability and required buffer/PyO3 features; record exact minors. | CPY-01 ratification, CPY-04/08 |
-| `PCDN-CPY-01-002` | Which PyO3 and packaging-tool versions are pinned? | Pin one reviewed PyO3 and maturin release in the Baseline Manifest; update only by evidence-backed amendment. | CPY-01 ratification, CPY-04/08 |
-| `PCDN-CPY-01-003` | Which physical Reference Board and Linux display/input path close the primary profile? | Prefer an existing rlvgl-supported board/path; record whether BBB is sufficient or an AArch64 SBC is required. | CPY-01 ratification, CPY-06/09 |
-| `PCDN-CPY-01-004` | Which exact host and embedded target triples are required? | Require native host, x86_64 Linux, AArch64 Linux, and add ARMv7 when the Reference Board uses it. | CPY-01 ratification, CPY-08 |
-| `PCDN-CPY-01-005` | Which MPY phase revisions form CPY's initial neutral contract frontier? | Pin only ratified surfaces needed by CPY-03/04; later rows enter through manifest amendments. | CPY-01 ratification, CPY-03/04 |
-| `PCDN-CPY-01-006` | Is free-threaded CPython a first-release requirement? | No; keep it a separately gated qualification variant until the GIL-enabled path is proven. | CPY-01 ratification, CPY-09 claim set |
+`PCDN-CPY-01-001` through `PCDN-CPY-01-006` are accepted as amended:
+
+- **PCDN-CPY-01-001 — CPython versions — Accepted as amended
+  2026-08-18.** CPython 3.13 is the minimum. Initial required conventional-GIL
+  testing covers 3.13 and 3.14; each manifest pins exact patches. Python 3.12
+  and older are unsupported by the first CPY baseline, and 3.15 prereleases
+  cannot satisfy release evidence.
+- **PCDN-CPY-01-002 — PyO3 and packaging tool — Accepted as amended
+  2026-08-18.** Pin PyO3 0.28.3 and maturin 1.13.0. Later updates require a
+  CPY-01 amendment, clean build/import/buffer/lifetime evidence, and a new
+  artifact manifest; a floating version range is not a baseline.
+- **PCDN-CPY-01-003 — Physical Reference Board — Accepted as amended
+  2026-08-18.** Use BeagleBone Black plus NHD-7.0CTP-CAPE-P as the first
+  physical minimal-SBC reference, with kernel `tilcdc` fbdev and kernel evdev.
+  The base profile excludes `/dev/mem`; CPY-06 must replace the current
+  reserved-memory/EDMA scratch path with ordinary owned frame storage. The BBB
+  closes physical armv7 evidence; an AArch64 target-side import/runtime row is
+  required but an AArch64 physical display board is not required initially.
+- **PCDN-CPY-01-004 — Target triples — Accepted as amended 2026-08-18.** The
+  initial required targets are `x86_64-apple-darwin`,
+  `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, and
+  `armv7-unknown-linux-gnueabihf`, with the roles in §7. No evidence may move
+  between triples.
+- **PCDN-CPY-01-005 — Neutral contract frontier — Accepted as amended
+  2026-08-18.** The initial consumed frontier is MPY-00 revision 0.2.5,
+  MPY-01 revision 0.2.0, MPY-02 revision 0.6.0, MPY-03 revision 0.4.0,
+  MPY-04 revision 0.8.0, and MPY-05 revision 0.2.1, all ratified at the source
+  revision recorded by the manifest. MPY-06 through MPY-09 are not neutral
+  authority and are not prerequisites for CPY planning; their actual
+  MicroPython evidence is consumed only by the CPY-09 parity rows that name
+  it.
+- **PCDN-CPY-01-006 — Free-threaded CPython — Accepted as amended
+  2026-08-18.** Free-threaded CPython is not a first-release requirement. It is
+  a later qualification variant with separate artifacts and race/lifetime
+  evidence; the extension MUST explicitly declare/use the correct PyO3 GIL
+  posture and cannot inherit conventional-GIL claims.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [x] Every PCDN in §11.2 is resolved.
 - [ ] A clean source commit and exact consumed document revisions are recorded.
-- [ ] The Baseline Manifest schema contains every §5 field.
+- [x] The Baseline Manifest schema contains every §5 field.
 - [ ] Required architecture, rootfs, and Reference Board rows are complete.
 - [ ] Every capability cell has an explicit state and evidence owner.
-- [ ] Qualification variants cannot borrow evidence from one another.
+- [x] Qualification variants cannot borrow evidence from one another.
 - [ ] The owner records ratification in §15.
 
 ## 13. Files Cited
@@ -204,6 +261,7 @@ buffer features are required.
 | File or authority | Role |
 |---|---|
 | `Cargo.toml`, crate manifests, `Cargo.lock` | Current Rust graph and dependency pins |
+| `docs/cpython/CPY-BASELINE-MANIFEST.schema.json` | Machine-readable CPY baseline grammar |
 | `docs/concepts/MPY-COVERAGE-MATRIX.json` | Existing semantic coverage/evidence model |
 | `docs/concepts/MPY-*.md` | Neutral and MicroPython phase status frontier |
 | `docs/concepts/LPAR-*.md` | LVGL/rlvgl behavior and baseline |
@@ -212,10 +270,53 @@ buffer features are required.
 
 ## 14. Unblocks
 
-Ratification unblocks CPY-02 crate-topology ratification and supplies the exact
-input matrix for later phases. It authorizes no file movement or binding code.
+All selection PCDNs are resolved, but CPY-01 remains Draft. Ratification is
+blocked by the machine-readable schema/manifest instance, clean source pin,
+exact Debian rootfs digests/package facts, and completed board/device rows in
+§12. Once those close, ratification may unblock CPY-02 ratification review. It
+authorizes no file movement or binding code.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — baseline PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-01-1, INV-CPY-01-2, INV-CPY-01-3, INV-CPY-01-4,
+INV-CPY-01-5, INV-CPY-01-6, PCDN-CPY-01-001, PCDN-CPY-01-002,
+PCDN-CPY-01-003, PCDN-CPY-01-004, PCDN-CPY-01-005, PCDN-CPY-01-006,
+CPY-BASELINE-MANIFEST.schema.json, §4, §5, §7, §8, §10, §11, §12, §13,
+§14
+
+**Commits:** pending
+
+**Summary:** Selects CPython 3.13/3.14, PyO3 0.28.3, maturin 1.13.0,
+four initial Rust targets, a Debian 13 rootfs family, the BBB physical
+reference, the ratified MPY-00 through MPY-05 frontier, and deferred
+free-threaded qualification.
+
+#### Rationale
+
+Debian 13 supplies CPython 3.13 for both `armhf` and `arm64`, while CPython
+3.14 is the current bugfix release and supplies a second supported minor for
+host and forward-rootfs evidence. The selected PyO3/maturin releases are the
+current compatible stable pair. BBB is the only repository target with an
+existing physical Linux fbdev/evdev integration and deliberately exercises a
+minimal 32-bit SBC envelope; excluding its `/dev/mem` scratch path prevents
+that implementation detail from becoming base CPY privilege policy.
+
+Considered and rejected: supporting 3.12 solely because it is installed on the
+drafting host; making prerelease 3.15 a release target; using only a 64-bit
+desktop as embedded proof; requiring a new AArch64 display board before the
+existing BBB path is qualified; and consuming MPY-06 through MPY-09 as neutral
+authority.
+
+What deliberately did not change: no Baseline Manifest instance, rootfs image,
+board result, Python toolchain, Cargo dependency, target build, or binding code
+is created by this amendment. CPY-01 remains Draft until those acceptance
+artifacts exist.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
