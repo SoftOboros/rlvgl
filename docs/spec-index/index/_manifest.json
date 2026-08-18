@@ -42,7 +42,7 @@
     "chips-silabs": 53,
     "chips-ti": 31,
     "concepts": 5,
-    "cpy": 270,
+    "cpy": 283,
     "crates-ci": 24,
     "dcb": 56,
     "disco-platform-guide": 1,
@@ -51,15 +51,15 @@
     "input": 13,
     "ki2c": 88,
     "lpar": 501,
-    "mpy": 349,
+    "mpy": 351,
     "qt-support": 64,
     "ratatui": 11,
     "rend": 14,
     "sctd": 48,
     "wid": 13,
-    "wld": 73
+    "wld": 75
   },
   "schema_version": 2,
-  "total_edges": 1375,
-  "total_objects": 2131
+  "total_edges": 1438,
+  "total_objects": 2148
 }
