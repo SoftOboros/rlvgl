@@ -4,8 +4,9 @@ WLD-01-SESSION-SHM-PRESENTATION.md - Wayland session and SHM presenter phase.
 
 # WLD-01 — Session and SHM Presentation
 
-**Status:** Draft 2026-08-18. Blocked by WLD-00 and
-`PCDN-WLD-001` through `PCDN-WLD-003`. No implementation is authorized.
+**Status:** Draft 2026-08-18. `PCDN-WLD-001` is resolved. This phase remains
+blocked by WLD-00, `PCDN-WLD-002`, and `PCDN-WLD-003`. No implementation is
+authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md).
 
@@ -272,8 +273,9 @@ more presents than the slot count.
 
 ## 12. Acceptance and Evidence
 
-WLD-01 may be ratified only after WLD-00 accepts `PCDN-WLD-001` through
-`PCDN-WLD-003` or records amendments here. Implementation exit requires:
+WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary. It may be
+ratified only after WLD-00 accepts `PCDN-WLD-002` and `PCDN-WLD-003` or records
+amendments here. Implementation exit requires:
 
 - [ ] Optional dependency and target gating is explicit in `Cargo.toml`.
 - [ ] Default and representative embedded/no-std feature checks are unchanged.
@@ -326,6 +328,26 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.1.1 — 2026-08-18 — Consumed PCDN-WLD-001 resolution
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** PCDN-WLD-001, §0, §12
+
+**Commits:** pending
+
+**Summary:** Records that WLD-01 consumes the accepted client substrate and
+event-loop boundary while remaining blocked on the two unresolved
+presentation decisions.
+
+#### Rationale
+
+The parent decision is now resolved, so the phase status must distinguish the
+accepted event-loop boundary from the presentation decisions that still block
+ratification and implementation.
 
 ### 0.1.0 — 2026-08-18 — Drafted
 

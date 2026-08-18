@@ -4,7 +4,7 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. Five PCDNs remain open. No implementation is
+**Status:** Draft 2026-08-18. Four PCDNs remain open. No implementation is
 authorized. Target release line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
@@ -242,12 +242,16 @@ amendment. It MUST NOT absorb CPython or MPY work to close its release gate.
 
 ## 12. PCDNs and Acceptance Checklist
 
-WLD-00 remains Draft until the owner accepts or amends all five decisions:
+`PCDN-WLD-001` is accepted as amended. WLD-00 remains Draft until the owner
+accepts or amends the other four decisions:
 
-- **PCDN-WLD-001 — Client substrate and event-loop boundary.** Adopt
-  `smithay-client-toolkit` over `wayland-client`, expose composable
-  dispatch/readiness plus an optional convenience loop, and keep protocol
-  read/dispatch/flush sequencing session-owned.
+- **PCDN-WLD-001 — Client substrate and event-loop boundary — Accepted as
+  amended 2026-08-18.** Use Smithay Client Toolkit as the protocol convenience
+  layer over `wayland-client`. One WLD session owns the connection, event
+  queue, delegates, and all protocol read/dispatch/flush sequencing. Expose a
+  composable nonblocking readiness boundary plus an optional blocking
+  convenience loop. No particular external event-loop framework is mandatory,
+  and raw Wayland protocol objects are not public rlvgl API.
 - **PCDN-WLD-002 — Reference presentation policy.** Use three SHM slots by
   default, opaque `XRGB8888`, complete Shadow Frame copies, separate frame and
   release gates, and bounded latest-state coalescing. Permit a configurable
@@ -272,7 +276,8 @@ Ratification additionally confirms:
 - [ ] §7 is the complete v0.2.7 capability envelope.
 - [ ] §8 keeps WLD to two implementation phases.
 - [ ] §9 concurrency boundaries preserve MPY and CPython authority.
-- [ ] PCDN-WLD-001 through PCDN-WLD-005 are resolved in this document.
+- [x] PCDN-WLD-001 is resolved as amended in this document.
+- [ ] PCDN-WLD-002 through PCDN-WLD-005 are resolved in this document.
 
 ## 13. Files Cited
 
@@ -305,6 +310,28 @@ ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.1.1 — 2026-08-18 — PCDN-WLD-001 accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-1, PCDN-WLD-001, §5.2, §12, §14
+
+**Commits:** pending
+
+**Summary:** Resolves the client substrate and event-loop boundary by placing
+Smithay Client Toolkit above `wayland-client`, retaining one session-owned
+protocol sequence, requiring a composable nonblocking boundary, and keeping a
+blocking convenience loop optional.
+
+#### Rationale
+
+SCTK and `wayland-client` are layers rather than competing substrates. This
+resolution uses SCTK protocol helpers without exporting its protocol objects
+or imposing a particular application event loop, while one WLD session keeps
+the Wayland read, dispatch, and flush sequence coherent.
 
 ### 0.1.0 — 2026-08-18 — Drafted
 
