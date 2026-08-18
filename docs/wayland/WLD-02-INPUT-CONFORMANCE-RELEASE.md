@@ -122,10 +122,11 @@ local held-state memory must still be cleared.
 | non-primary buttons | Ignore with optional telemetry; current pointer event has no button identity. |
 | leave/focus loss while pressed | Emit one synthetic `PointerUp`, then clear focus and held state. |
 
-Coordinates outside the admitted logical canvas are clamped or rejected by one
-documented rule and tested at every edge. Fixed-canvas letterboxing, if used,
-must reject presses outside the content region rather than mapping them to an
-edge pixel.
+Wayland pointer and touch coordinates are already surface-local. Adaptive
+Window uses them directly in logical surface coordinates without dividing by
+the integer buffer scale. Fixed Canvas subtracts the centered Canvas Region
+origin exactly once and rejects presses in the opaque letterbox rather than
+mapping them to an edge pixel.
 
 Pointer enter installs a system default cursor using the cursor-shape protocol
 when admitted. The implementation supplies a documented themed-cursor fallback
@@ -223,6 +224,8 @@ absence, or ordinary device hot-unplug.
 ### 11.1 Deterministic unit evidence
 
 - pointer pressed-motion, focus leave, duplicate release, and letterbox edges;
+- adaptive and fixed-canvas coordinate vectors proving no second division by
+  integer buffer scale;
 - xkb key vectors, held-key closure, no duplicate repeat, and unsupported keys;
 - touch slot allocation, suppression, frames, cancel, and stream transitions;
 - axis value120/discrete/continuous accumulation, sign, and remainder reset;
@@ -341,6 +344,25 @@ parity item remain unshipped/open. The documents may remain Draft or ratified
 without converting incomplete evidence into a release claim.
 
 ## 15. Change Log
+
+### 0.1.1 — 2026-08-18 — Consumed PCDN-WLD-003 geometry mapping
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-6, INV-WLD-7, PCDN-WLD-003, §6, §11
+
+**Commits:** pending
+
+**Summary:** Freezes surface-local input mapping for Adaptive Window and the
+single-origin subtraction plus letterbox rejection required by Fixed Canvas.
+
+#### Rationale
+
+Wayland input coordinates are already expressed in surface-local logical
+units. Applying buffer scale again would misplace events, while treating
+letterbox pixels as canvas pixels would create false edge input.
 
 ### 0.1.0 — 2026-08-18 — Drafted
 

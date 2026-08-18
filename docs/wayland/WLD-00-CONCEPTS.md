@@ -4,7 +4,7 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. Three PCDNs remain open. No implementation is
+**Status:** Draft 2026-08-18. Two PCDNs remain open. No implementation is
 authorized. Target release line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
@@ -81,8 +81,9 @@ concurrent Python work by inventing a second public frame-lifetime API.
 | **Latest-State Coalescing** | Bounded backpressure policy that retains the newest complete shadow frame and unions damage while submission is gated. | WLD-01 |
 | **Wayland Lifecycle Notice** | Configure, close, scale, or terminal connection information delivered outside `core::event::Event`. | WLD-01/02 |
 | **Seat Translation** | Mapping of one Wayland seat's capabilities and events into existing rlvgl input events without changing widget semantics. | WLD-02 |
-| **Adaptive Window** | Profile in which compositor size becomes the next accepted logical screen size at a defined frame boundary. | WLD-01 |
-| **Fixed Canvas** | Profile retaining an application-selected logical size, with constraints or a separately specified presentation transform. | WLD-01 |
+| **Adaptive Window** | Default geometry policy in which the latest valid compositor size becomes the accepted logical screen size at a frame boundary. | WLD-01 |
+| **Fixed Canvas** | Geometry policy retaining an application-selected logical size, advertising equal minimum and maximum hints, centering it at 1:1 with opaque letterboxing when the configured surface is larger, and failing rather than cropping or scaling when it is smaller. | WLD-01 |
+| **Fullscreen Kiosk** | XDG fullscreen shell-state modifier usable with either geometry policy; it defaults to Adaptive Window. | WLD-01 |
 
 ## 4. Source-of-Truth Map
 
@@ -176,7 +177,7 @@ a public lease merely to satisfy WLD implementation convenience.
 | Pixels | `wl_shm`, `XRGB8888`, explicit conversion, bounded slots | DMA-BUF, transparent windows, zero-copy GPU paths |
 | Presentation | buffer-coordinate damage or specified fallback, attach/commit, frame pacing, release-safe reuse | presentation-time feedback and adaptive latency tuning |
 | Input | one seat, pointer, default cursor, keyboard, touch, vertical pointer axis | multiple seats, horizontal axis, IME, tablet, relative pointer, gestures protocol |
-| Size | adaptive and fixed profiles, integer scale, compositor-owned output rotation | fractional scale, viewporter scaling, client-buffer rotation |
+| Size | adaptive default, deterministic fixed-canvas letterboxing, fullscreen modifier, positive integer scale, compositor-owned output rotation | fractional scale, viewporter scaling, client-content rotation |
 | Host integration | dispatch/poll/readiness API and convenience loop | mandatory ownership of the application's event loop |
 | Python | no interpreter dependency; internal Shadow Frame only | public `FrameLease`, buffer protocol, asyncio, wheel packaging |
 
@@ -242,8 +243,8 @@ amendment. It MUST NOT absorb CPython or MPY work to close its release gate.
 
 ## 12. PCDNs and Acceptance Checklist
 
-`PCDN-WLD-001` and `PCDN-WLD-002` are accepted as amended. WLD-00 remains
-Draft until the owner accepts or amends the other three decisions:
+`PCDN-WLD-001` through `PCDN-WLD-003` are accepted as amended. WLD-00 remains
+Draft until the owner accepts or amends the other two decisions:
 
 - **PCDN-WLD-001 — Client substrate and event-loop boundary — Accepted as
   amended 2026-08-18.** Use Smithay Client Toolkit as the protocol convenience
@@ -264,10 +265,20 @@ Draft until the owner accepts or amends the other three decisions:
   generations. An oversized geometry is rejected with a typed error, and
   replacement allocation remains gated until releases reduce any temporary
   peak to the configured budget.
-- **PCDN-WLD-003 — Size, scale, and rotation.** Make Adaptive Window the
-  desktop default; expose Fixed Canvas and fullscreen kiosk profiles; support
-  integer scale only; leave physical output rotation to the compositor; defer
-  fractional scale and client-buffer rotation.
+- **PCDN-WLD-003 — Size, scale, and rotation — Accepted as amended
+  2026-08-18.** Adaptive Window is the default geometry policy and adopts the
+  latest valid compositor size at a frame boundary. Fixed Canvas retains its
+  application-selected logical size, advertises equal minimum and maximum
+  hints, presents larger configured surfaces with centered opaque
+  letterboxing, rejects input outside the canvas, and reports a typed
+  lifecycle error rather than cropping or scaling when the configured surface
+  is too small. Fullscreen Kiosk is a shell-state modifier usable with either
+  geometry policy and defaults to Adaptive. Support positive integer buffer
+  scale only; size or scale changes create a new release-tracked generation
+  and force full invalidation. WLD uses `Rotation::Deg0` and the normal
+  Wayland buffer transform, leaving physical output rotation to the
+  compositor. Fractional scaling, viewporter scaling, and client-content
+  rotation remain deferred.
 - **PCDN-WLD-004 — Input closure.** Target one seat, use current rlvgl events,
   emit pointer motion only while pressed, allocate stable touch slots, map axis
   steps with remainder accumulation, and synthesize deterministic releases on
@@ -286,7 +297,8 @@ Ratification additionally confirms:
 - [ ] §9 concurrency boundaries preserve MPY and CPython authority.
 - [x] PCDN-WLD-001 is resolved as amended in this document.
 - [x] PCDN-WLD-002 is resolved as amended in this document.
-- [ ] PCDN-WLD-003 through PCDN-WLD-005 are resolved in this document.
+- [x] PCDN-WLD-003 is resolved as amended in this document.
+- [ ] PCDN-WLD-004 and PCDN-WLD-005 are resolved in this document.
 
 ## 13. Files Cited
 
@@ -319,6 +331,29 @@ ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.1.3 — 2026-08-18 — PCDN-WLD-003 accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-2, INV-WLD-6, PCDN-WLD-003, §3, §5.4, §7, §9, §12, §14
+
+**Commits:** pending
+
+**Summary:** Resolves geometry around an Adaptive Window default, a
+deterministic Fixed Canvas policy, fullscreen as an orthogonal shell-state
+modifier, positive integer buffer scale, release-tracked geometry generations,
+and compositor-owned physical rotation.
+
+#### Rationale
+
+Separating content geometry from fullscreen shell state keeps the renderer's
+logical contract explicit. Fixed Canvas remains pixel-exact and rejects
+undersized configurations rather than introducing an implicit scaler, while
+integer-scale generations preserve release-safe ownership across output
+changes.
 
 ### 0.1.2 — 2026-08-18 — PCDN-WLD-002 accepted as amended
 

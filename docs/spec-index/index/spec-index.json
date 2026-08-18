@@ -27,14 +27,14 @@
       "kind_provenance": "inferred",
       "line": 101,
       "source": "docs/spec-index/SBC-COMPATIBILITY.md",
-      "target": "PCDN-WLD-002"
+      "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 102,
       "source": "docs/spec-index/SBC-COMPATIBILITY.md",
-      "target": "PCDN-WLD-003"
+      "target": "PCDN-WLD-004"
     },
     {
       "edge_type": "cites",

@@ -4,8 +4,8 @@ WLD-01-SESSION-SHM-PRESENTATION.md - Wayland session and SHM presenter phase.
 
 # WLD-01 — Session and SHM Presentation
 
-**Status:** Draft 2026-08-18. `PCDN-WLD-001` and `PCDN-WLD-002` are resolved.
-This phase remains blocked by WLD-00 and `PCDN-WLD-003`. No implementation is
+**Status:** Draft 2026-08-18. `PCDN-WLD-001` through `PCDN-WLD-003` are
+resolved. This phase remains blocked by WLD-00. No implementation is
 authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md).
@@ -59,6 +59,7 @@ compatible for v0.2.7.
 | **Slot State** | `Free`, `Busy`, or `Retired`. Busy storage is immutable; Retired storage is destroyed after release or terminal teardown. |
 | **Submit Attempt** | Nonblocking operation that commits only when configured, frame-permitted, and holding a Free slot. |
 | **Accepted Configure** | Latest acknowledged XDG configure whose logical size/scale has been adopted by the renderer and SHM allocation handshake. |
+| **Canvas Region** | The surface-local rectangle containing Fixed Canvas content; any surrounding area is opaque letterbox and is not input-active. |
 
 ## 4. Source-of-Truth Map
 
@@ -113,7 +114,13 @@ pub struct WaylandConfig {
     pub app_id: String,
     pub initial_size: (u32, u32),
     pub size_policy: SizePolicy,
+    pub fullscreen: bool,
     pub buffer_count: NonZeroU8,
+}
+
+pub enum SizePolicy {
+    Adaptive,
+    FixedCanvas { width: NonZeroU32, height: NonZeroU32 },
 }
 
 pub enum WaylandLifecycleEvent {
@@ -156,10 +163,12 @@ from its session.
 
 ### 7.2 Initial configure
 
-The session acknowledges the configure serial, resolves zero width/height
-against the configured initial size, publishes a lifecycle Configure event,
-and waits for the runtime to adopt compatible renderer geometry. The first
-buffer attaches only after that handshake makes the session `Ready`.
+The session acknowledges the configure serial. A zero width or height means
+that the client retains its requested or current size for that dimension; it
+does not mean a zero-sized allocation. The session publishes a lifecycle
+Configure event and waits for the runtime to adopt compatible renderer
+geometry. The first buffer attaches only after that handshake makes the
+session `Ready`.
 
 ### 7.3 Resize
 
@@ -177,6 +186,25 @@ On later configure:
 The final API may use an explicit `accept_configure` call or an equivalent
 runtime handshake. Implicitly changing `screen()` in the middle of
 `present_plan` is forbidden.
+
+### 7.4 Geometry profiles
+
+Adaptive Window is the default. The newest valid nonzero compositor size is
+acknowledged promptly and adopted at a frame boundary. No non-null buffer is
+attached while renderer geometry and allocation disagree, and adoption starts
+a new release-tracked slot generation with full invalidation.
+
+Fixed Canvas keeps its application-selected logical `Screen` dimensions. WLD
+advertises equal XDG minimum and maximum size hints, while treating them as
+hints rather than proof that the compositor will comply. If the configured
+surface is larger, WLD presents the canvas at 1:1 in a centered Canvas Region
+and fills every surrounding pixel with opaque letterbox color. If either
+configured dimension is smaller, WLD reports a typed lifecycle error and does
+not crop, scale, or attach incompatible content.
+
+Fullscreen Kiosk is an XDG shell-state modifier, not a third geometry policy.
+It may be combined with either policy and defaults to Adaptive Window when no
+policy is selected.
 
 ## 8. Shadow Frame and Flush Contract
 
@@ -272,19 +300,24 @@ more presents than the slot count.
   ignored only under an explicitly opaque final-frame rule.
 - The backend marks an opaque region when correct; it never labels transparent
   content opaque.
-- Integer buffer scale is supported after the Accepted Configure handshake.
-  Logical damage and input coordinates remain logical; slot dimensions and
-  buffer damage are scaled exactly once.
-- The compositor owns physical output rotation. WLD advertises an unrotated
-  rlvgl `Screen` in v0.2.7.
+- Only positive integer buffer scale is supported after the Accepted Configure
+  handshake. Slot dimensions are the checked product of surface-logical
+  dimensions and scale. A size or scale change starts a release-tracked slot
+  generation and forces full invalidation. Logical damage is converted to
+  buffer coordinates exactly once.
+- Wayland input is already surface-local. WLD-02 subtracts a Fixed Canvas
+  origin once and rejects letterbox input; it does not divide input by the
+  integer buffer scale again.
+- The compositor owns physical output rotation. WLD reports
+  `Rotation::Deg0` and uses the normal Wayland buffer transform in v0.2.7.
 - Fractional scale, viewporter transforms, transparent windows, and
   client-buffer rotation are deferred.
 
 ## 12. Acceptance and Evidence
 
-WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary and
-`PCDN-WLD-002` presentation policy. It may be ratified only after WLD-00
-accepts `PCDN-WLD-003` or records an amendment here. Implementation exit
+WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary,
+`PCDN-WLD-002` presentation policy, and `PCDN-WLD-003` geometry policy. It may
+be ratified only after its parent WLD-00 is ratified. Implementation exit
 requires:
 
 - [ ] Optional dependency and target gating is explicit in `Cargo.toml`.
@@ -294,6 +327,12 @@ requires:
 - [ ] Pure state-machine tests cover initial configure, configure supersession,
       frame-before-release, release-before-frame, all-slots-busy, resize with
       Busy slots, disconnect, and clean teardown.
+- [ ] Configure tests cover zero dimensions, Adaptive adoption at a frame
+      boundary, Fixed Canvas letterbox geometry, and typed undersized failure.
+- [ ] Integer-scale vectors prove checked buffer dimensions, single conversion
+      of logical damage, new-generation retirement, and full invalidation.
+- [ ] `Screen` remains `Rotation::Deg0` with the normal Wayland buffer
+      transform.
 - [ ] Pixel vectors freeze `Color` to `XRGB8888` bytes, stride, scale, and
       damage conversion.
 - [ ] Full and partial present tests run for more frames than the slot count and
@@ -342,6 +381,26 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.1.3 — 2026-08-18 — Consumed PCDN-WLD-003 resolution
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-2, INV-WLD-6, PCDN-WLD-003, §3, §6, §7, §11, §12
+
+**Commits:** pending
+
+**Summary:** Freezes Adaptive Window as the default, deterministic Fixed
+Canvas letterboxing and undersized failure, fullscreen as a modifier, positive
+integer scaling, generation retirement, and compositor-owned rotation.
+
+#### Rationale
+
+The phase now distinguishes logical canvas size, configured surface size, and
+buffer size. That distinction prevents implicit crop/scale behavior, avoids
+double-scaling input, and preserves SHM ownership when geometry changes.
 
 ### 0.1.2 — 2026-08-18 — Consumed PCDN-WLD-002 resolution
 
