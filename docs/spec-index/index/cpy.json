@@ -1,122 +1,185 @@
 {
-  "edge_count": 147,
+  "edge_count": 156,
   "edges": [
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 29,
+      "line": 30,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "SBC-INV-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 102,
+      "line": 103,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "PCDN-CPY-00-001"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 208,
-      "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 209,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-2"
+      "target": "INV-CPY-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 210,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-3"
+      "target": "INV-CPY-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 211,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-4"
+      "target": "INV-CPY-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 212,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-5"
+      "target": "INV-CPY-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 213,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-6"
+      "target": "INV-CPY-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 214,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-7"
+      "target": "INV-CPY-6"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 215,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-8"
+      "target": "INV-CPY-7"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 216,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-9"
+      "target": "INV-CPY-8"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 217,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-10"
+      "target": "INV-CPY-9"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 218,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
-      "target": "INV-CPY-11"
+      "target": "INV-CPY-10"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 219,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "INV-CPY-11"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 220,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "INV-CPY-12"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 253,
+      "line": 252,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "PCDN-CPY-00-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 252,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "PCDN-CPY-00-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 254,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "PCDN-CPY-00-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 260,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "PCDN-CPY-00-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 255,
+      "line": 266,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "PCDN-CPY-00-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 317,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "INV-CPY-12"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 317,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "INV-CPY-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 317,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "INV-CPY-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 317,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "INV-CPY-9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 318,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "PCDN-CPY-00-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 318,
+      "source": "docs/cpython/CPY-00-CONCEPTS.md",
+      "target": "PCDN-CPY-00-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 318,
       "source": "docs/cpython/CPY-00-CONCEPTS.md",
       "target": "PCDN-CPY-00-003"
     },
@@ -1049,7 +1112,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 90,
+      "line": 91,
       "obj_id": "cpy:term:cpython director",
       "text": "The CPython application that submits application intent and processes queued cues."
     },
@@ -1061,7 +1124,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 91,
+      "line": 92,
       "obj_id": "cpy:term:native runtime service",
       "text": "The `std` owner of the endpoint, actor registry, rendering cadence, bounded queues, frame slots, and shutdown state. It never calls Python."
     },
@@ -1073,7 +1136,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 92,
+      "line": 93,
       "obj_id": "cpy:term:python handle",
       "text": "A CPython object containing stable identity and adapter state, never a Rust actor reference or raw native pointer."
     },
@@ -1085,7 +1148,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 93,
+      "line": 94,
       "obj_id": "cpy:term:frame descriptor",
       "text": "Immutable metadata naming frame identity, stage revision, dimensions, stride, exact byte format, damage, logical time, and loss state."
     },
@@ -1097,7 +1160,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 94,
+      "line": 95,
       "obj_id": "cpy:term:frame lease",
       "text": "A read-only Python-exportable hold on one frozen frame slot. The slot cannot be recycled until every export releases it."
     },
@@ -1109,7 +1172,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 95,
+      "line": 96,
       "obj_id": "cpy:term:frame slot",
       "text": "One bounded storage cell that transitions through writable, frozen, presented, leased, and recyclable ownership states."
     },
@@ -1121,7 +1184,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 96,
+      "line": 97,
       "obj_id": "cpy:term:native-presented mode",
       "text": "rlvgl presents frames on its native cadence while Python may observe leased frames."
     },
@@ -1133,7 +1196,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 97,
+      "line": 98,
       "obj_id": "cpy:term:python-presented mode",
       "text": "Python explicitly acquires and presents frames and therefore accepts the specified bounded backpressure contract."
     },
@@ -1145,7 +1208,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 98,
+      "line": 99,
       "obj_id": "cpy:term:mpy safe point",
       "text": "A recorded clean commit and green MPY-relevant evidence frontier at which CPY crate migration may begin without editing in-flight MPY work."
     },
@@ -1157,7 +1220,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 99,
+      "line": 100,
       "obj_id": "cpy:term:neutral contract crate",
       "text": "A crate containing interpreter-independent identities, values, protocol, descriptors, errors, or runtime behavior and no CPython/MicroPython ABI dependencies."
     },
@@ -1169,7 +1232,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 100,
+      "line": 101,
       "obj_id": "cpy:term:adapter crate",
       "text": "A crate that maps one interpreter ABI/object model onto the neutral contract and MUST NOT become a neutral semantic owner."
     },
@@ -1181,7 +1244,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 101,
+      "line": 102,
       "obj_id": "cpy:term:direct deployment",
       "text": "Trusted CPython and native runtime service share one process that owns admitted Linux device nodes."
     },
@@ -1193,7 +1256,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 102,
+      "line": 103,
       "obj_id": "cpy:term:hardened deployment",
       "text": "An unprivileged CPython process communicates with a privileged native rlvgl service over an authenticated local transport."
     },
@@ -1205,7 +1268,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "term",
-      "line": 103,
+      "line": 104,
       "obj_id": "cpy:term:host companion",
       "text": "A headless or windowed full-host profile using the same binding and neutral semantics as embedded Linux."
     },
@@ -1224,7 +1287,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 208,
+      "line": 209,
       "obj_id": "INV-CPY-1",
       "text": "CPY MUST have exactly one neutral semantic authority and MUST NOT make CPython or PyO3 the oracle for Stage-and-Actors behavior."
     },
@@ -1242,7 +1305,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 209,
+      "line": 210,
       "obj_id": "INV-CPY-2",
       "text": "Embedded Linux MUST remain the primary deployment, and every required host convenience MUST map to a stated embedded behavior or be profile-gated."
     },
@@ -1260,7 +1323,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 210,
+      "line": 211,
       "obj_id": "INV-CPY-3",
       "text": "Native actor objects, renderer state, input state, and presentation state MUST remain owned by native runtime code; Python receives stable handles and immutable values only."
     },
@@ -1279,7 +1342,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 211,
+      "line": 212,
       "obj_id": "INV-CPY-4",
       "text": "A native runtime or presenter thread MUST NOT call Python or retain `PyObject` state; callback delivery MUST cross the bounded cue boundary."
     },
@@ -1297,7 +1360,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 212,
+      "line": 213,
       "obj_id": "INV-CPY-5",
       "text": "Every Python-visible frame MUST have immutable bytes, exact metadata, and storage that remains valid until all exports release it."
     },
@@ -1315,7 +1378,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 213,
+      "line": 214,
       "obj_id": "INV-CPY-6",
       "text": "Every queue, frame ring, callback registry, and retained result set MUST be bounded and MUST expose rejection, loss, coalescing, or fault state."
     },
@@ -1333,7 +1396,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 214,
+      "line": 215,
       "obj_id": "INV-CPY-7",
       "text": "Neutral crates MUST NOT depend on either interpreter adapter, and adapter crates MUST NOT redefine neutral protocol or runtime semantics."
     },
@@ -1352,7 +1415,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 215,
+      "line": 216,
       "obj_id": "INV-CPY-8",
       "text": "CPY crate migration MUST NOT edit active MPY artifacts before a recorded MPY Safe Point and MUST preserve direct/actual-MicroPython evidence across each migration step."
     },
@@ -1371,7 +1434,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 216,
+      "line": 217,
       "obj_id": "INV-CPY-9",
       "text": "An untrusted Python process MUST NOT inherit raw device-memory or privileged display/input access; the deployment MUST use the hardened boundary or reject the configuration."
     },
@@ -1389,7 +1452,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 217,
+      "line": 218,
       "obj_id": "INV-CPY-10",
       "text": "CPython conformance MUST compare against the same neutral scenarios, results, cues, snapshots, geometry, and frames used by direct and actual-MicroPython drivers where their profiles overlap."
     },
@@ -1407,7 +1470,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 218,
+      "line": 219,
       "obj_id": "INV-CPY-11",
       "text": "Runtime close, interpreter finalization, dropped Python handles, and outstanding frame exports MUST follow one deterministic lifecycle without native use-after-finalize or slot reuse."
     },
@@ -1426,104 +1489,104 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 219,
+      "line": 220,
       "obj_id": "INV-CPY-12",
       "text": "GIL-enabled, free-threaded, direct, host, and daemon claims MUST remain separately labeled and MUST NOT borrow evidence across untested variants."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 261,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:261",
+      "line": 277,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:277",
       "text": "Every PCDN in §11.2 is resolved and recorded without silent defaults."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 262,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:262",
+      "line": 278,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:278",
       "text": "The six-axis authority table names every external grammar CPY composes."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 263,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:263",
+      "line": 279,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:279",
       "text": "The deployment-profile set and its Standards Action policy are accepted."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 264,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:264",
+      "line": 280,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:280",
       "text": "Every invariant in §9 has a verification surface and binding keyword."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 265,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:265",
+      "line": 281,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:281",
       "text": "CPY-02's unification/partition rules protect active MPY and WLD work."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 266,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:266",
+      "line": 282,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:282",
       "text": "The conformance targets name embedded-Linux, host, hardened, and"
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 268,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:268",
+      "line": 284,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:284",
       "text": "The phase order blocks implementation until its owning phase is ratified."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 269,
-      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:269",
+      "line": 285,
+      "obj_id": "docs/cpython/CPY-00-CONCEPTS.md:gate:285",
       "text": "The owner records ratification in §15 using the current amendment shape."
     },
     {
@@ -1548,7 +1611,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 295,
+      "line": 346,
       "obj_id": "docs/cpython/CPY-00-CONCEPTS.md#0.1.0",
       "text": "Opens the CPY family for embedded-Linux-first full CPython, host companionship, flattened frame leases, and explicit crate unification/partition."
     },
@@ -1559,7 +1622,7 @@
       "doc": "docs/cpython/CPY-00-CONCEPTS.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 295,
+      "line": 346,
       "obj_id": "docs/cpython/CPY-00-CONCEPTS.md#0.1.0-rationale",
       "text": "The prior analysis established that a CPython wrapper alone would leave\nruntime ownership, frame lifetime, crate reuse, privilege, and conformance\nundefined. A multi-phase family makes those boundaries reviewable before PyO3\nor packaging code lands.\n\nConsidered and rejected: extending MPY-06 directly, because it would mix two\ninterpreter ABIs and make unfinished MicroPython work the editing surface for a\nlarger Linux/host initiative; and adding a CPython crate without a topology\nphase, because that would freeze current coupling by accident.\n\nWhat deliberately did not change: any MPY, LPAR, WLD, protocol, runtime,\nplatform, or binding behavior. This revision is Draft and authorizes no code."
     },

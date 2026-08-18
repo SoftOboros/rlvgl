@@ -6,16 +6,17 @@ CPY-00-CONCEPTS.md - CPython embedded-Linux and host authority, invariants, and 
 
 **Document ID:** CPY-00-CONCEPTS
 
-**Status:** Draft 2026-08-18. Not ratified. No behavior implementation is
-authorized.
+**Status:** Ratified 2026-08-18. Normative for CPY authority, profiles,
+invariants, and phase order. Later phases remain separately gated.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
 **Canonical path:** `docs/cpython/CPY-00-CONCEPTS.md`
 
-**Blocks:** CPY-01 through CPY-09 behavior implementation.
+**Unblocks:** CPY-01 ratification review. CPY-02 through CPY-09 implementation
+remains blocked by each owning phase.
 
 ## 0. Authority Policy
 
@@ -246,27 +247,42 @@ Adding or changing a CPY invariant is **Standards Action**.
 - Claiming complete LVGL parity beyond the proven rlvgl/LPAR surface.
 - Static CPython embedding in the first implementation slice.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-00-001` | Is `embedded-linux-daemon` required for base CPY conformance or an optional hardened level? | Optional hardened level initially; mandatory whenever Python is untrusted or devices require broad privilege. | CPY-00 ratification and CPY-06 profile closure |
-| `PCDN-CPY-00-002` | Does crate unification transfer neutral specification authority out of MPY? | No. Move reusable code only; an authority transfer requires a separate joint Standards Action after MPY settles. | CPY-00 ratification and CPY-02 scope |
-| `PCDN-CPY-00-003` | Is `host-windowed` required for initiative release closure? | Required for the full host claim, but not a blocker for an embedded-Linux-only prerelease. | CPY-00 ratification and CPY-09 claims |
+`PCDN-CPY-00-001` through `PCDN-CPY-00-003` are accepted as amended:
+
+- **PCDN-CPY-00-001 — Hardened deployment — Accepted as amended
+  2026-08-18.** `embedded-linux-daemon` is a separately qualified hardened
+  level, not a prerequisite for base `embedded-linux-direct` conformance. It
+  becomes mandatory whenever Python is untrusted or the selected backend
+  requires broad privilege that must not be inherited by the Director
+  Process. A release may claim embedded-direct without claiming hardened.
+- **PCDN-CPY-00-002 — Neutral authority during crate unification — Accepted
+  as amended 2026-08-18.** CPY leads the crate-topology and CPython/PyO3 plan,
+  while ratified MPY/LPAR contracts remain the semantic authority. CPY-02 may
+  move proven reusable code to one neutral owner after its handoff gate, but
+  it cannot transfer specification authority or redefine neutral behavior.
+  Any future authority transfer requires a joint Standards Action.
+- **PCDN-CPY-00-003 — Embedded-first and full-host closure — Accepted as
+  amended 2026-08-18.** Full CPY closure requires `host-windowed`, but an
+  embedded-Linux prerelease may close `embedded-linux-direct` plus
+  `host-headless` without it. Every release and artifact MUST state its exact
+  profile claim and MUST NOT imply full-host conformance from an
+  embedded-only prerelease.
 
 ## 12. Acceptance Checklist
 
 CPY-00 may be ratified only when:
 
-- [ ] Every PCDN in §11.2 is resolved and recorded without silent defaults.
-- [ ] The six-axis authority table names every external grammar CPY composes.
-- [ ] The deployment-profile set and its Standards Action policy are accepted.
-- [ ] Every invariant in §9 has a verification surface and binding keyword.
-- [ ] CPY-02's unification/partition rules protect active MPY and WLD work.
-- [ ] The conformance targets name embedded-Linux, host, hardened, and
+- [x] Every PCDN in §11.2 is resolved and recorded without silent defaults.
+- [x] The six-axis authority table names every external grammar CPY composes.
+- [x] The deployment-profile set and its Standards Action policy are accepted.
+- [x] Every invariant in §9 has a verification surface and binding keyword.
+- [x] CPY-02's unification/partition rules protect active MPY and WLD work.
+- [x] The conformance targets name embedded-Linux, host, hardened, and
       free-threaded boundaries without conflating them.
-- [ ] The phase order blocks implementation until its owning phase is ratified.
-- [ ] The owner records ratification in §15 using the current amendment shape.
+- [x] The phase order blocks implementation until its owning phase is ratified.
+- [x] The owner records ratification in §15 using the current amendment shape.
 
 ## 13. Files Cited
 
@@ -286,11 +302,46 @@ CPY-00 may be ratified only when:
 
 ## 14. Unblocks
 
-Ratification of CPY-00 unblocks ratification review of CPY-01. It does not
+CPY-00 ratification unblocks ratification review of CPY-01. It does not
 authorize CPY-02 crate movement or any binding implementation. Those remain
 separately gated, and CPY-02 additionally requires the recorded MPY Safe Point.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — ratified; root PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-2, INV-CPY-7, INV-CPY-9, INV-CPY-12,
+PCDN-CPY-00-001, PCDN-CPY-00-002, PCDN-CPY-00-003, §6, §8, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Ratifies the CPY family boundary with a conditional hardened
+profile, MPY-retained neutral authority under CPY-led crate planning, and an
+embedded-first prerelease boundary that preserves a separate full-host gate.
+
+#### Rationale
+
+These decisions directly apply the owner's stated priorities: embedded Linux
+is primary, both embedded and full-host deployments remain in scope, CPY leads
+the CPython/PyO3 and crate-topology plan, and MicroPython work remains a
+separate semantic and implementation authority. Separating profile claims
+allows useful embedded progress without relabeling incomplete host or hardened
+evidence.
+
+Considered and rejected: making the daemon mandatory for every trusted
+appliance, because it would add an IPC boundary without a threat-model need;
+moving neutral authority into CPY merely because CPY leads crate planning,
+because that would make the adapter the oracle; and dropping host-windowed
+from full closure, because the requested initiative explicitly covers full
+host as well as embedded Linux.
+
+What deliberately did not change: CPY-01 through CPY-09 remain Draft and
+separately gated. This amendment authorizes no crate movement, PyO3 binding,
+runtime service, frame export, platform change, package, or release claim.
 
 ### 0.1.0 — 2026-08-18 — drafted
 

@@ -4,8 +4,8 @@ README.md - Informative index for the CPython embedded-Linux and host initiative
 
 # CPY — CPython Director for Embedded Linux and Host
 
-**Status:** Draft initiative opened 2026-08-18. No implementation is
-authorized by this index or by any unratified CPY phase.
+**Status:** CPY-00 ratified 2026-08-18. CPY-01 through CPY-09 remain Draft;
+no later-phase implementation is authorized by this index.
 
 CPY specifies a full CPython binding over rlvgl's Stage-and-Actors runtime,
 with embedded Linux as the primary deployment and full-host headless/windowed
@@ -38,8 +38,8 @@ through ratified phase documents and their acceptance gates.
 
 | Phase | Scope | Status |
 |---|---|---|
-| [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Draft; not ratified |
-| [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Draft; blocked by CPY-00 |
+| [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
+| [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Draft; ratification review unblocked |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Draft; blocked by CPY-00/01 and the MPY Safe Point |
 | [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; blocked by CPY-02 |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; blocked by CPY-03 and the consumed MPY phases |
