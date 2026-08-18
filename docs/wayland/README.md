@@ -17,7 +17,7 @@ buffer leases, or Stage/Actor protocol semantics.
 
 | Phase | Scope | Status |
 |---|---|---|
-| [WLD-00](WLD-00-CONCEPTS.md) | Authority, profiles, invariants, dependency boundaries, and phase plan | Draft; PCDN-WLD-001 through PCDN-WLD-003 resolved, with two PCDNs open |
+| [WLD-00](WLD-00-CONCEPTS.md) | Authority, profiles, invariants, dependency boundaries, and phase plan | Draft; PCDN-WLD-001 through PCDN-WLD-004 resolved, with one PCDN open |
 | [WLD-01](WLD-01-SESSION-SHM-PRESENTATION.md) | Wayland session, XDG lifecycle, SHM buffers, damage, pacing, and release-safe presentation | Draft; blocked by WLD-00 |
 | [WLD-02](WLD-02-INPUT-CONFORMANCE-RELEASE.md) | Seat input, cancellation policy, compositor conformance, performance evidence, docs, and v0.2.7 release closure | Draft; blocked by WLD-00 and WLD-01 |
 

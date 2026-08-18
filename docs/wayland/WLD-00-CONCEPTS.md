@@ -4,7 +4,7 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. Two PCDNs remain open. No implementation is
+**Status:** Draft 2026-08-18. One PCDN remains open. No implementation is
 authorized. Target release line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
@@ -243,8 +243,8 @@ amendment. It MUST NOT absorb CPython or MPY work to close its release gate.
 
 ## 12. PCDNs and Acceptance Checklist
 
-`PCDN-WLD-001` through `PCDN-WLD-003` are accepted as amended. WLD-00 remains
-Draft until the owner accepts or amends the other two decisions:
+`PCDN-WLD-001` through `PCDN-WLD-004` are accepted as amended. WLD-00 remains
+Draft until the owner accepts or amends the final decision:
 
 - **PCDN-WLD-001 — Client substrate and event-loop boundary — Accepted as
   amended 2026-08-18.** Use Smithay Client Toolkit as the protocol convenience
@@ -279,10 +279,24 @@ Draft until the owner accepts or amends the other two decisions:
   Wayland buffer transform, leaving physical output rotation to the
   compositor. Fractional scaling, viewporter scaling, and client-content
   rotation remain deferred.
-- **PCDN-WLD-004 — Input closure.** Target one seat, use current rlvgl events,
-  emit pointer motion only while pressed, allocate stable touch slots, map axis
-  steps with remainder accumulation, and synthesize deterministic releases on
-  cancel/focus/capability loss rather than expanding `Event` in v0.2.7.
+- **PCDN-WLD-004 — Input closure — Accepted as amended 2026-08-18.** Admit one
+  Wayland seat and translate through the existing rlvgl event vocabulary
+  without expanding `Event` in v0.2.7. Emit pointer motion only while the
+  primary button is held, while retaining the latest surface-local position.
+  Use xkb state for keyboard translation, emit one raw down/up pair, and leave
+  repeat synthesis to the existing rlvgl policy. Map Wayland touch IDs to
+  stable slots `0..4`; suppress excess contacts without remapping existing
+  slots, and keep a multi-touch sequence touch-only until every contact ends.
+  Map vertical axis input by preferring value120, then discrete steps, then
+  continuous fixed-point accumulation with a signed remainder; defer
+  horizontal and richer scroll semantics. Maintain a Held-State Ledger
+  containing only transitions delivered to the consumer. Pointer leave,
+  keyboard leave, touch cancel, capability or seat removal, and nonterminal
+  failure synthesize deterministic closure events from that ledger. Terminal
+  teardown clears it without outward delivery once the consumer is terminal.
+  Input queues are bounded: motion may coalesce, but transition and closure
+  boundaries must not be silently dropped or reordered; saturation must
+  reserve closure capacity or report terminal input loss.
 - **PCDN-WLD-005 — Release boundary.** Keep the entire v0.2.7 implementation
   optional and `rlvgl-platform`-owned; require Weston integration, smoke,
   feature-isolation, and performance evidence; defer DMA-BUF and every Python
@@ -298,7 +312,8 @@ Ratification additionally confirms:
 - [x] PCDN-WLD-001 is resolved as amended in this document.
 - [x] PCDN-WLD-002 is resolved as amended in this document.
 - [x] PCDN-WLD-003 is resolved as amended in this document.
-- [ ] PCDN-WLD-004 and PCDN-WLD-005 are resolved in this document.
+- [x] PCDN-WLD-004 is resolved as amended in this document.
+- [ ] PCDN-WLD-005 is resolved in this document.
 
 ## 13. Files Cited
 
@@ -331,6 +346,27 @@ ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.1.4 — 2026-08-18 — PCDN-WLD-004 accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-7, INV-WLD-8, PCDN-WLD-004, §5.5, §7, §9, §12, §14
+
+**Commits:** pending
+
+**Summary:** Resolves one-seat input translation through existing rlvgl
+events, delivered-state closure, stable touch slots, vertical-axis degradation,
+and bounded queues that preserve transition and closure boundaries.
+
+#### Rationale
+
+Capability-specific closure reflects Wayland's actual pointer, keyboard, and
+touch lifecycles without inventing a global focus event. Recording only
+delivered transitions prevents synthetic releases for state the consumer never
+observed, while the queue rule prevents pressure from stranding held state.
 
 ### 0.1.3 — 2026-08-18 — PCDN-WLD-003 accepted as amended
 

@@ -57,9 +57,9 @@
     "rend": 14,
     "sctd": 48,
     "wid": 13,
-    "wld": 64
+    "wld": 65
   },
   "schema_version": 2,
-  "total_edges": 1253,
-  "total_objects": 2110
+  "total_edges": 1260,
+  "total_objects": 2111
 }

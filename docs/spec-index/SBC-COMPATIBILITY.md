@@ -98,8 +98,8 @@ new behavior change.
 - **MPY:** Later phase ratification remains blocked by their own PCDNs and,
   where specified, compile, exception, cache/shared-memory, measured-budget,
   or board evidence.
-- **WLD:** `PCDN-WLD-001` through `PCDN-WLD-003` are resolved. WLD-00 remains
-  Draft until `PCDN-WLD-004` and `PCDN-WLD-005` are resolved. WLD-01 and
+- **WLD:** `PCDN-WLD-001` through `PCDN-WLD-004` are resolved. WLD-00 remains
+  Draft until `PCDN-WLD-005` is resolved. WLD-01 and
   WLD-02 cannot authorize code before their parent and prerequisite gates
   close, and release parity still requires compositor evidence.
 - **KI2C-07:** Physical-board facts and read-only probe evidence are missing;

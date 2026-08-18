@@ -4,8 +4,9 @@ WLD-02-INPUT-CONFORMANCE-RELEASE.md - Wayland input, conformance, and release ph
 
 # WLD-02 — Input, Conformance, and Release
 
-**Status:** Draft 2026-08-18. Blocked by WLD-00, WLD-01, and
-`PCDN-WLD-004` through `PCDN-WLD-005`. No implementation is authorized.
+**Status:** Draft 2026-08-18. `PCDN-WLD-004` is resolved. This phase remains
+blocked by WLD-00, WLD-01, and `PCDN-WLD-005`. No implementation is
+authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md). Presentation prerequisite:
 [`WLD-01`](WLD-01-SESSION-SHM-PRESENTATION.md).
@@ -64,7 +65,7 @@ without taking ownership of LPAR or Python surfaces.
 |---|---|
 | **Admitted Seat** | The single registry seat WLD binds for v0.2.7. Additional seats are observed but not bound as rlvgl devices. |
 | **Capability Epoch** | Interval during which a specific pointer, keyboard, or touch capability object is valid. Removal closes its held state before destruction. |
-| **Held-State Ledger** | Session-local record of delivered pointer button, key, and touch-down state used to synthesize deterministic release on abnormal sequence end. |
+| **Held-State Ledger** | Session-local record containing only pointer button, key, and touch-down transitions delivered to the consumer and not yet closed. |
 | **Primary Pointer** | Wayland pointer primary/left button translated into the current binary pressed pointer stream. |
 | **Touch Slot** | Stable rlvgl slot `0..4` allocated to one Wayland touch ID for the duration of its admitted sequence. |
 | **Suppressed Contact** | A touch arriving when all five slots are allocated. It produces telemetry but no rlvgl event until its Wayland sequence ends. |
@@ -98,7 +99,7 @@ For each capability add:
 2. Initialize empty per-capability state and its Capability Epoch.
 3. Begin translating only after all required listeners/keymaps are ready.
 
-For each capability removal:
+For each capability removal while the consuming runtime remains live:
 
 1. Emit Closure Events for every held state previously delivered from that
    capability.
@@ -106,9 +107,9 @@ For each capability removal:
 3. Release/destroy the protocol object according to its bound version.
 4. Advance the Capability Epoch so stale callbacks cannot mutate new state.
 
-Seat removal applies the same rule to every capability. Session teardown may
-skip outward event delivery only after the consuming runtime is also terminal;
-local held-state memory must still be cleared.
+Seat removal and nonterminal session failure apply the same rule to every
+capability. Session teardown skips outward event delivery only after the
+consuming runtime is terminal; local held-state memory must still be cleared.
 
 ## 6. Pointer and Cursor Mapping
 
@@ -120,7 +121,7 @@ local held-state memory must still be cleared.
 | primary button pressed | Emit `PointerDown` once and record held state. |
 | primary button released | Emit `PointerUp` once at the latest valid position and clear held state. |
 | non-primary buttons | Ignore with optional telemetry; current pointer event has no button identity. |
-| leave/focus loss while pressed | Emit one synthetic `PointerUp`, then clear focus and held state. |
+| pointer leave while pressed | Emit one synthetic `PointerUp`, then clear pointer focus and held state. |
 
 Wayland pointer and touch coordinates are already surface-local. Adaptive
 Window uses them directly in logical surface coordinates without dividing by
@@ -156,8 +157,9 @@ The backend MUST NOT turn compositor repeat into repeated raw `KeyDown` if
 raw down/up pair and existing rlvgl repeat policy. Compositor repeat metadata
 may be recorded for a future LPAR-owned configurable repeat amendment.
 
-Keyboard leave, capability removal, and disconnect emit `KeyUp` for every key
-whose down event was delivered without a matching up event.
+Keyboard leave, capability removal, seat removal, and nonterminal failure emit
+`KeyUp` for every key whose down event was delivered without a matching up
+event.
 
 ## 8. Touch Mapping
 
@@ -179,8 +181,9 @@ The current rlvgl split is preserved:
 - the next entirely new single-contact sequence may begin a new pointer stream.
 
 `wl_touch.frame` defines the delivery batch. `wl_touch.cancel`, surface loss,
-capability loss, or session failure emits a final closure representation for
-all delivered contacts before clearing slots when the runtime remains live.
+capability or seat removal, or nonterminal session failure emits a final
+closure representation for all delivered contacts before clearing slots when
+the runtime remains live.
 
 Tests must cover ID reuse only after up, arbitrary negative/large Wayland IDs,
 sixth-contact suppression, cancel before frame, transition from one to two
@@ -207,13 +210,14 @@ event extension and are deferred.
 
 Input and lifecycle queues are bounded. Motion may coalesce only when doing so
 cannot remove a down/up boundary or reorder against keyboard/touch frames.
-Button, key, touch down/up/cancel, configure, close, and terminal errors are
-never silently overwritten by motion.
+Button, key, touch down/up/cancel, configure, close, terminal errors, and
+synthetic closure boundaries are never silently overwritten by motion.
 
 Queue saturation produces telemetry and one documented recovery action. It
-must not leave Held-State Ledger entries that the consumer never observed.
-Acceptable designs reserve capacity for Closure Events or reset locally before
-reporting terminal input loss; the final implementation must prove its choice.
+must not leave Held-State Ledger entries that the consumer never observed or
+cannot close. The implementation reserves capacity for Closure Events or
+reports terminal input loss and clears locally once the consumer is terminal;
+the final implementation must prove its choice.
 
 Protocol and connection errors become typed lifecycle failures. WLD does not
 panic on compositor disconnect, malformed keymap, optional cursor-extension
@@ -287,8 +291,9 @@ allocation, and synchronization ownership.
 
 ## 12. Acceptance Checklist
 
-WLD-02 may be ratified only after WLD-01 is evidence-complete and WLD-00
-accepts or amends `PCDN-WLD-004` and `PCDN-WLD-005`.
+WLD-02 consumes the resolved `PCDN-WLD-004` input policy. It may be ratified
+only after WLD-01 is evidence-complete and WLD-00 accepts or amends
+`PCDN-WLD-005`.
 
 Implementation/release closure requires:
 
@@ -344,6 +349,27 @@ parity item remain unshipped/open. The documents may remain Draft or ratified
 without converting incomplete evidence into a release claim.
 
 ## 15. Change Log
+
+### 0.1.2 — 2026-08-18 — Consumed PCDN-WLD-004 resolution
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-7, INV-WLD-8, PCDN-WLD-004, §3, §5–§10, §12
+
+**Commits:** pending
+
+**Summary:** Freezes one-seat translation through current events, delivered
+held-state closure, pressed-only pointer motion, stable bounded touch slots,
+vertical-axis degradation, and transition-safe bounded queues.
+
+#### Rationale
+
+The accepted policy closes each Wayland capability through its own lifecycle
+signal and synthesizes releases only for state the consumer observed. Stable
+slots and non-droppable transition boundaries preserve input identity and
+prevent queue pressure or hot-unplug from leaving rlvgl state held.
 
 ### 0.1.1 — 2026-08-18 — Consumed PCDN-WLD-003 geometry mapping
 
