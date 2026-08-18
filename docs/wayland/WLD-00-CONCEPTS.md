@@ -4,7 +4,8 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. One PCDN remains open. No implementation is
+**Status:** Draft 2026-08-18. All five PCDNs are resolved; owner ratification
+of the remaining acceptance checklist is pending. No implementation is
 authorized. Target release line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
@@ -243,8 +244,8 @@ amendment. It MUST NOT absorb CPython or MPY work to close its release gate.
 
 ## 12. PCDNs and Acceptance Checklist
 
-`PCDN-WLD-001` through `PCDN-WLD-004` are accepted as amended. WLD-00 remains
-Draft until the owner accepts or amends the final decision:
+`PCDN-WLD-001` through `PCDN-WLD-005` are accepted as amended. WLD-00 remains
+Draft until the owner ratifies the remaining checklist:
 
 - **PCDN-WLD-001 — Client substrate and event-loop boundary — Accepted as
   amended 2026-08-18.** Use Smithay Client Toolkit as the protocol convenience
@@ -297,10 +298,24 @@ Draft until the owner accepts or amends the final decision:
   Input queues are bounded: motion may coalesce, but transition and closure
   boundaries must not be silently dropped or reordered; saturation must
   reserve closure capacity or report terminal input loss.
-- **PCDN-WLD-005 — Release boundary.** Keep the entire v0.2.7 implementation
-  optional and `rlvgl-platform`-owned; require Weston integration, smoke,
-  feature-isolation, and performance evidence; defer DMA-BUF and every Python
-  public surface.
+- **PCDN-WLD-005 — Release boundary — Accepted as amended 2026-08-18.** Keep
+  the complete v0.2.7 Wayland implementation optional, disabled by default,
+  host-target-gated, and owned by `rlvgl-platform`. Wayland dependencies must
+  not enter default or representative embedded/no-std dependency graphs. WLD
+  exposes no MPY, CPython, Python buffer, or public frame-lease surface.
+  Release requires automated Weston headless evidence covering XDG lifecycle,
+  presentation pacing, buffer release, resize/scale generations, input
+  closure, close, and disconnect; recorded smoke evidence for Weston, one
+  wlroots compositor, and Mutter or KWin; default, embedded/no-std, and
+  Wayland-feature build checks; strict Clippy and rustdoc; and documented
+  resource measurements at 800x480 and one HD geometry. Resource evidence
+  must demonstrate bounded allocation, stable idle behavior, and no
+  release/resize leak, but v0.2.7 establishes no unsupported universal
+  frame-time threshold. DMA-BUF requires a later proposal showing that a named
+  deployment budget is missed and defining format, modifier, allocation, and
+  synchronization ownership. Ratification authorizes only the applicable
+  phase; parity item 58 and the v0.2.7 release claim remain open until all
+  WLD-02 evidence, documentation, versioning, and changelog gates are complete.
 
 Ratification additionally confirms:
 
@@ -313,7 +328,7 @@ Ratification additionally confirms:
 - [x] PCDN-WLD-002 is resolved as amended in this document.
 - [x] PCDN-WLD-003 is resolved as amended in this document.
 - [x] PCDN-WLD-004 is resolved as amended in this document.
-- [ ] PCDN-WLD-005 is resolved in this document.
+- [x] PCDN-WLD-005 is resolved as amended in this document.
 
 ## 13. Files Cited
 
@@ -346,6 +361,27 @@ ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.1.5 — 2026-08-18 — PCDN-WLD-005 accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-9, INV-WLD-10, PCDN-WLD-005, §5.6, §7–§9, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Resolves the optional feature boundary, Python isolation,
+compositor and feature evidence, bounded-resource expectations, DMA-BUF
+deferral, and the distinction between phase ratification and release parity.
+
+#### Rationale
+
+An optional backend must remain absent from embedded dependency graphs as well
+as disabled at runtime. Evidence gates verify protocol correctness and bounded
+behavior without inventing a universal performance threshold, while leaving
+DMA-BUF and Python-facing lifetimes to separately justified work.
 
 ### 0.1.4 — 2026-08-18 — PCDN-WLD-004 accepted as amended
 

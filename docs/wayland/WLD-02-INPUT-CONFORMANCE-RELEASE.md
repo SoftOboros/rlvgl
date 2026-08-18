@@ -4,8 +4,8 @@ WLD-02-INPUT-CONFORMANCE-RELEASE.md - Wayland input, conformance, and release ph
 
 # WLD-02 — Input, Conformance, and Release
 
-**Status:** Draft 2026-08-18. `PCDN-WLD-004` is resolved. This phase remains
-blocked by WLD-00, WLD-01, and `PCDN-WLD-005`. No implementation is
+**Status:** Draft 2026-08-18. `PCDN-WLD-004` and `PCDN-WLD-005` are resolved.
+This phase remains blocked by WLD-00 and WLD-01. No implementation is
 authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md). Presentation prerequisite:
@@ -272,14 +272,20 @@ profile:
 - idle CPU use while the surface is visible and fully obscured; and
 - comparison against the existing simulator or fbdev path where meaningful.
 
+The evidence must demonstrate the accepted allocation bound, stable idle
+behavior, and absence of release/resize leaks. WLD v0.2.7 does not invent a
+universal frame-time threshold without a named deployment budget.
+
 DMA-BUF is not admitted merely because SHM copying is measurable. A follow-up
-proposal must show that a target budget is missed and define format, modifier,
-allocation, and synchronization ownership.
+proposal must show that a named deployment budget is missed and define format,
+modifier, allocation, and synchronization ownership.
 
 ### 11.5 Feature and release evidence
 
-- default workspace checks remain green without Wayland dependencies;
-- representative embedded/no-std targets remain green;
+- default workspace checks remain green without Wayland dependencies entering
+  their dependency graphs;
+- representative embedded/no-std targets remain green without Wayland
+  dependencies entering their dependency graphs;
 - `rlvgl-platform` with `wayland` passes check, tests, strict Clippy, and
   rustdoc on the supported host target;
 - public platform and example documentation describes selection and limits;
@@ -291,9 +297,9 @@ allocation, and synchronization ownership.
 
 ## 12. Acceptance Checklist
 
-WLD-02 consumes the resolved `PCDN-WLD-004` input policy. It may be ratified
-only after WLD-01 is evidence-complete and WLD-00 accepts or amends
-`PCDN-WLD-005`.
+WLD-02 consumes the resolved `PCDN-WLD-004` input policy and
+`PCDN-WLD-005` release boundary. It may be ratified only after WLD-01 is
+evidence-complete and WLD-00 is ratified.
 
 Implementation/release closure requires:
 
@@ -310,6 +316,8 @@ Implementation/release closure requires:
 - [ ] wlroots and desktop-compositor smoke evidence is recorded.
 - [ ] Resource/copy/latency measurements are recorded without claiming an
       unproven DMA-BUF need.
+- [ ] Measurements prove bounded allocation, stable idle behavior, and no
+      release/resize leak at 800x480 and one HD geometry.
 - [ ] Default/no-std/Wayland feature, Clippy, rustdoc, and documentation gates
       pass.
 - [ ] Changelog, version, feature documentation, example, and parity tracking
@@ -339,8 +347,10 @@ Excluded without owning-family amendment:
 
 ## 14. Unblocks and Initiative Closure
 
-Completion of WLD-02 closes the initial WLD initiative and permits parity item
-58 to be marked complete for its stated v0.2.7 SHM baseline. Deferred features
+Ratification authorizes only the applicable phase; it does not establish a
+release claim. Completion of every WLD-02 evidence, documentation, versioning,
+and changelog gate closes the initial WLD initiative and permits parity item 58
+to be marked complete for its stated v0.2.7 SHM baseline. Deferred features
 remain new phases or a successor initiative; they are not implied by initial
 closure.
 
@@ -349,6 +359,27 @@ parity item remain unshipped/open. The documents may remain Draft or ratified
 without converting incomplete evidence into a release claim.
 
 ## 15. Change Log
+
+### 0.1.3 — 2026-08-18 — Consumed PCDN-WLD-005 resolution
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-9, INV-WLD-10, PCDN-WLD-005, §11–§14
+
+**Commits:** pending
+
+**Summary:** Freezes the optional host-only feature boundary, Python
+isolation, compositor and build evidence, bounded-resource expectations,
+DMA-BUF deferral, and the release-parity gate.
+
+#### Rationale
+
+Design and phase ratification authorize bounded work but cannot substitute for
+compositor, feature-isolation, and resource evidence. Named measurements make
+SHM behavior reviewable while requiring a separately justified proposal before
+DMA-BUF or Python-visible lifetime work enters scope.
 
 ### 0.1.2 — 2026-08-18 — Consumed PCDN-WLD-004 resolution
 
