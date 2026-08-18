@@ -47,7 +47,7 @@ through ratified phase documents and their acceptance gates.
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |
 | [CPY-07](CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md) | Headless and windowed host profiles, asyncio readiness, and launcher boundary | Draft; three policies resolved; window topology and drain count open |
 | [CPY-08](CPY-08-PACKAGING-CROSS-DEPLOYMENT.md) | Wheels, target-rootfs cross-builds, services, versioning, and artifact manifests | Draft; six packaging policies resolved; build/import/reproducibility proof open |
-| [CPY-09](CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md) | Cross-driver parity, frame/thread/lifetime evidence, budgets, docs, and release closure | Draft; blocked by CPY-01 through CPY-08 |
+| [CPY-09](CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md) | Cross-driver parity, frame/thread/lifetime evidence, budgets, docs, and release closure | Draft; three policies resolved; budgets/version/retention open |
 
 ## Coordination boundaries
 

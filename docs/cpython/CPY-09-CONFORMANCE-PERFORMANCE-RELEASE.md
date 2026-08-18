@@ -6,9 +6,11 @@ CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md - CPY claim, evidence, budget, documen
 
 **Document ID:** CPY-09-CONFORMANCE-PERFORMANCE-RELEASE
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Three policy PCDNs resolved 2026-08-18;
+numeric budgets, release version, and evidence retention remain open. Not
+ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -127,6 +129,31 @@ visible in its Release Level and public documentation.
 - Offline install/import for every artifact row, wheel tag audit, dependency
   closure, stub/descriptor fingerprint, and upgrade compatibility.
 
+### 6.6 Hardened security review
+
+Every Hardened Claim requires a versioned threat model and review record for
+the exact daemon/Director artifact pair. The review MUST include:
+
+- trust/data-flow diagrams and a closed inventory of daemon privileges,
+  devices, filesystem access, socket permissions, dependencies, and accepted
+  protocol/frame resources;
+- peer-credential rejection tests, socket/path permission tests, malformed and
+  adversarial protocol fuzzing, negotiated-limit/resource-exhaustion tests,
+  disconnect/crash cleanup, and stale-epoch/replay rejection;
+- Director-process fd/maps audits proving it receives no device, scanout,
+  `/dev/mem`, daemon-internal, or unexpected inherited descriptor;
+- daemon open/file/device audits proving no authority outside its CPY-06
+  Privilege Envelope and no writable shared/live frame exposure;
+- dependency/SBOM vulnerability review against the exact retained artifact;
+- documentation review ensuring “hardened” describes this local privilege and
+  protocol boundary rather than claiming a general Python sandbox; and
+- sign-off by at least one repository reviewer who did not author the reviewed
+  daemon/security slice, with every accepted risk linked to an owner and claim.
+
+An external assessment is optional unless the consuming deployment policy
+requires it. Its absence cannot be hidden, and an external report cannot
+replace the required repository evidence above.
+
 ## 7. Frozen Decisions — Measurement and Budgets
 
 Each required profile MUST measure at least:
@@ -143,6 +170,15 @@ Each required profile MUST measure at least:
 Measurements MUST state tool, clock, sampling, warmup, iterations, hardware,
 load, build profile, and confidence/dispersion. Budgets are profile-specific;
 host measurements cannot satisfy embedded limits.
+
+The required actor populations are exactly 50, 250, and 1,000 live Actors per
+Stage. The count excludes the Stage root, transaction-local references,
+resources, and non-Actor List items. The initial fixture uses the five MPY-01
+Wave 1 actor types in equal proportions, a fixed tree/field seed, and the same
+descriptor fingerprint across direct native, actual MicroPython where
+applicable, and CPython. Every claimed initial profile MUST run all three
+points; a target that cannot complete 1,000 does not silently substitute a
+smaller stress point and requires an explicit CPY-09 amendment/claim reduction.
 
 ## 8. Frozen Decisions — Documentation and Release
 
@@ -162,6 +198,23 @@ A closing Release Level MUST ship:
 Natural initiative completion MUST produce `CPY-RETROSPECTIVE.md` following
 the repository retrospective discipline. The retrospective cannot authorize
 new behavior.
+
+### 8.1 Release Levels
+
+Release Levels are non-transitive claim sets; closing one does not imply any
+other row:
+
+| Release Level | Required closed profiles/variants | Explicitly not implied |
+|---|---|---|
+| `CPY-RL-EMBEDDED-DIRECT-1` | `host-headless` semantic/frame companion plus `embedded-linux-direct` on the CPY-01 board/rootfs, conventional GIL, version-specific wheels | host-windowed, daemon hardening, WLD, free-threaded, ABI-limited |
+| `CPY-RL-FULL-HOST-1` | `host-headless` plus every claimed `host-windowed` operating-system/backend row, asyncio, conventional GIL, version-specific wheels | physical embedded, hardened daemon, free-threaded, ABI-limited |
+| `CPY-RL-HARDENED-1` | `host-headless` companion plus `embedded-linux-daemon`, unprivileged Director, copied-frame transport, and §6.6 security review | Direct/profile evidence not named by the claim, remote transport, general Python sandboxing |
+| `CPY-RL-FREE-THREADED-1` | A separately qualified free-threaded variant of one already closed deployment profile with its own artifact/race/lifetime evidence | conventional-GIL evidence reuse or profiles not named by the variant |
+
+`CPY-RL-EMBEDDED-DIRECT-1` is the first closure target. Full-host, Hardened,
+and free-threaded levels close only when their own rows pass; they do not block
+that embedded-focused level. A release may carry more than one closed level,
+but public wording and manifests list each separately.
 
 ## 9. Phase Invariants
 
@@ -189,7 +242,7 @@ new behavior.
 | Screenshots/demo videos | Informative evidence only unless a phase defines a deterministic comparator. |
 | Benchmarks on drafting host | Diagnostic until Baseline/Budget method pins them. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Decisions
 
 ### 11.1 Non-goals
 
@@ -199,20 +252,30 @@ new behavior.
 - Publishing artifacts as part of documentation ratification.
 - Treating absent evidence as a zero, pass, or unsupported capability.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
+- **PCDN-CPY-09-002 — Actor populations — Accepted as amended
+  2026-08-18.** Require exactly 50, 250, and 1,000 live Actors with the frozen
+  Wave 1 mixed fixture/counting rules in §7 for every initial claimed profile.
+- **PCDN-CPY-09-003 — Release Levels — Accepted as amended 2026-08-18.** Use
+  the four non-transitive levels in §8.1. Embedded Direct plus host-headless is
+  first; full-host, Hardened, and free-threaded close separately.
+- **PCDN-CPY-09-006 — Hardened security review — Accepted as amended
+  2026-08-18.** Require the exact threat, permission/fd/maps, fuzz/resource,
+  dependency, documentation, and independent repository review in §6.6.
+  External assessment is deployment-policy-dependent and cannot replace it.
+
+### 11.3 Open Decisions
+
+| PCDN | Question | Current disposition | Blocks |
 |---|---|---|---|
-| `PCDN-CPY-09-001` | What are exact startup, RSS, frame latency/jitter, throughput, and artifact-size budgets? | Set provisional budgets only after CPY-03/05/06 measurement; ratify final values against representative hardware. | CPY-09 ratification/release |
-| `PCDN-CPY-09-002` | What actor population points are required? | Include small, medium, and stress points such as 50/250/1000 when target memory permits; record any profile-specific reduction. | CPY-09 ratification |
-| `PCDN-CPY-09-003` | Which Release Levels are first: embedded-direct, full-host, hardened, free-threaded? | Embedded-direct plus host-headless first; host-windowed and hardened/free-threaded close only with their own evidence. | Release claim set |
-| `PCDN-CPY-09-004` | What version/release line carries the first CPY artifacts? | Select after implementation and compatibility evidence; do not assume the current rlvgl line. | Release publication |
-| `PCDN-CPY-09-005` | How long and where are large frame/board evidence bundles retained? | Checksummed durable artifact store plus repository-small manifests/vectors; exact retention follows release policy. | CPY-09 ratification |
-| `PCDN-CPY-09-006` | What constitutes hardened security review? | Permission/fd boundary tests plus targeted threat review; external assessment is optional unless deployment policy requires it. | Hardened claim only |
+| `PCDN-CPY-09-001` | What are exact startup, RSS, frame latency/jitter, throughput, and artifact-size budgets? | Remains open. Set provisional values only from CPY-03/05/06 representative measurements, then ratify profile-specific envelopes against the CPY-01 host/board matrix. | CPY-09 ratification/release |
+| `PCDN-CPY-09-004` | What version/release line carries the first CPY artifacts? | Remains open until implementation, compatibility, artifact, and release evidence identifies a truthful SemVer line; the current rlvgl version is not inherited automatically. | Release publication |
+| `PCDN-CPY-09-005` | How long and where are large frame/board evidence bundles retained? | Remains open until the project selects a durable artifact store and retention policy. Repository-small manifests/vectors and cryptographic locators are required regardless. | CPY-09 ratification |
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [ ] Every PCDN in §§11.2–11.3 is resolved; three evidence/release PCDNs remain open.
 - [ ] Claim, baseline, artifact, evidence, and closure schemas are complete and
       referentially checked.
 - [ ] Direct/actual-MicroPython/CPython comparisons are green for every
@@ -237,11 +300,52 @@ new behavior.
 
 ## 14. Unblocks
 
-Ratification defines the evidence and budget gates but does not itself release
-anything. A Release Level is unblocked only by a later owner CPY Closure Record
-showing every included claim green and every omitted profile explicit.
+Three policy PCDNs are resolved, but CPY-09 remains Draft. Ratification is
+blocked by exact measured budgets, release-version selection, durable retention
+policy, completed schemas, and the applicable evidence from CPY-01 through
+CPY-08. Ratification would define the evidence and budget gates but would not
+itself release anything. A Release Level is unblocked only by a later owner CPY
+Closure Record showing every included claim green and every omitted profile
+explicit.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — closure policy PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-09-1, INV-CPY-09-2, INV-CPY-09-3, INV-CPY-09-4,
+INV-CPY-09-5, INV-CPY-09-6, INV-CPY-09-7, INV-CPY-09-8, INV-CPY-09-9,
+INV-CPY-09-10, PCDN-CPY-09-002, PCDN-CPY-09-003, PCDN-CPY-09-006,
+§6, §7, §8, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Fixes the 50/250/1,000 Actor population points, separates the
+Embedded Direct, Full Host, Hardened, and free-threaded Release Levels, and
+defines the exact Hardened security review while retaining three genuine
+measurement/release-infrastructure gates.
+
+#### Rationale
+
+One mixed Wave 1 population fixture makes scaling comparable across drivers and
+profiles without letting the minimal SBC silently shrink the claim. Independent
+Release Levels preserve embedded-first progress while keeping full-host and
+security claims truthful. Hardened closure needs privilege/protocol evidence and
+an independent repository review, not merely successful daemon startup.
+
+Considered and rejected: profile-specific hidden actor reductions, one aggregate
+“Python supported” release badge, requiring optional profiles before Embedded
+Direct, treating conventional-GIL evidence as free-threaded proof, calling the
+daemon a general sandbox, and paper-selecting budgets, SemVer, or storage
+retention before their evidence and infrastructure exist.
+
+What deliberately did not change: no scenario fixture, benchmark, budget,
+security review, artifact store, version, release, closure record, or
+retrospective is created. CPY-09 remains Draft and the three evidence/release
+PCDNs remain open.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
