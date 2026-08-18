@@ -9,7 +9,7 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 **Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18;
 `PCDN-CPY-03-002` remains measurement-blocked. Not ratified.
 
-**Revision:** 0.2.0
+**Revision:** 0.2.1
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -205,7 +205,7 @@ Thread itself has no Python thread state.
 | Asyncio | Consumes Readiness Signal in CPY-07; it does not own scheduling semantics. |
 | Daemon | Reuses the same Host Runtime Crate/service lifecycle behind another transport. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Decisions
 
 ### 11.1 Non-goals
 
@@ -244,7 +244,7 @@ Thread itself has no Python thread state.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open.
 - [ ] Lifecycle and Service Turn state machines are complete and deterministic.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [ ] The service has a native-only headless test consumer before PyO3 lands.
@@ -271,6 +271,19 @@ unblock CPY-04 binding and CPY-05 frame integration; it would not authorize
 device access.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — open-capacity checklist consistency
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** §11, §12
+
+**Commits:** pending
+
+**Summary:** Points the acceptance checklist at both the resolved decisions
+and the remaining measured-capacity decision. No policy changed.
 
 ### 0.2.0 — 2026-08-18 — runtime policy PCDNs accepted as amended
 

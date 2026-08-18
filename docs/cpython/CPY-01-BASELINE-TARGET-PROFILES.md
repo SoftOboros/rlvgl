@@ -10,7 +10,7 @@ CPY-01-BASELINE-TARGET-PROFILES.md - Exact source, runtime, target, and capabili
 2026-08-18. Not ratified; the exact manifest instance and target evidence are
 still required.
 
-**Revision:** 0.2.0
+**Revision:** 0.2.1
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -196,7 +196,7 @@ buffer features are required.
 | Existing BBB example | Selected physical/direct-console starting point, but its `/dev/mem` render scratch is excluded from base CPY conformance; CPY-06 must supply an ordinary-owned-memory path and physical input evidence. |
 | Host simulator | Candidate host-windowed presenter, not a substitute for deterministic headless frames. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -277,6 +277,20 @@ exact Debian rootfs digests/package facts, and completed board/device rows in
 authorizes no file movement or binding code.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — decision-label consistency
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** §11
+
+**Commits:** pending
+
+**Summary:** Labels the baseline-selection decisions as resolved while
+retaining the separate manifest-instance and target-evidence gates. No policy
+changed.
 
 ### 0.2.0 — 2026-08-18 — baseline PCDNs accepted as amended
 

@@ -9,7 +9,7 @@ CPY-02-UNIFY-PARTITION-CRATES.md - Neutral-contract unification and interpreter/
 **Status:** Draft 2026-08-18. Six topology PCDNs resolved 2026-08-18. Not
 ratified; no crate movement is authorized.
 
-**Revision:** 0.2.0
+**Revision:** 0.2.1
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -74,8 +74,8 @@ separation.
 | **Semantic Unification** | Moving duplicate interpreter-neutral definitions or scenarios to one existing neutral owner and making all adapters consume them. | Owned by CPY-02; constrained by CPY-00 and MPY authority. |
 | **Crate Partition** | A package boundary justified by target envelope, unsafe/lifecycle authority, dependency direction, publication, or independent consumers. | Owned by CPY-02. |
 | **Dependency Firewall** | A machine-checked prohibition on interpreter/platform dependencies entering a neutral or `no_std` crate. | Owned by CPY-02. |
-| **Host Runtime Crate** | Proposed `std` crate owning service threads, bounded channels, readiness, frame slots, and shutdown without Python objects. | Owned by CPY-02/03; exact name remains open. |
-| **CPython Adapter Crate** | Proposed PyO3 crate exporting the Python module and mapping Python objects to the neutral/host runtime. | Owned by CPY-02/04; proposed package name `rlvgl-cpython`. |
+| **Host Runtime Crate** | Planned `std` crate owning service threads, bounded channels, readiness, frame slots, and shutdown without Python objects. | Owned by CPY-02/03; selected package name `rlvgl-runtime-std`. |
+| **CPython Adapter Crate** | Planned PyO3 crate exporting the Python module and mapping Python objects to the neutral/host runtime. | Owned by CPY-02/04; selected package name `rlvgl-cpython`. |
 | **Compatibility Re-export** | Temporary public path forwarding an existing consumer to a moved neutral item with a documented removal frontier. | Owned by CPY-02. |
 | **Migration Slice** | One independently green graph change with before/after public-path and conformance evidence. | Owned by CPY-02. |
 | **Partition Candidate** | A proposed crate split that remains rejected until §6 criteria and evidence justify it. | Owned by CPY-02. |
@@ -227,7 +227,7 @@ or generated cross-family evidence MUST wait for a coordinated handoff.
 | Root `rlvgl` facade | May add optional re-exports after leaf crates stabilize; it is not the PyO3 extension implementation. |
 | CRATES-CI publish order | Compose; new publishable crates must be added through its governed process and package dry-run gates. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -324,6 +324,19 @@ Runtime crate skeleton. Shared-file migration is separately blocked until an
 actual Handoff Record satisfying `PCDN-CPY-02-006` exists.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — selected-crate label consistency
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** §3, §11
+
+**Commits:** pending
+
+**Summary:** Aligns glossary and section labels with the selected
+`rlvgl-runtime-std` and `rlvgl-cpython` package decisions. No policy changed.
 
 ### 0.2.0 — 2026-08-18 — topology PCDNs accepted as amended
 

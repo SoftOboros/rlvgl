@@ -9,7 +9,7 @@ CPY-00-CONCEPTS.md - CPython embedded-Linux and host authority, invariants, and 
 **Status:** Ratified 2026-08-18. Normative for CPY authority, profiles,
 invariants, and phase order. Later phases remain separately gated.
 
-**Revision:** 0.2.0
+**Revision:** 0.2.1
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -98,7 +98,7 @@ timing owner, or an accidental privileged plugin host.
 | **Python-Presented Mode** | Python explicitly acquires and presents frames and therefore accepts the specified bounded backpressure contract. | Owned by CPY-05; optional profile. |
 | **MPY Safe Point** | A recorded clean commit and green MPY-relevant evidence frontier at which CPY crate migration may begin without editing in-flight MPY work. | Owned by CPY-02; does not exist upstream yet. |
 | **Neutral Contract Crate** | A crate containing interpreter-independent identities, values, protocol, descriptors, errors, or runtime behavior and no CPython/MicroPython ABI dependencies. | Owned by CPY-02 as a classification; current instances are `rlvgl-api` and `rlvgl-core`. |
-| **Adapter Crate** | A crate that maps one interpreter ABI/object model onto the neutral contract and MUST NOT become a neutral semantic owner. | Owned by CPY-02; instances include `rlvgl-micropython` and proposed `rlvgl-cpython`. |
+| **Adapter Crate** | A crate that maps one interpreter ABI/object model onto the neutral contract and MUST NOT become a neutral semantic owner. | Owned by CPY-02; instances include `rlvgl-micropython` and planned `rlvgl-cpython`. |
 | **Direct Deployment** | Trusted CPython and native runtime service share one process that owns admitted Linux device nodes. | Owned by CPY-06. |
 | **Hardened Deployment** | An unprivileged CPython process communicates with a privileged native rlvgl service over an authenticated local transport. | Owned by CPY-06; optional until `PCDN-CPY-00-001` resolves. |
 | **Host Companion** | A headless or windowed full-host profile using the same binding and neutral semantics as embedded Linux. | Owned by CPY-07. |
@@ -234,7 +234,7 @@ Adding or changing a CPY invariant is **Standards Action**.
 | WLD Shadow Frame/session | `compose` | WLD remains independent. A future shared neutral frame type requires cross-family amendment, not a CPY file move. |
 | CPython extension versus embedded interpreter | `adapt` | Extension-module topology is the default. A Rust launcher embedding CPython is admitted only for a documented event-loop requirement and exposes the same Python API. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -307,6 +307,19 @@ authorize CPY-02 crate movement or any binding implementation. Those remain
 separately gated, and CPY-02 additionally requires the recorded MPY Safe Point.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — decision-label consistency
+
+**Author:** Ira Abbott
+
+**Change kind:** editorial
+
+**Touches:** §3, §11
+
+**Commits:** pending
+
+**Summary:** Describes the selected adapter crate as planned and labels the
+fully resolved root-decision section accordingly. No policy changed.
 
 ### 0.2.0 — 2026-08-18 — ratified; root PCDNs accepted as amended
 
