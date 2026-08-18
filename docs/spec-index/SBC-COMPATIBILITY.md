@@ -98,7 +98,7 @@ new behavior change.
   five frame-policy decisions while retaining measured slot capacities.
   CPY-06 has resolved all six embedded-Linux policy decisions, and CPY-07 has
   resolved three host policies while retaining two measured/topology gates.
-  The exact
+  CPY-08 has resolved all six packaging-policy decisions. The exact
   manifest/rootfs/board artifacts, an actual MPY Handoff Record, measured
   queue/performance budgets, binding implementation/conformance evidence, and
   per-phase ratification remain open. CPY planning leads the future shared

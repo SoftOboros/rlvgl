@@ -6,9 +6,10 @@ CPY-08-PACKAGING-CROSS-DEPLOYMENT.md - CPython wheel, cross-build, rootfs, servi
 
 **Document ID:** CPY-08-PACKAGING-CROSS-DEPLOYMENT
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Six packaging-policy PCDNs resolved 2026-08-18;
+build, target import, and reproducibility evidence remain open. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -80,6 +81,29 @@ need one manifest and explicit compatibility claims.
 
 ## 5. Frozen Decisions — Package Layout
 
+The canonical build authority is maturin 1.13.0 in a mixed Rust/Python project
+under `cpython/`, separate from the repository root's unrelated Python project:
+
+```text
+cpython/
+├── Cargo.toml                 # package rlvgl-cpython
+├── pyproject.toml             # distribution rlvgl; maturin backend
+├── src/lib.rs                 # private module rlvgl._native
+└── python/rlvgl/
+    ├── __init__.py            # only public import facade
+    ├── __init__.pyi           # generated public facade types
+    ├── _generated.py          # descriptor-generated conveniences
+    ├── _native.pyi            # generated native surface
+    └── py.typed
+```
+
+`pyproject.toml` MUST set maturin's Python source to `python` and module name to
+`rlvgl._native`. `rlvgl.__init__` reexports the supported public names and
+checks `_generated.DESCRIPTOR_FINGERPRINT` against the extension's fingerprint.
+The generated `__init__.pyi`, `_generated.py`, and `_native.pyi` share that
+input fingerprint. The repository root `pyproject.toml` remains the `afdb` tool
+project and MUST NOT become wheel metadata for `rlvgl`.
+
 The Python Distribution MUST contain:
 
 - one import surface selected by `PCDN-CPY-04-001`;
@@ -96,6 +120,17 @@ form. Native Host Runtime code remains testable without extension-module link
 mode.
 
 ## 6. Frozen Decisions — Build and ABI Matrix
+
+The first release uses version-specific conventional-GIL CPython wheels. It
+builds distinct `cp313-cp313` and `cp314-cp314` rows for every claimed host or
+target platform and enables no PyO3 `abi3`/`abi3t` feature. Platform tags come
+from the exact target interpreter/rootfs and repair audit; an internal
+`linux_*` wheel MUST NOT be relabeled `manylinux_*` without that policy's audit
+and runtime proof.
+
+ABI-limited and free-threaded wheels are later qualification rows with separate
+feature, symbol, buffer, finalization, and import/lifetime evidence. A source
+build using an exact Python minor does not authorize an ABI-limited wheel.
 
 Each Target Wheel row MUST state:
 
@@ -133,6 +168,22 @@ Cross-compile success alone is not Import Proof.
 
 ## 8. Frozen Decisions — Services, Versioning, and Reproducibility
 
+### 8.1 First artifact and channel set
+
+The minimum first artifact set is:
+
+1. retained version-specific host wheels for each claimed CPython/host row;
+2. a target-specific embedded Direct Deployment wheel plus offline Rootfs
+   Bundle for Debian 13 `armhf` and the separate `arm64` import/runtime row;
+3. generated typing and descriptor-fingerprint artifacts inside each wheel;
+4. checksummed Artifact/Baseline Manifests, licenses, and dependency inventory.
+
+These artifacts target the project's retained build/evidence store and offline
+rootfs installation first. Upload to PyPI, another public index, or a public
+release channel is a separate owner-authorized release action and is not part
+of CPY-08 ratification. An sdist may be retained for audit, but it is not a
+substitute for a target wheel or Import Proof.
+
 Direct Deployment packages MUST NOT install a privileged service they do not
 use. Hardened Deployment ships a Runtime Daemon unit, unprivileged Director
 configuration, device/permission policy, protocol compatibility statement, and
@@ -147,6 +198,40 @@ Release artifacts MUST be reproducible from the pinned source/tool/rootfs
 inputs to the declared reproducibility level. Every file is checksummed. The
 build MUST emit an SBOM or dependency inventory sufficient to audit native and
 Python contents. Release installation MUST require no network access.
+
+For one exact Baseline Manifest and pinned build image, two clean builds MUST
+produce byte-identical wheels, generated Python/stub files, extension or native
+binaries, and Artifact Manifests. Builds pin `SOURCE_DATE_EPOCH`, use locked/
+offline dependencies after acquisition, normalize archive metadata, and record
+the build-container/toolchain digest. A Rootfs Bundle represented as an image
+may have container/filesystem allocation differences only if its normalized
+file manifest—including paths, modes, owners, xattrs where relevant, sizes,
+and content hashes—is identical and the differing image fields are declared.
+Any other nondeterminism is a failed gate, not an undocumented exception.
+
+### 8.2 Native dependency policy
+
+- Embedded bundles obtain glibc, the dynamic loader, libgcc/unwind, kernel
+  interfaces, udev policy, and optional compositor libraries from the exact
+  pinned Target Rootfs; wheels MUST NOT smuggle replacement system libraries.
+- Host wheel repair may bundle only non-system shared libraries permitted by
+  the platform tag policy and supported by license/SBOM review. The Artifact
+  Manifest records original name/hash and repaired location/hash.
+- Operating-system libraries/frameworks and graphics/display drivers remain
+  target supplied. Optional WLD/window dependencies appear only in artifacts
+  selecting those profiles; headless/direct artifacts cannot acquire them
+  accidentally.
+- An unresolved dynamic dependency, ambient search path, or undeclared runtime
+  download fails build/install evidence.
+
+### 8.3 Launcher and daemon artifact scope
+
+The first embedded-direct plus host-headless Release Level is extension-only
+and ships no Rust launcher or Runtime Daemon. A launcher is added only for a
+host-windowed row closed by CPY-07 as Launcher-Owned. The Runtime Daemon and its
+service/device policy ship only in a separately closed Hardened Release Level.
+All such units use the same negotiated neutral protocol and package API but
+have separate binary, privilege, install, upgrade, and evidence rows.
 
 ## 9. Phase Invariants
 
@@ -166,13 +251,13 @@ Python contents. Release installation MUST require no network access.
 | Existing surface | CPY-08 treatment |
 |---|---|
 | PyO3 `extension-module`/build configuration | Follow the selected current PyO3 guidance; keep native Rust tests buildable separately. |
-| maturin/setuptools-rust | Select one as build authority in PCDN; do not maintain divergent wheel metadata. |
+| maturin/setuptools-rust | Maturin 1.13.0 is the sole first build authority; setuptools-rust metadata is not maintained in parallel. |
 | Cargo packages | Follow CRATES-CI publication order and dry-run gates for publishable new crates. |
 | Root workspace version skew | Record actual component versions; CPY release cannot assume one workspace-wide version. |
 | Existing Linux examples | Source of smoke scenarios, not installable Python artifacts. |
 | WLD/system libraries | Optional backend dependencies declared only on artifacts that select WLD. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -182,21 +267,36 @@ Python contents. Release installation MUST require no network access.
 - Downloading toolchains or dependencies at runtime.
 - Shipping generated stubs that are not fingerprinted to runtime descriptors.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-08-001` | Which Python packaging tool and project layout are canonical? | Use the CPY-01-pinned maturin release unless a required mixed package layout proves it insufficient. | CPY-08 ratification |
-| `PCDN-CPY-08-002` | Are first-release wheels version-specific or ABI-limited? | Decide after CPY-04/05 C-API audit; prefer truthful version-specific artifacts for initial proof over premature ABI breadth. | CPY-08 ratification/release matrix |
-| `PCDN-CPY-08-003` | Which public/internal distribution channels are release targets? | Produce retained wheel/rootfs artifacts first; public-index upload is a separately authorized release action. | Release publication only |
-| `PCDN-CPY-08-004` | Which shared native libraries are bundled versus supplied by the target? | Bundle only where wheel policy permits and license/audit supports it; embedded rootfs pins system libraries explicitly. | Artifact matrix |
-| `PCDN-CPY-08-005` | What reproducibility level is required? | Byte-identical where toolchains permit; otherwise normalized manifest equality plus documented nondeterministic fields. | CPY-08/09 acceptance |
-| `PCDN-CPY-08-006` | Does the first release ship a Rust launcher and/or Runtime Daemon? | Ship only profiles ratified by CPY-06/07/09; extension-only remains the minimum artifact. | Artifact set |
+- **PCDN-CPY-08-001 — Packaging authority/layout — Accepted as amended
+  2026-08-18.** Use maturin 1.13.0 and the exact `cpython/` mixed layout in §5,
+  with `python-source = "python"` and `module-name = "rlvgl._native"`. The root
+  `afdb` project remains separate.
+- **PCDN-CPY-08-002 — First wheel ABI — Accepted as amended 2026-08-18.** Ship
+  distinct conventional-GIL `cp313-cp313` and `cp314-cp314` wheels. No
+  `abi3`, `abi3t`, or free-threaded artifact is in the first Release Level.
+- **PCDN-CPY-08-003 — Distribution channels — Accepted as amended
+  2026-08-18.** Retain wheels, Rootfs Bundles, and manifests in the project
+  evidence/artifact store for offline installation. Public-index/release
+  upload remains a separate owner-authorized release action.
+- **PCDN-CPY-08-004 — Shared libraries — Accepted as amended 2026-08-18.**
+  Target rootfs supplies system ABI, kernel, and display libraries. Host repair
+  may bundle only policy-permitted, licensed, checksummed non-system libraries;
+  backend dependencies remain feature/artifact-specific.
+- **PCDN-CPY-08-005 — Reproducibility — Accepted as amended 2026-08-18.** Two
+  clean builds in one pinned build image are byte-identical for wheels, package
+  files, binaries, and manifests. Rootfs image containers may use exact
+  normalized file-manifest equality only for declared allocation metadata.
+- **PCDN-CPY-08-006 — Launcher/daemon scope — Accepted as amended
+  2026-08-18.** The first embedded-direct plus host-headless set is
+  extension-only. Launcher and daemon artifacts ship only with their separately
+  closed host-windowed or Hardened profiles.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
-- [ ] Python package layout, names, stubs, and fingerprints are exact.
+- [x] Every PCDN in §11.2 is resolved.
+- [x] Python package layout, names, stubs, and fingerprints are exact.
 - [ ] Every claimed target has a build/install/Import Proof row.
 - [ ] Cross-build and rootfs inputs are pinned and cannot use ambient host ABI.
 - [ ] Direct/launcher/daemon artifacts have correct privilege/service contents.
@@ -217,10 +317,51 @@ Python contents. Release installation MUST require no network access.
 
 ## 14. Unblocks
 
-Ratification unblocks packaging implementation for already-ratified profiles.
-Artifact publication and release claims remain CPY-09/owner actions.
+All six packaging-policy PCDNs are resolved, but CPY-08 remains Draft.
+Ratification is blocked by CPY-01/02/04 and selected CPY-06/07 profiles,
+implemented package metadata, target wheels/import proofs, cross-rootfs
+artifacts, clean reproducibility pairs, dependency/license/SBOM evidence, and
+upgrade/offline-install tests. Ratification would unblock packaging
+implementation for already-ratified profiles. Artifact publication and release
+claims remain CPY-09/owner actions.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — packaging PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-08-1, INV-CPY-08-2, INV-CPY-08-3, INV-CPY-08-4,
+INV-CPY-08-5, INV-CPY-08-6, INV-CPY-08-7, INV-CPY-08-8,
+PCDN-CPY-08-001, PCDN-CPY-08-002, PCDN-CPY-08-003, PCDN-CPY-08-004,
+PCDN-CPY-08-005, PCDN-CPY-08-006, §5, §6, §8, §10, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Fixes the maturin mixed package layout, version-specific CPython
+wheels, retained/offline channel boundary, native-library policy,
+reproducibility level, and extension-only first artifact set.
+
+#### Rationale
+
+The mixed package keeps generated Python typing beside a private native module
+without colliding with the root `afdb` project. Version-specific wheels keep
+the first buffer/thread/finalization proof tied to the interpreter actually
+tested. Embedded targets depend on a pinned rootfs ABI, while reproducible
+offline artifacts make cross-build and target import evidence auditable.
+
+Considered and rejected: reusing the root Python project, dual maturin/
+setuptools-rust metadata, first-release `abi3` breadth, guessing manylinux tags,
+bundling glibc or display drivers, publishing as part of documentation
+ratification, allowing undeclared nondeterminism, and shipping unused privileged
+services or a speculative launcher.
+
+What deliberately did not change: no `cpython/` package tree, PyO3 feature,
+wheel, sdist, rootfs bundle, repaired library, launcher, daemon, upload, or
+artifact manifest is created. Exact platform tags and build/import results
+remain evidence-gated, and CPY-08 remains Draft.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
