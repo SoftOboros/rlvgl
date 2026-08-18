@@ -266,6 +266,42 @@ fn create_stable_button(
         .unwrap()
 }
 
+fn create_stable_slider(
+    registry: &mut StageRegistry,
+    parent: rlvgl_core::actor::ObjectId,
+) -> rlvgl_core::actor::ObjectId {
+    let slider = descriptor("slider::Slider");
+    registry
+        .create(
+            slider.type_id,
+            rlvgl_core::actor::CreateDestination::Child { parent },
+            &[
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(slider, "bounds"),
+                    value: ValueRef::Rect {
+                        x: BOUNDS.x,
+                        y: BOUNDS.y,
+                        width: BOUNDS.width,
+                        height: BOUNDS.height,
+                    },
+                },
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(slider, "min"),
+                    value: ValueRef::I32(0),
+                },
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(slider, "max"),
+                    value: ValueRef::I32(100),
+                },
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(slider, "value"),
+                    value: ValueRef::I32(50),
+                },
+            ],
+        )
+        .unwrap()
+}
+
 fn root_order(registry: &mut StageRegistry) -> Vec<rlvgl_core::actor::ObjectId> {
     let token = registry.snapshot_begin().unwrap();
     let page = registry
@@ -2160,19 +2196,45 @@ fn semantic_noop_set_flag_still_commits_once_with_outputless_effects() {
 
 const REFERENCE_TYPE: TypeId = TypeId::registered(0x0001_ff01);
 const REFERENCE_FIELD: u32 = 77;
-const REFERENCE_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
-    id: REFERENCE_FIELD,
-    name: "reference",
-    value_tag: ValueTag::Object,
-    access: PropertyAccess::ReadOnly,
-    default: PropertyDefault::Absent,
-    constraint: PropertyConstraint::None,
-    required_capabilities: ActorCapabilities::EMPTY,
-    effects: MutationEffects::NONE,
-}];
+const WRITABLE_REFERENCE_FIELD: u32 = 78;
+const BOUNDED_TEXT_FIELD: u32 = 79;
+const REFERENCE_PROPERTIES: [PropertyDescriptor; 3] = [
+    PropertyDescriptor {
+        id: REFERENCE_FIELD,
+        name: "reference",
+        value_tag: ValueTag::Object,
+        access: PropertyAccess::ReadOnly,
+        default: PropertyDefault::Absent,
+        constraint: PropertyConstraint::None,
+        required_capabilities: ActorCapabilities::EMPTY,
+        effects: MutationEffects::NONE,
+    },
+    PropertyDescriptor {
+        id: WRITABLE_REFERENCE_FIELD,
+        name: "writable_reference",
+        value_tag: ValueTag::Object,
+        access: PropertyAccess::ReadWrite,
+        default: PropertyDefault::Absent,
+        constraint: PropertyConstraint::None,
+        required_capabilities: ActorCapabilities::EMPTY,
+        effects: MutationEffects::DRAW.union(MutationEffects::SNAPSHOT),
+    },
+    PropertyDescriptor {
+        id: BOUNDED_TEXT_FIELD,
+        name: "bounded_text",
+        value_tag: ValueTag::Text,
+        access: PropertyAccess::ReadWrite,
+        default: PropertyDefault::Text(""),
+        constraint: PropertyConstraint::TextBytes { max: 4 },
+        required_capabilities: ActorCapabilities::EMPTY,
+        effects: MutationEffects::DRAW.union(MutationEffects::SNAPSHOT),
+    },
+];
 
 struct ReferenceActor {
     reference: u64,
+    writable_reference: u64,
+    bounded_text: String,
 }
 
 impl Widget for ReferenceActor {
@@ -2188,13 +2250,14 @@ impl Widget for ReferenceActor {
 }
 
 impl MpyActor for ReferenceActor {
-    type Prepared = ();
+    type Prepared = (u64, String);
 
     fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
-        if id == REFERENCE_FIELD {
-            Ok(OwnedValue::Object(self.reference))
-        } else {
-            Err(RegistryError::UnknownProperty { property_id: id })
+        match id {
+            REFERENCE_FIELD => Ok(OwnedValue::Object(self.reference)),
+            WRITABLE_REFERENCE_FIELD => Ok(OwnedValue::Object(self.writable_reference)),
+            BOUNDED_TEXT_FIELD => Ok(OwnedValue::Text(self.bounded_text.clone())),
+            _ => Err(RegistryError::UnknownProperty { property_id: id }),
         }
     }
 
@@ -2202,17 +2265,49 @@ impl MpyActor for ReferenceActor {
         &self,
         directions: &[ActorDirection],
     ) -> Result<ActorPreparation<Self::Prepared>, RegistryError> {
-        if directions.is_empty() {
-            Ok(ActorPreparation {
-                prepared: (),
-                text_delta: 0,
-            })
-        } else {
-            Err(RegistryError::BatchInvalid)
+        let mut writable_reference = self.writable_reference;
+        let mut bounded_text = self.bounded_text.clone();
+        for direction in directions {
+            match direction {
+                ActorDirection::SetProperty { id, value } => match (*id, value) {
+                    (WRITABLE_REFERENCE_FIELD, OwnedValue::Object(value)) => {
+                        writable_reference = *value;
+                    }
+                    (BOUNDED_TEXT_FIELD, OwnedValue::Text(value)) => {
+                        bounded_text.clone_from(value);
+                    }
+                    (REFERENCE_FIELD, _) => {
+                        return Err(RegistryError::ReadOnlyField { field_id: *id });
+                    }
+                    _ => return Err(RegistryError::UnknownProperty { property_id: *id }),
+                },
+                ActorDirection::ResetProperty { id } if *id == BOUNDED_TEXT_FIELD => {
+                    bounded_text.clear();
+                }
+                ActorDirection::ResetProperty { id } => {
+                    return Err(RegistryError::UnknownProperty { property_id: *id });
+                }
+                ActorDirection::InvokeAction { id, .. } => {
+                    return Err(RegistryError::UnknownAction { action_id: *id });
+                }
+            }
         }
+        let text_delta = i64::try_from(bounded_text.len()).map_err(|_| RegistryError::Internal)?
+            - i64::try_from(self.bounded_text.len()).map_err(|_| RegistryError::Internal)?;
+        Ok(ActorPreparation {
+            prepared: (writable_reference, bounded_text),
+            text_delta,
+        })
     }
 
-    fn commit(&mut self, (): Self::Prepared) {}
+    fn commit(&mut self, prepared: Self::Prepared) -> Self::Prepared {
+        let retired = (
+            self.writable_reference,
+            core::mem::take(&mut self.bounded_text),
+        );
+        (self.writable_reference, self.bounded_text) = prepared;
+        retired
+    }
 }
 
 fn construct_reference(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
@@ -2231,7 +2326,14 @@ fn construct_reference(args: ConstructorArgs<'_>) -> Result<ConstructedActor, Re
             });
         }
     };
-    let constructed = construct_native_actor(REFERENCE_TYPE, ReferenceActor { reference });
+    let constructed = construct_native_actor(
+        REFERENCE_TYPE,
+        ReferenceActor {
+            reference,
+            writable_reference: reference,
+            bounded_text: String::new(),
+        },
+    );
     LEAKED_PRECONSTRUCTED_WIDGET.with(|leaked| {
         *leaked.borrow_mut() = Some(constructed.node().widget().clone());
     });
@@ -2262,6 +2364,687 @@ static REFERENCE_CATALOG: [TypeDescriptor; 2] = [
 
 fn reference_registry() -> StageRegistry {
     StageRegistry::new(StageId::new(92).unwrap(), &REFERENCE_CATALOG, limits()).unwrap()
+}
+
+fn create_stable_reference(
+    registry: &mut StageRegistry,
+    parent: rlvgl_core::actor::ObjectId,
+    reference: rlvgl_core::actor::ObjectId,
+) -> rlvgl_core::actor::ObjectId {
+    registry
+        .create(
+            REFERENCE_TYPE,
+            rlvgl_core::actor::CreateDestination::Child { parent },
+            &[rlvgl_core::actor::ConstructorInput {
+                id: REFERENCE_FIELD,
+                value: ValueRef::Object(reference.get()),
+            }],
+        )
+        .unwrap()
+}
+
+#[test]
+fn set_property_lowers_stable_and_earlier_object_values_with_create_only_outputs() {
+    let container = &REFERENCE_CATALOG[0];
+    let reference = &REFERENCE_CATALOG[1];
+    let mut registry = reference_registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let stable_target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let stable_reference = create_stable_reference(&mut registry, parent, parent);
+    let starting_revision = registry.revision();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(stable_reference),
+                directions: vec![ActorDirection::SetProperty {
+                    id: WRITABLE_REFERENCE_FIELD,
+                    value: OwnedValue::Object(stable_target.get()),
+                }],
+            },
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(parent),
+                },
+                vec![],
+            ),
+            create(
+                2,
+                reference,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(parent),
+                },
+                vec![CreateField {
+                    id: REFERENCE_FIELD,
+                    value: OwnedValue::BatchObject(1),
+                }],
+            ),
+            BatchStageDirection::MutateActor {
+                object: BatchObjectReference::EarlierBatch(2),
+                directions: vec![ActorDirection::SetProperty {
+                    id: WRITABLE_REFERENCE_FIELD,
+                    value: OwnedValue::BatchObject(1),
+                }],
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(
+        committed
+            .create_outputs()
+            .iter()
+            .map(|output| (output.operation_index, output.batch_ref))
+            .collect::<Vec<_>>(),
+        [(1, 1), (2, 2)]
+    );
+    let outputs = committed.take_create_outputs();
+    let created_target = outputs[0].object_id;
+    let created_reference = outputs[1].object_id;
+    assert_eq!(
+        registry
+            .property(stable_reference, WRITABLE_REFERENCE_FIELD)
+            .unwrap(),
+        OwnedValue::Object(stable_target.get())
+    );
+    assert_eq!(
+        registry
+            .property(created_reference, REFERENCE_FIELD)
+            .unwrap(),
+        OwnedValue::Object(created_target.get())
+    );
+    assert_eq!(
+        registry
+            .property(created_reference, WRITABLE_REFERENCE_FIELD)
+            .unwrap(),
+        OwnedValue::Object(created_target.get())
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn set_property_schema_errors_precede_object_resolution_in_field_order() {
+    let mut registry = reference_registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let actor = create_stable_reference(&mut registry, parent, parent);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let cases = [
+        (
+            vec![ActorDirection::SetProperty {
+                id: 9_999,
+                value: OwnedValue::BatchObject(99),
+            }],
+            RegistryError::UnknownProperty { property_id: 9_999 },
+        ),
+        (
+            vec![ActorDirection::SetProperty {
+                id: REFERENCE_FIELD,
+                value: OwnedValue::BatchObject(99),
+            }],
+            RegistryError::ReadOnlyField {
+                field_id: REFERENCE_FIELD,
+            },
+        ),
+        (
+            vec![ActorDirection::SetProperty {
+                id: WRITABLE_REFERENCE_FIELD,
+                value: OwnedValue::I32(1),
+            }],
+            RegistryError::TypeMismatch {
+                field_id: WRITABLE_REFERENCE_FIELD,
+                expected: ValueTag::Object,
+                actual: ValueTag::I32,
+            },
+        ),
+        (
+            vec![
+                ActorDirection::SetProperty {
+                    id: WRITABLE_REFERENCE_FIELD,
+                    value: OwnedValue::BatchObject(99),
+                },
+                ActorDirection::SetProperty {
+                    id: BOUNDED_TEXT_FIELD,
+                    value: OwnedValue::Text("12345".into()),
+                },
+            ],
+            RegistryError::Range {
+                field_id: BOUNDED_TEXT_FIELD,
+            },
+        ),
+    ];
+
+    for (directions, expected) in cases {
+        assert_eq!(
+            registry
+                .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::Stable(actor),
+                    directions,
+                }])
+                .unwrap_err(),
+            expected
+        );
+        assert_eq!(registry.revision(), starting_revision);
+        assert_eq!(registry.usage(), starting_usage);
+        assert_eq!(
+            registry.property(actor, WRITABLE_REFERENCE_FIELD).unwrap(),
+            OwnedValue::Object(parent.get())
+        );
+        assert_eq!(
+            registry.property(actor, BOUNDED_TEXT_FIELD).unwrap(),
+            OwnedValue::Text(String::new())
+        );
+    }
+
+    assert_eq!(
+        RegistryError::ReadOnlyField {
+            field_id: REFERENCE_FIELD,
+        }
+        .error_class(),
+        rlvgl_core::actor::ErrorClass::ReadOnly
+    );
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(actor),
+                directions: Vec::new(),
+            }])
+            .unwrap_err(),
+        RegistryError::BatchInvalid
+    );
+    assert_eq!(registry.revision(), starting_revision);
+}
+
+#[test]
+fn set_property_target_resolution_precedes_every_property_field() {
+    let container = &REFERENCE_CATALOG[0];
+    let mut registry = reference_registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let actor = create_stable_reference(&mut registry, parent, parent);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let invalid_fields = vec![ActorDirection::SetProperty {
+        id: 9_999,
+        value: OwnedValue::BatchObject(99),
+    }];
+
+    for object in [
+        BatchObjectReference::EarlierBatch(0),
+        BatchObjectReference::EarlierBatch(99),
+    ] {
+        assert_eq!(
+            registry
+                .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                    object,
+                    directions: invalid_fields.clone(),
+                }])
+                .unwrap_err(),
+            RegistryError::BatchInvalid
+        );
+        assert_eq!(registry.revision(), starting_revision);
+        assert_eq!(registry.usage(), starting_usage);
+    }
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::EarlierBatch(1),
+                    directions: invalid_fields.clone(),
+                },
+                create(
+                    1,
+                    container,
+                    BatchCreateDestination::Root {
+                        name: "future".into(),
+                    },
+                    vec![],
+                ),
+            ])
+            .unwrap_err(),
+        RegistryError::BatchInvalid
+    );
+    assert_eq!(registry.root_id("future"), None);
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::Delete {
+                    object: BatchObjectReference::Stable(actor),
+                },
+                BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::Stable(actor),
+                    directions: invalid_fields,
+                },
+            ])
+            .unwrap_err(),
+        RegistryError::StaleObject { object_id: actor }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert!(registry.actor_info(actor).is_ok());
+    assert_eq!(registry.children(parent).unwrap(), [actor]);
+}
+
+#[test]
+fn set_property_reference_errors_and_delete_rollback_are_prepublication() {
+    let container = &REFERENCE_CATALOG[0];
+    let mut registry = reference_registry();
+    let parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let actor = create_stable_reference(&mut registry, parent, parent);
+
+    for value in [
+        OwnedValue::BatchObject(0),
+        OwnedValue::BatchObject(99),
+        OwnedValue::Object(0),
+    ] {
+        let starting_revision = registry.revision();
+        let starting_usage = registry.usage();
+        let error = registry
+            .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(actor),
+                directions: vec![ActorDirection::SetProperty {
+                    id: WRITABLE_REFERENCE_FIELD,
+                    value,
+                }],
+            }])
+            .unwrap_err();
+        assert_eq!(
+            error,
+            RegistryError::BatchInvalidField {
+                field_id: WRITABLE_REFERENCE_FIELD,
+            }
+        );
+        assert_eq!(
+            error.error_class(),
+            rlvgl_core::actor::ErrorClass::BatchInvalid
+        );
+        assert_eq!(registry.revision(), starting_revision);
+        assert_eq!(registry.usage(), starting_usage);
+    }
+
+    let starting_revision = registry.revision();
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::Stable(actor),
+                    directions: vec![ActorDirection::SetProperty {
+                        id: WRITABLE_REFERENCE_FIELD,
+                        value: OwnedValue::BatchObject(1),
+                    }],
+                },
+                create(
+                    1,
+                    container,
+                    BatchCreateDestination::Root {
+                        name: "future".into(),
+                    },
+                    vec![],
+                ),
+            ])
+            .unwrap_err(),
+        RegistryError::BatchInvalidField {
+            field_id: WRITABLE_REFERENCE_FIELD,
+        }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.root_id("future"), None);
+
+    let victim = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_children = registry.children(parent).unwrap();
+    let stale_error = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::Delete {
+                object: BatchObjectReference::Stable(victim),
+            },
+            BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(actor),
+                directions: vec![ActorDirection::SetProperty {
+                    id: WRITABLE_REFERENCE_FIELD,
+                    value: OwnedValue::Object(victim.get()),
+                }],
+            },
+        ])
+        .unwrap_err();
+    assert_eq!(
+        stale_error,
+        RegistryError::StaleObjectField {
+            field_id: WRITABLE_REFERENCE_FIELD,
+            object_id: victim,
+        }
+    );
+    assert_eq!(
+        stale_error.error_class(),
+        rlvgl_core::actor::ErrorClass::StaleObject
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.children(parent).unwrap(), starting_children);
+    assert!(registry.actor_info(victim).is_ok());
+    assert_eq!(
+        registry.property(actor, WRITABLE_REFERENCE_FIELD).unwrap(),
+        OwnedValue::Object(parent.get())
+    );
+}
+
+#[test]
+fn collective_slider_set_property_on_earlier_target_commits_final_tuple() {
+    let container = descriptor("container::Container");
+    let slider = descriptor("slider::Slider");
+    let min = property(slider, "min");
+    let max = property(slider, "max");
+    let value = property(slider, "value");
+    let mut registry = registry();
+    let starting_revision = registry.revision();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            create(
+                1,
+                container,
+                BatchCreateDestination::Root {
+                    name: "main".into(),
+                },
+                vec![],
+            ),
+            create(
+                2,
+                slider,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::EarlierBatch(1),
+                },
+                vec![
+                    CreateField {
+                        id: field(slider, "min"),
+                        value: OwnedValue::I32(0),
+                    },
+                    CreateField {
+                        id: field(slider, "max"),
+                        value: OwnedValue::I32(100),
+                    },
+                    CreateField {
+                        id: field(slider, "value"),
+                        value: OwnedValue::I32(50),
+                    },
+                ],
+            ),
+            BatchStageDirection::MutateActor {
+                object: BatchObjectReference::EarlierBatch(2),
+                directions: vec![
+                    ActorDirection::SetProperty {
+                        id: min,
+                        value: OwnedValue::I32(200),
+                    },
+                    ActorDirection::SetProperty {
+                        id: max,
+                        value: OwnedValue::I32(300),
+                    },
+                    ActorDirection::SetProperty {
+                        id: value,
+                        value: OwnedValue::I32(250),
+                    },
+                ],
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(
+        committed
+            .create_outputs()
+            .iter()
+            .map(|output| (output.operation_index, output.batch_ref))
+            .collect::<Vec<_>>(),
+        [(0, 1), (1, 2)]
+    );
+    let outputs = committed.take_create_outputs();
+    let created_slider = outputs[1].object_id;
+    assert_eq!(
+        registry.property(created_slider, min).unwrap(),
+        OwnedValue::I32(200)
+    );
+    assert_eq!(
+        registry.property(created_slider, max).unwrap(),
+        OwnedValue::I32(300)
+    );
+    assert_eq!(
+        registry.property(created_slider, value).unwrap(),
+        OwnedValue::I32(250)
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn slider_tuple_failures_roll_back_prior_properties_with_exact_fields() {
+    let label = descriptor("label::Label");
+    let slider = descriptor("slider::Slider");
+    let label_text = property(label, "text");
+    let min = property(slider, "min");
+    let max = property(slider, "max");
+    let value = property(slider, "value");
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "main" },
+    );
+    let stable_label = create_stable_label(&mut registry, root);
+    let stable_slider = create_stable_slider(&mut registry, root);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_effects = registry.last_commit_effects();
+    let starting_invalidations = registry.last_invalidations().to_vec();
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::Stable(stable_label),
+                    directions: vec![ActorDirection::SetProperty {
+                        id: label_text,
+                        value: OwnedValue::Text("rolled back".into()),
+                    }],
+                },
+                BatchStageDirection::MutateActor {
+                    object: BatchObjectReference::Stable(stable_slider),
+                    directions: vec![
+                        ActorDirection::SetProperty {
+                            id: min,
+                            value: OwnedValue::I32(200),
+                        },
+                        ActorDirection::SetProperty {
+                            id: max,
+                            value: OwnedValue::I32(100),
+                        },
+                    ],
+                },
+            ])
+            .unwrap_err(),
+        RegistryError::Range { field_id: max }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.last_commit_effects(), starting_effects);
+    assert_eq!(registry.last_invalidations(), starting_invalidations);
+    assert_eq!(
+        registry.property(stable_label, label_text).unwrap(),
+        OwnedValue::Text("leaf".into())
+    );
+    assert_eq!(
+        registry.property(stable_slider, min).unwrap(),
+        OwnedValue::I32(0)
+    );
+    assert_eq!(
+        registry.property(stable_slider, max).unwrap(),
+        OwnedValue::I32(100)
+    );
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(stable_slider),
+                directions: vec![ActorDirection::SetProperty {
+                    id: value,
+                    value: OwnedValue::I32(101),
+                }],
+            }])
+            .unwrap_err(),
+        RegistryError::Range { field_id: value }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(
+        registry.property(stable_slider, value).unwrap(),
+        OwnedValue::I32(50)
+    );
+}
+
+#[test]
+fn same_value_set_property_commits_once_with_outputless_effects() {
+    let slider = descriptor("slider::Slider");
+    let value = property(slider, "value");
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "main" },
+    );
+    let stable_slider = create_stable_slider(&mut registry, root);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+            object: BatchObjectReference::Stable(stable_slider),
+            directions: vec![ActorDirection::SetProperty {
+                id: value,
+                value: OwnedValue::I32(50),
+            }],
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(
+        registry.property(stable_slider, value).unwrap(),
+        OwnedValue::I32(50)
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW.union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn set_property_text_capacity_rejects_without_publication() {
+    let label = descriptor("label::Label");
+    let mut registry = StageRegistry::new(
+        StageId::new(97).unwrap(),
+        &CATALOG,
+        RegistryLimits {
+            max_text_bytes: 4,
+            ..limits()
+        },
+    )
+    .unwrap();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "r" },
+    );
+    let stable_label = registry
+        .create(
+            label.type_id,
+            rlvgl_core::actor::CreateDestination::Child { parent: root },
+            &[
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(label, "bounds"),
+                    value: ValueRef::Rect {
+                        x: BOUNDS.x,
+                        y: BOUNDS.y,
+                        width: BOUNDS.width,
+                        height: BOUNDS.height,
+                    },
+                },
+                rlvgl_core::actor::ConstructorInput {
+                    id: field(label, "text"),
+                    value: ValueRef::Text("a"),
+                },
+            ],
+        )
+        .unwrap();
+    let text = property(label, "text");
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_effects = registry.last_commit_effects();
+    let starting_invalidations = registry.last_invalidations().to_vec();
+
+    assert_eq!(starting_usage.text_bytes, 2);
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::MutateActor {
+                object: BatchObjectReference::Stable(stable_label),
+                directions: vec![ActorDirection::SetProperty {
+                    id: text,
+                    value: OwnedValue::Text("grow".into()),
+                }],
+            }])
+            .unwrap_err(),
+        RegistryError::Capacity {
+            kind: CapacityKind::TextBytes,
+        }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.last_commit_effects(), starting_effects);
+    assert_eq!(registry.last_invalidations(), starting_invalidations);
+    assert_eq!(
+        registry.property(stable_label, text).unwrap(),
+        OwnedValue::Text("a".into())
+    );
 }
 
 #[test]

@@ -15,8 +15,10 @@ protocol evidence. The exact Reorder and Reparent payloads have the same proof,
 including all four Reparent reference pairs. PromoteRoot now has an exact
 target/name/index codec, negotiated text-limit enforcement, and stable/Batch
 reference vectors. SetFlag now has exact stable flag IDs, canonical Boolean
-encoding, stable/Batch target vectors, and outputless result proof. Complete
-Endpoint dispatch remains deferred.
+encoding, stable/Batch target vectors, and outputless result proof.
+SetProperties now has an exact nonempty typed-field payload, complete negotiated
+value-limit enforcement, object-reference context, and field-attributed error
+proof. Complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -111,7 +113,7 @@ to operation-specific PCDNs.
 
 | Opcode | Common target context | Remainder/result status |
 |---|---|---|
-| `SET_PROPERTIES` | Actor whose properties are collectively set | Property fields and success values deferred |
+| `SET_PROPERTIES` | Actor whose properties are collectively set | Exact nonempty typed fields and outputless success; §5.7 |
 | `RESET_PROPERTIES` | Actor whose properties are reset | Property IDs and success values deferred |
 | `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
 | `SET_FLAG` | Actor owning runtime metadata | Exact flag ID plus canonical Boolean and outputless success; §5.6 |
@@ -482,6 +484,101 @@ resolution, descriptor capability validation, prepared atomic commit,
 revision/result attribution, native state/event ordering, and retained-storage
 release.
 
+### 5.7 SetProperties payload, result, and collective validation
+
+SetProperties specializes the common target envelope with one nonempty
+canonical MPY-02 typed field list:
+
+```text
+set_properties_payload = target:ObjectReference |
+                         field_count:u16 |
+                         field[field_count]
+field = property_id:u32 | value:Value
+```
+
+The operation opcode is exactly `SET_PROPERTIES` (`0x0000_0002`), flags are
+`0`, and the counted field list consumes the complete operation payload. At
+least one field is required. Property IDs are nonzero and strictly increasing,
+which rejects zero, duplicate, and out-of-order IDs as `InvalidFrame` before
+descriptor lookup. A missing/truncated value, a malformed canonical value, or
+any trailing byte is also `InvalidFrame`. Known non-object target tags produce
+`TypeMismatch`; an unknown target or field-value tag remains `Unsupported`. A
+Command carrying SetProperties is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+The target is structurally classified and contextually resolved before any
+property field. An unbound or forward Batch target is `BatchInvalid`; a stale
+stable target is `StaleObject`. Field semantics then use two distinct passes:
+
+1. validate every field's descriptor existence, access, declared schema/value
+   tag, and scalar constraint in increasing property-ID order; then
+2. only if the complete schema pass succeeds, resolve every contextual Object
+   value in increasing property-ID order.
+
+The first error within the active pass is deterministic. A later property's
+schema `Range` therefore takes precedence over an earlier property's unbound
+`BatchObject`, because reference resolution has not begun. Unknown IDs produce
+`UnknownProperty`, nonwritable descriptors produce `ReadOnly`, mismatched value
+tags produce `TypeMismatch`, and descriptor constraint failures produce
+`Range` or the descriptor's declared structured error. Those errors carry the
+actual property `field_id`.
+
+Object-valued properties have an additional contextual boundary. The actor
+descriptor MUST first prove that the property schema expects an Object before
+the adapter interprets either `ValueTag::Object` or `ValueTag::BatchObject` as
+a reference during the second pass. A stable Object is then generation-checked;
+a BatchObject must resolve to an earlier unique Create binding in the same
+Batch. The first such failure in increasing ID order is `StaleObject` or
+`BatchInvalid` at that property ID. A BatchObject in a field whose schema is not
+Object-valued fails with `TypeMismatch` during the earlier schema pass; it is
+never a generic escape from descriptor typing. The allocation-free structural
+codec preserves the canonical tags but intentionally performs no registry
+resolution.
+
+The unbounded encode/decode functions are structural and tooling helpers only.
+After negotiation, request acceptance MUST use the `with_limits` encoder or
+decoder. It applies `max_items_per_command` to the property count and applies
+`max_text_bytes` and `max_byte_payload` to every Text and Bytes value.
+Complete structural validation, including nonemptiness, ID ordering, value
+structure, and trailing-byte rejection, precedes every `LimitExceeded`
+decision. The enclosing Batch independently enforces `max_frame_bytes`.
+
+SetProperties validates the target, every descriptor, every value, every
+object-valued reference, all constraints, and the combined mutation effects
+before changing one actor property. Failure leaves every property unchanged;
+there is no successful prefix. Commit installs all requested values under the
+Batch's one visible Stage revision and unions their mutation effects for
+invalidation and lifecycle processing. Aggregate Stage capacity validation
+follows the field passes. A failure such as total `TextBytes` capacity is
+`Capacity` attributed to the SetProperties operation with `field_id = None`,
+because no single property is authoritative for the collective total.
+
+SetProperties success is outputless. BatchSuccess carries the final/current
+`result_revision` but no `OperationResult` at the SetProperties operation
+index. Other output-bearing operations retain their increasing records. A
+record correlated to SetProperties is `InvalidFrame` under its result schema.
+The narrow API absence validator requires prior caller correlation to opcode
+SetProperties and does not validate other opcode schemas, negotiated limits,
+or the complete success envelope.
+
+Setting every field to its already-current value is a valid collective no-op.
+It remains part of the accepted mutation Batch, whose visible commit advances
+`StageRevision` exactly once for the complete Batch, including when that no-op
+SetProperties is its only direction. Snapshots or typed property reads remain
+the authoritative readback rather than an echoed success payload.
+
+The smallest structural payload is ten bytes with a BatchObject target and one
+`None` field, or sixteen bytes with a stable Object target. Semantic validity
+also requires a matching writable property descriptor that accepts `None`, and
+the BatchObject form additionally requires an earlier binding. Eight smallest
+structural BatchObject records produce a 214-byte Batch frame; eight stable-
+target records produce 262 bytes and correctly exceed the independent 256-byte
+frame floor. These figures are wire-size evidence, not catalog execution
+evidence. Complete Endpoint integration remains responsible for contextual
+target and object-valued field resolution, descriptor lookup, collective
+prepared validation, allocation-free commit, field error/result attribution,
+lifecycle/cue ordering, and retained-storage release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -697,6 +794,14 @@ material, but they MUST preserve the same ordering and visible semantics.
   Enabled universal, gates Clickable and Focusable on `CONTROL`, preserves
   synchronized disabled/focus/edit state cleanup, defines outputless no-op
   revision semantics, and leaves Endpoint execution evidence-gated.
+- **PCDN-MPY-04-010 — Closed by owner acceptance 2026-08-18:** §5.7 freezes
+  SetProperties as a contextual target plus a nonempty strictly ordered typed
+  field list. It requires structural validation before negotiated count/Text/
+  Bytes limits, admits stable/earlier-Batch targets and schema-proven object-
+  valued field references, freezes the complete schema pass before contextual
+  reference resolution, distinguishes property-attributed failures from
+  aggregate operation-attributed Capacity, defines outputless no-op revision
+  semantics, and leaves Endpoint execution evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -706,7 +811,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-009 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-010 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -726,11 +831,12 @@ material, but they MUST preserve the same ordering and visible semantics.
 ## 14. Unblocks
 
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
-PromoteRoot, and SetFlag schemas now unblock the remaining operation-specific
-payload/result PCDNs and Endpoint orchestration without authorizing guessed
-remainder schemas. After those codecs and endpoint integration are implemented,
-MPY-04 provides the complete stage mutation/introspection surface consumed by
-MPY-06 and the deterministic snapshot oracle consumed by MPY-07/09.
+PromoteRoot, SetFlag, and SetProperties schemas now unblock the remaining
+operation-specific payload/result PCDNs and Endpoint orchestration without
+authorizing guessed remainder schemas. After those codecs and endpoint
+integration are implemented, MPY-04 provides the complete stage mutation/
+introspection surface consumed by MPY-06 and the deterministic snapshot oracle
+consumed by MPY-07/09.
 
 ## 15. Change Log
 
@@ -962,7 +1068,7 @@ text, item-count, and complete-frame bounds remain explicit.
 
 **Touches:** PCDN-MPY-04-009, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
 
-**Commits:** pending
+**Commits:** `c857b37`
 
 **Summary:** Freezes SetFlag as a contextual target followed by one stable
 runtime-flag byte and one canonical Boolean byte. Adds allocation-free
@@ -979,3 +1085,32 @@ Canonical Boolean bytes remove alternate encodings, and descriptor-gating the
 control flags prevents unsupported actors from accepting inert metadata.
 Outputless success and one Batch revision report the synchronized flag/state
 commit without redundant result values, including for a valid no-op.
+
+### 0.9.0 — 2026-08-18 — SetProperties wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-010, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes SetProperties as a contextual target followed by one
+nonempty canonical typed field list. Adds allocation-free structural and
+negotiated-limit codecs, stable and BatchObject target vectors, object-valued
+stable/Batch field vectors, strict list and structural-before-limit coverage,
+outputless result validation, two-phase property-attributed and aggregate-
+Capacity error fixtures, and truthful minimum-frame size evidence.
+
+#### Rationale
+
+A canonical increasing field list gives collective property writes one
+deterministic two-phase validation and error order while retaining MPY-02 typed
+values. Completing schema/access/type/scalar validation before contextual
+Object resolution ensures semantic errors outrank reference availability,
+while requiring descriptor-proven Object context prevents BatchObject from
+becoming an untyped escape. Aggregate Stage capacity remains operation-
+attributed because no one field owns the total. Outputless success uses the
+common Batch revision, and independent item, value-payload, and frame limits
+keep minimum-profile behavior explicit.

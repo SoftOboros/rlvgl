@@ -932,6 +932,18 @@ pub struct PromoteRootPayload<'a> {
 /// Structural or contextual failure while decoding a PromoteRoot payload.
 pub type PromoteRootPayloadError = ObjectReferenceError;
 
+/// Complete Batch-only SetProperties payload.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SetPropertiesPayload<'a> {
+    /// Stable or earlier-created actor whose properties are collectively set.
+    pub target: ObjectReference,
+    /// Nonempty descriptor property fields in strictly increasing ID order.
+    pub fields: FieldList<'a>,
+}
+
+/// Structural or contextual failure while decoding a SetProperties payload.
+pub type SetPropertiesPayloadError = ObjectReferenceError;
+
 /// Stable runtime-owned object metadata flags writable through SetFlag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -2058,6 +2070,92 @@ pub fn decode_promote_root_operation_with_limits(
     decode_promote_root_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete SetProperties payload without negotiated-limit checks.
+///
+/// This allocation-free structural helper is appropriate before negotiation
+/// or inside a caller that separately enforces [`Limits`]. Protocol request
+/// acceptance should use [`encode_set_properties_payload_with_limits`].
+pub fn encode_set_properties_payload(
+    payload: SetPropertiesPayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_properties_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    encode_field_list_into(payload.fields, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode one complete SetProperties payload under negotiated value limits.
+///
+/// Complete structural validation precedes count, Text, and Bytes limits. The
+/// enclosing Batch separately applies `max_frame_bytes`.
+pub fn encode_set_properties_payload_with_limits(
+    payload: SetPropertiesPayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_properties_payload_structure(payload)?;
+    validate_field_count(payload.fields, limits.max_items_per_command)?;
+    validate_field_list_payload_limits(payload.fields, limits)?;
+    encode_set_properties_payload(payload, output)
+}
+
+/// Decode one complete SetProperties payload without negotiated-limit checks.
+///
+/// The contextual target is classified first. The remainder must be exactly
+/// one nonempty canonical [`FieldList`]. Request acceptance should use
+/// [`decode_set_properties_payload_with_limits`].
+pub fn decode_set_properties_payload(
+    input: &[u8],
+) -> Result<SetPropertiesPayload<'_>, SetPropertiesPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let fields = decode_field_list(&input[target_consumed..])?;
+    if fields.is_empty() {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    Ok(SetPropertiesPayload { target, fields })
+}
+
+/// Decode one complete SetProperties payload under negotiated value limits.
+///
+/// Complete structural decoding precedes count, Text, and Bytes limits.
+pub fn decode_set_properties_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<SetPropertiesPayload<'_>, SetPropertiesPayloadError> {
+    let payload = decode_set_properties_payload(input)?;
+    validate_field_count(payload.fields, limits.max_items_per_command)?;
+    validate_field_list_payload_limits(payload.fields, limits)?;
+    Ok(payload)
+}
+
+/// Decode one zero-flag SetProperties operation without negotiated checks.
+///
+/// There is deliberately no Command counterpart: MPY v1 SetProperties is
+/// Batch-only. Request acceptance should use
+/// [`decode_set_properties_operation_with_limits`].
+pub fn decode_set_properties_operation(
+    operation: OperationRef<'_>,
+) -> Result<SetPropertiesPayload<'_>, SetPropertiesPayloadError> {
+    if operation.opcode != opcode::SET_PROPERTIES || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_properties_payload(operation.payload)
+}
+
+/// Decode one zero-flag SetProperties operation under negotiated value limits.
+pub fn decode_set_properties_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<SetPropertiesPayload<'_>, SetPropertiesPayloadError> {
+    if operation.opcode != opcode::SET_PROPERTIES || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_properties_payload_with_limits(operation.payload, limits)
+}
+
 /// Encode one complete SetFlag payload.
 ///
 /// No negotiated variable-size limit applies to this fixed-size payload. The
@@ -2240,6 +2338,41 @@ pub fn validate_set_flag_result_absent(
         return Err(CodecError::InvalidFrame);
     }
     Ok(())
+}
+
+/// Validate that one correlated SetProperties emitted no result record.
+///
+/// The caller MUST already have correlated `set_properties_operation_index`
+/// to a submitted opcode [`opcode::SET_PROPERTIES`]. This helper validates the
+/// structural [`BatchSuccess`] shape and the absence of that one index only. It
+/// does not validate other opcode result schemas, negotiated Limits, or the
+/// complete success envelope. Other output-bearing operations may still
+/// contribute records.
+pub fn validate_set_properties_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    set_properties_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if set_properties_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == set_properties_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+fn validate_set_properties_payload_structure(
+    payload: SetPropertiesPayload<'_>,
+) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    if payload.fields.is_empty() {
+        return Err(CodecError::InvalidFrame);
+    }
+    validate_field_list_structure(payload.fields)
 }
 
 fn validate_promote_root_payload_structure(

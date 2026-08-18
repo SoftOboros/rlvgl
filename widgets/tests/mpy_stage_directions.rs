@@ -588,7 +588,7 @@ fn list_actions_prepare_transactionally_and_property_matrix_is_descriptor_driven
                 value: OwnedValue::U32(2),
             }],
         }]),
-        Err(RegistryError::ReadOnly)
+        Err(RegistryError::ReadOnlyField { field_id: count })
     );
     assert_eq!(
         registry.apply_batch(&[StageDirection::SetFlag {

@@ -407,6 +407,21 @@ fn validate_actor_directions(
     descriptor: &TypeDescriptor,
     directions: &[ActorDirection],
 ) -> Result<(), RegistryError> {
+    validate_actor_directions_with_context(descriptor, directions, false)
+}
+
+fn validate_atomic_actor_directions(
+    descriptor: &TypeDescriptor,
+    directions: &[ActorDirection],
+) -> Result<(), RegistryError> {
+    validate_actor_directions_with_context(descriptor, directions, true)
+}
+
+fn validate_actor_directions_with_context(
+    descriptor: &TypeDescriptor,
+    directions: &[ActorDirection],
+    allow_batch_object: bool,
+) -> Result<(), RegistryError> {
     for direction in directions {
         match direction {
             ActorDirection::SetProperty { id, value } => {
@@ -416,13 +431,17 @@ fn validate_actor_directions(
                     .find(|property| property.id == *id)
                     .ok_or(RegistryError::UnknownProperty { property_id: *id })?;
                 if property.access != PropertyAccess::ReadWrite {
-                    return Err(RegistryError::ReadOnly);
+                    return Err(RegistryError::ReadOnlyField { field_id: *id });
                 }
-                if value.tag() != property.value_tag {
+                let actual = value.tag();
+                let contextual_object = allow_batch_object
+                    && property.value_tag == ValueTag::Object
+                    && matches!(actual, ValueTag::Object | ValueTag::BatchObject);
+                if actual != property.value_tag && !contextual_object {
                     return Err(RegistryError::TypeMismatch {
                         field_id: *id,
                         expected: property.value_tag,
-                        actual: value.tag(),
+                        actual,
                     });
                 }
                 validate_property_constraint(property, value)?;
@@ -434,7 +453,7 @@ fn validate_actor_directions(
                     .find(|property| property.id == *id)
                     .ok_or(RegistryError::UnknownProperty { property_id: *id })?;
                 if property.access != PropertyAccess::ReadWrite {
-                    return Err(RegistryError::ReadOnly);
+                    return Err(RegistryError::ReadOnlyField { field_id: *id });
                 }
                 let _ = property.default.owned();
             }
@@ -1763,12 +1782,22 @@ pub enum RegistryError {
         /// Field outside its range.
         field_id: u32,
     },
+    /// Attempted mutation targets a read-only descriptor field.
+    ReadOnlyField {
+        /// Descriptor-local field identifier.
+        field_id: u32,
+    },
     /// Attempted mutation targets read-only state.
     ReadOnly,
     /// A described direction is not implemented by this runtime profile.
     Unsupported,
     /// A command group is structurally valid but cannot be committed atomically.
     BatchInvalid,
+    /// A batch-local property reference cannot resolve at its field.
+    BatchInvalidField {
+        /// Descriptor-local field identifier.
+        field_id: u32,
+    },
     /// A public native widget borrow prevents entering an atomic director turn.
     DispatchBusy,
     /// Root or parent policy rejects the requested relationship.
@@ -1777,6 +1806,13 @@ pub enum RegistryError {
     DuplicateRoot,
     /// Object handle is deleted, unknown, or generation-stale.
     StaleObject {
+        /// Rejected handle.
+        object_id: ObjectId,
+    },
+    /// A stable property reference is stale at its field.
+    StaleObjectField {
+        /// Descriptor-local field identifier.
+        field_id: u32,
         /// Rejected handle.
         object_id: ObjectId,
     },
@@ -1805,12 +1841,12 @@ impl RegistryError {
             }
             Self::TypeMismatch { .. } => ErrorClass::TypeMismatch,
             Self::Range { .. } => ErrorClass::Range,
-            Self::ReadOnly => ErrorClass::ReadOnly,
+            Self::ReadOnlyField { .. } | Self::ReadOnly => ErrorClass::ReadOnly,
             Self::Unsupported => ErrorClass::Unsupported,
-            Self::BatchInvalid => ErrorClass::BatchInvalid,
+            Self::BatchInvalid | Self::BatchInvalidField { .. } => ErrorClass::BatchInvalid,
             Self::DispatchBusy => ErrorClass::DispatchBusy,
             Self::InvalidParent | Self::DuplicateRoot => ErrorClass::InvalidParent,
-            Self::StaleObject { .. } => ErrorClass::StaleObject,
+            Self::StaleObject { .. } | Self::StaleObjectField { .. } => ErrorClass::StaleObject,
             Self::Capacity { .. } => ErrorClass::Capacity,
             Self::StageClosed => ErrorClass::StageNotFound,
         }
@@ -3608,17 +3644,25 @@ impl StageRegistry {
                 continue;
             }
 
-            let resolved = self.resolve_atomic_direction(direction, &tree_shadow, &bindings)?;
+            let mut resolved = self.resolve_atomic_direction(direction, &tree_shadow, &bindings)?;
+            if let StageDirection::MutateActor {
+                object_id,
+                directions,
+            } = &mut resolved
+            {
+                let descriptor = tree_shadow.actor(*object_id)?.descriptor;
+                if directions.is_empty() {
+                    return Err(RegistryError::BatchInvalid);
+                }
+                validate_atomic_actor_directions(descriptor, directions)?;
+                self.resolve_atomic_actor_values(descriptor, directions, &tree_shadow, &bindings)?;
+            }
             match &resolved {
                 StageDirection::MutateActor {
                     object_id,
                     directions,
                 } => {
                     let descriptor = tree_shadow.actor(*object_id)?.descriptor;
-                    if directions.is_empty() {
-                        return Err(RegistryError::BatchInvalid);
-                    }
-                    validate_actor_directions(descriptor, directions)?;
                     effects = effects.union(actor_direction_effects(descriptor, directions)?);
                     push_unique(&mut touched, *object_id);
                     if let Some((_, group)) = actor_groups
@@ -3957,6 +4001,52 @@ impl StageRegistry {
                 Ok(object_id)
             }
         }
+    }
+
+    fn resolve_atomic_actor_values(
+        &self,
+        descriptor: &TypeDescriptor,
+        directions: &mut [ActorDirection],
+        shadow: &TreeShadow,
+        bindings: &[(u16, ObjectId, usize)],
+    ) -> Result<(), RegistryError> {
+        for direction in directions {
+            let ActorDirection::SetProperty { id, value } = direction else {
+                continue;
+            };
+            let property = descriptor
+                .properties
+                .iter()
+                .find(|property| property.id == *id)
+                .expect("atomic schema validation resolved every property field");
+            if property.value_tag != ValueTag::Object {
+                continue;
+            }
+            let reference = match value {
+                OwnedValue::Object(raw) => BatchObjectReference::Stable(
+                    ObjectId::new(*raw)
+                        .ok_or(RegistryError::BatchInvalidField { field_id: *id })?,
+                ),
+                OwnedValue::BatchObject(batch_ref) => {
+                    BatchObjectReference::EarlierBatch(*batch_ref)
+                }
+                _ => unreachable!("atomic schema validation accepts only Object references here"),
+            };
+            let object_id = self
+                .resolve_atomic_reference(reference, shadow, bindings)
+                .map_err(|error| match error {
+                    RegistryError::BatchInvalid => {
+                        RegistryError::BatchInvalidField { field_id: *id }
+                    }
+                    RegistryError::StaleObject { object_id } => RegistryError::StaleObjectField {
+                        field_id: *id,
+                        object_id,
+                    },
+                    other => other,
+                })?;
+            *value = OwnedValue::Object(object_id.get());
+        }
+        Ok(())
     }
 
     fn resolve_atomic_direction(
