@@ -43,7 +43,7 @@ through ratified phase documents and their acceptance gates.
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Draft; six topology PCDNs resolved; blocked by CPY-01 and an actual MPY Handoff Record |
 | [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; four policy PCDNs resolved; capacity measurement and CPY-02 open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; six binding-policy PCDNs resolved; dependency/implementation evidence open |
-| [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; blocked by CPY-02/03 |
+| [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; blocked by CPY-03/04/05 |
 | [CPY-07](CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md) | Headless and windowed host profiles, asyncio readiness, and launcher boundary | Draft; blocked by CPY-03/04/05 |
 | [CPY-08](CPY-08-PACKAGING-CROSS-DEPLOYMENT.md) | Wheels, target-rootfs cross-builds, services, versioning, and artifact manifests | Draft; blocked by CPY-02/04 and target decisions |

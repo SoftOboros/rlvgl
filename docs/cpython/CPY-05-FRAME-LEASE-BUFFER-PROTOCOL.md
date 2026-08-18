@@ -6,9 +6,10 @@ CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md - Flattened frame metadata, slot lifetime,
 
 **Document ID:** CPY-05-FRAME-LEASE-BUFFER-PROTOCOL
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Five policy PCDNs resolved 2026-08-18;
+`PCDN-CPY-05-002` remains measurement-blocked. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -98,6 +99,33 @@ The descriptor MUST describe memory as exported, not the renderer's conceptual
 `u32` value. A name such as `Argb8888` is insufficient unless it fixes the
 actual byte order on the target architecture.
 
+The first-release Pixel Layout identifier is `BGRA8888_LE_STRAIGHT`. It is a
+top-to-bottom, left-to-right, tightly packed software-reference layout with:
+
+- four unsigned 8-bit components per pixel at byte offsets `[B, G, R, A]`;
+- unassociated/straight alpha, where `0` is transparent and `255` is opaque;
+- `row_stride == width * 4` and `byte_length == row_stride * height`;
+- no row padding or architecture-native integer reinterpretation; and
+- `color_space == "rlvgl-renderer-v1"`, meaning current renderer component
+  values with no publication-time transfer/profile conversion and the existing
+  sRGB-naive straight-alpha blend behavior, not a calibrated-sRGB claim.
+
+The defining operation is
+`Color(r, g, b, a).to_argb8888().to_le_bytes()`. These canonical vectors MUST
+produce the same bytes on every admitted target:
+
+| Logical channels `(R,G,B,A)` | Exported bytes |
+|---|---|
+| `(00,00,00,00)` | `00 00 00 00` |
+| `(ff,00,00,80)` | `00 00 ff 80` |
+| `(12,34,56,78)` | `56 34 12 78` |
+
+A backend whose render/scanout memory has another layout or padded stride MUST
+copy/convert once while transitioning into the canonical frozen publication
+slot. The zero-copy claim begins at the frozen Frame Slot and covers all Python
+views of that slot; it does not claim that every backend renders directly into
+the published storage.
+
 ## 6. Frozen Decisions — Slot and Lease Lifecycle
 
 The slot lifecycle is:
@@ -127,10 +155,12 @@ Adding a slot lifecycle state is **Standards Action**.
 
 ## 7. Frozen Decisions — Python Buffer Export
 
-The initial exporter SHOULD expose one read-only, C-contiguous byte view with
-`itemsize == 1`; dimensions, stride, and Pixel Layout remain explicit Frame
-attributes. A multidimensional/structured export requires resolution of
-`PCDN-CPY-05-003` and must not invent a misleading PEP 3118 format.
+The initial exporter MUST expose one read-only, C-contiguous, one-dimensional
+unsigned-byte view: PEP 3118 format `B`, `itemsize == 1`,
+`shape == (byte_length,)`, and `strides == (1,)`. Width, height, row stride,
+Pixel Layout, damage, and sequence metadata remain immutable `Frame`
+attributes. The exporter MUST NOT advertise a multidimensional or structured
+view in the first release.
 
 Writable export requests MUST fail. A consumer may create its own copy. Python
 libraries may construct NumPy/Pillow/Cairo views over the exported bytes, but
@@ -150,11 +180,35 @@ slots are pinned, rlvgl MUST use a bounded policy that preserves native cadence
 and reports Observer Loss when observation resumes. It MUST NOT overwrite a
 leased slot or block scanout indefinitely.
 
+Every completed native frame receives its Frame ID before observer publication.
+When no observer slot is recyclable, that frame is still presented natively,
+observer publication is skipped, and the service extends one pending inclusive
+loss range. The next successfully published observer Frame reports exactly:
+
+- `lost_count`;
+- `first_lost_frame_id`; and
+- `last_lost_frame_id`.
+
+The range contains every completed Frame ID after the prior delivered observer
+Frame and before the current delivered Frame that was not published to that
+observer. A skipped frame is never replayed later or represented as the current
+frame. If close/fault occurs before another observer Frame can carry the range,
+the terminal lifecycle record MUST carry the same pending loss fields. Frame
+notices and egress coalescing MUST preserve this accounting under CPY-03.
+
 ### 8.2 Headless/Python-presented
 
 When Python is the required consumer/presenter, slot exhaustion MUST return a
 typed Frame Busy/capacity outcome or honor an explicit bounded wait/timeout.
 No call may block forever by default.
+
+The first release requires this mode for host-headless frame capture and
+conformance. Slot exhaustion returns `CapacityError` with
+`context.resource == "frame_slot"` unless the caller selected a finite wait;
+expiration of that wait returns `WaitTimeoutError` without overwriting a live
+lease. Python-driven physical-device scanout is optional and does not block the
+embedded-Linux conformance profile, whose required path is native presentation
+with optional Python observation.
 
 ### 8.3 Canvas input
 
@@ -162,6 +216,20 @@ Writable Canvas Buffer storage MUST be distinct from live frame/scanout slots.
 Publishing it to rlvgl MUST validate size/layout and transfer or snapshot its
 content at an explicit Safe Turn. Python mutation after commit cannot race the
 native draw traversal.
+
+No public Canvas Buffer ships in the first release. The preceding isolation
+rule reserves the only admissible future design; adding the resource is
+Standards Action with a named consumer, owned-capacity policy, and Safe Turn
+evidence.
+
+### 8.4 Capacity accounting
+
+For the initial layout, `slot_bytes == width * height * 4` and the configured
+retained-byte ceiling is `slot_bytes * slot_count` plus fixed descriptor/lease
+overhead. Slot count, byte ceiling, pinned high-water mark, skipped-frame count,
+and wait/capacity outcomes MUST be exposed in metrics and the CPY-09 evidence
+manifest. Exact minimum/default/maximum counts remain measurement-gated by
+`PCDN-CPY-05-002`; no implementation default may become normative by accident.
 
 ## 9. Phase Invariants
 
@@ -187,7 +255,7 @@ native draw traversal.
 | WLD Shadow Frame/SHM slots | WLD-private. Shared types require later cross-family reconciliation; no CPY relocation. |
 | `bytes` | Optional copying convenience, not the canonical zero-copy frame boundary. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Decisions
 
 ### 11.1 Non-goals
 
@@ -198,26 +266,41 @@ native draw traversal.
   first profile.
 - Using Python garbage-collection timing as the slot reuse protocol.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
+- **PCDN-CPY-05-001 — Initial Pixel Layout — Accepted as amended
+  2026-08-18.** Use the exact tightly packed `BGRA8888_LE_STRAIGHT` layout,
+  `rlvgl-renderer-v1` color-space label, and canonical vectors in §5. A
+  backend-local conversion before freeze does not weaken Python-side zero-copy.
+- **PCDN-CPY-05-003 — Initial buffer shape — Accepted as amended
+  2026-08-18.** Export only a one-dimensional, read-only, C-contiguous `B`
+  view. Structured or multidimensional export is a later additive profile.
+- **PCDN-CPY-05-004 — Observer loss — Accepted as amended 2026-08-18.** Never
+  block native presentation or overwrite a lease. Skip publication while all
+  observer slots are pinned and report the exact inclusive Frame-ID range/count
+  on the next observer Frame or terminal lifecycle record.
+- **PCDN-CPY-05-005 — Required presentation modes — Accepted as amended
+  2026-08-18.** Require native-presented embedded observation and required-
+  consumer host-headless capture. Python-driven physical scanout is optional.
+- **PCDN-CPY-05-006 — Canvas Buffer scope — Accepted as amended
+  2026-08-18.** Defer the public Canvas Buffer from the first release while
+  reserving the isolated owned-storage/Safe Turn contract for Standards Action.
+
+### 11.3 Open Decision
+
+| PCDN | Question | Current disposition | Blocks |
 |---|---|---|---|
-| `PCDN-CPY-05-001` | What exact initial Pixel Layout is canonical? | Select one software-reference layout whose byte vector is proven on all required architectures; name bytes explicitly. | CPY-05 ratification |
-| `PCDN-CPY-05-002` | What are the default/minimum/max frame-slot counts per mode? | Triple buffering for native observer as candidate; measure memory/cadence and make capacities configurable/bounded. | CPY-05 ratification and CPY-09 budgets |
-| `PCDN-CPY-05-003` | Is the initial Python export 1-D bytes or multidimensional/strided? | 1-D read-only `B` view with explicit metadata; add structured views only after consumer evidence. | CPY-05 ratification |
-| `PCDN-CPY-05-004` | What exact observer-loss policy applies when every exportable slot is pinned? | Preserve native present, skip/coalesce observer publication, and report exact skipped Frame IDs/count. | CPY-05 ratification |
-| `PCDN-CPY-05-005` | Is Python-Presented Mode required in the first release? | Required for headless capture; optional for device scanout, where native presentation is primary. | CPY-05/07/09 claims |
-| `PCDN-CPY-05-006` | Does Canvas Buffer ship in the first release? | Defer unless a named Python-drawing consumer is required; reserve the isolation contract now. | CPY-05 scope, not Frame Lease proof |
+| `PCDN-CPY-05-002` | What are the default/minimum/maximum Frame Slot counts per mode? | Remains open. Measure retained memory, pin duration, native cadence, conversion bandwidth, observer loss, and required-consumer latency on host and the CPY-01 SBC. Record configurable bounds and defaults in CPY-09; triple buffering is a candidate, not a decision. | CPY-05 ratification and CPY-09 budgets |
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
-- [ ] Exact Pixel Layout and canonical byte vectors are recorded.
+- [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-05-002` remains open.
+- [x] Exact Pixel Layout and canonical byte vectors are recorded.
 - [ ] Slot lifecycle covers render, native present, every buffer export, close,
       and final release.
 - [ ] Each mode has bounded saturation/loss behavior.
 - [ ] Writable live-frame access is impossible by API and tests.
-- [ ] Damage overflow and observer loss are unambiguous.
+- [x] Damage overflow and observer loss policy is unambiguous.
 - [ ] Cross-architecture and finalization lifetime proofs are specified.
 - [ ] The owner records ratification in §15.
 
@@ -234,10 +317,52 @@ native draw traversal.
 
 ## 14. Unblocks
 
-Ratification and a headless held-lease proof unblock frame exposure in CPY-04,
-embedded presentation in CPY-06, and host capture in CPY-07.
+Five policy PCDNs are resolved, but CPY-05 remains Draft. Ratification is
+blocked by measured slot counts in `PCDN-CPY-05-002`, CPY-02/03, cross-target
+layout vectors, held-lease/finalization proofs, and owner acceptance of the
+completed phase. Ratification and a headless held-lease proof would unblock
+frame exposure in CPY-04, embedded presentation in CPY-06, and host capture in
+CPY-07.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — frame policy PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-05-1, INV-CPY-05-2, INV-CPY-05-3, INV-CPY-05-4,
+INV-CPY-05-5, INV-CPY-05-6, INV-CPY-05-7, INV-CPY-05-8,
+PCDN-CPY-05-001, PCDN-CPY-05-003, PCDN-CPY-05-004, PCDN-CPY-05-005,
+PCDN-CPY-05-006, §5, §7, §8, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Fixes the first flattened Pixel Layout and vectors, one-dimensional
+read-only Python buffer, exact observer-loss range, required headless/native
+modes, and Canvas Buffer deferral while retaining measured slot counts as the
+only phase PCDN.
+
+#### Rationale
+
+The software renderer already serializes `0xAARRGGBB` explicitly as little-
+endian bytes, giving CPY a deterministic `[B,G,R,A]` publication oracle without
+redefining rendering. A tight one-dimensional lease is broadly consumable and
+keeps width/stride semantics explicit. Native cadence must not inherit Python
+lease duration, while required-consumer headless mode must surface bounded
+capacity instead of silently losing frames.
+
+Considered and rejected: architecture-native `u32` naming, direct export of a
+mutable or padded backend surface, multidimensional PEP 3118 metadata before a
+consumer requires it, blocking native present behind pinned Python views,
+silent latest-frame coalescing, mandatory Python-driven device scanout, and an
+unowned first-release Canvas Buffer.
+
+What deliberately did not change: no frame slot, lease, buffer exporter, copy,
+conversion, capacity, or Canvas resource is implemented. WLD SHM ownership and
+internal mutable `Surface`/framebuffer typestates remain with their authorities;
+CPY-05 remains Draft and slot counts remain evidence-gated.
 
 ### 0.1.0 — 2026-08-18 — drafted
 

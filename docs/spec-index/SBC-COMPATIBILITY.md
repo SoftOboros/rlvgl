@@ -93,8 +93,9 @@ new behavior change.
 - **CPY:** CPY-00 is ratified with `PCDN-CPY-00-001` through
   `PCDN-CPY-00-003` accepted as amended. CPY-01 through CPY-09 remain Draft;
   CPY-01's six baseline selections and CPY-02's six topology decisions are
-  resolved, CPY-03 has resolved four runtime-policy decisions, and CPY-04 has
-  resolved all six director-binding policy decisions. The exact
+  resolved, CPY-03 has resolved four runtime-policy decisions, CPY-04 has
+  resolved all six director-binding policy decisions, and CPY-05 has resolved
+  five frame-policy decisions while retaining measured slot capacities. The exact
   manifest/rootfs/board artifacts, an actual MPY Handoff Record, measured
   queue/performance budgets, binding implementation/conformance evidence, and
   per-phase ratification remain open. CPY planning leads the future shared
