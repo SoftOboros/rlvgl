@@ -42,7 +42,7 @@
     "chips-silabs": 53,
     "chips-ti": 31,
     "concepts": 5,
-    "cpy": 283,
+    "cpy": 287,
     "crates-ci": 24,
     "dcb": 56,
     "disco-platform-guide": 1,
@@ -60,6 +60,6 @@
     "wld": 80
   },
   "schema_version": 2,
-  "total_edges": 1451,
-  "total_objects": 2155
+  "total_edges": 1453,
+  "total_objects": 2159
 }
