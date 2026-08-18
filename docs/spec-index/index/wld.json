@@ -1,5 +1,5 @@
 {
-  "edge_count": 68,
+  "edge_count": 80,
   "edges": [
     {
       "edge_type": "defines",
@@ -81,6 +81,13 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 245,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 248,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-001"
@@ -95,182 +102,224 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 259,
+      "line": 267,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 263,
+      "line": 271,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 267,
+      "line": 275,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 283,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 275,
+      "line": 283,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "INV-WLD-10"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 279,
+      "line": 287,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 280,
+      "line": 288,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 280,
+      "line": 289,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 289,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 314,
+      "line": 323,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "PCDN-WLD-001"
+      "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 320,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 320,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-10"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
+      "line": 329,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "INV-WLD-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
+      "line": 329,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "INV-WLD-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
+      "line": 329,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "INV-WLD-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-7"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "INV-WLD-9"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/wayland/WLD-00-CONCEPTS.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
+      "line": 329,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
+      "line": 346,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 352,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 352,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "INV-WLD-9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/wayland/WLD-00-CONCEPTS.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
+      "line": 374,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 342,
+      "line": 374,
       "source": "docs/wayland/WLD-00-CONCEPTS.md",
       "target": "PCDN-WLD-005"
     },
@@ -284,7 +333,7 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 8,
+      "line": 7,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-002"
     },
@@ -298,98 +347,133 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 276,
+      "line": 285,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 277,
+      "line": 286,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 277,
+      "line": 287,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 332,
+      "line": 346,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
+      "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 338,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 358,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 358,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 358,
+      "line": 352,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
+      "line": 352,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
+      "line": 352,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 358,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 358,
+      "line": 352,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
+      "line": 367,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 373,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-003"
     },
@@ -481,12 +565,12 @@
   "family": "wld",
   "kind_counts": {
     "amendment": 3,
-    "gate": 28,
+    "gate": 31,
     "invariant": 10,
     "rationale": 3,
     "term": 12
   },
-  "object_count": 56,
+  "object_count": 59,
   "objects": [
     {
       "attrs": {
@@ -800,8 +884,8 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 274,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:274",
+      "line": 282,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:282",
       "text": "§0 authority boundaries are accepted."
     },
     {
@@ -815,8 +899,8 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 275,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:275",
+      "line": 283,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:283",
       "text": "§6 `INV-WLD-1` through `INV-WLD-10` are accepted."
     },
     {
@@ -827,8 +911,8 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 276,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:276",
+      "line": 284,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:284",
       "text": "§7 is the complete v0.2.7 capability envelope."
     },
     {
@@ -839,8 +923,8 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 277,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:277",
+      "line": 285,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:285",
       "text": "§8 keeps WLD to two implementation phases."
     },
     {
@@ -851,8 +935,8 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 278,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:278",
+      "line": 286,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:286",
       "text": "§9 concurrency boundaries preserve MPY and CPython authority."
     },
     {
@@ -863,9 +947,21 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 279,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:279",
+      "line": 287,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:287",
       "text": "PCDN-WLD-001 is resolved as amended in this document."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-00-CONCEPTS.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 288,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:288",
+      "text": "PCDN-WLD-002 is resolved as amended in this document."
     },
     {
       "attrs": {
@@ -875,9 +971,9 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "gate",
-      "line": 280,
-      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:280",
-      "text": "PCDN-WLD-002 through PCDN-WLD-005 are resolved in this document."
+      "line": 289,
+      "obj_id": "docs/wayland/WLD-00-CONCEPTS.md:gate:289",
+      "text": "PCDN-WLD-003 through PCDN-WLD-005 are resolved in this document."
     },
     {
       "attrs": {
@@ -920,7 +1016,7 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 336,
+      "line": 368,
       "obj_id": "docs/wayland/WLD-00-CONCEPTS.md#0.1.0",
       "text": "Opens a three-document WLD family for a native optional Wayland"
     },
@@ -948,7 +1044,7 @@
       "doc": "docs/wayland/WLD-00-CONCEPTS.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 336,
+      "line": 368,
       "obj_id": "docs/wayland/WLD-00-CONCEPTS.md#0.1.0-rationale",
       "text": "Wayland presentation, buffer ownership, lifecycle, and seat input form one\nprotocol session and cannot be modeled safely as a framebuffer write alone.\nThe small family provides enough authority to prevent protocol and\ncross-initiative drift without absorbing generic Python frames, interpreter\nbindings, or unrelated platform backends."
     },
@@ -960,69 +1056,9 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "gate",
-      "line": 280,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:280",
+      "line": 290,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:290",
       "text": "Optional dependency and target gating is explicit in `Cargo.toml`."
-    },
-    {
-      "attrs": {
-        "checked": false,
-        "cited_ids": []
-      },
-      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "family": "wld",
-      "kind": "gate",
-      "line": 281,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:281",
-      "text": "Default and representative embedded/no-std feature checks are unchanged."
-    },
-    {
-      "attrs": {
-        "checked": false,
-        "cited_ids": []
-      },
-      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "family": "wld",
-      "kind": "gate",
-      "line": 282,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:282",
-      "text": "Constructor failures cover missing required globals and unsupported"
-    },
-    {
-      "attrs": {
-        "checked": false,
-        "cited_ids": []
-      },
-      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "family": "wld",
-      "kind": "gate",
-      "line": 284,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:284",
-      "text": "Pure state-machine tests cover initial configure, configure supersession,"
-    },
-    {
-      "attrs": {
-        "checked": false,
-        "cited_ids": []
-      },
-      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "family": "wld",
-      "kind": "gate",
-      "line": 287,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:287",
-      "text": "Pixel vectors freeze `Color` to `XRGB8888` bytes, stride, scale, and"
-    },
-    {
-      "attrs": {
-        "checked": false,
-        "cited_ids": []
-      },
-      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "family": "wld",
-      "kind": "gate",
-      "line": 289,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:289",
-      "text": "Full and partial present tests run for more frames than the slot count and"
     },
     {
       "attrs": {
@@ -1034,6 +1070,90 @@
       "kind": "gate",
       "line": 291,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:291",
+      "text": "Default and representative embedded/no-std feature checks are unchanged."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 292,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:292",
+      "text": "Constructor failures cover missing required globals and unsupported"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 294,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:294",
+      "text": "Pure state-machine tests cover initial configure, configure supersession,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 297,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:297",
+      "text": "Pixel vectors freeze `Color` to `XRGB8888` bytes, stride, scale, and"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 299,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:299",
+      "text": "Full and partial present tests run for more frames than the slot count and"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 301,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:301",
+      "text": "Slot configuration accepts only two or three slots, defaults to three,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 303,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:303",
+      "text": "Checked byte-budget tests cover oversized geometry, Retired resize"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "family": "wld",
+      "kind": "gate",
+      "line": 305,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:305",
       "text": "Backpressure tests prove latest-state coalescing, bounded memory, damage"
     },
     {
@@ -1044,8 +1164,8 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "gate",
-      "line": 293,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:293",
+      "line": 307,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:307",
       "text": "A minimal headless-compositor test maps one window and presents at least"
     },
     {
@@ -1056,8 +1176,8 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "gate",
-      "line": 295,
-      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:295",
+      "line": 309,
+      "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md:gate:309",
       "text": "Public items satisfy `#![deny(missing_docs)]`; strict Clippy and rustdoc"
     },
     {
@@ -1095,7 +1215,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 352,
+      "line": 387,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.1.0",
       "text": "Proposes the v0.2.7 Wayland session, composable dispatch boundary,"
     },
@@ -1117,7 +1237,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 352,
+      "line": 387,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.1.0-rationale",
       "text": "The existing display trait supplies a useful compatibility boundary but cannot\nown Wayland callbacks and lifecycle alone. A session plus a complete private\nframe closes protocol ownership and rotating-buffer correctness without\nchanging public display or Python APIs during concurrent MPY/CPython work."
     },

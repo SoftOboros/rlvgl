@@ -1,5 +1,5 @@
 {
-  "edge_count": 4,
+  "edge_count": 6,
   "edges": [
     {
       "edge_type": "cites",
@@ -11,6 +11,13 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 66,
+      "source": "docs/spec-index/SBC-COMPATIBILITY.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 101,
       "source": "docs/spec-index/SBC-COMPATIBILITY.md",
       "target": "PCDN-WLD-001"
@@ -18,9 +25,16 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 102,
+      "line": 101,
       "source": "docs/spec-index/SBC-COMPATIBILITY.md",
       "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/spec-index/SBC-COMPATIBILITY.md",
+      "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",

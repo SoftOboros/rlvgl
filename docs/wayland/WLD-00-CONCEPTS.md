@@ -4,7 +4,7 @@ WLD-00-CONCEPTS.md - Native Wayland backend authority and phase map.
 
 # WLD-00 — Native Wayland Backend Concepts
 
-**Status:** Draft 2026-08-18. Four PCDNs remain open. No implementation is
+**Status:** Draft 2026-08-18. Three PCDNs remain open. No implementation is
 authorized. Target release line: rlvgl v0.2.7.
 
 ## 0. Authority Policy
@@ -242,8 +242,8 @@ amendment. It MUST NOT absorb CPython or MPY work to close its release gate.
 
 ## 12. PCDNs and Acceptance Checklist
 
-`PCDN-WLD-001` is accepted as amended. WLD-00 remains Draft until the owner
-accepts or amends the other four decisions:
+`PCDN-WLD-001` and `PCDN-WLD-002` are accepted as amended. WLD-00 remains
+Draft until the owner accepts or amends the other three decisions:
 
 - **PCDN-WLD-001 — Client substrate and event-loop boundary — Accepted as
   amended 2026-08-18.** Use Smithay Client Toolkit as the protocol convenience
@@ -252,10 +252,18 @@ accepts or amends the other four decisions:
   composable nonblocking readiness boundary plus an optional blocking
   convenience loop. No particular external event-loop framework is mandatory,
   and raw Wayland protocol objects are not public rlvgl API.
-- **PCDN-WLD-002 — Reference presentation policy.** Use three SHM slots by
-  default, opaque `XRGB8888`, complete Shadow Frame copies, separate frame and
-  release gates, and bounded latest-state coalescing. Permit a configurable
-  two-slot minimum without changing semantics.
+- **PCDN-WLD-002 — Reference presentation policy — Accepted as amended
+  2026-08-18.** Use an opaque `XRGB8888` reference presenter with a complete
+  private Shadow Frame. Support exactly two or three SHM slots, with three as
+  the default. Each submission copies the complete latest frame into one Free
+  slot. `wl_surface.frame` controls pacing, while `wl_buffer.release`
+  exclusively controls slot reuse. While either gate is closed, retain only
+  the latest Shadow Frame and bounded accumulated damage; do not queue
+  historical frames or allocate additional presentation slots. Checked
+  allocation limits cover the Shadow Frame plus active and retired resize
+  generations. An oversized geometry is rejected with a typed error, and
+  replacement allocation remains gated until releases reduce any temporary
+  peak to the configured budget.
 - **PCDN-WLD-003 — Size, scale, and rotation.** Make Adaptive Window the
   desktop default; expose Fixed Canvas and fullscreen kiosk profiles; support
   integer scale only; leave physical output rotation to the compositor; defer
@@ -277,7 +285,8 @@ Ratification additionally confirms:
 - [ ] §8 keeps WLD to two implementation phases.
 - [ ] §9 concurrency boundaries preserve MPY and CPython authority.
 - [x] PCDN-WLD-001 is resolved as amended in this document.
-- [ ] PCDN-WLD-002 through PCDN-WLD-005 are resolved in this document.
+- [x] PCDN-WLD-002 is resolved as amended in this document.
+- [ ] PCDN-WLD-003 through PCDN-WLD-005 are resolved in this document.
 
 ## 13. Files Cited
 
@@ -310,6 +319,29 @@ ratified and their evidence gates close. Opening this initiative does not bump
 any crate version or authorize a manifest change.
 
 ## 15. Change Log
+
+### 0.1.2 — 2026-08-18 — PCDN-WLD-002 accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-3, INV-WLD-4, INV-WLD-5, PCDN-WLD-002, §5.3, §7, §9, §12, §14
+
+**Commits:** pending
+
+**Summary:** Resolves the SHM reference policy with exactly two or three
+release-tracked slots, three by default, a complete private Shadow Frame,
+separate pacing and reuse gates, latest-state coalescing, and a checked byte
+budget covering active and retired resize generations.
+
+#### Rationale
+
+Three slots follow the pinned LVGL reference preference, while an exact
+two-slot option serves constrained targets. A hard slot bound and aggregate
+byte budget prevent compositor delay or repeated resize from causing dynamic
+buffer growth. Complete copies keep every rotating slot current without
+introducing per-slot damage-history correctness into the reference path.
 
 ### 0.1.1 — 2026-08-18 — PCDN-WLD-001 accepted as amended
 

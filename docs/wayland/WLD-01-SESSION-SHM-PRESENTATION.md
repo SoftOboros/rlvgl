@@ -4,8 +4,8 @@ WLD-01-SESSION-SHM-PRESENTATION.md - Wayland session and SHM presenter phase.
 
 # WLD-01 — Session and SHM Presentation
 
-**Status:** Draft 2026-08-18. `PCDN-WLD-001` is resolved. This phase remains
-blocked by WLD-00, `PCDN-WLD-002`, and `PCDN-WLD-003`. No implementation is
+**Status:** Draft 2026-08-18. `PCDN-WLD-001` and `PCDN-WLD-002` are resolved.
+This phase remains blocked by WLD-00 and `PCDN-WLD-003`. No implementation is
 authorized.
 
 Parent: [`WLD-00`](WLD-00-CONCEPTS.md).
@@ -212,9 +212,18 @@ No resize, drop request, frame callback, or later attach makes a Busy slot
 writable. Only its release event or terminal teardown closes compositor
 ownership.
 
-The default is three slots; two is the supported minimum. A configured value
-outside the admitted range is rejected at construction rather than silently
-clamped.
+The admitted slot count is exactly two or three, with three as the default. A
+configured value outside that set is rejected at construction rather than
+silently clamped. The backend never allocates a dynamic additional
+presentation slot when all configured slots are Busy.
+
+Checked byte accounting covers the complete Shadow Frame, active slots, and
+Retired slots from older resize generations. Geometry whose steady-state
+allocation exceeds the configured budget is rejected with a typed error. If
+new slots would exceed the budget only because old Busy slots remain Retired,
+presentation stays nonblocking and gated until matching release events reduce
+the temporary peak; repeated configure events cannot grow storage without
+bound.
 
 ## 10. Submission and Backpressure
 
@@ -273,9 +282,10 @@ more presents than the slot count.
 
 ## 12. Acceptance and Evidence
 
-WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary. It may be
-ratified only after WLD-00 accepts `PCDN-WLD-002` and `PCDN-WLD-003` or records
-amendments here. Implementation exit requires:
+WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary and
+`PCDN-WLD-002` presentation policy. It may be ratified only after WLD-00
+accepts `PCDN-WLD-003` or records an amendment here. Implementation exit
+requires:
 
 - [ ] Optional dependency and target gating is explicit in `Cargo.toml`.
 - [ ] Default and representative embedded/no-std feature checks are unchanged.
@@ -288,6 +298,10 @@ amendments here. Implementation exit requires:
       damage conversion.
 - [ ] Full and partial present tests run for more frames than the slot count and
       detect stale pixels.
+- [ ] Slot configuration accepts only two or three slots, defaults to three,
+      and never allocates an additional presentation slot under pressure.
+- [ ] Checked byte-budget tests cover oversized geometry, Retired resize
+      generations, release-driven allocation progress, and repeated configure.
 - [ ] Backpressure tests prove latest-state coalescing, bounded memory, damage
       overflow promotion, and no blocking wait in `vsync()`.
 - [ ] A minimal headless-compositor test maps one window and presents at least
@@ -328,6 +342,27 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.1.2 — 2026-08-18 — Consumed PCDN-WLD-002 resolution
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-3, INV-WLD-4, INV-WLD-5, PCDN-WLD-002, §9, §10, §12
+
+**Commits:** pending
+
+**Summary:** Freezes an exact two-or-three-slot SHM policy with three as the
+default, forbids pressure-driven slot growth, and adds checked steady-state and
+resize-generation byte-budget gates.
+
+#### Rationale
+
+Release-tracked slots and the private Shadow Frame make two slots sufficient
+for correctness and three preferable for the reference profile. Explicit
+slot and byte bounds prevent compositor delay and repeated resize from turning
+that preference into unbounded memory growth.
 
 ### 0.1.1 — 2026-08-18 — Consumed PCDN-WLD-001 resolution
 
