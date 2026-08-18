@@ -4,9 +4,10 @@ README.md - Wayland native backend SBC family index.
 
 # WLD — Native Wayland Backend
 
-**Status:** WLD-00 and WLD-01 ratified 2026-08-18. WLD-01 implementation is
-authorized within its phase boundary; WLD-02 remains gated. Target release
-line: rlvgl v0.2.7.
+**Status:** WLD-00 and WLD-01 ratified 2026-08-18. The first WLD-01 platform
+implementation and deterministic evidence are authored; Linux compositor and
+remaining lifecycle evidence are still open, so WLD-02 remains gated. Target
+release line: rlvgl v0.2.7.
 
 WLD specifies a native, `std`-only Wayland display and input backend for
 `rlvgl-platform`. It is deliberately independent of the concurrent MPY and
@@ -19,7 +20,7 @@ buffer leases, or Stage/Actor protocol semantics.
 | Phase | Scope | Status |
 |---|---|---|
 | [WLD-00](WLD-00-CONCEPTS.md) | Authority, profiles, invariants, dependency boundaries, and phase plan | **Ratified** 2026-08-18; all five PCDNs resolved |
-| [WLD-01](WLD-01-SESSION-SHM-PRESENTATION.md) | Wayland session, XDG lifecycle, SHM buffers, damage, pacing, and release-safe presentation | **Ratified** 2026-08-18; implementation and exit evidence pending |
+| [WLD-01](WLD-01-SESSION-SHM-PRESENTATION.md) | Wayland session, XDG lifecycle, SHM buffers, damage, pacing, and release-safe presentation | **Ratified** 2026-08-18; first implementation and deterministic evidence authored; Linux runtime exit evidence pending |
 | [WLD-02](WLD-02-INPUT-CONFORMANCE-RELEASE.md) | Seat input, cancellation policy, compositor conformance, performance evidence, docs, and v0.2.7 release closure | Draft; blocked by WLD-01 implementation evidence |
 
 ## Authority and evidence

@@ -93,7 +93,7 @@ wayland = [
 `calloop` or `xkbcommon` features. `wayland-client` is selected at 0.31.15
 with default features disabled. WLD-02 may add the admitted keyboard feature,
 but no external event-loop framework becomes mandatory. The `wayland` feature
-has a Rust 1.86 minimum and is available only on Unix hosts with file-descriptor
+has a Rust 1.86 minimum and is available only on Linux hosts with file-descriptor
 readiness; this host-only minimum does not change default or embedded builds.
 
 Dependencies MUST be optional and target-gated. The platform crate remains
@@ -132,6 +132,7 @@ pub struct WaylandConfig {
     pub size_policy: SizePolicy,
     pub fullscreen: bool,
     pub buffer_count: NonZeroU8,
+    pub registry_timeout: Duration,
     pub limits: WaylandLimits,
 }
 
@@ -168,7 +169,7 @@ impl WaylandSession {
 }
 ```
 
-`connect` may perform bounded registry setup, but it MUST NOT hide an unbounded
+`connect` performs registry setup within `registry_timeout`, but it MUST NOT hide an unbounded
 wait for the initial configure. `dispatch_ready` is the only public protocol-I/O
 step: it consumes caller-reported readiness and retains pending dispatch,
 prepare-read, read-or-cancel, and outbound-flush ordering inside the session.
@@ -366,11 +367,11 @@ WLD-01 consumes the resolved `PCDN-WLD-001` event-loop boundary,
 `PCDN-WLD-002` presentation policy, and `PCDN-WLD-003` geometry policy. Its
 parent WLD-00 and this phase are ratified. Implementation exit requires:
 
-- [ ] Optional dependency and target gating is explicit in `Cargo.toml`.
-- [ ] The manifest selects SCTK 0.21.1 without default features and
+- [x] Optional dependency and target gating is explicit in `Cargo.toml`.
+- [x] The manifest selects SCTK 0.21.1 without default features and
       `wayland-client` 0.31.15, records Rust 1.86 for the host feature, and
       contains no mandatory calloop dependency.
-- [ ] Default and representative embedded/no-std feature checks are unchanged.
+- [x] Default and representative embedded/no-std feature checks are unchanged.
 - [ ] Constructor failures cover missing required globals and unsupported
       formats/versions.
 - [ ] Readiness tests cover pending dispatch, read preparation cancellation,
@@ -382,13 +383,13 @@ parent WLD-00 and this phase are ratified. Implementation exit requires:
       boundary, Fixed Canvas letterbox geometry, and typed undersized failure.
 - [ ] Integer-scale vectors prove checked buffer dimensions, single conversion
       of logical damage, new-generation retirement, and full invalidation.
-- [ ] `Screen` remains `Rotation::Deg0` with the normal Wayland buffer
+- [x] `Screen` remains `Rotation::Deg0` with the normal Wayland buffer
       transform.
-- [ ] Pixel vectors freeze `Color` to `XRGB8888` bytes, stride, scale, and
+- [x] Pixel vectors freeze `Color` to `XRGB8888` bytes, stride, scale, and
       damage conversion.
 - [ ] Full and partial present tests run for more frames than the slot count and
       detect stale pixels.
-- [ ] Slot configuration accepts only two or three slots, defaults to three,
+- [x] Slot configuration accepts only two or three slots, defaults to three,
       and never allocates an additional presentation slot under pressure.
 - [ ] Checked byte-budget tests cover oversized geometry, Retired resize
       generations, release-driven allocation progress, and repeated configure.
@@ -403,6 +404,48 @@ parent WLD-00 and this phase are ratified. Implementation exit requires:
 
 WLD-02 owns the broader input, compatibility, performance, and release evidence.
 
+### 12.1 Implementation evidence — 2026-08-18
+
+The first WLD-01 implementation slice now exists in `rlvgl-platform`. It owns
+one XDG toplevel and event queue, a bounded registry-bootstrap timeout, explicit
+prepare/read-or-cancel/dispatch/flush sequencing, a private complete Shadow
+Frame, exact two-or-three-slot SCTK SHM generations, configure tokens, integer
+scale, fixed-canvas letterboxing, frame pacing, release-only slot reuse, and
+bounded retired-generation accounting. The feature is Linux-target-gated;
+SCTK 0.21.1 itself does not compile on Apple targets because its data-device
+modules call non-Apple `rustix::pipe` APIs.
+
+Evidence recorded on an x86_64 macOS host with Rust 1.96.0:
+
+| Gate | Result |
+|---|---|
+| `cargo test -p rlvgl-platform --features wayland --lib` | Pass: 164 tests, including 17 host-independent WLD geometry, XRGB, damage, pacing, slot-bound, resize-budget, and stale-pixel vectors. |
+| `cargo check -p rlvgl-platform --features wayland --tests --target x86_64-unknown-linux-gnu` | Pass: the Linux backend and its compositor-smoke test type-check. |
+| `cargo clippy -p rlvgl-platform --features wayland --target x86_64-unknown-linux-gnu -- -D warnings` | Pass. |
+| `RUSTDOCFLAGS='-D warnings -A rustdoc::broken-intra-doc-links' cargo doc -p rlvgl-platform --features wayland --target x86_64-unknown-linux-gnu --no-deps` | Pass for public/missing-doc warnings. The repository-wide strict rustdoc command without the targeted allowance remains blocked by pre-existing broken links outside WLD. |
+| `cargo check -p rlvgl-platform --no-default-features` | Pass. |
+| `cargo check -p rlvgl-platform --no-default-features --target thumbv7em-none-eabihf` | Pass; the embedded dependency tree contains neither SCTK nor Wayland crates. |
+| Linux feature dependency inspection | SCTK 0.21.1 and `wayland-client` 0.31.15 selected; no calloop or xkbcommon dependency appears in the WLD feature tree. |
+
+`platform/tests/wayland_smoke.rs` is the explicit compositor test. It connects,
+accepts the initial configure, maps a 64×48 XDG window, submits one complete
+frame, and requires a compositor frame callback. It is intentionally ignored
+outside a Linux compositor evidence job. This macOS workspace has no running
+Docker daemon, QEMU user-mode runner, or Weston binary, so the test has not yet
+been executed and the corresponding acceptance box remains open. A Linux
+evidence host should run:
+
+```text
+cargo test -p rlvgl-platform --features wayland \
+  --test wayland_smoke -- --ignored --exact \
+  maps_xdg_window_and_observes_frame_callback
+```
+
+WLD-01 therefore has implementation and deterministic evidence, but is not
+exit-complete. Readiness fault injection, configure/lifecycle supersession,
+live SHM release/resize sequences, the compositor smoke, and clean terminal
+teardown still require Linux runtime evidence before WLD-02 can be unblocked.
+
 ## 13. Files and Expected Ownership
 
 Expected implementation locus:
@@ -411,6 +454,7 @@ Expected implementation locus:
 - `platform/src/lib.rs`
 - `platform/src/wayland/mod.rs`
 - `platform/src/wayland/display.rs`
+- `platform/src/wayland/model.rs`
 - `platform/src/wayland/shm.rs`
 - `platform/tests/wayland_*.rs`
 - one focused example under `examples/` if needed for compositor integration
@@ -434,6 +478,31 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.2.1 — 2026-08-18 — Implementation and deterministic evidence
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** semantic
+
+**Touches:** INV-WLD-1, INV-WLD-2, INV-WLD-3, INV-WLD-4, INV-WLD-5, INV-WLD-6, §5–§13
+
+**Commits:** pending
+
+**Summary:** Implements the first WLD-01 platform slice and records its
+deterministic, cross-target, Clippy, and documentation evidence. Makes the
+already-required registry bound explicit as `registry_timeout` and narrows the
+feature gate from generic Unix to Linux, matching the WLD parent scope and the
+actual SCTK 0.21.1 portability boundary.
+
+#### Rationale
+
+SCTK's public global-binding helpers require its synchronous registry
+initializer, so WLD isolates that roundtrip behind a timeout and socket
+cancellation while keeping initial configure dispatch caller-driven. The
+host-independent model lets geometry, XRGB conversion, damage, pacing, slot
+bounds, and resize-budget behavior execute on the development host without
+claiming the still-open Linux compositor evidence.
 
 ### 0.2.0 — 2026-08-18 — Ratified
 

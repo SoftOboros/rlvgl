@@ -4,7 +4,12 @@
 
 extern crate alloc;
 
-#[cfg(any(feature = "simulator", feature = "fatfs", feature = "linux_fbdev"))]
+#[cfg(any(
+    feature = "simulator",
+    feature = "fatfs",
+    feature = "linux_fbdev",
+    all(feature = "wayland", target_os = "linux")
+))]
 extern crate std;
 
 #[cfg(feature = "simulator")]
@@ -171,6 +176,12 @@ pub mod uefi_serial_transport;
 ))]
 /// WAV (RIFF) header parser for embedded audio playback.
 pub mod wav;
+#[cfg(all(feature = "wayland", target_os = "linux"))]
+/// Native XDG-shell Wayland session and shared-memory display backend.
+pub mod wayland;
+#[cfg(all(test, feature = "wayland", not(target_os = "linux")))]
+#[path = "wayland/model.rs"]
+mod wayland_model;
 #[cfg(feature = "simulator")]
 pub mod wgpu_blitter;
 #[cfg(all(

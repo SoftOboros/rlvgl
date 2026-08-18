@@ -44,6 +44,10 @@ rlvgl-playit = { path = "../playit", version = "0.2.4", default-features = false
 ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
 libc = { version = "0.2", optional = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+smithay-client-toolkit = { version = "0.21.1", default-features = false, optional = true }
+wayland-client = { version = "0.31.15", default-features = false, optional = true }
+
 [target.'cfg(any(target_arch = "arm", target_os = "none"))'.dependencies]
 stm32h7 = { version = "0.15.1", optional = true, features = ["stm32h747cm7", "rt"] }
 stm32h7xx-hal = { version = "0.16", optional = true, features = ["stm32h747cm7", "sdmmc", "xspi"] }
@@ -88,6 +92,8 @@ lottie = ["rlvgl-core/lottie"]
 canvas = ["rlvgl-core/canvas", "embedded-graphics"]
 pinyin = ["rlvgl-core/pinyin"]
 linux_fbdev = ["dep:libc"]
+## Native Linux Wayland client using XDG shell and release-tracked SHM buffers.
+wayland = ["dep:smithay-client-toolkit", "dep:wayland-client"]
 fatfs = ["rlvgl-core/fatfs"]
 nes = ["rlvgl-core/nes"]
 

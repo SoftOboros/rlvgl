@@ -20,6 +20,7 @@ drivers, and accelerator integrations. The base crate is `no_std`.
 | `regression` | Enables regression-only tests in this crate. | Test-oriented. | No production runtime impact. |
 | `sdram_ramtest` | Enables SDRAM validation helpers. | Embedded-oriented. | Adds debug/test code; not usually wanted in release firmware. |
 | `simulator` | Enables the desktop simulator stack (`wgpu`, `winit`, `eframe`, loading helpers). | Host-only; this is the main `std` path in the crate. | Large compile-time and binary-size increase, but essential for desktop simulation. |
+| `wayland` | Enables the native XDG-shell client, private shadow frame, and bounded release-tracked SHM presenter. | Linux-only; requires Rust 1.86 or newer. No calloop or keyboard dependency is enabled in WLD-01. | Allocates one complete logical shadow frame plus exactly two or three full SHM slots and any release-pending resize generations within the configured byte limit. |
 | `uefi` | Enables the UEFI display/input backend and Playit transport support. | Requires a UEFI target such as `aarch64-unknown-uefi`. | Moderate code-size increase. |
 | `st7789` | Enables SPI display integration for ST7789-class panels. | Embedded `no_std`; requires `embedded-hal` and display-interface traits. | Small-to-moderate increase tied to panel support. |
 | `stm32h747i_disco` | Enables the STM32H747I-DISCO board support path. | Embedded ARM-only in practice. | Pulls in the largest board-specific dependency set in this crate. |
