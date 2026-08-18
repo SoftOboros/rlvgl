@@ -1,13 +1,12 @@
 <!--
-README.md - Provenance and verification guide for CPY baseline evidence.
+README.md - Provenance and verification guide for CPY baseline and phase evidence.
 -->
 
-# CPY Baseline Evidence
+# CPY Evidence
 
-This directory contains the first machine-checkable CPY-01/02 baseline. It
-freezes selection and provenance; it does not claim that planned interpreter,
-wheel, frame, device, or performance rows have passed their later runtime
-gates.
+This directory contains machine-checkable CPY baseline and phase evidence.
+Each artifact states its qualification boundary; diagnostic host measurements
+do not satisfy embedded-Linux, physical-board, Python, frame, or release gates.
 
 ## Evidence set
 
@@ -17,6 +16,8 @@ gates.
 | [`CPY-HANDOFF-0cf406b.json`](CPY-HANDOFF-0cf406b.json) | MPY owner's acknowledged Safe Point, verified MPY frontier, concurrent-work boundary, and exact paths authorized for the first shared CPY migration wave. |
 | [`_generated/CPY-CARGO-LOCK-0cf406b.lock`](_generated/CPY-CARGO-LOCK-0cf406b.lock) | Detached copy of the resolver snapshot used for the baseline. The workspace intentionally ignores its root `Cargo.lock`; this evidence file preserves the exact selection without changing that policy. |
 | [`_generated/CPY-GRAPH-0cf406b.json`](_generated/CPY-GRAPH-0cf406b.json) | Normalized workspace packages, features, local dependency edges, public-path hashes, and governed publish order. |
+| [`CPY-CAPACITY-HOST-2026-08-18.json`](CPY-CAPACITY-HOST-2026-08-18.json) | CPY-03 diagnostic host matrix: four ingress/egress/turn candidates, three bounded-channel stress scenarios, and five retained iterations per row. It explicitly makes no capacity decision. |
+| [`_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock) | Detached resolver snapshot for the capacity probe, including Crossbeam Channel 0.5.16. |
 
 The immutable source authority is commit
 `0cf406bb22509f1040af6a772d0476a614c7bd9c`. The baseline hashes all 53
@@ -80,3 +81,38 @@ python3 scripts/cpy_evidence.py capture \
 
 Do not edit `_generated/` by hand. A new baseline uses a new manifest and
 artifact names; it does not overwrite historical evidence.
+
+## CPY-03 capacity evidence
+
+The native probe constructs the non-`Send` Endpoint on its owner thread and
+uses bounded Crossbeam channels around empty neutral Safe Turns. It records
+cold-burst admission, sustained retry pressure, and a 50 ms stalled observer.
+Owned-envelope accounting, whole-process peak RSS, completion count, ordering,
+queue-depth bounds, observed empty-to-nonempty transitions, and latency
+distributions are retained for every run.
+
+The committed host bundle is `diagnostic-host` with
+`normative_decision: false`. It cannot close `PCDN-CPY-03-002`: the workload
+does not yet include representative actor/render/frame/input/readiness work,
+and the same committed probe has not yet run on the CPY-01 BeagleBone Black.
+
+Validate the retained bundle:
+
+```bash
+python3 scripts/cpy_capacity_probe.py validate \
+  docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json
+python3 scripts/test_cpy_capacity_probe.py
+```
+
+Capture a new clean-source host matrix under a new evidence name:
+
+```bash
+python3 scripts/cpy_capacity_probe.py capture \
+  --profile host-headless \
+  --hardware-label <stable-hardware-label> \
+  --output docs/cpython/evidence/<new-name>.json
+```
+
+An embedded run additionally requires `--profile embedded-linux-direct` and
+`--physical-board`. Those flags identify the environment; they do not promote
+candidate measurements into defaults or a release budget.

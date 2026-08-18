@@ -4,9 +4,9 @@ README.md - Informative index for the CPython embedded-Linux and host initiative
 
 # CPY — CPython Director for Embedded Linux and Host
 
-**Status:** CPY-00 through CPY-02 ratified 2026-08-18. CPY-03 through CPY-09
-remain Draft and separately evidence-gated. The first native-only Host Runtime
-crate slice is authorized by CPY-02's recorded MPY handoff.
+**Status:** CPY-00 through CPY-02 ratified 2026-08-18. CPY-03 has a native
+owner proof and diagnostic host capacity matrix; CPY-03 through CPY-09 remain
+Draft and separately evidence-gated.
 
 CPY specifies a full CPython binding over rlvgl's Stage-and-Actors runtime,
 with embedded Linux as the primary deployment and full-host headless/windowed
@@ -42,7 +42,7 @@ through ratified phase documents and their acceptance gates.
 | [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
 | [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Ratified 2026-08-18; exact baseline retained; runtime qualification remains later-phase evidence |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; graph/firewall/handoff complete; first `runtime-std` slice authorized |
-| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; four policy PCDNs resolved; native-only skeleton authorized; capacity measurement open |
+| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; four policy PCDNs resolved; native owner proof and host diagnostic matrix complete; board/representative capacity measurement open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; six binding-policy PCDNs resolved; dependency/implementation evidence open |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |
@@ -65,6 +65,9 @@ through ratified phase documents and their acceptance gates.
   authored CPY-01 grammar for exact source, interpreter, rootfs, board, and
   artifact baselines. The first conforming instance and its provenance are in
   [`evidence/`](evidence/README.md).
+- [CPY-CAPACITY-EVIDENCE.schema.json](CPY-CAPACITY-EVIDENCE.schema.json) is the
+  authored diagnostic grammar for CPY-03 queue/turn candidates. Its instances
+  cannot select normative defaults.
 
 Generated object-index JSON is not edited by hand. After authored CPY and any
 concurrent WLD/MPY documentation settle, regenerate the combined projection

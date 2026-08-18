@@ -6,10 +6,12 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 
 **Document ID:** CPY-03-NATIVE-RUNTIME-SERVICE
 
-**Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18;
-`PCDN-CPY-03-002` remains measurement-blocked. Not ratified.
+**Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18; native
+owner proof and host diagnostic capacity matrix complete;
+`PCDN-CPY-03-002` remains representative-service/board measurement-blocked.
+Not ratified.
 
-**Revision:** 0.2.1
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -242,14 +244,47 @@ Thread itself has no Python thread state.
 |---|---|---|---|
 | `PCDN-CPY-03-002` | What are initial ingress/egress and per-turn capacities? | Remains open. Record candidate values only after native scenario traces measure burst depth, retained bytes, wakeups, latency, and constrained-board memory; CPY-09 must close the selected defaults/maxima. | CPY-03 ratification and CPY-09 budgets |
 
+### 11.4 Measurement Progress
+
+Commit `9382b0503703a452ed633f8805627dd25b0d9e69` adds the first
+clean-source native capacity probe and its evidence schema. The probe uses the
+selected bounded Crossbeam primitive around an owner-thread non-`Send`
+Endpoint and exercises an empty neutral Safe Turn. Candidate values remain
+explicit inputs and the schema requires `normative_decision: false`.
+
+The retained host bundle
+[`CPY-CAPACITY-HOST-2026-08-18.json`](evidence/CPY-CAPACITY-HOST-2026-08-18.json)
+contains 60 measured runs: four `(ingress, egress, turn)` tuples from
+`(8, 16, 4)` through `(64, 128, 32)`, three scenarios, and five iterations per
+row after one warmup. All runs completed exactly one record per accepted
+request, preserved sequence order, stayed within both queue bounds, and
+released all tracked envelope bytes.
+
+On the recorded x86_64 macOS host, median whole-process peak RSS ranged from
+737,280 through 909,312 bytes across rows. Median tracked peak envelope bytes
+ranged from 2,736 through 47,872 bytes. Under sustained admission, median p95
+delivery latency ranged from 50,695 through 174,711 ns. The 50 ms observer
+stall remained visible in median p99 delivery latency for every candidate
+(53.09 through 57.84 ms), while ingress-full and egress-backpressure counters
+remained observable.
+
+This is diagnostic transport evidence, not the capacity decision. It excludes
+representative Actor, render, frame, input, Python/PyO3, and OS-readiness work;
+its queue-transition counts are not `eventfd`/self-pipe wakeup counts; and a
+macOS host cannot supply constrained-board memory or cadence evidence. The
+same committed probe plus representative service workload must run on the
+CPY-01 BeagleBone Black before `PCDN-CPY-03-002` can close.
+
 ## 12. Acceptance Checklist
 
 - [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open.
 - [ ] Lifecycle and Service Turn state machines are complete and deterministic.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
-- [ ] The service has a native-only headless test consumer before PyO3 lands.
+- [x] The Host Runtime Crate has a native-only non-`Send` owner test and
+      capacity probe before PyO3 lands.
 - [ ] Close/finalization and restart/epoch rules are exact.
-- [ ] No Python dependency enters the Host Runtime Crate.
+- [x] The dependency firewall and runtime crate graph contain no Python or
+      PyO3 dependency.
 - [ ] The owner records ratification in §15.
 
 ## 13. Files Cited
@@ -260,17 +295,52 @@ Thread itself has no Python thread state.
 | `core/src/actor.rs` | Actor registry/runtime ownership |
 | `docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md` | Safe Turn, cues, bounded scheduling |
 | `examples/beaglebone-black/src/main.rs` | Existing Linux input/render/present cadence evidence |
+| `runtime-std/examples/cpy_capacity_probe.rs` | Native transport/capacity measurement executable |
+| `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
+| `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
 | CPython thread-state documentation | External wait/thread/finalization authority |
 
 ## 14. Unblocks
 
-Four policy PCDNs are resolved, but CPY-03 remains Draft. Ratification is
-blocked by measured capacities in `PCDN-CPY-03-002`, CPY-02 ratification, and
-the remaining acceptance evidence. Ratification plus a native-only proof would
-unblock CPY-04 binding and CPY-05 frame integration; it would not authorize
-device access.
+Four policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
+Draft. Ratification is blocked by representative host and physical-board
+capacity evidence in `PCDN-CPY-03-002` plus the remaining lifecycle,
+ordering, readiness, and close acceptance evidence. Ratification would unblock
+the CPY-04 binding and CPY-05 frame integration; it would not authorize device
+access.
 
 ## 15. Change Log
+
+### 0.3.0 — 2026-08-18 — diagnostic host capacity matrix
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** evidence
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-2, INV-CPY-03-5,
+PCDN-CPY-03-002, §8, §11, §12, §13, §14
+
+**Commits:** `9382b050` (probe source; the retained bundle names this authority)
+
+**Summary:** Adds a clean-source native bounded-channel probe, formal evidence
+schema, retained Cargo resolution, and 60-run host diagnostic matrix without
+selecting capacities.
+
+#### Rationale
+
+The open capacity PCDN requires measurements rather than a paper default. A
+transport-only matrix first validates bounded admission, egress pressure,
+ordering, retained bytes, and reproducible evidence mechanics before the
+service adds representative semantic and framebuffer work.
+
+Considered and rejected: treating one microbenchmark score as the default,
+using unbounded channels for easier benchmarking, or relabeling macOS memory
+as constrained-board evidence.
+
+What deliberately did not change: no ingress, egress, or per-turn default or
+maximum is selected; no eventfd/self-pipe readiness, lifecycle service,
+representative render/frame/input workload, Python binding, or physical-board
+claim is implemented. `PCDN-CPY-03-002` remains open and CPY-03 remains Draft.
 
 ### 0.2.1 — 2026-08-18 — open-capacity checklist consistency
 
