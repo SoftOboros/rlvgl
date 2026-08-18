@@ -35,3 +35,27 @@ assert_eq!(task.join()?, 12);
 The integration test uses an actual non-`Send` `rlvgl_core::endpoint::Endpoint`
 as the owned state. This is a native headless proof, not a Python or display
 test.
+
+## Capacity probe
+
+The `cpy_capacity_probe` example is a diagnostic CPY-03 measurement target. It
+uses bounded Crossbeam channels around an owner-thread `Endpoint`, exercises
+cold bursts, sustained admission, and a stalled egress observer, and emits one
+JSON result. Its candidate values are inputs, not runtime defaults:
+
+```bash
+cargo run --release -p rlvgl-runtime-std \
+  --example cpy_capacity_probe -- \
+  --scenario observer-stall \
+  --ingress-capacity 32 \
+  --egress-capacity 64 \
+  --turn-budget 16 \
+  --messages 1024 \
+  --ingress-payload-bytes 256 \
+  --egress-payload-bytes 128 \
+  --observer-stall-us 50000
+```
+
+Use `scripts/cpy_capacity_probe.py` for a reproducible matrix and evidence
+bundle. Host output is diagnostic and cannot select embedded-Linux capacities;
+the same committed probe must also run on the CPY-01 reference board.

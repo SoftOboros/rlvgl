@@ -1,0 +1,625 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://softoboros.com/schemas/rlvgl/cpy-capacity-evidence-1.json",
+  "title": "rlvgl CPY Capacity Evidence",
+  "description": "Clean-source diagnostic measurements for CPY-03 bounded queue and per-turn capacity candidates; this schema never selects normative defaults or maxima.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "created_at",
+    "qualification",
+    "profile",
+    "normative_decision",
+    "source",
+    "toolchain",
+    "environment",
+    "method",
+    "runs",
+    "summaries"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "CPY-CAPACITY-EVIDENCE-1"
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "qualification": {
+      "enum": [
+        "diagnostic-host",
+        "physical-board-candidate"
+      ]
+    },
+    "profile": {
+      "enum": [
+        "host-headless",
+        "embedded-linux-direct"
+      ]
+    },
+    "normative_decision": {
+      "const": false
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "toolchain": {
+      "$ref": "#/$defs/toolchain"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "method": {
+      "$ref": "#/$defs/method"
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    },
+    "summaries": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/summary"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nonnegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scenario": {
+      "enum": [
+        "cold-burst",
+        "sustained",
+        "observer-stall"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree_clean",
+        "probe_sources",
+        "cargo_lock"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/gitCommit"
+        },
+        "tree_clean": {
+          "const": true
+        },
+        "probe_sources": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/sourceRecord"
+          }
+        },
+        "cargo_lock": {
+          "$ref": "#/$defs/sourceRecord"
+        }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rustc_version",
+        "cargo_version",
+        "python_version",
+        "crossbeam_channel",
+        "probe_binary_sha256",
+        "build_profile"
+      ],
+      "properties": {
+        "rustc_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crossbeam_channel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "checksum"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^0\\.5\\.[0-9]+$"
+            },
+            "checksum": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "probe_binary_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "build_profile": {
+          "const": "release"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardware_label",
+        "operating_system",
+        "kernel",
+        "machine",
+        "cpu_model",
+        "rust_host_triple",
+        "logical_cpus",
+        "total_memory_bytes",
+        "rss_sampler",
+        "physical_board"
+      ],
+      "properties": {
+        "hardware_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "machine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rust_host_triple": {
+          "type": "string",
+          "minLength": 1
+        },
+        "logical_cpus": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "total_memory_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "rss_sampler": {
+          "enum": [
+            "linux-proc-status-vmrss",
+            "darwin-ps-rss"
+          ]
+        },
+        "physical_board": {
+          "type": "boolean"
+        }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock",
+        "warmups",
+        "iterations",
+        "messages",
+        "ingress_payload_bytes",
+        "egress_payload_bytes",
+        "observer_stall_us",
+        "retry_backoff_us",
+        "sampling_hold_us",
+        "scenarios",
+        "candidates",
+        "limitations"
+      ],
+      "properties": {
+        "clock": {
+          "const": "std::time::Instant monotonic clock"
+        },
+        "warmups": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "iterations": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "messages": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "ingress_payload_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "egress_payload_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "observer_stall_us": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "retry_backoff_us": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "sampling_hold_us": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "scenarios": {
+          "const": [
+            "cold-burst",
+            "sustained",
+            "observer-stall"
+          ]
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/candidate"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "ingress_capacity",
+        "egress_capacity",
+        "turn_budget"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^i[1-9][0-9]*-e[1-9][0-9]*-t[1-9][0-9]*$"
+        },
+        "ingress_capacity": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "egress_capacity": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "turn_budget": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "samples",
+        "minimum_ns",
+        "p50_ns",
+        "p95_ns",
+        "p99_ns",
+        "maximum_ns",
+        "mean_ns"
+      ],
+      "properties": {
+        "samples": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "minimum_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "p50_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "p95_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "p99_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "maximum_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "mean_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      }
+    },
+    "probeConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "ingress_capacity",
+        "egress_capacity",
+        "turn_budget",
+        "messages",
+        "ingress_payload_bytes",
+        "egress_payload_bytes",
+        "observer_stall_us",
+        "retry_backoff_us",
+        "sampling_hold_us"
+      ],
+      "properties": {
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "ingress_capacity": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "egress_capacity": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "turn_budget": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "messages": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "ingress_payload_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "egress_payload_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "observer_stall_us": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "retry_backoff_us": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "sampling_hold_us": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "workload",
+        "retained_bytes_scope",
+        "config",
+        "offered_requests",
+        "accepted_requests",
+        "terminal_admission_rejections",
+        "ingress_full_observations",
+        "completed_records",
+        "sequence_errors",
+        "service_turns",
+        "ingress_empty_to_nonempty_observations",
+        "egress_empty_to_nonempty_observations",
+        "egress_backpressured_records",
+        "egress_backpressure_ns",
+        "peak_ingress_depth",
+        "peak_egress_depth",
+        "peak_owned_envelope_bytes",
+        "owned_envelope_bytes_at_end",
+        "service_latency",
+        "delivery_latency",
+        "probe_duration_ns",
+        "service_checksum",
+        "consumer_checksum"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "CPY-CAPACITY-PROBE-1"
+        },
+        "workload": {
+          "const": "bounded-crossbeam-transport-with-empty-endpoint-safe-turn"
+        },
+        "retained_bytes_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config": {
+          "$ref": "#/$defs/probeConfig"
+        },
+        "offered_requests": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "accepted_requests": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "terminal_admission_rejections": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "ingress_full_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "completed_records": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "sequence_errors": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "service_turns": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "ingress_empty_to_nonempty_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "egress_empty_to_nonempty_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "egress_backpressured_records": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "egress_backpressure_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "peak_ingress_depth": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "peak_egress_depth": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "peak_owned_envelope_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "owned_envelope_bytes_at_end": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "service_latency": {
+          "$ref": "#/$defs/distribution"
+        },
+        "delivery_latency": {
+          "$ref": "#/$defs/distribution"
+        },
+        "probe_duration_ns": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "service_checksum": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "consumer_checksum": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "iteration",
+        "peak_rss_bytes",
+        "rss_source",
+        "probe"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iteration": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "peak_rss_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "rss_source": {
+          "enum": [
+            "linux-proc-status-vmrss",
+            "darwin-ps-rss"
+          ]
+        },
+        "probe": {
+          "$ref": "#/$defs/probe"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "scenario",
+        "samples",
+        "median_peak_rss_bytes",
+        "median_probe_duration_ns",
+        "median_peak_owned_envelope_bytes",
+        "median_service_p95_ns",
+        "median_delivery_p95_ns",
+        "maximum_ingress_full_observations",
+        "maximum_egress_backpressured_records",
+        "all_sequence_clean",
+        "all_envelope_bytes_released"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "samples": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "median_peak_rss_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "median_probe_duration_ns": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "median_peak_owned_envelope_bytes": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "median_service_p95_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "median_delivery_p95_ns": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "maximum_ingress_full_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "maximum_egress_backpressured_records": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "all_sequence_clean": {
+          "const": true
+        },
+        "all_envelope_bytes_released": {
+          "const": true
+        }
+      }
+    }
+  }
+}
