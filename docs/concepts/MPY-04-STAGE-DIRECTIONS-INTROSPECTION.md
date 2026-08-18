@@ -11,9 +11,10 @@ geometry, invalidation, and snapshot substrate has focused implementation
 evidence. Local-style projection, subscription metadata in snapshots, and the
 complete cross-driver conformance gate remain open. The common Batch mutation-
 target envelope and exact Delete payload have allocation-free codecs and golden
-protocol evidence. The exact Reorder payload has the same API/golden proof;
-the exact Reparent payload now has all four contextual-reference pair vectors.
-Complete Endpoint dispatch remains deferred.
+protocol evidence. The exact Reorder and Reparent payloads have the same proof,
+including all four Reparent reference pairs. PromoteRoot now has an exact
+target/name/index codec, negotiated text-limit enforcement, and stable/Batch
+reference vectors. Complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -114,7 +115,7 @@ to operation-specific PCDNs.
 | `SET_FLAG` | Actor owning runtime metadata | Flag ID/value and success values deferred |
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
 | `REPARENT` | Actor subtree being moved | Exact parent plus `u32` index and outputless success; §5.4 |
-| `PROMOTE_ROOT` | Actor becoming or moving as a named root | Root name/order data and success values deferred |
+| `PROMOTE_ROOT` | Actor becoming or moving as a named root | Exact UTF-8 name plus `u32` index and outputless success; §5.5 |
 | `REORDER` | Actor moving within its current owner | Exact `u32` index and outputless success; §5.3 |
 | `DELETE` | Root of the subtree being deleted | Exact empty remainder and outputless success; §5.2 |
 | `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values deferred |
@@ -320,6 +321,99 @@ for Batch-reference resolution, detach-first shadow validation, root-name and
 capacity accounting, prepared allocation-free commit, error/result
 attribution, lifecycle/cue ordering, and retained-storage release.
 
+### 5.5 PromoteRoot payload, result, and post-detach semantics
+
+PromoteRoot specializes the common target envelope with one length-delimited
+UTF-8 root name and one raw four-byte little-endian index:
+
+```text
+promote_root_payload = target:ObjectReference |
+                       name_length:u32 |
+                       name_utf8_bytes:name_length |
+                       index:u32
+```
+
+The operation opcode is exactly `PROMOTE_ROOT` (`0x0000_0008`), flags are `0`,
+and the index consumes the complete remainder. The decoder classifies `target`
+first, then requires a complete length-delimited UTF-8 name, exactly four index
+bytes, and no trailing bytes. A missing/truncated field, invalid UTF-8, or
+trailing byte is `InvalidFrame`. A canonical known non-object target tag is
+`TypeMismatch`; an unknown value tag is `Unsupported`. A Command carrying
+PromoteRoot is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+An unbound, forward, or otherwise invalid Batch reference is `BatchInvalid` at
+the target context; a stale stable target is `StaleObject`. The wire codec does
+not resolve either reference form.
+
+The name is byte-exact UTF-8. The codec neither normalizes Unicode nor changes
+case. A zero-length name is structurally canonical and round-trips unchanged,
+but Stage semantic validation returns `InvalidParent`; keeping this distinction
+retains the same empty-name boundary as Create. A name already owned by another
+root is also `InvalidParent`. The target actor descriptor MUST declare
+`STAGE_ROOT`; an ineligible actor returns `InvalidParent` before mutation.
+
+The unbounded encode/decode functions are structural and tooling helpers only.
+After negotiation, request acceptance MUST use the `with_limits` encoder or
+decoder, which enforces `max_text_bytes` against UTF-8 byte length. Complete
+structural validation, including trailing-byte rejection, precedes a
+`LimitExceeded` decision. The enclosing Batch independently enforces
+`max_frame_bytes`, while prepared Stage validation must reserve the resulting
+root-name bytes against the Batch budget and bounded Stage text capacity before
+mutation.
+
+`index` is the final zero-based named-root position after detaching `target`
+from its current owner. Preparation therefore:
+
+1. resolves the target without mutation;
+2. validates the nonempty name, root-name ownership, and `STAGE_ROOT`
+   eligibility, returning `InvalidParent` on failure;
+3. conceptually removes it from its current parent's child order, or removes
+   its existing root entry and releases the old root name's exact UTF-8 byte
+   count;
+4. validates `index` against the post-detach root order, returning `Range` on
+   failure;
+5. validates the final root count and text accounting after adding the new
+   name's exact UTF-8 byte count, returning `Capacity` on failure; and
+6. inserts the same actor subtree at that exact root position under the new
+   name.
+
+This definition gives child-to-root promotion and root move/rename one ordering
+rule. The released old name is available to a later operation in the same
+shadow Batch. Positions from zero through the post-detach root count are valid;
+a larger index returns `Range`. Exceeding root-count or prepared text capacity
+returns `Capacity`. This ordering also fixes cross-class semantic precedence:
+target resolution happens first, producing `StaleObject` for an invalid stable
+reference or `BatchInvalid` for an invalid same-Batch reference as applicable;
+then name, capability, or uniqueness `InvalidParent` precedes post-detach index
+`Range`, which precedes final `Capacity`. These errors are attributed to the
+PromoteRoot operation index with no `field_id`: the payload has positional
+fields and declares no registered keyed field ID.
+
+Promoting an existing root with the same name to its current final index is a
+valid no-op direction. It remains part of the accepted mutation Batch, whose
+visible commit advances `StageRevision` exactly once for the complete Batch,
+including when this no-op PromoteRoot is its only direction.
+
+PromoteRoot is outputless. BatchSuccess carries the final/current
+`result_revision` but no `OperationResult` at the PromoteRoot operation index.
+Other output-bearing operations retain their increasing records. A record
+correlated to PromoteRoot is `InvalidFrame` under its result schema. The narrow
+API absence validator requires prior caller correlation to opcode PromoteRoot
+and does not validate other opcode schemas, negotiated limits, or the complete
+success envelope.
+
+The allocation-free payload is 11 plus the name byte length with a BatchObject
+target and 17 plus the name byte length with a stable Object target. One stable
+target with the minimum profile's 128-byte maximum name produces a 145-byte
+payload and a 195-byte one-operation Batch frame. Seven stable targets with
+one-byte names produce a 248-byte frame; eight produce 278 bytes and correctly
+fail the independent 256-byte `max_frame_bytes` floor despite satisfying
+`max_items_per_command = 8`. Complete Endpoint integration remains responsible
+for Batch-reference resolution, post-detach shadow validation, root-name and
+capacity accounting, prepared allocation-free commit, error/result
+attribution, lifecycle/cue ordering, and retained-storage release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -522,6 +616,13 @@ material, but they MUST preserve the same ordering and visible semantics.
   name release, same-parent behavior, stable/earlier-Batch reference pairs,
   structured tree/capacity/range errors, outputless no-op revision semantics,
   and the remaining Endpoint evidence boundary.
+- **PCDN-MPY-04-008 — Closed by owner acceptance 2026-08-17:** §5.5 freezes
+  PromoteRoot as target, length-delimited byte-exact UTF-8 root name, and raw
+  little-endian `u32` post-detach root index. It preserves empty names through
+  structural decoding for semantic `InvalidParent`, applies
+  `max_text_bytes`, admits stable/earlier-Batch targets, defines outputless
+  success and operation-attributed tree errors, and leaves Endpoint execution
+  evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -531,7 +632,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-007 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-008 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -550,11 +651,11 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 ## 14. Unblocks
 
-The common mutation-target envelope plus exact Delete, Reorder, and Reparent
-schemas now unblock the remaining operation-specific payload/result PCDNs and
-Endpoint orchestration without authorizing guessed remainder schemas. After
-those codecs and endpoint integration are implemented, MPY-04 provides the
-complete stage mutation/introspection surface consumed by MPY-06 and the
+The common mutation-target envelope plus exact Delete, Reorder, Reparent, and
+PromoteRoot schemas now unblock the remaining operation-specific payload/result
+PCDNs and Endpoint orchestration without authorizing guessed remainder schemas.
+After those codecs and endpoint integration are implemented, MPY-04 provides
+the complete stage mutation/introspection surface consumed by MPY-06 and the
 deterministic snapshot oracle consumed by MPY-07/09.
 
 ## 15. Change Log
@@ -735,7 +836,7 @@ values, including for a valid same-position no-op.
 
 **Touches:** PCDN-MPY-04-007, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `b122e81`
 
 **Summary:** Freezes Reparent as target reference, new-parent reference, and
 raw little-endian `u32` final index with zero-flag Batch admission and
@@ -752,3 +853,29 @@ Dropping a root's name and budget on detach preserves a single child identity
 model and makes bounded text accounting reversible. Fixed positional fields
 need no negotiated payload limit; the outer Batch frame remains the authority
 when eight large stable-reference operations do not fit 256 bytes.
+
+### 0.7.0 — 2026-08-17 — PromoteRoot wire ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-008, INV-MPY-04-3, INV-MPY-04-6, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes PromoteRoot as a contextual target followed by one
+length-delimited byte-exact UTF-8 root name and raw little-endian `u32`
+post-detach root index. Adds allocation-free structural and negotiated-text
+codecs, stable and BatchObject vectors, empty-name preservation, outputless
+result validation, operation-attributed Range/InvalidParent/Capacity proof,
+and truthful minimum-frame size evidence.
+
+#### Rationale
+
+Detaching before indexing gives child promotion and existing-root move/rename
+one deterministic ordering rule. Preserving an empty UTF-8 name in the codec
+keeps structure separate from Stage name policy, while the negotiated decoder
+enforces the per-name byte limit before Endpoint dispatch. Outputless success
+uses the common Batch revision without redundant identity data; independent
+text, item-count, and complete-frame bounds remain explicit.

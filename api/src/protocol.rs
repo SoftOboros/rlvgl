@@ -916,6 +916,20 @@ pub struct ReparentPayload {
 /// Structural or contextual failure while decoding a Reparent payload.
 pub type ReparentPayloadError = ObjectReferenceError;
 
+/// Complete Batch-only PromoteRoot payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PromoteRootPayload<'a> {
+    /// Stable or earlier-created actor becoming or moving as a named root.
+    pub target: ObjectReference,
+    /// Exact UTF-8 root name assigned after detaching the actor.
+    pub name: &'a str,
+    /// Final zero-based root position after detaching the actor.
+    pub index: u32,
+}
+
+/// Structural or contextual failure while decoding a PromoteRoot payload.
+pub type PromoteRootPayloadError = ObjectReferenceError;
+
 /// Completion status carried by a Result frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionStatus {
@@ -1890,6 +1904,114 @@ pub fn decode_reparent_operation(
     decode_reparent_payload(operation.payload)
 }
 
+/// Encode one complete PromoteRoot payload without negotiated-limit checks.
+///
+/// This allocation-free structural helper is appropriate before negotiation
+/// or inside a caller that separately enforces [`Limits`]. Protocol request
+/// acceptance should use [`encode_promote_root_payload_with_limits`]. An empty
+/// name is structurally canonical and is rejected later by Stage semantics.
+pub fn encode_promote_root_payload(
+    payload: PromoteRootPayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_promote_root_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    writer.bytes_with_length(payload.name.as_bytes())?;
+    writer.u32(payload.index)?;
+    Ok(writer.position)
+}
+
+/// Encode one complete PromoteRoot payload under negotiated text limits.
+///
+/// Structural validation precedes the `max_text_bytes` check. No other
+/// negotiated value or item limit applies to this payload. The caller still
+/// applies complete-frame `max_frame_bytes` when wrapping the payload in its
+/// Operation and Batch envelopes.
+pub fn encode_promote_root_payload_with_limits(
+    payload: PromoteRootPayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_promote_root_payload_structure(payload)?;
+    if payload.name.len() > limits.max_text_bytes as usize {
+        return Err(CodecError::LimitExceeded);
+    }
+    encode_promote_root_payload(payload, output)
+}
+
+/// Decode one complete PromoteRoot payload without negotiated-limit checks.
+///
+/// The decoder classifies the contextual target first, then validates the
+/// length-delimited UTF-8 name, raw index, and absence of trailing bytes. Use
+/// [`decode_promote_root_payload_with_limits`] at the negotiated request
+/// boundary. An empty name is structurally preserved for semantic rejection.
+pub fn decode_promote_root_payload(
+    input: &[u8],
+) -> Result<PromoteRootPayload<'_>, PromoteRootPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let mut reader = Reader::new(&input[target_consumed..]);
+    let name = str::from_utf8(
+        reader
+            .bytes_with_length()
+            .map_err(|error| nested_mutation_target_error(error.into()))?,
+    )
+    .map_err(|_| CodecError::InvalidFrame)?;
+    let index = reader
+        .u32()
+        .map_err(|error| nested_mutation_target_error(error.into()))?;
+    if reader.position != reader.input.len() {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    Ok(PromoteRootPayload {
+        target,
+        name,
+        index,
+    })
+}
+
+/// Decode one complete PromoteRoot payload under negotiated text limits.
+///
+/// Complete structural decoding precedes the `max_text_bytes` check.
+pub fn decode_promote_root_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<PromoteRootPayload<'_>, PromoteRootPayloadError> {
+    let payload = decode_promote_root_payload(input)?;
+    if payload.name.len() > limits.max_text_bytes as usize {
+        return Err(CodecError::LimitExceeded.into());
+    }
+    Ok(payload)
+}
+
+/// Decode one zero-flag PromoteRoot operation without negotiated-limit checks.
+///
+/// There is deliberately no Command counterpart: MPY v1 PromoteRoot is
+/// Batch-only. Request acceptance should use
+/// [`decode_promote_root_operation_with_limits`].
+pub fn decode_promote_root_operation(
+    operation: OperationRef<'_>,
+) -> Result<PromoteRootPayload<'_>, PromoteRootPayloadError> {
+    if operation.opcode != opcode::PROMOTE_ROOT || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_promote_root_payload(operation.payload)
+}
+
+/// Decode one zero-flag PromoteRoot operation under negotiated text limits.
+///
+/// This is the acceptance-facing operation decoder after limits negotiation.
+pub fn decode_promote_root_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<PromoteRootPayload<'_>, PromoteRootPayloadError> {
+    if operation.opcode != opcode::PROMOTE_ROOT || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_promote_root_payload_with_limits(operation.payload, limits)
+}
+
 /// Validate that one correlated Delete emitted no operation-result record.
 ///
 /// The caller MUST already have correlated `delete_operation_index` to a
@@ -1962,6 +2084,39 @@ pub fn validate_reparent_result_absent(
     {
         return Err(CodecError::InvalidFrame);
     }
+    Ok(())
+}
+
+/// Validate that one correlated PromoteRoot emitted no operation-result record.
+///
+/// The caller MUST already have correlated `promote_root_operation_index` to a
+/// submitted opcode [`opcode::PROMOTE_ROOT`]. This helper validates the
+/// structural [`BatchSuccess`] shape and the absence of that one index only. It
+/// does not validate other opcode result schemas, negotiated Limits, or the
+/// complete success envelope. Other output-bearing operations may still
+/// contribute records.
+pub fn validate_promote_root_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    promote_root_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if promote_root_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == promote_root_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+fn validate_promote_root_payload_structure(
+    payload: PromoteRootPayload<'_>,
+) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    let _ = u32::try_from(payload.name.len()).map_err(|_| CodecError::InvalidFrame)?;
     Ok(())
 }
 

@@ -237,6 +237,22 @@ fn create_stable_label(
         .unwrap()
 }
 
+fn root_order(registry: &mut StageRegistry) -> Vec<rlvgl_core::actor::ObjectId> {
+    let token = registry.snapshot_begin().unwrap();
+    let page = registry
+        .snapshot_read(
+            token,
+            limits().max_actors,
+            usize::try_from(limits().max_text_bytes).unwrap(),
+        )
+        .unwrap();
+    assert!(page.ended);
+    page.records
+        .into_iter()
+        .filter_map(|record| record.parent.is_none().then_some(record.object_id))
+        .collect()
+}
+
 #[test]
 fn create_children_later_mutation_and_reorder_commit_once_with_owned_outputs() {
     let container = descriptor("container::Container");
@@ -1361,6 +1377,398 @@ fn root_to_child_reparent_releases_name_accounting_for_same_batch_reuse() {
     assert_eq!(registry.usage().roots, starting_usage.roots);
     assert_eq!(registry.usage().text_bytes, starting_usage.text_bytes);
     registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn promote_root_handles_stable_and_earlier_targets_with_exact_create_outputs() {
+    let container = descriptor("container::Container");
+    let mut registry = registry();
+    let alpha = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "alpha" },
+    );
+    let source = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "source" },
+    );
+    let source_child = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent: source },
+    );
+    let omega = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "omega" },
+    );
+    let starting_revision = registry.revision();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::Stable(source),
+                name: "source-renamed".into(),
+                index: 0,
+            },
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(alpha),
+                },
+                vec![],
+            ),
+            create(
+                2,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::EarlierBatch(1),
+                },
+                vec![],
+            ),
+            BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::EarlierBatch(1),
+                name: "promoted".into(),
+                index: 3,
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(
+        committed
+            .create_outputs()
+            .iter()
+            .map(|output| (output.operation_index, output.batch_ref))
+            .collect::<Vec<_>>(),
+        [(1, 1), (2, 2)]
+    );
+    let outputs = committed.take_create_outputs();
+    let promoted = outputs[0].object_id;
+    let promoted_child = outputs[1].object_id;
+
+    assert_eq!(root_order(&mut registry), [source, alpha, omega, promoted]);
+    assert_eq!(registry.root_id("source"), None);
+    assert_eq!(registry.root_id("source-renamed"), Some(source));
+    assert_eq!(registry.root_id("promoted"), Some(promoted));
+    assert_eq!(registry.actor_info(source).unwrap().parent, None);
+    assert_eq!(
+        registry.actor_info(source_child).unwrap().parent,
+        Some(source)
+    );
+    assert_eq!(registry.children(source).unwrap(), [source_child]);
+    assert_eq!(registry.actor_info(promoted).unwrap().parent, None);
+    assert_eq!(
+        registry.actor_info(promoted_child).unwrap().parent,
+        Some(promoted)
+    );
+    assert_eq!(registry.children(promoted).unwrap(), [promoted_child]);
+    assert!(registry.children(alpha).unwrap().is_empty());
+
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn same_name_same_position_promote_root_commits_one_revision() {
+    let mut registry = registry();
+    let alpha = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "alpha" },
+    );
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let child = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent: target },
+    );
+    let omega = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "omega" },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_order = root_order(&mut registry);
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::PromoteRoot {
+            object: BatchObjectReference::Stable(target),
+            name: "target".into(),
+            index: 1,
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(root_order(&mut registry), starting_order);
+    assert_eq!(root_order(&mut registry), [alpha, target, omega]);
+    assert_eq!(registry.root_id("target"), Some(target));
+    assert_eq!(registry.children(target).unwrap(), [child]);
+    assert_eq!(registry.actor_info(child).unwrap().parent, Some(target));
+    assert_eq!(registry.usage(), starting_usage);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn promote_root_invalid_parent_cases_and_target_precedence_are_prepublication() {
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "root" },
+    );
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let label = create_stable_label(&mut registry, root);
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_order = root_order(&mut registry);
+
+    for direction in [
+        BatchStageDirection::PromoteRoot {
+            object: BatchObjectReference::Stable(target),
+            name: String::new(),
+            index: 0,
+        },
+        BatchStageDirection::PromoteRoot {
+            object: BatchObjectReference::Stable(target),
+            name: "root".into(),
+            index: 0,
+        },
+        BatchStageDirection::PromoteRoot {
+            object: BatchObjectReference::Stable(label),
+            name: "label".into(),
+            index: 0,
+        },
+    ] {
+        assert_eq!(
+            registry.prepare_atomic_batch(vec![direction]).unwrap_err(),
+            RegistryError::InvalidParent
+        );
+        assert_eq!(registry.revision(), starting_revision);
+        assert_eq!(registry.usage(), starting_usage);
+        assert_eq!(root_order(&mut registry), starting_order);
+        assert_eq!(registry.root_id("root"), Some(root));
+        assert_eq!(registry.root_id("target"), Some(target));
+        assert_eq!(registry.actor_info(label).unwrap().parent, Some(root));
+    }
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::Delete {
+                    object: BatchObjectReference::Stable(target),
+                },
+                BatchStageDirection::PromoteRoot {
+                    object: BatchObjectReference::Stable(target),
+                    name: String::new(),
+                    index: usize::MAX,
+                },
+            ])
+            .unwrap_err(),
+        RegistryError::StaleObject { object_id: target }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(root_order(&mut registry), starting_order);
+    assert_eq!(registry.root_id("target"), Some(target));
+}
+
+#[test]
+fn promote_root_text_budget_rejection_and_exact_old_name_reuse_are_atomic() {
+    let mut constrained = StageRegistry::new(
+        StageId::new(94).unwrap(),
+        &CATALOG,
+        RegistryLimits {
+            max_text_bytes: 2,
+            ..limits()
+        },
+    )
+    .unwrap();
+    let first = create_stable_container(
+        &mut constrained,
+        rlvgl_core::actor::CreateDestination::Root { name: "a" },
+    );
+    let second = create_stable_container(
+        &mut constrained,
+        rlvgl_core::actor::CreateDestination::Root { name: "b" },
+    );
+    let constrained_revision = constrained.revision();
+    let constrained_usage = constrained.usage();
+    assert_eq!(
+        constrained
+            .prepare_atomic_batch(vec![BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::Stable(first),
+                name: "long".into(),
+                index: 0,
+            }])
+            .unwrap_err(),
+        RegistryError::Capacity {
+            kind: CapacityKind::TextBytes,
+        }
+    );
+    assert_eq!(constrained.revision(), constrained_revision);
+    assert_eq!(constrained.usage(), constrained_usage);
+    assert_eq!(root_order(&mut constrained), [first, second]);
+    assert_eq!(constrained.root_id("a"), Some(first));
+
+    let exact_budget = "anchor".len() + "x".len() + "released".len();
+    let mut reuse = StageRegistry::new(
+        StageId::new(95).unwrap(),
+        &CATALOG,
+        RegistryLimits {
+            max_text_bytes: u32::try_from(exact_budget).unwrap(),
+            ..limits()
+        },
+    )
+    .unwrap();
+    let anchor = create_stable_container(
+        &mut reuse,
+        rlvgl_core::actor::CreateDestination::Root { name: "anchor" },
+    );
+    let renamed = create_stable_container(
+        &mut reuse,
+        rlvgl_core::actor::CreateDestination::Root { name: "released" },
+    );
+    let starting_revision = reuse.revision();
+    let prepared = reuse
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::Stable(renamed),
+                name: "x".into(),
+                index: 1,
+            },
+            create(
+                1,
+                descriptor("container::Container"),
+                BatchCreateDestination::Root {
+                    name: "released".into(),
+                },
+                vec![],
+            ),
+        ])
+        .unwrap();
+    let committed = reuse.commit_prepared_batch(prepared).unwrap();
+    let replacement = committed.create_outputs()[0].object_id;
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(committed.create_outputs().len(), 1);
+    assert_eq!(committed.create_outputs()[0].operation_index, 1);
+    assert_eq!(committed.create_outputs()[0].batch_ref, 1);
+    assert_eq!(root_order(&mut reuse), [anchor, renamed, replacement]);
+    assert_eq!(reuse.root_id("x"), Some(renamed));
+    assert_eq!(reuse.root_id("released"), Some(replacement));
+    assert_eq!(
+        reuse.usage().text_bytes,
+        u32::try_from(exact_budget).unwrap()
+    );
+    reuse.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn promote_root_range_rejection_preserves_exact_state() {
+    let mut registry = registry();
+    let alpha = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "alpha" },
+    );
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let omega = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "omega" },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_order = root_order(&mut registry);
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::Stable(target),
+                name: "renamed".into(),
+                index: 3,
+            }])
+            .unwrap_err(),
+        RegistryError::Range { field_id: 0 }
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(root_order(&mut registry), starting_order);
+    assert_eq!(root_order(&mut registry), [alpha, target, omega]);
+    assert_eq!(registry.root_id("target"), Some(target));
+    assert_eq!(registry.root_id("renamed"), None);
+}
+
+#[test]
+fn saturated_root_capacity_distinguishes_reorder_from_child_promotion() {
+    let mut registry = StageRegistry::new(
+        StageId::new(96).unwrap(),
+        &CATALOG,
+        RegistryLimits {
+            max_roots: 2,
+            ..limits()
+        },
+    )
+    .unwrap();
+    let alpha = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "alpha" },
+    );
+    let target = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "target" },
+    );
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::PromoteRoot {
+            object: BatchObjectReference::Stable(target),
+            name: "renamed".into(),
+            index: 0,
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    assert_eq!(registry.usage().roots, starting_usage.roots);
+    assert_eq!(root_order(&mut registry), [target, alpha]);
+    assert_eq!(registry.root_id("target"), None);
+    assert_eq!(registry.root_id("renamed"), Some(target));
+    registry.release_committed_batch(committed).unwrap();
+
+    let child = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Child { parent: alpha },
+    );
+    let rejection_revision = registry.revision();
+    let rejection_usage = registry.usage();
+    let rejection_order = root_order(&mut registry);
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::PromoteRoot {
+                object: BatchObjectReference::Stable(child),
+                name: "child".into(),
+                index: 2,
+            }])
+            .unwrap_err(),
+        RegistryError::Capacity {
+            kind: CapacityKind::Roots,
+        }
+    );
+    assert_eq!(registry.revision(), rejection_revision);
+    assert_eq!(registry.usage(), rejection_usage);
+    assert_eq!(root_order(&mut registry), rejection_order);
+    assert_eq!(root_order(&mut registry), [target, alpha]);
+    assert_eq!(registry.children(alpha).unwrap(), [child]);
+    assert_eq!(registry.actor_info(child).unwrap().parent, Some(alpha));
+    assert_eq!(registry.root_id("child"), None);
 }
 
 const REFERENCE_TYPE: TypeId = TypeId::registered(0x0001_ff01);
