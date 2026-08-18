@@ -1,5 +1,5 @@
 {
-  "edge_count": 172,
+  "edge_count": 231,
   "edges": [
     {
       "edge_type": "cites",
@@ -186,84 +186,182 @@
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 153,
+      "line": 182,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 154,
+      "line": 183,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 155,
+      "line": 184,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 156,
+      "line": 185,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 157,
+      "line": 186,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 158,
+      "line": 187,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "INV-CPY-01-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 185,
+      "line": 212,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 186,
+      "line": 212,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 214,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 219,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 187,
+      "line": 223,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 188,
+      "line": 230,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 189,
+      "line": 235,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 190,
+      "line": 243,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 287,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 287,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 287,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 287,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "INV-CPY-01-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 288,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 289,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 289,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 289,
+      "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "target": "PCDN-CPY-01-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 289,
       "source": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "target": "PCDN-CPY-01-006"
     },
@@ -487,301 +585,616 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 93,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "PCDN-CPY-03-003"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 159,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 160,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-2"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 161,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-3"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 162,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-4"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 163,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-5"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 164,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-6"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 165,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-7"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 166,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "INV-CPY-03-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 193,
-      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
-      "target": "PCDN-CPY-03-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 194,
+      "line": 10,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 195,
+      "line": 94,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 196,
+      "line": 96,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 159,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 188,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 189,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 190,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 191,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 192,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 193,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 194,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 195,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 220,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 225,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 229,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 197,
+      "line": 233,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 243,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 268,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 281,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 281,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 281,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 281,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "INV-CPY-03-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
+      "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "target": "PCDN-CPY-03-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
       "source": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "target": "PCDN-CPY-03-005"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 158,
+      "line": 289,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 159,
+      "line": 290,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 160,
+      "line": 291,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 161,
+      "line": 292,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 162,
+      "line": 293,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 163,
+      "line": 294,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-6"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 164,
+      "line": 295,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-7"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 165,
+      "line": 296,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "INV-CPY-04-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 193,
+      "line": 322,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 194,
+      "line": 326,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 195,
+      "line": 331,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 196,
+      "line": 335,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 197,
+      "line": 339,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 198,
+      "line": 342,
       "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "target": "PCDN-CPY-04-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 133,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "PCDN-CPY-05-003"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 170,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 171,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-2"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 172,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-3"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 173,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-4"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 174,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-5"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 175,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-6"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 176,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-7"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 177,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "INV-CPY-05-8"
+      "line": 385,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 205,
-      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
-      "target": "PCDN-CPY-05-001"
+      "line": 385,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 206,
+      "line": 385,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 385,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "INV-CPY-04-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 388,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 388,
+      "source": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "target": "PCDN-CPY-04-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 10,
       "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "target": "PCDN-CPY-05-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 207,
+      "line": 232,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 238,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 239,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 240,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 241,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 242,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 243,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 244,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 245,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 271,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
       "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "target": "PCDN-CPY-05-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 208,
+      "line": 278,
       "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "target": "PCDN-CPY-05-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 209,
+      "line": 282,
       "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "target": "PCDN-CPY-05-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 210,
+      "line": 285,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 293,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 297,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 321,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 335,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 335,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 335,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 335,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 336,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 336,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 336,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 336,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "INV-CPY-05-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 337,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 337,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 337,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 337,
+      "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "target": "PCDN-CPY-05-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 338,
       "source": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "target": "PCDN-CPY-05-006"
     },
@@ -1208,13 +1621,13 @@
   ],
   "family": "cpy",
   "kind_counts": {
-    "amendment": 11,
+    "amendment": 15,
     "gate": 80,
     "invariant": 83,
-    "rationale": 11,
+    "rationale": 15,
     "term": 77
   },
-  "object_count": 262,
+  "object_count": 270,
   "objects": [
     {
       "attrs": {
@@ -1746,7 +2159,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 64,
+      "line": 66,
       "obj_id": "cpy:term:baseline manifest",
       "text": "Checksummed record of exact source commits, document revisions, tool versions, interpreters, targets, rootfs identity, and enabled features."
     },
@@ -1758,7 +2171,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 65,
+      "line": 67,
       "obj_id": "cpy:term:required profile",
       "text": "A CPY-00 deployment profile whose complete capability and evidence row is mandatory for its named conformance target."
     },
@@ -1770,7 +2183,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 66,
+      "line": 68,
       "obj_id": "cpy:term:qualification variant",
       "text": "GIL-enabled or free-threaded interpreter/build form tested separately within one deployment profile."
     },
@@ -1782,7 +2195,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 67,
+      "line": 69,
       "obj_id": "cpy:term:reference board",
       "text": "The physical embedded-Linux target that supplies device, cadence, permission, shutdown, and resource evidence."
     },
@@ -1794,7 +2207,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 68,
+      "line": 70,
       "obj_id": "cpy:term:target rootfs",
       "text": "Checksummed runtime filesystem and dynamic-linker environment used to build/import/run the extension."
     },
@@ -1806,7 +2219,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 69,
+      "line": 71,
       "obj_id": "cpy:term:capability cell",
       "text": "Required, optional, unsupported, or not-applicable status plus the phase/evidence locator for one profile capability."
     },
@@ -1824,7 +2237,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 153,
+      "line": 182,
       "obj_id": "INV-CPY-01-1",
       "text": "Every CPY evidence claim MUST resolve to one checksummed Baseline Manifest and one clean rlvgl source commit."
     },
@@ -1842,7 +2255,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 154,
+      "line": 183,
       "obj_id": "INV-CPY-01-2",
       "text": "A consumed MPY, LPAR, or WLD behavior MUST be ratified at the recorded revision before CPY implementation relies on it."
     },
@@ -1861,7 +2274,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 155,
+      "line": 184,
       "obj_id": "INV-CPY-01-3",
       "text": "Every required capability cell MUST name its proof phase and MUST NOT be satisfied by a different deployment or qualification variant."
     },
@@ -1880,7 +2293,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 156,
+      "line": 185,
       "obj_id": "INV-CPY-01-4",
       "text": "Unsupported or unavailable capability cells MUST be explicit and MUST NOT disappear from generated documentation."
     },
@@ -1898,7 +2311,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 157,
+      "line": 186,
       "obj_id": "INV-CPY-01-5",
       "text": "Target-rootfs and board evidence MUST identify ABI, loader, kernel, device, and permission facts rather than only a marketing board name."
     },
@@ -1916,20 +2329,20 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 158,
+      "line": 187,
       "obj_id": "INV-CPY-01-6",
       "text": "Free-threaded, ABI-limited, and version-specific artifacts MUST remain separately identified and tested."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 194,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:194",
+      "line": 251,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:251",
       "text": "Every PCDN in §11.2 is resolved."
     },
     {
@@ -1940,20 +2353,20 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 195,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:195",
+      "line": 252,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:252",
       "text": "A clean source commit and exact consumed document revisions are recorded."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 196,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:196",
+      "line": 253,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:253",
       "text": "The Baseline Manifest schema contains every §5 field."
     },
     {
@@ -1964,8 +2377,8 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 197,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:197",
+      "line": 254,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:254",
       "text": "Required architecture, rootfs, and Reference Board rows are complete."
     },
     {
@@ -1976,20 +2389,20 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 198,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:198",
+      "line": 255,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:255",
       "text": "Every capability cell has an explicit state and evidence owner."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 199,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:199",
+      "line": 256,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:256",
       "text": "Qualification variants cannot borrow evidence from one another."
     },
     {
@@ -2000,15 +2413,64 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 200,
-      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:200",
+      "line": 257,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md:gate:257",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": false,
+        "date": "2026-08-18",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "baseline pcdns accepted as amended",
+        "summary": "Selects CPython 3.13/3.14, PyO3 0.28.3, maturin 1.13.0,",
+        "touches": [
+          "INV-CPY-01-1",
+          "INV-CPY-01-2",
+          "INV-CPY-01-3",
+          "INV-CPY-01-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 281,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md#0.2.0",
+      "text": "Selects CPython 3.13/3.14, PyO3 0.28.3, maturin 1.13.0,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-01-1",
+          "INV-CPY-01-2",
+          "INV-CPY-01-3",
+          "INV-CPY-01-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 281,
+      "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md#0.2.0-rationale",
+      "text": "Debian 13 supplies CPython 3.13 for both `armhf` and `arm64`, while CPython\n3.14 is the current bugfix release and supplies a second supported minor for\nhost and forward-rootfs evidence. The selected PyO3/maturin releases are the\ncurrent compatible stable pair. BBB is the only repository target with an\nexisting physical Linux fbdev/evdev integration and deliberately exercises a\nminimal 32-bit SBC envelope; excluding its `/dev/mem` scratch path prevents\nthat implementation detail from becoming base CPY privilege policy.\n\nConsidered and rejected: supporting 3.12 solely because it is installed on the\ndrafting host; making prerelease 3.15 a release target; using only a 64-bit\ndesktop as embedded proof; requiring a new AArch64 display board before the\nexisting BBB path is qualified; and consuming MPY-06 through MPY-09 as neutral\nauthority.\n\nWhat deliberately did not change: no Baseline Manifest instance, rootfs image,\nboard result, Python toolchain, Cargo dependency, target build, or binding code\nis created by this amendment. CPY-01 remains Draft until those acceptance\nartifacts exist."
     },
     {
       "attrs": {
         "author": "Ira Abbott / OpenAI Codex (drafting)",
         "change_kind": "scope",
-        "chronological_rank": 1,
+        "chronological_rank": 2,
         "commits": null,
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -2026,7 +2488,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 220,
+      "line": 321,
       "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md#0.1.0",
       "text": "Defines the clean baseline manifest, deployment capability matrix, architecture rows, and separate qualification variants for CPY."
     },
@@ -2037,7 +2499,7 @@
       "doc": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 220,
+      "line": 321,
       "obj_id": "docs/cpython/CPY-01-BASELINE-TARGET-PROFILES.md#0.1.0-rationale",
       "text": "The initiative spans host and embedded Linux, so a single local import result\ncannot establish compatibility. This phase makes source, interpreter, ABI,\nrootfs, device, and claim boundaries explicit before crate or binding choices\nlock them in.\n\nConsidered and rejected: pinning the versions present on the drafting host,\nbecause that would make an incidental environment the deployment authority.\n\nWhat deliberately did not change: no version, board, target, or MPY frontier is\nselected in this Draft; those remain owner decisions."
     },
@@ -2472,7 +2934,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 62,
+      "line": 63,
       "obj_id": "cpy:term:service thread",
       "text": "Native thread that constructs and exclusively owns the Endpoint, actor registry, render state, and service state machine."
     },
@@ -2484,7 +2946,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 63,
+      "line": 64,
       "obj_id": "cpy:term:ingress queue",
       "text": "Bounded FIFO of neutral requests accepted from adapter callers."
     },
@@ -2496,7 +2958,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 64,
+      "line": 65,
       "obj_id": "cpy:term:egress queue",
       "text": "Bounded ordered records containing results, cues, frame notices, metrics, lifecycle, and faults."
     },
@@ -2508,7 +2970,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 65,
+      "line": 66,
       "obj_id": "cpy:term:readiness signal",
       "text": "Level/edge-safe operating-system primitive indicating that egress or terminal state is available without carrying semantic data."
     },
@@ -2520,7 +2982,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 66,
+      "line": 67,
       "obj_id": "cpy:term:service epoch",
       "text": "Monotonic identity of one service construction, preventing stale handles or records from binding after restart."
     },
@@ -2532,7 +2994,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 67,
+      "line": 68,
       "obj_id": "cpy:term:service turn",
       "text": "One service scheduling boundary containing admitted ingress, a neutral Safe Turn, native input/render/present work, and record publication in a frozen order."
     },
@@ -2544,7 +3006,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "term",
-      "line": 68,
+      "line": 69,
       "obj_id": "cpy:term:close fence",
       "text": "State after which no new user request is accepted and all later records are lifecycle/finalization records."
     },
@@ -2562,7 +3024,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 159,
+      "line": 188,
       "obj_id": "INV-CPY-03-1",
       "text": "The Service Thread MUST exclusively construct, own, and destroy Endpoint and actor/render state."
     },
@@ -2580,7 +3042,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 160,
+      "line": 189,
       "obj_id": "INV-CPY-03-2",
       "text": "Ingress and egress MUST contain no Python objects, borrowed actor references, or callbacks into Python."
     },
@@ -2598,7 +3060,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 161,
+      "line": 190,
       "obj_id": "INV-CPY-03-3",
       "text": "Every accepted request MUST produce exactly one terminal result or a documented service-terminal cancellation record."
     },
@@ -2617,7 +3079,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 162,
+      "line": 191,
       "obj_id": "INV-CPY-03-4",
       "text": "Service Turn ordering MUST be deterministic and MUST NOT depend on Python polling or callback duration."
     },
@@ -2635,7 +3097,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 163,
+      "line": 192,
       "obj_id": "INV-CPY-03-5",
       "text": "Queue saturation, coalescing, loss, closing, and fault states MUST be observable and bounded."
     },
@@ -2653,7 +3115,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 164,
+      "line": 193,
       "obj_id": "INV-CPY-03-6",
       "text": "Readiness MUST wake consumers without becoming a second semantic queue or losing a drainable terminal state."
     },
@@ -2671,7 +3133,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 165,
+      "line": 194,
       "obj_id": "INV-CPY-03-7",
       "text": "Close MUST be idempotent and MUST destroy native state before module/interpreter finalization can invalidate adapter resources."
     },
@@ -2689,7 +3151,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 166,
+      "line": 195,
       "obj_id": "INV-CPY-03-8",
       "text": "A restarted service MUST use a new epoch and MUST reject handles and records from every prior epoch."
     },
@@ -2701,8 +3163,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 201,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:201",
+      "line": 247,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:247",
       "text": "Every PCDN in §11.2 is resolved."
     },
     {
@@ -2713,8 +3175,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 202,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:202",
+      "line": 248,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:248",
       "text": "Lifecycle and Service Turn state machines are complete and deterministic."
     },
     {
@@ -2725,8 +3187,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 203,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:203",
+      "line": 249,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:249",
       "text": "Queue loss/reservation classes map to neutral record semantics."
     },
     {
@@ -2737,8 +3199,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 204,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:204",
+      "line": 250,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:250",
       "text": "The service has a native-only headless test consumer before PyO3 lands."
     },
     {
@@ -2749,8 +3211,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 205,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:205",
+      "line": 251,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:251",
       "text": "Close/finalization and restart/epoch rules are exact."
     },
     {
@@ -2761,8 +3223,8 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 206,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:206",
+      "line": 252,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:252",
       "text": "No Python dependency enters the Host Runtime Crate."
     },
     {
@@ -2773,15 +3235,64 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 207,
-      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:207",
+      "line": 253,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md:gate:253",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": false,
+        "date": "2026-08-18",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "runtime policy pcdns accepted as amended",
+        "summary": "Selects bounded Crossbeam queues and Unix readiness primitives,",
+        "touches": [
+          "INV-CPY-03-1",
+          "INV-CPY-03-2",
+          "INV-CPY-03-3",
+          "INV-CPY-03-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 275,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.2.0",
+      "text": "Selects bounded Crossbeam queues and Unix readiness primitives,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-03-1",
+          "INV-CPY-03-2",
+          "INV-CPY-03-3",
+          "INV-CPY-03-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 275,
+      "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.2.0-rationale",
+      "text": "Crossbeam supplies a small, well-tested bounded queue without imposing an\nasync runtime, while `eventfd`/self-pipe readiness integrates with the selected\nLinux/macOS host matrix and carries no semantic records. One thread preserves\nthe simplest deterministic ownership proof. Exact capacities cannot be\nselected responsibly from policy alone and therefore remain evidence-blocked.\n\nConsidered and rejected: unbounded standard channels, Tokio as a mandatory\nruntime, a separate presenter thread without a backend constraint, cancelling\nan in-progress neutral commit, silently discarding queued requests during\nclose, and advertising subinterpreter support from module initialization alone.\n\nWhat deliberately did not change: no dependency, queue, readiness descriptor,\nthread, service, backend, PyO3 module, or capacity constant is implemented.\nCPY-03 remains Draft."
     },
     {
       "attrs": {
         "author": "Ira Abbott / OpenAI Codex (drafting)",
         "change_kind": "scope",
-        "chronological_rank": 1,
+        "chronological_rank": 2,
         "commits": null,
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -2799,7 +3310,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 226,
+      "line": 309,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.1.0",
       "text": "Defines Python-independent runtime-thread ownership, bounded ingress/egress, deterministic turns, readiness, epochs, faults, and shutdown."
     },
@@ -2810,7 +3321,7 @@
       "doc": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 226,
+      "line": 309,
       "obj_id": "docs/cpython/CPY-03-NATIVE-RUNTIME-SERVICE.md#0.1.0-rationale",
       "text": "Native rendering and input cannot inherit Python callback latency or\nfinalization hazards. A reusable service crate also gives the future daemon and\nheadless tools the same lifecycle without importing PyO3.\n\nConsidered and rejected: letting PyO3 wrappers own actor references directly,\nand invoking callbacks from the render thread; both collapse the interpreter\nand native timing domains.\n\nWhat deliberately did not change: Endpoint, Safe Turn, actor, result, or cue\nsemantics remain owned by their MPY/core authorities."
     },
@@ -2822,7 +3333,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 57,
+      "line": 58,
       "obj_id": "cpy:term:python runtime",
       "text": "Top-level Python object owning one adapter connection to one Native Runtime Service epoch."
     },
@@ -2834,7 +3345,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 58,
+      "line": 59,
       "obj_id": "cpy:term:cpython stage",
       "text": "Stable-id wrapper submitting stage-scoped directions and queries."
     },
@@ -2846,7 +3357,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 59,
+      "line": 60,
       "obj_id": "cpy:term:cpython actor",
       "text": "Stable identity/type wrapper with generic property/action/subscription methods."
     },
@@ -2858,7 +3369,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 60,
+      "line": 61,
       "obj_id": "cpy:term:cpython transaction",
       "text": "Context/builder collecting neutral directions into one atomic Batch without mutating the native runtime before commit."
     },
@@ -2870,7 +3381,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 61,
+      "line": 62,
       "obj_id": "cpy:term:cpython subscription",
       "text": "Adapter-owned handle pairing a neutral subscription identity with a Python callback token."
     },
@@ -2882,7 +3393,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 62,
+      "line": 63,
       "obj_id": "cpy:term:callback registry",
       "text": "Module/runtime-local map from stable callback token to Python callable, accessed only on Python-attached threads."
     },
@@ -2894,7 +3405,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 63,
+      "line": 64,
       "obj_id": "cpy:term:generic layer",
       "text": "Mandatory descriptor-driven Runtime/Stage/Actor/Transaction/Subscription operations."
     },
@@ -2906,7 +3417,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 64,
+      "line": 65,
       "obj_id": "cpy:term:generated convenience layer",
       "text": "Python classes, signatures, enums, and `.pyi` stubs generated from the same admitted descriptors as the Generic Layer."
     },
@@ -2918,7 +3429,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "term",
-      "line": 65,
+      "line": 66,
       "obj_id": "cpy:term:binding turn",
       "text": "Explicit `poll`, synchronous result construction, or asyncio callback turn that drains native records and invokes eligible Python callbacks."
     },
@@ -2937,7 +3448,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 158,
+      "line": 289,
       "obj_id": "INV-CPY-04-1",
       "text": "Python wrappers MUST contain stable ids/epochs and MUST NOT contain native actor references or raw pointers."
     },
@@ -2956,7 +3467,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 159,
+      "line": 290,
       "obj_id": "INV-CPY-04-2",
       "text": "Every public actor operation MUST lower through neutral descriptors/directions and MUST NOT implement widget behavior in Python."
     },
@@ -2974,7 +3485,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 160,
+      "line": 291,
       "obj_id": "INV-CPY-04-3",
       "text": "The Generic Layer and Generated Convenience Layer MUST share one descriptor source and MUST produce equivalent neutral requests."
     },
@@ -2993,7 +3504,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 161,
+      "line": 292,
       "obj_id": "INV-CPY-04-4",
       "text": "Python input conversion MUST complete before request acceptance and MUST NOT leave borrowed mutable Python storage in native queues."
     },
@@ -3011,7 +3522,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 162,
+      "line": 293,
       "obj_id": "INV-CPY-04-5",
       "text": "Every neutral error MUST map to one stable exception category with machine-readable context."
     },
@@ -3030,7 +3541,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 163,
+      "line": 294,
       "obj_id": "INV-CPY-04-6",
       "text": "Native threads MUST NOT access the Callback Registry; callbacks MUST run only during a Binding Turn."
     },
@@ -3049,7 +3560,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 164,
+      "line": 295,
       "obj_id": "INV-CPY-04-7",
       "text": "Callback exceptions MUST be contained and MUST NOT alter native commit, cue ordering, or presentation cadence."
     },
@@ -3067,20 +3578,20 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 165,
+      "line": 296,
       "obj_id": "INV-CPY-04-8",
       "text": "Close/finalization MUST release callbacks, handles, and service resources without calling Python from native teardown."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 202,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:202",
+      "line": 349,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:349",
       "text": "Every PCDN in §11.2 is resolved."
     },
     {
@@ -3091,33 +3602,33 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 203,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:203",
+      "line": 350,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:350",
       "text": "Generic objects and every method lower to ratified neutral operations."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 204,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:204",
+      "line": 351,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:351",
       "text": "Exact value and error conversion tables are complete."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 205,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:205",
-      "text": "Callback retention, ordering, release, and exception handling are closed."
+      "line": 352,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:352",
+      "text": "Callback retention, ordering, release, and exception policy is closed."
     },
     {
       "attrs": {
@@ -3127,8 +3638,8 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 206,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:206",
+      "line": 353,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:353",
       "text": "Blocking calls detach Python while the native service remains independent."
     },
     {
@@ -3139,8 +3650,8 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 207,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:207",
+      "line": 354,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:354",
       "text": "Descriptor-generated classes/stubs cannot drift from the Generic Layer."
     },
     {
@@ -3151,8 +3662,8 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 208,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:208",
+      "line": 355,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:355",
       "text": "Module/subinterpreter/finalization state is explicit."
     },
     {
@@ -3163,15 +3674,64 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 209,
-      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:209",
+      "line": 356,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md:gate:356",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": false,
+        "date": "2026-08-18",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "director-binding pcdns accepted as amended",
+        "summary": "Fixes the package/module/crate names, exact neutral-to-Python",
+        "touches": [
+          "INV-CPY-04-1",
+          "INV-CPY-04-2",
+          "INV-CPY-04-3",
+          "INV-CPY-04-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 379,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md#0.2.0",
+      "text": "Fixes the package/module/crate names, exact neutral-to-Python"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-04-1",
+          "INV-CPY-04-2",
+          "INV-CPY-04-3",
+          "INV-CPY-04-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 379,
+      "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md#0.2.0-rationale",
+      "text": "One awaitable Request primitive keeps synchronous and asyncio use on the same\nbounded service/egress contract, while explicit finite waits make hidden native\nblocking visible. Exact tagged value classes prevent Python's broad `int` and\nmutable-buffer behavior from erasing neutral identity or lifetime guarantees.\nStrong callback retention provides deterministic cue delivery and teardown.\n\nConsidered and rejected: synchronous-by-default actor operations, implicit\ntransaction auto-commit, borrowed mutable buffer ingress, floats for fixed\nprecision, direct imports from the extension module, native-thread callbacks,\nweak-by-default callbacks, handwritten conveniences beyond the admitted Wave 1\ndescriptors, and first-release subinterpreter claims.\n\nWhat deliberately did not change: no Python package, PyO3 module, generated\nclass, exception type, queue, or callback registry is implemented. Neutral\nMPY/LPAR behavior remains separately owned, CPY-04 remains Draft, and CPY-05\nstill gates the framebuffer object."
     },
     {
       "attrs": {
         "author": "Ira Abbott / OpenAI Codex (drafting)",
         "change_kind": "scope",
-        "chronological_rank": 1,
+        "chronological_rank": 2,
         "commits": null,
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -3189,7 +3749,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 229,
+      "line": 416,
       "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md#0.1.0",
       "text": "Defines the generic CPython object model, conversion, exception, transaction, callback, polling, generated-typing, and finalization boundaries."
     },
@@ -3200,7 +3760,7 @@
       "doc": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 229,
+      "line": 416,
       "obj_id": "docs/cpython/CPY-04-CPYTHON-DIRECTOR-BINDING.md#0.1.0-rationale",
       "text": "Full CPython should add ergonomics and ecosystem integration without becoming\na second runtime or descriptor authority. A generic mandatory layer plus\ndescriptor-generated conveniences preserves breadth and type quality together.\n\nConsidered and rejected: handwritten widget wrappers and native-thread Python\ncallbacks, because both introduce semantic drift and timing/finalization risk.\n\nWhat deliberately did not change: neutral Stage/Actor/batch/cue behavior and\nthe MicroPython adapter remain separately owned."
     },
@@ -3212,7 +3772,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 60,
+      "line": 61,
       "obj_id": "cpy:term:frame id",
       "text": "Monotonic identity of one frozen rendered frame within a Service Epoch."
     },
@@ -3224,7 +3784,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 61,
+      "line": 62,
       "obj_id": "cpy:term:pixel layout",
       "text": "Exact byte-level channel order, component width, packing, alpha meaning, and endianness of a frame."
     },
@@ -3236,7 +3796,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 62,
+      "line": 63,
       "obj_id": "cpy:term:damage set",
       "text": "Bounded clipped rectangles whose union covers every changed output byte, plus overflow/full-damage state."
     },
@@ -3248,7 +3808,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 63,
+      "line": 64,
       "obj_id": "cpy:term:observer loss",
       "text": "Explicit count/range indicating frames not made available to a Python observer while native presentation continued."
     },
@@ -3260,7 +3820,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 64,
+      "line": 65,
       "obj_id": "cpy:term:canvas buffer",
       "text": "Separate writable Python-exportable resource that becomes render input only after an explicit Safe Turn commit."
     },
@@ -3272,7 +3832,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "term",
-      "line": 65,
+      "line": 66,
       "obj_id": "cpy:term:frame busy",
       "text": "Bounded admission outcome when the selected mode cannot acquire/recycle a slot without violating a live lease."
     },
@@ -3290,7 +3850,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 170,
+      "line": 238,
       "obj_id": "INV-CPY-05-1",
       "text": "A frozen/published frame MUST remain byte-for-byte immutable until every native and Python lease releases it."
     },
@@ -3308,7 +3868,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 171,
+      "line": 239,
       "obj_id": "INV-CPY-05-2",
       "text": "Every export MUST retain valid storage until its matching release, including after Frame object release and service close."
     },
@@ -3326,7 +3886,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 172,
+      "line": 240,
       "obj_id": "INV-CPY-05-3",
       "text": "Frame metadata MUST state exact byte layout, stride, dimensions, damage, revision, and loss without architecture-dependent ambiguity."
     },
@@ -3344,7 +3904,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 173,
+      "line": 241,
       "obj_id": "INV-CPY-05-4",
       "text": "Writable Python access to live frame, render, DMA, or scanout storage MUST be rejected."
     },
@@ -3362,7 +3922,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 174,
+      "line": 242,
       "obj_id": "INV-CPY-05-5",
       "text": "Slot count and retained bytes MUST be bounded, and saturation MUST produce the mode-specific observable outcome."
     },
@@ -3380,7 +3940,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 175,
+      "line": 243,
       "obj_id": "INV-CPY-05-6",
       "text": "Native-presented mode MUST preserve native cadence when Python observers or callbacks stall."
     },
@@ -3399,7 +3959,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 176,
+      "line": 244,
       "obj_id": "INV-CPY-05-7",
       "text": "Observer frame loss/coalescing MUST be reported by exact count/range and MUST NOT masquerade as consecutive frames."
     },
@@ -3417,7 +3977,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 177,
+      "line": 245,
       "obj_id": "INV-CPY-05-8",
       "text": "Canvas Buffer writes MUST remain isolated from active rendering until a validated Safe Turn commit."
     },
@@ -3429,20 +3989,20 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 214,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:214",
-      "text": "Every PCDN in §11.2 is resolved."
+      "line": 297,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:297",
+      "text": "Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-05-002` remains open."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 215,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:215",
+      "line": 298,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:298",
       "text": "Exact Pixel Layout and canonical byte vectors are recorded."
     },
     {
@@ -3453,8 +4013,8 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 216,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:216",
+      "line": 299,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:299",
       "text": "Slot lifecycle covers render, native present, every buffer export, close,"
     },
     {
@@ -3465,8 +4025,8 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 218,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:218",
+      "line": 301,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:301",
       "text": "Each mode has bounded saturation/loss behavior."
     },
     {
@@ -3477,21 +4037,21 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 219,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:219",
+      "line": 302,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:302",
       "text": "Writable live-frame access is impossible by API and tests."
     },
     {
       "attrs": {
-        "checked": false,
+        "checked": true,
         "cited_ids": []
       },
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 220,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:220",
-      "text": "Damage overflow and observer loss are unambiguous."
+      "line": 303,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:303",
+      "text": "Damage overflow and observer loss policy is unambiguous."
     },
     {
       "attrs": {
@@ -3501,8 +4061,8 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 221,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:221",
+      "line": 304,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:304",
       "text": "Cross-architecture and finalization lifetime proofs are specified."
     },
     {
@@ -3513,15 +4073,64 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 222,
-      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:222",
+      "line": 305,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md:gate:305",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": false,
+        "date": "2026-08-18",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.0",
+        "shape": "block",
+        "status": "frame policy pcdns accepted as amended",
+        "summary": "Fixes the first flattened Pixel Layout and vectors, one-dimensional",
+        "touches": [
+          "INV-CPY-05-1",
+          "INV-CPY-05-2",
+          "INV-CPY-05-3",
+          "INV-CPY-05-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 329,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md#0.2.0",
+      "text": "Fixes the first flattened Pixel Layout and vectors, one-dimensional"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-05-1",
+          "INV-CPY-05-2",
+          "INV-CPY-05-3",
+          "INV-CPY-05-4"
+        ]
+      },
+      "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 329,
+      "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md#0.2.0-rationale",
+      "text": "The software renderer already serializes `0xAARRGGBB` explicitly as little-\nendian bytes, giving CPY a deterministic `[B,G,R,A]` publication oracle without\nredefining rendering. A tight one-dimensional lease is broadly consumable and\nkeeps width/stride semantics explicit. Native cadence must not inherit Python\nlease duration, while required-consumer headless mode must surface bounded\ncapacity instead of silently losing frames.\n\nConsidered and rejected: architecture-native `u32` naming, direct export of a\nmutable or padded backend surface, multidimensional PEP 3118 metadata before a\nconsumer requires it, blocking native present behind pinned Python views,\nsilent latest-frame coalescing, mandatory Python-driven device scanout, and an\nunowned first-release Canvas Buffer.\n\nWhat deliberately did not change: no frame slot, lease, buffer exporter, copy,\nconversion, capacity, or Canvas resource is implemented. WLD SHM ownership and\ninternal mutable `Surface`/framebuffer typestates remain with their authorities;\nCPY-05 remains Draft and slot counts remain evidence-gated."
     },
     {
       "attrs": {
         "author": "Ira Abbott / OpenAI Codex (drafting)",
         "change_kind": "scope",
-        "chronological_rank": 1,
+        "chronological_rank": 2,
         "commits": null,
         "conformant_change_kind": true,
         "conformant_status": true,
@@ -3539,7 +4148,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 242,
+      "line": 367,
       "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md#0.1.0",
       "text": "Defines exact flattened-frame metadata, immutable slot/lease lifecycle, read-only buffer export, presentation modes, and bounded observer backpressure."
     },
@@ -3550,7 +4159,7 @@
       "doc": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 242,
+      "line": 367,
       "obj_id": "docs/cpython/CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md#0.1.0-rationale",
       "text": "Python needs a real framebuffer boundary, not a copied screenshot convenience.\nThe exporter lifetime and native presentation cadence must therefore be\ndesigned together before a `memoryview` is exposed.\n\nConsidered and rejected: exporting `Surface.buf` directly and returning only\n`bytes`; the first is unsound across borrow/slot reuse, while the second hides\nthe intended zero-copy lifetime and copies every frame.\n\nWhat deliberately did not change: internal Surface mutation, framebuffer\ntypestates, LPAR presentation semantics, and WLD SHM ownership remain with\ntheir existing authorities."
     },
