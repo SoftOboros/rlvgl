@@ -1,0 +1,20 @@
+[package]
+name = "rlvgl-runtime-std"
+version = "0.0.0"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+edition = "2024"
+license = "MIT"
+description = "Interpreter-neutral std ownership boundary for rlvgl host runtimes."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+documentation = "https://docs.rs/rlvgl-runtime-std"
+keywords = ["graphics", "gui", "runtime", "embedded-linux"]
+categories = ["gui"]
+publish = false
+
+[dependencies]
+rlvgl-core = { version = "0.2.6", path = "../core", default-features = false }
+
+[features]
+default = []

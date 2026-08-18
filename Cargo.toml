@@ -499,7 +499,7 @@ rlvgl-core = { path = "core" }
 
 [workspace]
 members = [
-    "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
+    "core", "platform", "widgets", "ui", "api", "micropython", "runtime-std", "fs-sim", "i18n", "playit",
     "devices/rlvgl-i2c-test-support", "devices/rlvgl-kria-i2c",
     "devices/rlvgl-device-stts22h", "devices/rlvgl-device-veml3235sl",
     "devices/rlvgl-device-ptn3460",
