@@ -100,10 +100,10 @@ new behavior change.
 - **MPY:** Later phase ratification remains blocked by their own PCDNs and,
   where specified, compile, exception, cache/shared-memory, measured-budget,
   or board evidence.
-- **WLD:** All five PCDNs are resolved. WLD-00 remains Draft pending owner
-  ratification of its remaining authority and scope checklist. WLD-01 and
-  WLD-02 cannot authorize code before their parent and prerequisite gates
-  close, and release parity still requires compositor evidence.
+- **WLD:** WLD-00 is Ratified with all five PCDNs resolved. WLD-01 remains
+  Draft pending phase ratification, and WLD-02 remains Draft and blocked by
+  WLD-01. Release parity still requires the complete compositor, isolation,
+  resource, documentation, versioning, and changelog evidence.
 - **KI2C-07:** Physical-board facts and read-only probe evidence are missing;
   hardware-blocked is not a conformance result.
 - **Legacy bridges:** The four documents above require their §15 bridge before
