@@ -464,17 +464,24 @@ fn validate_actor_directions_with_context(
                     .find(|action| action.id == *id)
                     .ok_or(RegistryError::UnknownAction { action_id: *id })?;
                 if action.transaction == ActionTransaction::BatchForbidden {
-                    return Err(RegistryError::BatchInvalid);
+                    return Err(RegistryError::BatchInvalidField { field_id: *id });
+                }
+                if !action.results.is_empty() {
+                    return Err(RegistryError::UnsupportedAction { action_id: *id });
                 }
                 if action.arguments.len() != arguments.len() {
-                    return Err(RegistryError::BatchInvalid);
+                    return Err(RegistryError::BatchInvalidField { field_id: *id });
                 }
                 for (argument, expected) in arguments.iter().zip(action.arguments) {
-                    if argument.tag() != *expected {
+                    let actual = argument.tag();
+                    let contextual_object = allow_batch_object
+                        && *expected == ValueTag::Object
+                        && matches!(actual, ValueTag::Object | ValueTag::BatchObject);
+                    if actual != *expected && !contextual_object {
                         return Err(RegistryError::TypeMismatch {
                             field_id: *id,
                             expected: *expected,
-                            actual: argument.tag(),
+                            actual,
                         });
                     }
                 }
@@ -1822,9 +1829,14 @@ pub enum RegistryError {
     ReadOnly,
     /// A described direction is not implemented by this runtime profile.
     Unsupported,
+    /// An action's declared result schema is unsupported by atomic invocation.
+    UnsupportedAction {
+        /// Descriptor-local action identifier.
+        action_id: u32,
+    },
     /// A command group is structurally valid but cannot be committed atomically.
     BatchInvalid,
-    /// A batch-local property reference cannot resolve at its field.
+    /// A keyed descriptor field cannot participate in the requested Batch.
     BatchInvalidField {
         /// Descriptor-local field identifier.
         field_id: u32,
@@ -1840,7 +1852,7 @@ pub enum RegistryError {
         /// Rejected handle.
         object_id: ObjectId,
     },
-    /// A stable property reference is stale at its field.
+    /// A stable keyed-field reference is stale at its descriptor field.
     StaleObjectField {
         /// Descriptor-local field identifier.
         field_id: u32,
@@ -1873,7 +1885,7 @@ impl RegistryError {
             Self::TypeMismatch { .. } => ErrorClass::TypeMismatch,
             Self::Range { .. } => ErrorClass::Range,
             Self::ReadOnlyField { .. } | Self::ReadOnly => ErrorClass::ReadOnly,
-            Self::Unsupported => ErrorClass::Unsupported,
+            Self::Unsupported | Self::UnsupportedAction { .. } => ErrorClass::Unsupported,
             Self::BatchInvalid | Self::BatchInvalidField { .. } => ErrorClass::BatchInvalid,
             Self::DispatchBusy => ErrorClass::DispatchBusy,
             Self::InvalidParent | Self::DuplicateRoot => ErrorClass::InvalidParent,
@@ -4038,41 +4050,68 @@ impl StageRegistry {
         bindings: &[(u16, ObjectId, usize)],
     ) -> Result<(), RegistryError> {
         for direction in directions {
-            let ActorDirection::SetProperty { id, value } = direction else {
-                continue;
-            };
-            let property = descriptor
-                .properties
-                .iter()
-                .find(|property| property.id == *id)
-                .expect("atomic schema validation resolved every property field");
-            if property.value_tag != ValueTag::Object {
-                continue;
-            }
-            let reference = match value {
-                OwnedValue::Object(raw) => BatchObjectReference::Stable(
-                    ObjectId::new(*raw)
-                        .ok_or(RegistryError::BatchInvalidField { field_id: *id })?,
-                ),
-                OwnedValue::BatchObject(batch_ref) => {
-                    BatchObjectReference::EarlierBatch(*batch_ref)
-                }
-                _ => unreachable!("atomic schema validation accepts only Object references here"),
-            };
-            let object_id = self
-                .resolve_atomic_reference(reference, shadow, bindings)
-                .map_err(|error| match error {
-                    RegistryError::BatchInvalid => {
-                        RegistryError::BatchInvalidField { field_id: *id }
+            match direction {
+                ActorDirection::SetProperty { id, value } => {
+                    let property = descriptor
+                        .properties
+                        .iter()
+                        .find(|property| property.id == *id)
+                        .ok_or(RegistryError::UnknownProperty { property_id: *id })?;
+                    if property.value_tag == ValueTag::Object {
+                        self.resolve_atomic_actor_reference_value(*id, value, shadow, bindings)?;
                     }
-                    RegistryError::StaleObject { object_id } => RegistryError::StaleObjectField {
-                        field_id: *id,
-                        object_id,
-                    },
-                    other => other,
-                })?;
-            *value = OwnedValue::Object(object_id.get());
+                }
+                ActorDirection::InvokeAction { id, arguments } => {
+                    let action = descriptor
+                        .actions
+                        .iter()
+                        .find(|action| action.id == *id)
+                        .ok_or(RegistryError::UnknownAction { action_id: *id })?;
+                    for (argument, expected) in arguments.iter_mut().zip(action.arguments) {
+                        if *expected == ValueTag::Object {
+                            self.resolve_atomic_actor_reference_value(
+                                *id, argument, shadow, bindings,
+                            )?;
+                        }
+                    }
+                }
+                ActorDirection::ResetProperty { .. } => {}
+            }
         }
+        Ok(())
+    }
+
+    fn resolve_atomic_actor_reference_value(
+        &self,
+        field_id: u32,
+        value: &mut OwnedValue,
+        shadow: &TreeShadow,
+        bindings: &[(u16, ObjectId, usize)],
+    ) -> Result<(), RegistryError> {
+        let reference = match value {
+            OwnedValue::Object(raw) => BatchObjectReference::Stable(
+                ObjectId::new(*raw).ok_or(RegistryError::BatchInvalidField { field_id })?,
+            ),
+            OwnedValue::BatchObject(batch_ref) => BatchObjectReference::EarlierBatch(*batch_ref),
+            other => {
+                return Err(RegistryError::TypeMismatch {
+                    field_id,
+                    expected: ValueTag::Object,
+                    actual: other.tag(),
+                });
+            }
+        };
+        let object_id = self
+            .resolve_atomic_reference(reference, shadow, bindings)
+            .map_err(|error| match error {
+                RegistryError::BatchInvalid => RegistryError::BatchInvalidField { field_id },
+                RegistryError::StaleObject { object_id } => RegistryError::StaleObjectField {
+                    field_id,
+                    object_id,
+                },
+                other => other,
+            })?;
+        *value = OwnedValue::Object(object_id.get());
         Ok(())
     }
 

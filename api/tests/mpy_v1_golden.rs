@@ -3,28 +3,32 @@
 use rlvgl_api::protocol::{
     Batch, BatchBudget, BatchSuccess, Capabilities, CodecError, Command, Completion,
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
-    FieldList, FieldRef, FrameRef, Hello, Limits, MPY_V1, MutationTargetEnvelope, ObjectReference,
-    ObjectReferenceError, OpcodeList, OperationList, OperationRef, OperationResultList,
-    OperationResultRef, PromoteRootPayload, PropertyIdList, ProtocolVersion, ReorderPayload,
-    ReparentPayload, ResetPropertiesPayload, RuntimeFlag, RuntimeNotice, SetFlagPayload,
-    SetPropertiesPayload, ValueList, ValueRef, ValueTag, create_result_object,
-    decode_batch_success, decode_batch_success_with_limits, decode_create_operation_with_limits,
-    decode_create_payload, decode_create_payload_with_limits, decode_delete_operation,
-    decode_delete_payload, decode_field_list, decode_field_list_with_limits, decode_frame,
-    decode_frame_with_limits, decode_mutation_operation_target, decode_mutation_target_envelope,
-    decode_object_reference, decode_operation_list, decode_operation_list_with_limit,
-    decode_promote_root_operation, decode_promote_root_operation_with_limits,
-    decode_promote_root_payload, decode_promote_root_payload_with_limits, decode_reorder_operation,
-    decode_reorder_payload, decode_reparent_operation, decode_reparent_payload,
-    decode_reset_properties_operation, decode_reset_properties_operation_with_limits,
-    decode_reset_properties_payload, decode_reset_properties_payload_with_limits,
-    decode_set_flag_operation, decode_set_flag_payload, decode_set_properties_operation,
+    FieldList, FieldRef, FrameRef, Hello, InvokeActionPayload, Limits, MPY_V1,
+    MutationTargetEnvelope, ObjectReference, ObjectReferenceError, OpcodeList, OperationList,
+    OperationRef, OperationResultList, OperationResultRef, PromoteRootPayload, PropertyIdList,
+    ProtocolVersion, ReorderPayload, ReparentPayload, ResetPropertiesPayload, RuntimeFlag,
+    RuntimeNotice, SetFlagPayload, SetPropertiesPayload, ValueList, ValueRef, ValueTag,
+    create_result_object, decode_batch_success, decode_batch_success_with_limits,
+    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
+    decode_delete_operation, decode_delete_payload, decode_field_list,
+    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    decode_invoke_action_operation, decode_invoke_action_operation_with_limits,
+    decode_invoke_action_payload, decode_invoke_action_payload_with_limits,
+    decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
+    decode_operation_list, decode_operation_list_with_limit, decode_promote_root_operation,
+    decode_promote_root_operation_with_limits, decode_promote_root_payload,
+    decode_promote_root_payload_with_limits, decode_reorder_operation, decode_reorder_payload,
+    decode_reparent_operation, decode_reparent_payload, decode_reset_properties_operation,
+    decode_reset_properties_operation_with_limits, decode_reset_properties_payload,
+    decode_reset_properties_payload_with_limits, decode_set_flag_operation,
+    decode_set_flag_payload, decode_set_properties_operation,
     decode_set_properties_operation_with_limits, decode_set_properties_payload,
     decode_set_properties_payload_with_limits, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
     encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
     encode_delete_payload, encode_field_list, encode_field_list_with_limit,
     encode_field_list_with_limits, encode_frame, encode_frame_with_limits,
+    encode_invoke_action_payload, encode_invoke_action_payload_with_limits,
     encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
     encode_operation_list_with_limit, encode_promote_root_payload,
     encode_promote_root_payload_with_limits, encode_reorder_payload, encode_reparent_payload,
@@ -32,10 +36,10 @@ use rlvgl_api::protocol::{
     encode_set_flag_payload, encode_set_properties_payload,
     encode_set_properties_payload_with_limits, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
-    validate_delete_result_absent, validate_promote_root_result_absent,
-    validate_reorder_result_absent, validate_reparent_result_absent,
-    validate_reset_properties_result_absent, validate_set_flag_result_absent,
-    validate_set_properties_result_absent,
+    validate_delete_result_absent, validate_invoke_action_result_absent,
+    validate_promote_root_result_absent, validate_reorder_result_absent,
+    validate_reparent_result_absent, validate_reset_properties_result_absent,
+    validate_set_flag_result_absent, validate_set_properties_result_absent,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -128,6 +132,12 @@ const SET_PROPERTIES_PRECEDENCE_FIELDS: &[FieldRef<'static>] = &[
 ];
 const RESET_PROPERTY_IDS: &[u32] = &[1, 9, 10];
 const BATCH_RESET_PROPERTY_IDS: &[u32] = &[1, 2];
+const INVOKE_ACTION_ARGUMENTS: &[ValueRef<'static>] = &[
+    ValueRef::Bool(true),
+    ValueRef::Text("go"),
+    ValueRef::Object(0x0000_0002_0000_0001),
+];
+const INVOKE_ACTION_BATCH_ARGUMENTS: &[ValueRef<'static>] = &[ValueRef::BatchObject(6)];
 const CREATE_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Object(0x0000_0002_0000_0001)];
 const MUTATION_OPCODES: &[u32] = &[
     opcode::SET_PROPERTIES,
@@ -2385,6 +2395,408 @@ fn reset_properties_is_outputless_and_errors_follow_target_then_property_order()
 }
 
 #[test]
+fn invoke_action_payloads_round_trip_targets_empty_and_object_arguments() {
+    let cases = [
+        (
+            InvokeActionPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                action_id: 9,
+                arguments: ValueList::from_slice(&[]),
+            },
+            "payload.invoke_action_object_empty",
+            15,
+        ),
+        (
+            InvokeActionPayload {
+                target: ObjectReference::BatchObject(7),
+                action_id: 9,
+                arguments: ValueList::from_slice(&[]),
+            },
+            "payload.invoke_action_batch_object_empty",
+            9,
+        ),
+        (
+            InvokeActionPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                action_id: 9,
+                arguments: ValueList::from_slice(INVOKE_ACTION_ARGUMENTS),
+            },
+            "payload.invoke_action_object_arguments",
+            33,
+        ),
+        (
+            InvokeActionPayload {
+                target: ObjectReference::BatchObject(7),
+                action_id: 9,
+                arguments: ValueList::from_slice(INVOKE_ACTION_BATCH_ARGUMENTS),
+            },
+            "payload.invoke_action_batch_argument",
+            12,
+        ),
+    ];
+
+    for (payload, fixture_name, expected_length) in cases {
+        let mut encoded = [0u8; 48];
+        let length = encode_invoke_action_payload(payload, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(
+            decode_invoke_action_payload(&encoded[..length]),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_invoke_action_payload_with_limits(&encoded[..length], limits()),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_invoke_action_operation(OperationRef {
+                opcode: opcode::INVOKE_ACTION,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_invoke_action_operation_with_limits(
+                OperationRef {
+                    opcode: opcode::INVOKE_ACTION,
+                    flags: 0,
+                    payload: &encoded[..length],
+                },
+                limits(),
+            ),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_invoke_action_payload(&encoded[..length])
+                .unwrap()
+                .arguments
+                .iter()
+                .collect::<Vec<_>>(),
+            payload.arguments.iter().collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn invoke_action_rejects_zero_id_malformed_arguments_trailing_and_bad_envelope() {
+    assert_eq!(
+        decode_invoke_action_payload(&[]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_invoke_action_payload(&[ValueTag::Bool as u8, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    assert_eq!(
+        decode_invoke_action_payload(&[0xff]),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+
+    let target = [ValueTag::BatchObject as u8, 7, 0];
+    for remainder in [
+        &[][..],
+        &[9, 0, 0][..],
+        &[0, 0, 0, 0, 0, 0][..],
+        &[9, 0, 0, 0][..],
+        &[9, 0, 0, 0, 1, 0][..],
+        &[9, 0, 0, 0, 1, 0, ValueTag::Bool as u8, 2][..],
+        &[9, 0, 0, 0, 0, 0, 0][..],
+    ] {
+        let mut malformed = target.to_vec();
+        malformed.extend_from_slice(remainder);
+        assert_eq!(
+            decode_invoke_action_payload(&malformed),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let mut unknown_argument = target.to_vec();
+    unknown_argument.extend_from_slice(&[9, 0, 0, 0, 1, 0, 0xff]);
+    assert_eq!(
+        decode_invoke_action_payload(&unknown_argument),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+
+    for payload in [
+        InvokeActionPayload {
+            target: ObjectReference::BatchObject(7),
+            action_id: 0,
+            arguments: ValueList::from_slice(&[]),
+        },
+        InvokeActionPayload {
+            target: ObjectReference::Object(1),
+            action_id: 9,
+            arguments: ValueList::from_slice(&[]),
+        },
+        InvokeActionPayload {
+            target: ObjectReference::BatchObject(7),
+            action_id: 9,
+            arguments: ValueList::from_slice(&[ValueRef::BatchObject(0)]),
+        },
+    ] {
+        assert_eq!(
+            encode_invoke_action_payload(payload, &mut [0; 32]),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_invoke_action_payload(
+            InvokeActionPayload {
+                target: ObjectReference::BatchObject(7),
+                action_id: 9,
+                arguments: ValueList::from_slice(&[]),
+            },
+            &mut [0; 8],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.invoke_action_object_empty");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::RESET_PROPERTIES, 0),
+        (opcode::INVOKE_ACTION, 1),
+    ] {
+        let operation = OperationRef {
+            opcode: operation_opcode,
+            flags,
+            payload: &valid,
+        };
+        assert_eq!(
+            decode_invoke_action_operation(operation),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+        assert_eq!(
+            decode_invoke_action_operation_with_limits(operation, limits()),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn invoke_action_applies_argument_limits_after_complete_structure() {
+    let arguments = [ValueRef::Text("abc"), ValueRef::Bytes(&[1, 2, 3])];
+    let payload = InvokeActionPayload {
+        target: ObjectReference::BatchObject(7),
+        action_id: 9,
+        arguments: ValueList::from_slice(&arguments),
+    };
+    let mut encoded = [0u8; 32];
+    let length = encode_invoke_action_payload(payload, &mut encoded).unwrap();
+
+    let mut one_item = limits();
+    one_item.max_items_per_command = 1;
+    assert_eq!(
+        encode_invoke_action_payload_with_limits(payload, one_item, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_invoke_action_payload_with_limits(&encoded[..length], one_item),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut tiny_text = limits();
+    tiny_text.max_text_bytes = 2;
+    assert_eq!(
+        encode_invoke_action_payload_with_limits(payload, tiny_text, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_invoke_action_payload_with_limits(&encoded[..length], tiny_text),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut tiny_bytes = limits();
+    tiny_bytes.max_byte_payload = 2;
+    assert_eq!(
+        encode_invoke_action_payload_with_limits(payload, tiny_bytes, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_invoke_action_payload_with_limits(&encoded[..length], tiny_bytes),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut zero_items = limits();
+    zero_items.max_items_per_command = 0;
+    assert_eq!(
+        encode_invoke_action_payload_with_limits(
+            InvokeActionPayload {
+                target: ObjectReference::BatchObject(7),
+                action_id: 0,
+                arguments: ValueList::from_slice(&arguments),
+            },
+            zero_items,
+            &mut encoded,
+        ),
+        Err(CodecError::InvalidFrame),
+        "action-ID structure precedes negotiated argument limits"
+    );
+    let malformed_argument = [
+        ValueTag::BatchObject as u8,
+        7,
+        0,
+        9,
+        0,
+        0,
+        0,
+        1,
+        0,
+        ValueTag::BatchObject as u8,
+        0,
+        0,
+    ];
+    assert_eq!(
+        decode_invoke_action_payload_with_limits(&malformed_argument, zero_items),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame)),
+        "argument structure precedes negotiated argument limits"
+    );
+}
+
+#[test]
+fn invoke_action_transactional_empty_results_are_outputless_with_ordered_errors() {
+    let outputless = BatchSuccess {
+        result_revision: 25,
+        results: OperationResultList::from_slice(&[]),
+    };
+    let mut encoded = [0u8; 128];
+    let length = encode_batch_success(outputless, 1, &mut encoded).unwrap();
+    assert_eq!(&encoded[..length], fixture("payload.invoke_action_success"));
+    let decoded = decode_batch_success(&encoded[..length], 1).unwrap();
+    assert_eq!(validate_invoke_action_result_absent(decoded, 1, 0), Ok(()));
+
+    let other_output = [OperationResultRef {
+        operation_index: 1,
+        values: ValueList::from_slice(CREATE_RESULT_VALUES),
+    }];
+    let mixed = BatchSuccess {
+        result_revision: 26,
+        results: OperationResultList::from_slice(&other_output),
+    };
+    assert_eq!(validate_invoke_action_result_absent(mixed, 2, 0), Ok(()));
+    assert_eq!(
+        validate_invoke_action_result_absent(mixed, 2, 1),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_invoke_action_result_absent(mixed, 2, 2),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let forbidden_output = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(MUTATION_RESULT_VALUES),
+    }];
+    assert_eq!(
+        validate_invoke_action_result_absent(
+            BatchSuccess {
+                result_revision: 26,
+                results: OperationResultList::from_slice(&forbidden_output),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    // Semantic precedence is target, descriptor/transaction, complete argument
+    // schema, contextual arguments, and then collective preparation.
+    for (status, field_id, diagnostic, fixture_name) in [
+        (
+            ErrorClass::StaleObject,
+            None,
+            "target",
+            "frame.invoke_action_stale_target",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            None,
+            "target-ref",
+            "frame.invoke_action_batch_target",
+        ),
+        (
+            ErrorClass::UnknownAction,
+            Some(9),
+            "action",
+            "frame.invoke_action_unknown_action",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            Some(9),
+            "transaction",
+            "frame.invoke_action_batch_forbidden",
+        ),
+        (
+            ErrorClass::Unsupported,
+            Some(9),
+            "results",
+            "frame.invoke_action_resultful_unsupported",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            Some(9),
+            "argument-count",
+            "frame.invoke_action_argument_count",
+        ),
+        (
+            ErrorClass::TypeMismatch,
+            Some(9),
+            "argument",
+            "frame.invoke_action_type_mismatch",
+        ),
+        (
+            ErrorClass::StaleObject,
+            Some(9),
+            "argument-object",
+            "frame.invoke_action_stale_argument",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            Some(9),
+            "argument-ref",
+            "frame.invoke_action_batch_argument",
+        ),
+        (
+            ErrorClass::Range,
+            Some(9),
+            "range",
+            "frame.invoke_action_range",
+        ),
+        (
+            ErrorClass::Capacity,
+            None,
+            "effects",
+            "frame.invoke_action_capacity",
+        ),
+    ] {
+        let error = FrameRef::Result(Completion {
+            request_id: 1,
+            status: CompletionStatus::Error(status),
+            operation_index: Some(0),
+            field_id,
+            diagnostic,
+            payload: &[],
+        });
+        let length = encode_frame(MPY_V1, error, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, error);
+    }
+}
+
+#[test]
 fn set_flag_payloads_freeze_ids_boolean_bytes_and_reference_forms() {
     let cases = [
         (
@@ -3475,6 +3887,89 @@ fn eight_minimal_reset_properties_operations_fit_the_floor() {
     assert_eq!(stable_length, 15);
     let stable_operation = OperationRef {
         opcode: opcode::RESET_PROPERTIES,
+        flags: 0,
+        payload: &stable_payload[..stable_length],
+    };
+    let stable_operations = [stable_operation; 8];
+    let stable_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&stable_operations),
+    });
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, limits(), &mut encoded),
+        Ok(254)
+    );
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 253;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_minimal_invoke_action_operations_fit_the_floor() {
+    let empty_arguments: [ValueRef<'static>; 0] = [];
+
+    let mut batch_payload = [0u8; 9];
+    let batch_length = encode_invoke_action_payload_with_limits(
+        InvokeActionPayload {
+            target: ObjectReference::BatchObject(7),
+            action_id: 1,
+            arguments: ValueList::from_slice(&empty_arguments),
+        },
+        limits(),
+        &mut batch_payload,
+    )
+    .unwrap();
+    assert_eq!(batch_length, 9);
+    let batch_operation = OperationRef {
+        opcode: opcode::INVOKE_ACTION,
+        flags: 0,
+        payload: &batch_payload[..batch_length],
+    };
+    let batch_operations = [batch_operation; 8];
+    let batch_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&batch_operations),
+    });
+    let mut encoded = [0u8; 256];
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch_target_frame, limits(), &mut encoded),
+        Ok(206)
+    );
+
+    let mut stable_payload = [0u8; 15];
+    let stable_length = encode_invoke_action_payload_with_limits(
+        InvokeActionPayload {
+            target: ObjectReference::Object(0x0000_0002_0000_0001),
+            action_id: 1,
+            arguments: ValueList::from_slice(&empty_arguments),
+        },
+        limits(),
+        &mut stable_payload,
+    )
+    .unwrap();
+    assert_eq!(stable_length, 15);
+    let stable_operation = OperationRef {
+        opcode: opcode::INVOKE_ACTION,
         flags: 0,
         payload: &stable_payload[..stable_length],
     };

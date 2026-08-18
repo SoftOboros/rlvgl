@@ -956,6 +956,20 @@ pub struct ResetPropertiesPayload<'a> {
 /// Structural or contextual failure while decoding a ResetProperties payload.
 pub type ResetPropertiesPayloadError = ObjectReferenceError;
 
+/// Complete Batch-only InvokeAction payload.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InvokeActionPayload<'a> {
+    /// Stable or earlier-created actor whose descriptor action is invoked.
+    pub target: ObjectReference,
+    /// Nonzero descriptor action identifier.
+    pub action_id: u32,
+    /// Ordered canonical action arguments; an empty list is permitted.
+    pub arguments: ValueList<'a>,
+}
+
+/// Structural or contextual failure while decoding an InvokeAction payload.
+pub type InvokeActionPayloadError = ObjectReferenceError;
+
 /// Stable runtime-owned object metadata flags writable through SetFlag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -2346,6 +2360,99 @@ pub fn decode_reset_properties_operation_with_limits(
     decode_reset_properties_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete InvokeAction payload without negotiated checks.
+///
+/// This allocation-free structural helper is appropriate before negotiation
+/// or inside a caller that separately enforces [`Limits`]. Protocol request
+/// acceptance should use [`encode_invoke_action_payload_with_limits`].
+pub fn encode_invoke_action_payload(
+    payload: InvokeActionPayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_invoke_action_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    writer.u32(payload.action_id)?;
+    encode_value_list_into(payload.arguments, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode one InvokeAction payload under negotiated argument limits.
+///
+/// Complete structural validation precedes item, Text, and Bytes limits. The
+/// enclosing Batch separately applies `max_frame_bytes`.
+pub fn encode_invoke_action_payload_with_limits(
+    payload: InvokeActionPayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_invoke_action_payload_structure(payload)?;
+    validate_value_count(payload.arguments, limits.max_items_per_command)?;
+    validate_value_list_payload_limits(payload.arguments, limits)?;
+    encode_invoke_action_payload(payload, output)
+}
+
+/// Decode one complete InvokeAction payload without negotiated checks.
+///
+/// The contextual target is classified first, followed by a nonzero raw
+/// little-endian action ID and one complete canonical [`ValueList`].
+pub fn decode_invoke_action_payload(
+    input: &[u8],
+) -> Result<InvokeActionPayload<'_>, InvokeActionPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let mut reader = Reader::new(&input[target_consumed..]);
+    let action_id = reader
+        .u32()
+        .map_err(|error| nested_mutation_target_error(error.into()))?;
+    require_nonzero(action_id)?;
+    let arguments =
+        decode_value_list(&reader.input[reader.position..]).map_err(ObjectReferenceError::from)?;
+    Ok(InvokeActionPayload {
+        target,
+        action_id,
+        arguments,
+    })
+}
+
+/// Decode one InvokeAction payload under negotiated argument limits.
+///
+/// Complete structural decoding precedes item, Text, and Bytes limits.
+pub fn decode_invoke_action_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<InvokeActionPayload<'_>, InvokeActionPayloadError> {
+    let payload = decode_invoke_action_payload(input)?;
+    validate_value_count(payload.arguments, limits.max_items_per_command)?;
+    validate_value_list_payload_limits(payload.arguments, limits)?;
+    Ok(payload)
+}
+
+/// Decode one zero-flag InvokeAction operation without negotiated checks.
+///
+/// There is deliberately no Command counterpart: MPY v1 InvokeAction is
+/// Batch-only. Request acceptance should use
+/// [`decode_invoke_action_operation_with_limits`].
+pub fn decode_invoke_action_operation(
+    operation: OperationRef<'_>,
+) -> Result<InvokeActionPayload<'_>, InvokeActionPayloadError> {
+    if operation.opcode != opcode::INVOKE_ACTION || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_invoke_action_payload(operation.payload)
+}
+
+/// Decode one zero-flag InvokeAction operation under negotiated limits.
+pub fn decode_invoke_action_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<InvokeActionPayload<'_>, InvokeActionPayloadError> {
+    if operation.opcode != opcode::INVOKE_ACTION || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_invoke_action_payload_with_limits(operation.payload, limits)
+}
+
 /// Encode one complete SetFlag payload.
 ///
 /// No negotiated variable-size limit applies to this fixed-size payload. The
@@ -2578,6 +2685,40 @@ pub fn validate_reset_properties_result_absent(
         return Err(CodecError::InvalidFrame);
     }
     Ok(())
+}
+
+/// Validate that one correlated outputless InvokeAction emitted no result.
+///
+/// The caller MUST already have correlated `invoke_action_operation_index` to
+/// a submitted opcode [`opcode::INVOKE_ACTION`] whose descriptor is
+/// Transactional and declares no result values. This helper validates the
+/// structural [`BatchSuccess`] shape and the absence of that one index only. It
+/// does not validate result-bearing or deferred actions, other opcode result
+/// schemas, negotiated Limits, or the complete success envelope. Other
+/// output-bearing operations may still contribute records.
+pub fn validate_invoke_action_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    invoke_action_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if invoke_action_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == invoke_action_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+fn validate_invoke_action_payload_structure(
+    payload: InvokeActionPayload<'_>,
+) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    require_nonzero(payload.action_id)?;
+    validate_value_list_structure(payload.arguments)
 }
 
 fn validate_reset_properties_payload_structure(

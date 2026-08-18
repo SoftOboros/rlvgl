@@ -421,6 +421,8 @@ impl MpyActor for List {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]
@@ -439,6 +441,58 @@ mod tests {
         list.set_items(&["C"]);
 
         assert_eq!(list.items(), &["C"]);
+        assert_eq!(list.selected(), None);
+    }
+
+    #[test]
+    fn mpy_actions_prepare_all_list_transitions_in_declared_order() {
+        let mut list = List::new(Rect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 48,
+        });
+        let prepared = list
+            .prepare(&[
+                ActorDirection::InvokeAction {
+                    id: MPY_APPEND_ACTION,
+                    arguments: vec![OwnedValue::Text(String::from("A"))],
+                },
+                ActorDirection::InvokeAction {
+                    id: MPY_APPEND_ACTION,
+                    arguments: vec![OwnedValue::Text(String::from("B"))],
+                },
+                ActorDirection::InvokeAction {
+                    id: MPY_SELECT_ACTION,
+                    arguments: vec![OwnedValue::U32(1)],
+                },
+                ActorDirection::InvokeAction {
+                    id: MPY_REMOVE_ACTION,
+                    arguments: vec![OwnedValue::U32(0)],
+                },
+                ActorDirection::InvokeAction {
+                    id: MPY_CLEAR_SELECTION_ACTION,
+                    arguments: vec![],
+                },
+            ])
+            .unwrap();
+        assert!(list.items().is_empty());
+        assert_eq!(list.selected(), None);
+        assert_eq!(prepared.text_delta, 1);
+
+        list.commit(prepared.prepared);
+        assert_eq!(list.items(), &[String::from("B")]);
+        assert_eq!(list.selected(), None);
+
+        let prepared = list
+            .prepare(&[ActorDirection::InvokeAction {
+                id: MPY_CLEAR_ACTION,
+                arguments: vec![],
+            }])
+            .unwrap();
+        assert_eq!(prepared.text_delta, -1);
+        list.commit(prepared.prepared);
+        assert!(list.items().is_empty());
         assert_eq!(list.selected(), None);
     }
 }

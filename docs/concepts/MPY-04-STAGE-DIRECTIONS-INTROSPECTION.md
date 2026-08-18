@@ -20,7 +20,9 @@ SetProperties now has an exact nonempty typed-field payload, complete negotiated
 value-limit enforcement, object-reference context, and field-attributed error
 proof. ResetProperties now has an exact nonempty property-ID payload,
 structural-before-limit validation, stable/Batch target vectors, and outputless
-result proof. Complete Endpoint dispatch remains deferred.
+result proof. InvokeAction now has an exact typed-argument request and
+outputless result proof for Transactional actions whose descriptors declare no
+results. Complete Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -117,7 +119,7 @@ to operation-specific PCDNs.
 |---|---|---|
 | `SET_PROPERTIES` | Actor whose properties are collectively set | Exact nonempty typed fields and outputless success; §5.7 |
 | `RESET_PROPERTIES` | Actor whose properties are reset | Exact nonempty ordered property IDs and outputless success; §5.8 |
-| `INVOKE_ACTION` | Actor owning the descriptor action | Action ID, arguments, and result values deferred |
+| `INVOKE_ACTION` | Actor owning the descriptor action | Exact action ID and typed arguments; outputless Transactional/empty-result slice; §5.9 |
 | `SET_FLAG` | Actor owning runtime metadata | Exact flag ID plus canonical Boolean and outputless success; §5.6 |
 | `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
 | `REPARENT` | Actor subtree being moved | Exact parent plus `u32` index and outputless success; §5.4 |
@@ -662,6 +664,98 @@ descriptor lookup, collective prepared validation, allocation-free commit,
 property and aggregate error attribution, lifecycle/cue ordering, canonical
 readback, and retained-storage release.
 
+### 5.9 InvokeAction request and outputless Transactional actions
+
+InvokeAction specializes the common target envelope with one nonzero action ID
+and one canonical MPY-02 value list:
+
+```text
+invoke_action_payload = target:ObjectReference |
+                        action_id:u32-le |
+                        arguments:ValueList
+```
+
+The operation opcode is exactly `INVOKE_ACTION` (`0x0000_0004`), flags are `0`,
+and the ValueList consumes the complete operation payload. `action_id` zero is
+`InvalidFrame`; the ordered argument list may be empty. A missing/truncated
+action ID or ValueList, malformed canonical argument, or trailing byte is also
+`InvalidFrame`. An unknown argument tag remains `Unsupported`. Known non-object
+target tags produce `TypeMismatch`, while an unknown target tag remains
+`Unsupported`. A Command carrying InvokeAction is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+Semantic validation follows this fixed order:
+
+1. Structurally classify and contextually resolve the target. An unbound or
+   forward Batch target is `BatchInvalid`; a stale stable target is
+   `StaleObject`. Target failures are operation-attributed with
+   `field_id = None`.
+2. Resolve the action descriptor, whose required capabilities were already
+   proven against its actor type during catalog validation, and validate its
+   transaction/result class. An unknown ID is `UnknownAction` at the actual
+   action ID. `BatchForbidden` is `BatchInvalid` at that ID. This slice admits
+   only `Transactional` actions whose descriptors declare an empty result
+   schema. A nonempty result schema is `Unsupported` at the action ID until its
+   result contract is frozen by a later PCDN; deferred action admission also
+   remains reserved for that later work.
+3. Validate the complete argument count and declared tags in positional order.
+   A count mismatch is `BatchInvalid`; a tag failure is `TypeMismatch`. Each is
+   attributed with the action ID because positional arguments do not invent
+   registered field IDs.
+4. Only after the complete schema pass succeeds, resolve schema-proven Object
+   arguments in positional order. Stable references are generation-checked;
+   BatchObject arguments must name earlier unique Create bindings in the same
+   Batch. Their `StaleObject` or `BatchInvalid` errors carry the action ID.
+5. Collectively prepare the action and its mutation effects before changing
+   actor state. An actor-produced `Range` failure carries the action ID.
+   Aggregate Stage `Capacity` is operation-attributed with `field_id = None`,
+   because no one positional argument owns the total.
+
+This order means a later argument's tag `TypeMismatch` takes precedence over an
+earlier argument's unbound `BatchObject`; contextual resolution has not begun.
+The action descriptor MUST first prove that an argument position expects an
+Object before the adapter interprets either `ValueTag::Object` or
+`ValueTag::BatchObject` as a reference. A BatchObject in another position is
+`TypeMismatch` during the complete schema pass, not an untyped escape from the
+descriptor.
+
+The unbounded encode/decode functions are structural and tooling helpers only.
+After negotiation, request acceptance MUST use the `with_limits` encoder or
+decoder. Complete structural validation, including target and action-ID
+validity, canonical argument structure, and trailing-byte rejection, precedes
+`max_items_per_command`, `max_text_bytes`, and `max_byte_payload`. The item
+limit applies to the argument count; Text and Bytes limits apply to each
+corresponding argument. The enclosing Batch independently enforces
+`max_frame_bytes`.
+
+Success for the admitted Transactional/empty-result slice is outputless.
+BatchSuccess carries the final/current `result_revision` but no
+`OperationResult` at the InvokeAction operation index. Other output-bearing
+operations retain their increasing records. A record correlated to an admitted
+outputless InvokeAction is `InvalidFrame` under this result schema. The narrow
+API absence validator requires the caller to have already correlated the
+operation with InvokeAction and proven its descriptor Transactional with an
+empty result schema. It does not validate result-bearing or deferred actions,
+other opcode schemas, negotiated limits, or the complete success envelope.
+
+An admitted action whose prepared effects already hold is a valid no-op. It
+remains part of the accepted mutation Batch, whose visible commit advances
+`StageRevision` exactly once for the complete Batch, including when that no-op
+InvokeAction is its only direction. Snapshots or typed reads remain the
+authoritative state readback rather than an echoed success payload.
+
+The smallest structural payload is nine bytes with a BatchObject target, one
+nonzero action ID, and no arguments, or fifteen bytes with a stable Object
+target. Semantic execution also requires a matching admitted action descriptor,
+and the BatchObject form additionally requires an earlier binding. Eight
+smallest structural BatchObject records produce a 206-byte Batch frame; eight
+stable-target records produce a 254-byte Batch frame. Both fit the conservative
+256-byte frame floor. These figures are wire-size evidence, not catalog
+execution evidence. Complete Endpoint integration remains responsible for
+contextual target and Object-argument resolution, descriptor and capability
+lookup, transaction/result-class admission, collective prepared execution,
+error attribution, lifecycle/cue ordering, and retained-storage release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -893,6 +987,14 @@ material, but they MUST preserve the same ordering and visible semantics.
   property-attributed descriptor failures from aggregate operation-attributed
   Capacity, defines outputless no-op revision semantics, and leaves Endpoint
   execution evidence-gated.
+- **PCDN-MPY-04-012 — Closed by owner acceptance 2026-08-18:** §5.9 freezes
+  InvokeAction as a contextual target, nonzero raw action ID, and canonical
+  possibly-empty ValueList. It requires complete structure before negotiated
+  argument limits, admits stable/earlier-Batch targets and schema-proven Object
+  arguments, fixes target/descriptor/schema/reference/preparation precedence,
+  and closes outputless success only for Transactional descriptors declaring
+  no results. BatchForbidden actions are BatchInvalid; result-bearing and
+  deferred actions remain later evidence-gated work.
 
 ## 12. Acceptance Checklist
 
@@ -902,7 +1004,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-011 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-012 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -922,12 +1024,13 @@ material, but they MUST preserve the same ordering and visible semantics.
 ## 14. Unblocks
 
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
-PromoteRoot, SetFlag, SetProperties, and ResetProperties schemas now unblock the
-remaining operation-specific payload/result PCDNs and Endpoint orchestration
-without authorizing guessed remainder schemas. After those codecs and endpoint
-integration are implemented, MPY-04 provides the complete stage mutation/
-introspection surface consumed by MPY-06 and the deterministic snapshot oracle
-consumed by MPY-07/09.
+PromoteRoot, SetFlag, SetProperties, ResetProperties, and the outputless
+Transactional InvokeAction slice now unblock the remaining operation-specific
+payload/result PCDNs and Endpoint orchestration without authorizing guessed
+remainder or deferred/result-bearing action schemas. After those codecs and
+endpoint integration are implemented, MPY-04 provides the complete stage
+mutation/introspection surface consumed by MPY-06 and the deterministic
+snapshot oracle consumed by MPY-07/09.
 
 ## 15. Change Log
 
@@ -1214,7 +1317,7 @@ keep minimum-profile behavior explicit.
 
 **Touches:** PCDN-MPY-04-011, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
 
-**Commits:** pending
+**Commits:** `2205c2f`
 
 **Summary:** Freezes ResetProperties as a contextual target followed by one
 nonempty strictly increasing raw property-ID list. Adds allocation-free
@@ -1232,3 +1335,30 @@ keeps reset distinct from writing inferred zeros or permitting values outside a
 descriptor's set schema. Complete validation before commit preserves collective
 atomicity; outputless success uses the common Batch revision, while the item
 and outer frame limits keep minimum-profile behavior explicit.
+
+### 0.11.0 — 2026-08-18 — InvokeAction request and outputless action slice ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-012, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes InvokeAction as a contextual target, nonzero raw action ID,
+and canonical possibly-empty argument ValueList. Adds allocation-free
+structural and negotiated-limit codecs, stable and BatchObject target and
+Object-argument vectors, structural-before-limit coverage, a narrow outputless
+result validator, ordered action/error fixtures, and exact 206-byte and
+254-byte minimum-frame evidence.
+
+#### Rationale
+
+Reusing the canonical ValueList preserves typed zero-copy arguments and one
+negotiated payload policy. Completing descriptor, transaction, and
+argument-schema validation before contextual Object resolution gives action
+failures a deterministic order without treating BatchObject as an untyped
+escape. This slice admits only Transactional descriptors with empty results, so
+outputless success can use the common Batch revision while BatchForbidden,
+result-bearing, and deferred contracts remain explicit later gates.
