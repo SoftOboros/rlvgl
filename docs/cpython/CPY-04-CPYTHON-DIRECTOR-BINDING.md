@@ -6,9 +6,10 @@ CPY-04-CPYTHON-DIRECTOR-BINDING.md - PyO3 module, object, conversion, callback, 
 
 **Document ID:** CPY-04-CPYTHON-DIRECTOR-BINDING
 
-**Status:** Draft 2026-08-18. Not ratified.
+**Status:** Draft 2026-08-18. Six policy PCDNs resolved 2026-08-18;
+implementation and dependency evidence remain open. Not ratified.
 
-**Revision:** 0.1.0
+**Revision:** 0.2.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -77,22 +78,34 @@ Python-controlled turns.
 | Generated Python stubs/conveniences | Generator inputs pinned to descriptor/evidence manifest |
 | Interpreter/thread/module behavior | Official CPython C API and selected PyO3 release |
 
-## 5. Frozen Decisions — Mandatory Object Model
+## 5. Frozen Decisions — Module and Mandatory Object Model
 
-The public package MUST provide these conceptual objects, with final spelling
-resolved in §11:
+The distribution name and public import package are `rlvgl`. The compiled
+extension is the private package member `rlvgl._native`, implemented by the
+Rust crate `rlvgl-cpython`. Public Python code MUST import names from `rlvgl`,
+not `_native`; this permits generated Python conveniences and typing metadata
+without making the extension basename a second API.
+
+The public package MUST provide `Runtime`, `Stage`, `Actor`, `Transaction`,
+`TransactionActor`, `Subscription`, `Request`, and `PollBatch`. The first
+generated convenience set additionally provides `Container`, `Label`,
+`Button`, `Slider`, and `List` for the exact MPY-01 Wave 1 actor rows. Those
+classes are typed `Actor` projections; they do not wrap Rust widget objects or
+replace the Generic Layer.
 
 ```python
-runtime = rlvgl.Runtime(...)
-stage = runtime.create_stage(...)
-actor = stage.create(type_id_or_name, properties={...})
+runtime = rlvgl.Runtime(default_timeout=1.0, ...)
+stage = runtime.create_stage(...).result()
+actor = stage.create(type_id_or_name, properties={...}).result()
 
 with stage.transaction() as tx:
     child = tx.create("label", parent=actor, properties={"text": "Ready"})
     tx.set(actor, "enabled", True)
+    committed = tx.commit()
+committed.result()
 
-subscription = actor.on("clicked", callback)
-records = runtime.poll(limit=...)
+subscription = actor.on("clicked", callback).result()
+batch = runtime.poll(limit=...)
 runtime.close()
 ```
 
@@ -106,10 +119,92 @@ it and MUST NOT add behavior unavailable through descriptors.
 
 ## 6. Frozen Decisions — Value and Exception Mapping
 
-Neutral values MUST map deterministically to Python scalars, immutable records,
-enums, tuples/lists, and bytes-like objects under a documented table. Mutable
-Python containers are copied/validated before request acceptance; the service
-never borrows their storage after the call returns.
+### 6.1 Exact value conversion
+
+Neutral values use this first-release mapping:
+
+| Neutral value | Python projection | Admission and lifetime rule |
+|---|---|---|
+| `None` | `None` | No alternate sentinel. |
+| `Bool` | `bool` | Input MUST be an actual `bool`; integer `0`/`1` is not silently retagged. |
+| `I32`, `U32`, `I64`, `U64` | `int` | Reject `bool`; range-check against the exact neutral width before admission. |
+| `Precise(i32)` | immutable `Precise(raw: int)` | Preserve the owning descriptor's fixed-precision meaning and exact signed `i32`; never round-trip through `float`. |
+| `Color(u32)` | immutable `Color(argb: int)` | Preserve exact `0xAARRGGBB`; component constructors are conveniences that validate `0..=255`. |
+| `Point` | immutable `Point(x: int, y: int)` | Each field is an exact signed `i32`. |
+| `Size` | immutable `Size(width: int, height: int)` | Each field is an exact signed `i32`; descriptor rules decide whether negatives are valid. |
+| `Rect` | immutable `Rect(x: int, y: int, width: int, height: int)` | Each field is an exact signed `i32`; semantic validation remains with the owning operation. |
+| `Enum(domain, value)` | generic `EnumValue(domain: int, value: int)` or the descriptor-generated `IntEnum` for that domain | The Generic Layer always preserves both `u32` fields. A generated enum supplies the domain implicitly and MUST lower to the same pair. |
+| `Text` | `str` | Encode with strict UTF-8 and enforce negotiated byte limits before admission. |
+| `Bytes` | `bytes` | Any admitted contiguous bytes-like input is copied into owned ingress storage; egress is immutable `bytes`. |
+| `Object` | `Actor` or generated actor projection | Require the same live `Runtime` and Service Epoch; lower only the stable object id. |
+| `Resource(kind, id)` | immutable `ResourceRef(kind: int, id: int)` | Validate the resource kind and owning runtime/epoch before admission. |
+| `BatchObject` | `TransactionActor` | Valid only inside its creating `Transaction`; it MUST NOT escape as an accepted post-commit value. Successful create results resolve it to an `Actor`. |
+
+Neutral value lists become immutable Python tuples on output. Input sequences,
+mappings, and mutable buffers are fully traversed, copied, and validated before
+the enclosing request is offered to ingress. No conversion path may retain a
+borrow into Python-owned mutable storage.
+
+### 6.2 Exact exception hierarchy
+
+Every exception below carries read-only `code`, `request_id`,
+`operation_index`, and `context` attributes when those fields exist. `code` is
+the generated stable neutral error discriminant; rendered message text is not
+an identity or parsing surface.
+
+```text
+RlvglError
+├── ProtocolError
+│   ├── InvalidFrameError
+│   └── VersionMismatchError
+├── RlvglLookupError
+│   ├── StageNotFoundError
+│   ├── StaleObjectError
+│   ├── UnknownTypeError
+│   ├── UnknownPropertyError
+│   ├── UnknownActionError
+│   └── UnknownEventError
+├── ValidationError
+│   ├── TypeMismatchError
+│   ├── RangeError
+│   ├── ReadOnlyError
+│   ├── InvalidParentError
+│   └── BatchInvalidError
+├── UnsupportedError
+│   └── UnsupportedInterpreterError
+├── BackpressureError
+│   ├── CapacityError
+│   ├── QueueFullError
+│   └── DispatchBusyError
+├── ServiceError
+│   ├── ServiceClosingError
+│   ├── ServiceFaultedError
+│   └── WaitTimeoutError
+└── InternalError
+```
+
+The neutral mapping is exact:
+
+| Neutral `ErrorClass` | Python exception |
+|---|---|
+| `InvalidFrame` | `InvalidFrameError` |
+| `VersionMismatch` | `VersionMismatchError` |
+| `StageNotFound` | `StageNotFoundError` |
+| `StaleObject` | `StaleObjectError` |
+| `UnknownType` | `UnknownTypeError` |
+| `UnknownProperty` | `UnknownPropertyError` |
+| `UnknownAction` | `UnknownActionError` |
+| `UnknownEvent` | `UnknownEventError` |
+| `TypeMismatch` | `TypeMismatchError` |
+| `Range` | `RangeError` |
+| `ReadOnly` | `ReadOnlyError` |
+| `InvalidParent` | `InvalidParentError` |
+| `Unsupported` | `UnsupportedError` |
+| `Capacity` | `CapacityError` |
+| `QueueFull` | `QueueFullError` |
+| `DispatchBusy` | `DispatchBusyError` |
+| `BatchInvalid` | `BatchInvalidError` |
+| `Internal` | `InternalError` |
 
 Neutral error categories MUST map one-to-one to a stable exception hierarchy
 rooted at one package exception. Exceptions MUST retain machine-readable code,
@@ -123,6 +218,22 @@ into Rust or stop native presentation.
 
 ## 7. Frozen Decisions — Transactions and Results
 
+The minimum execution API has one mode per explicit spelling:
+
+| Surface | Mode | Contract |
+|---|---|---|
+| Descriptor lookup, wrapper inspection, and transaction building | Immediate/local | Performs no native wait and either returns or raises before ingress admission. |
+| `Stage.create`, `Actor.set`, `Actor.action`, `Actor.query`, `Actor.on`, `Transaction.commit`, and equivalent Generic Layer operations | Nonblocking submission | Returns `Request[T]` only after conversion and bounded ingress admission; it does not wait for a Safe Turn. |
+| `Runtime.poll(limit=N)` | Nonblocking bounded drain | Requires a positive finite `N`, enters one Binding Turn, and returns a `PollBatch` with records, callback failures, truncation/readiness, and loss metadata. |
+| `Request.result(timeout=...)` | Bounded synchronous wait | Uses an explicit finite timeout or the Runtime's positive finite `default_timeout`, detaches Python while blocked, and drains through the same Binding Turn path. There is no implicit infinite wait. |
+| `await request` | Awaitable | CPY-07 attaches the same readiness signal and egress drain to the current asyncio loop; no second result or callback queue is permitted. |
+| `Runtime.close(timeout=...)` | Idempotent bounded synchronous convenience | Submits/reuses the close request, detaches while waiting, and places the still-live `Request` in `WaitTimeoutError.request` if the local wait times out. |
+
+Callbacks may submit new nonblocking requests. A callback MUST NOT recursively
+enter `poll`, `Request.result`, `Runtime.close`, or another Binding Turn on the
+same Runtime; such an attempt raises `DispatchBusyError` without consuming or
+reordering native records.
+
 Transaction builders are adapter-local until commit. A failed Python-side
 conversion MUST leave the builder inspectable or deterministically aborted and
 MUST submit no partial batch.
@@ -132,10 +243,20 @@ MUST detach the Python thread state while blocked. Timeouts MUST NOT imply that
 an accepted native request was canceled unless the neutral protocol confirms
 cancellation; the caller can later recover its result by request identity.
 
+Exiting a transaction context without an explicit successful `commit()` aborts
+the adapter-local builder and submits nothing. Context-manager exit MUST NOT
+hide a native wait or silently auto-commit.
+
 ## 8. Frozen Decisions — Callbacks and Polling
 
 The Callback Registry is owned by the Python Runtime/module state and accessed
 only during a Binding Turn. Native cues contain callback tokens, not callables.
+The first release retains every callable strongly from successful local
+registration until the subscription close fence and all earlier referencing
+cues have drained. If native subscription admission fails, the provisional
+token is released. Weak callback retention is not part of the minimum API; a
+later explicit weak-subscription convenience must report collection as an
+ordered subscription closure rather than silently dropping cues.
 
 `poll()` MUST:
 
@@ -150,6 +271,16 @@ only during a Binding Turn. Native cues contain callback tokens, not callables.
 
 Asyncio MUST invoke the same drain path; it cannot maintain a parallel callback
 queue or different error policy.
+
+Every callback exception is appended as an immutable `CallbackFailure` entry
+to the current `PollBatch`, including Service Epoch, subscription identity, cue
+sequence, and the Python exception. The Runtime then invokes its configured
+`callback_exception_hook(failure)`. With no custom hook, the binding delegates
+the original exception to CPython's `sys.unraisablehook` through the supported
+PyO3/CPython unraisable-error path, naming the `Subscription` as the offending
+object. If a custom hook raises, that secondary failure is itself reported as
+unraisable; both failures remain contained. Neither path changes native commit,
+cue order, later callback eligibility, or presentation.
 
 ## 9. Phase Invariants
 
@@ -175,7 +306,7 @@ queue or different error policy.
 | Python buffer protocol | Frame-specific implementation owned by CPY-05, surfaced as `Frame`. |
 | Python dataclasses/enums | May be generated or native extension types, but wire identity and descriptor fingerprints remain neutral. |
 
-## 11. Non-Goals and Open Decisions
+## 11. Non-Goals and Resolved Decisions
 
 ### 11.1 Non-goals
 
@@ -186,23 +317,39 @@ queue or different error policy.
 - A handwritten duplicate of the descriptor catalog.
 - Subinterpreter/free-threaded claims without their dedicated evidence rows.
 
-### 11.2 Open Decisions
+### 11.2 Resolved Decisions
 
-| PCDN | Question | Recommended disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-04-001` | What are the distribution package, extension module, and Rust crate names? | Python import `rlvgl`; Rust crate `rlvgl-cpython`; permit an internal extension basename if wheel layout requires it. | CPY-04 ratification/CPY-08 |
-| `PCDN-CPY-04-002` | Which calls are synchronous, polling, or awaitable in the minimum API? | Nonblocking submission plus explicit poll; provide bounded synchronous conveniences that detach while waiting. | CPY-04 ratification |
-| `PCDN-CPY-04-003` | How does the Callback Registry retain callables? | Strong retention for live subscriptions, released by ordered teardown; weak mode only as explicit convenience. | CPY-04 ratification |
-| `PCDN-CPY-04-004` | Which generated named widget conveniences ship initially? | Generate only admitted descriptor rows; generic API is always complete and mandatory. | CPY-04 ratification and typing/docs |
-| `PCDN-CPY-04-005` | Are subinterpreters supported in the first release? | Reject or isolate explicitly; do not use process-global Python state. | CPY-03/04 ratification |
-| `PCDN-CPY-04-006` | What is the exact exception hierarchy and callback-exception hook? | One stable root plus neutral-category subclasses; default hook records and delegates to Python's unraisable/error reporting without stopping native work. | CPY-04 ratification |
+- **PCDN-CPY-04-001 — Package and crate names — Accepted as amended
+  2026-08-18.** The distribution/import package is `rlvgl`, its private native
+  extension is `rlvgl._native`, and the implementation crate is
+  `rlvgl-cpython`. Only the package root is a public import surface.
+- **PCDN-CPY-04-002 — Minimum execution API — Accepted as amended
+  2026-08-18.** Native operations submit nonblocking and return `Request`;
+  `poll` is a bounded nonblocking drain; `Request.result` and `Runtime.close`
+  are finite synchronous waits; and `await Request` consumes the same CPY-03
+  readiness/egress path.
+- **PCDN-CPY-04-003 — Callback retention — Accepted as amended
+  2026-08-18.** Retain callbacks strongly through the ordered subscription
+  close fence and drain of earlier cues. Weak retention is excluded from the
+  first minimum API.
+- **PCDN-CPY-04-004 — Initial generated conveniences — Accepted as amended
+  2026-08-18.** Generate only `Container`, `Label`, `Button`, `Slider`, and
+  `List` from the exact MPY-01 Wave 1 descriptors. The Generic Layer remains
+  mandatory and complete for every admitted actor.
+- **PCDN-CPY-04-005 — Subinterpreters — Accepted as amended 2026-08-18.** The
+  first release rejects subinterpreter initialization/use with
+  `UnsupportedInterpreterError`, composing CPY-03's native-service decision.
+- **PCDN-CPY-04-006 — Exceptions and callback failure — Accepted as amended
+  2026-08-18.** Use the exact §6 hierarchy/mapping, return binding-local
+  `CallbackFailure` records, and route the default report through
+  `sys.unraisablehook` without unwinding into Rust or altering native work.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §11.2 is resolved.
+- [x] Every PCDN in §11.2 is resolved.
 - [ ] Generic objects and every method lower to ratified neutral operations.
-- [ ] Exact value and error conversion tables are complete.
-- [ ] Callback retention, ordering, release, and exception handling are closed.
+- [x] Exact value and error conversion tables are complete.
+- [x] Callback retention, ordering, release, and exception policy is closed.
 - [ ] Blocking calls detach Python while the native service remains independent.
 - [ ] Descriptor-generated classes/stubs cannot drift from the Generic Layer.
 - [ ] Module/subinterpreter/finalization state is explicit.
@@ -221,10 +368,50 @@ queue or different error policy.
 
 ## 14. Unblocks
 
-Ratification plus CPY-03's native-only proof unblocks the leaf PyO3 adapter.
-Frame export remains separately gated by CPY-05.
+All six policy PCDNs are resolved, but CPY-04 remains Draft. Ratification is
+blocked by CPY-03, the consumed MPY phases, generated/generic trace parity,
+thread/finalization tests, and owner acceptance of the completed phase.
+Ratification plus CPY-03's native-only proof would unblock the leaf PyO3
+adapter. Frame export remains separately gated by CPY-05.
 
 ## 15. Change Log
+
+### 0.2.0 — 2026-08-18 — director-binding PCDNs accepted as amended
+
+**Author:** Ira Abbott
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-04-1, INV-CPY-04-2, INV-CPY-04-3, INV-CPY-04-4,
+INV-CPY-04-5, INV-CPY-04-6, INV-CPY-04-7, INV-CPY-04-8,
+PCDN-CPY-04-001, PCDN-CPY-04-002, PCDN-CPY-04-003, PCDN-CPY-04-004,
+PCDN-CPY-04-005, PCDN-CPY-04-006, §5, §6, §7, §8, §11, §12, §14
+
+**Commits:** pending
+
+**Summary:** Fixes the package/module/crate names, exact neutral-to-Python
+value and exception mappings, nonblocking Request API, bounded sync/async
+drains, callback lifetime and failure handling, initial generated actor set,
+and first-release subinterpreter rejection.
+
+#### Rationale
+
+One awaitable Request primitive keeps synchronous and asyncio use on the same
+bounded service/egress contract, while explicit finite waits make hidden native
+blocking visible. Exact tagged value classes prevent Python's broad `int` and
+mutable-buffer behavior from erasing neutral identity or lifetime guarantees.
+Strong callback retention provides deterministic cue delivery and teardown.
+
+Considered and rejected: synchronous-by-default actor operations, implicit
+transaction auto-commit, borrowed mutable buffer ingress, floats for fixed
+precision, direct imports from the extension module, native-thread callbacks,
+weak-by-default callbacks, handwritten conveniences beyond the admitted Wave 1
+descriptors, and first-release subinterpreter claims.
+
+What deliberately did not change: no Python package, PyO3 module, generated
+class, exception type, queue, or callback registry is implemented. Neutral
+MPY/LPAR behavior remains separately owned, CPY-04 remains Draft, and CPY-05
+still gates the framebuffer object.
 
 ### 0.1.0 — 2026-08-18 — drafted
 
