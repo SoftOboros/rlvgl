@@ -61,6 +61,38 @@ impl ServiceTicket {
     }
 }
 
+/// Rejection of a handle, ticket, or record from another service epoch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ServiceEpochMismatch {
+    current: ServiceEpoch,
+    received: ServiceEpoch,
+}
+
+impl ServiceEpochMismatch {
+    /// Return the epoch owned by the validating service.
+    pub fn current(self) -> ServiceEpoch {
+        self.current
+    }
+
+    /// Return the mismatched epoch carried by the retained value.
+    pub fn received(self) -> ServiceEpoch {
+        self.received
+    }
+}
+
+impl fmt::Display for ServiceEpochMismatch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "service epoch mismatch: current {}, received {}",
+            self.current.get(),
+            self.received.get()
+        )
+    }
+}
+
+impl std::error::Error for ServiceEpochMismatch {}
+
 /// Explicit bounded capacities for one native service instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ServiceConfig {
@@ -230,6 +262,17 @@ pub enum ServiceRecord<Output, Fault> {
 }
 
 impl<Output, Fault> ServiceRecord<Output, Fault> {
+    /// Return the service epoch that emitted this record.
+    pub fn epoch(&self) -> ServiceEpoch {
+        match self {
+            Self::Lifecycle { epoch, .. } | Self::ServiceFault { epoch, .. } => *epoch,
+            Self::Completed { ticket, .. }
+            | Self::DriverFault { ticket, .. }
+            | Self::RuntimeFault { ticket, .. }
+            | Self::Rejected { ticket, .. } => ticket.epoch(),
+        }
+    }
+
     /// Return the request ticket when this is a terminal request record.
     pub fn ticket(&self) -> Option<ServiceTicket> {
         match self {
@@ -449,6 +492,34 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
     /// Return this service instance's monotonic epoch.
     pub fn epoch(&self) -> ServiceEpoch {
         self.epoch
+    }
+
+    /// Reject a retained handle epoch that does not belong to this service.
+    ///
+    /// Adapter layers call this before binding a Stage, Actor, subscription,
+    /// request, or other epoch-bearing handle to a restarted service.
+    pub fn validate_epoch(&self, epoch: ServiceEpoch) -> Result<(), ServiceEpochMismatch> {
+        if epoch == self.epoch {
+            Ok(())
+        } else {
+            Err(ServiceEpochMismatch {
+                current: self.epoch,
+                received: epoch,
+            })
+        }
+    }
+
+    /// Reject a request ticket retained from another service epoch.
+    pub fn validate_ticket(&self, ticket: ServiceTicket) -> Result<(), ServiceEpochMismatch> {
+        self.validate_epoch(ticket.epoch())
+    }
+
+    /// Reject an egress record retained from another service epoch.
+    pub fn validate_record(
+        &self,
+        record: &ServiceRecord<Output, Fault>,
+    ) -> Result<(), ServiceEpochMismatch> {
+        self.validate_epoch(record.epoch())
     }
 
     /// Return the explicit capacities used by this service.

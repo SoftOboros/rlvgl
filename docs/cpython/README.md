@@ -6,8 +6,8 @@ README.md - Informative index for the CPython embedded-Linux and host initiative
 
 **Status:** CPY-00 through CPY-02 ratified 2026-08-18. All CPY-03 policy PCDNs
 are resolved; its bounded native service, Unix readiness, and retained v1/v2
-host capacity matrices are complete. CPY-03 through CPY-09 remain Draft and
-separately evidence-gated.
+host capacity matrices are complete, with typed restart/stale-epoch validation.
+CPY-03 through CPY-09 remain Draft and separately evidence-gated.
 
 CPY specifies a full CPython binding over rlvgl's Stage-and-Actors runtime,
 with embedded Linux as the primary deployment and full-host headless/windowed
@@ -43,7 +43,7 @@ through ratified phase documents and their acceptance gates.
 | [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
 | [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Ratified 2026-08-18; exact baseline retained; runtime qualification remains later-phase evidence |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; graph/firewall/handoff complete; first `runtime-std` slice authorized |
-| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; all five policy PCDNs resolved; representative native-workload/BBB qualification open |
+| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; all five policy PCDNs and restart/stale-epoch proof complete; native-workload/close/BBB evidence open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; six binding-policy PCDNs resolved; dependency/implementation evidence open |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |

@@ -17,8 +17,8 @@ mod service;
 pub use readiness::{ReadinessKind, ReadinessSignal};
 pub use service::{
     AdmissionError, NativeService, RequestId, RuntimeFault, ServiceConfig, ServiceConfigError,
-    ServiceEpoch, ServiceJoinError, ServiceLifecycle, ServiceMetricsSnapshot, ServiceRecord,
-    ServiceRejection, ServiceStartError, ServiceTicket, spawn_native_service,
+    ServiceEpoch, ServiceEpochMismatch, ServiceJoinError, ServiceLifecycle, ServiceMetricsSnapshot,
+    ServiceRecord, ServiceRejection, ServiceStartError, ServiceTicket, spawn_native_service,
 };
 
 /// A joinable one-shot task whose state remains entirely on its owner thread.

@@ -28,6 +28,13 @@ not yet define semantic record loss classes, frame slots, platform cadence,
 render/present work, or Python finalization behavior. Those surfaces remain
 gated by CPY-03/05/06 measurements and integration.
 
+Every restarted service receives a strictly newer process-local epoch.
+Adapter-owned handles, request tickets, and retained records must be checked
+with `validate_epoch`, `validate_ticket`, or `validate_record` before reuse;
+the service returns a typed `ServiceEpochMismatch` instead of binding a stale
+identity to the new owner. Request IDs may repeat only under a different
+service epoch.
+
 ```rust
 use rlvgl_runtime_std::spawn_owned_thread_task;
 
@@ -58,6 +65,8 @@ let service = spawn_native_service(
         requests.into_iter().map(|value| Ok::<_, ()>(value + state.len())).collect()
     },
 )?;
+let epoch = service.epoch();
+service.validate_epoch(epoch)?;
 let _ticket = service.try_submit(1).expect("explicit capacity admits request");
 let records = service.shutdown()?;
 assert!(!records.is_empty());

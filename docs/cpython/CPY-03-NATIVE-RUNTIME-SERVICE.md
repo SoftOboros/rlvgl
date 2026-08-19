@@ -8,10 +8,12 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 
 **Status:** Draft 2026-08-19. All five policy PCDNs are resolved; native
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
-diagnostic capacity matrices are complete. Representative native-workload and
-physical-board qualification evidence remains open. Not ratified.
+diagnostic capacity matrices are complete. Typed restart/stale-epoch
+validation and stress evidence are complete. Representative native-workload,
+close stress, and physical-board qualification evidence remains open. Not
+ratified.
 
-**Revision:** 0.6.0
+**Revision:** 0.7.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -133,6 +135,14 @@ begun with exactly one `ServiceClosing` terminal result, drains the resulting
 records ahead of the terminal `Closed` record, and then destroys native state.
 No request is silently abandoned, and a repeated close observes/reuses the
 same terminal outcome.
+
+Every service construction receives a strictly newer nonzero process-local
+Service Epoch. Request IDs may repeat only inside a different Service Epoch.
+Before a retained handle, request ticket, or egress record is interpreted
+against a running service, the adapter MUST validate its Service Epoch. A
+mismatch MUST return the typed current/received epoch error before any stable
+identity lookup or callback dispatch. This CPY service fence composes but does
+not redefine the MPY-owned Endpoint Epoch.
 
 ## 7. Frozen Decisions — Turn and Record Ordering
 
@@ -331,7 +341,9 @@ same clean source has not run on the BBB.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
       capacity probe before PyO3 lands.
-- [ ] Native close and restart/epoch rules are exact under stress tests.
+- [ ] Native close rules are exact under stress tests.
+- [x] Restart/epoch validation rejects every retained prior epoch, ticket, and
+      record under repeated service construction.
 - [x] The dependency firewall and runtime crate graph contain no Python or
       PyO3 dependency.
 - [ ] The owner records ratification in §15.
@@ -347,7 +359,7 @@ same clean source has not run on the BBB.
 | `runtime-std/examples/cpy_capacity_probe.rs` | Native transport/capacity measurement executable |
 | `runtime-std/src/service.rs` | Bounded owner-thread lifecycle, admission, records, close/fault, and metrics |
 | `runtime-std/src/readiness.rs` | Linux `eventfd`, Unix self-pipe, and race-safe coalescing |
-| `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, and fault evidence |
+| `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, fault, and restart/stale-epoch evidence |
 | `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
 | `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
 | `docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json` | Production-service v2 host matrix |
@@ -358,7 +370,7 @@ same clean source has not run on the BBB.
 All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
 Draft. Ratification is blocked by representative Python-independent semantic
 workload and physical-board capacity qualification, semantic record classes,
-representative native cadence, and restart/stale-handle evidence. CPY-04 owns
+representative native cadence, and close stress evidence. CPY-04 owns
 binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
 lifetime and slot counts, and CPY-06 owns physical device presentation; none is
 a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
@@ -366,6 +378,41 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.7.0 — 2026-08-19 — reject stale service epochs
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-7, INV-CPY-03-8, §6, §12, §13, §14
+
+**Commits:** pending
+
+**Summary:** Adds typed validation for retained service epochs, request
+tickets, and records, plus a 64-restart stress proof that old values cannot
+bind to a new native owner.
+
+#### Rationale
+
+Request IDs are intentionally scoped to one Service Epoch and may repeat after
+restart. A binding therefore needs one CPY-owned check that rejects retained
+values before interpreting their stable identities against the new owner. The
+service now exposes the check directly instead of asking each interpreter
+adapter to reproduce epoch comparison and error attribution.
+
+The semantic negative control replaced epoch comparison with unconditional
+acceptance. The focused restart test then failed on the first prior epoch;
+restoring the guard made all 64 restart cycles pass.
+
+Considered and rejected: globally unique request IDs without epochs, silently
+discarding stale records, leaving comparison to PyO3, or treating an MPY
+Endpoint Epoch as the CPY service lifecycle owner.
+
+What deliberately did not change: no MPY identity semantics, queue capacity,
+close disposition, Python exception mapping, Frame Lease, device backend, or
+release budget changed. Close stress and representative host/BBB qualification
+remain open.
 
 ### 0.6.0 — 2026-08-19 — explicit qualification envelope
 

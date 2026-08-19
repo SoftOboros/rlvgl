@@ -149,6 +149,72 @@ fn endpoint_turns_and_drop_remain_on_one_owner_thread() {
 }
 
 #[test]
+fn restart_stress_rejects_every_prior_epoch_ticket_and_record() {
+    let mut prior_epochs = Vec::new();
+    let mut prior_tickets = Vec::new();
+    let mut prior_records = Vec::new();
+
+    for cycle in 0_u64..64 {
+        let service = spawn_native_service(
+            "cpy-restart-epoch",
+            ServiceConfig::new(2, 8, 1).expect("valid explicit capacities"),
+            || (),
+            |_, requests: Vec<u64>| requests.into_iter().map(Ok::<_, &'static str>).collect(),
+        )
+        .expect("spawn restarted native service");
+        let epoch = service.epoch();
+
+        if let Some(stale_epoch) = prior_epochs.last().copied() {
+            assert!(epoch > stale_epoch, "service epochs must increase");
+        }
+        for &stale_epoch in &prior_epochs {
+            let mismatch = service
+                .validate_epoch(stale_epoch)
+                .expect_err("prior service epoch must be stale");
+            assert_eq!(mismatch.current(), epoch);
+            assert_eq!(mismatch.received(), stale_epoch);
+        }
+        for &stale_ticket in &prior_tickets {
+            let mismatch = service
+                .validate_ticket(stale_ticket)
+                .expect_err("prior request ticket must be stale");
+            assert_eq!(mismatch.current(), epoch);
+            assert_eq!(mismatch.received(), stale_ticket.epoch());
+        }
+        for record in &prior_records {
+            let mismatch = service
+                .validate_record(record)
+                .expect_err("prior service record must be stale");
+            assert_eq!(mismatch.current(), epoch);
+            assert_eq!(mismatch.received(), record.epoch());
+        }
+
+        service
+            .validate_epoch(epoch)
+            .expect("current service epoch remains valid");
+        let ticket = service
+            .try_submit(cycle)
+            .expect("admit one request in restarted service");
+        service
+            .validate_ticket(ticket)
+            .expect("current request ticket remains valid");
+        wait_until(|| service.metrics().completed_requests == 1);
+        let mut records = service.drain().expect("drain restarted service");
+        for record in &records {
+            service
+                .validate_record(record)
+                .expect("current egress record remains valid");
+        }
+        records.extend(service.shutdown().expect("ordered restarted shutdown"));
+        assert!(records.iter().all(|record| record.epoch() == epoch));
+
+        prior_epochs.push(epoch);
+        prior_tickets.push(ticket);
+        prior_records.extend(records);
+    }
+}
+
+#[test]
 fn full_and_close_outcomes_preserve_exact_terminal_accounting() {
     let (started_sender, started_receiver) = bounded(1);
     let (release_sender, release_receiver) = bounded(1);
