@@ -1,7 +1,7 @@
-//! Native CPY-03 bounded-channel capacity probe with JSON output.
+//! Native CPY-03 service capacity probe with JSON output.
 //!
-//! This executable is evidence tooling, not a service API. Candidate queue and
-//! turn values arrive through the command line and never become defaults.
+//! This executable is evidence tooling, not a source of runtime defaults.
+//! Every queue and turn value arrives through the command line.
 
 use std::{
     env,
@@ -9,20 +9,23 @@ use std::{
     mem::size_of,
     process::ExitCode,
     sync::{
-        Arc, Barrier,
+        Arc,
         atomic::{AtomicU64, AtomicUsize, Ordering},
+        mpsc::{Receiver, SyncSender, sync_channel},
     },
     thread,
     time::{Duration, Instant},
 };
 
-use crossbeam_channel::{Receiver, Sender, TryRecvError, TrySendError, bounded};
 use rlvgl_core::{
     cue::{CUE_FRAME_OVERHEAD_BYTES, CueLimits},
     endpoint::{Endpoint, EndpointLimits},
     subscription::{EndpointEpoch, SubscriptionLimits},
 };
-use rlvgl_runtime_std::spawn_owned_thread_task;
+use rlvgl_runtime_std::{
+    AdmissionError, NativeService, ServiceConfig, ServiceLifecycle, ServiceRecord,
+    spawn_native_service,
+};
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -153,6 +156,7 @@ fn parse_u64(name: &str, value: &str) -> Result<u64, String> {
 #[derive(Debug)]
 struct ProbeRequest {
     sequence: u64,
+    measured: bool,
     admitted_at: Instant,
     payload: Vec<u8>,
 }
@@ -166,6 +170,7 @@ impl ProbeRequest {
 #[derive(Debug)]
 struct ProbeRecord {
     sequence: u64,
+    measured: bool,
     admitted_at: Instant,
     service_done_at: Instant,
     payload: Vec<u8>,
@@ -198,186 +203,176 @@ impl EnvelopeTracker {
     }
 }
 
-#[derive(Debug, Default)]
-struct Counters {
-    ingress_full_observations: AtomicU64,
-    ingress_empty_to_nonempty: AtomicU64,
-    egress_empty_to_nonempty: AtomicU64,
-    peak_ingress_depth: AtomicUsize,
-    peak_egress_depth: AtomicUsize,
-}
-
-fn update_max(target: &AtomicUsize, candidate: usize) {
-    let mut observed = target.load(Ordering::Relaxed);
-    while candidate > observed {
-        match target.compare_exchange_weak(observed, candidate, Ordering::SeqCst, Ordering::Relaxed)
-        {
-            Ok(_) => return,
-            Err(actual) => observed = actual,
-        }
-    }
+struct StartGate {
+    started: SyncSender<()>,
+    release: Receiver<()>,
 }
 
 struct ServiceState {
     endpoint: Endpoint,
-    ingress: Receiver<ProbeRequest>,
-    egress: Sender<ProbeRecord>,
-    start: Arc<Barrier>,
-    accepted_target: Arc<AtomicUsize>,
+    start_gate: Option<StartGate>,
     tracker: Arc<EnvelopeTracker>,
-    counters: Arc<Counters>,
-    config: ProbeConfig,
+    service_checksum: Arc<AtomicU64>,
+    egress_payload_bytes: usize,
+}
+
+fn run_service_turn(
+    state: &mut ServiceState,
+    requests: Vec<ProbeRequest>,
+) -> Vec<Result<ProbeRecord, String>> {
+    if let Some(gate) = state.start_gate.take() {
+        gate.started
+            .send(())
+            .expect("cold-burst priming turn announces start");
+        gate.release
+            .recv()
+            .expect("cold-burst priming turn receives release");
+    }
+    if let Err(error) = state.endpoint.run_safe_turn() {
+        return requests
+            .into_iter()
+            .map(|_| Err(format!("empty Endpoint Safe Turn failed: {error:?}")))
+            .collect();
+    }
+
+    requests
+        .into_iter()
+        .map(|request| {
+            let request_bytes = request.retained_bytes();
+            let payload_checksum = request.payload.iter().fold(0_u64, |checksum, byte| {
+                checksum.wrapping_mul(16_777_619) ^ u64::from(*byte)
+            });
+            state
+                .service_checksum
+                .fetch_xor(black_box(payload_checksum), Ordering::SeqCst);
+            let fill = u8::try_from(request.sequence % 251).expect("modulo value fits in u8");
+            let record = ProbeRecord {
+                sequence: request.sequence,
+                measured: request.measured,
+                admitted_at: request.admitted_at,
+                service_done_at: Instant::now(),
+                payload: vec![fill; state.egress_payload_bytes],
+            };
+            state.tracker.add(record.retained_bytes());
+            state.tracker.remove(request_bytes);
+            Ok(record)
+        })
+        .collect()
 }
 
 #[derive(Debug, Default)]
-struct WorkerStats {
-    service_turns: usize,
-    egress_backpressured_records: usize,
-    egress_backpressure_ns: u64,
-    service_checksum: u64,
-}
-
-fn run_service(state: &mut ServiceState) -> Result<WorkerStats, String> {
-    state.start.wait();
-    let target = state.accepted_target.load(Ordering::SeqCst);
-    let mut processed = 0;
-    let mut statistics = WorkerStats::default();
-
-    while processed < target {
-        let first = state
-            .ingress
-            .recv()
-            .map_err(|_| "ingress disconnected before target was processed".to_owned())?;
-        let mut batch = Vec::with_capacity(state.config.turn_budget);
-        batch.push(first);
-        while batch.len() < state.config.turn_budget && processed + batch.len() < target {
-            match state.ingress.try_recv() {
-                Ok(request) => batch.push(request),
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => {
-                    return Err("ingress disconnected while a turn was admitted".to_owned());
-                }
-            }
-        }
-
-        state
-            .endpoint
-            .run_safe_turn()
-            .map_err(|error| format!("empty Endpoint Safe Turn failed: {error:?}"))?;
-        statistics.service_turns += 1;
-
-        for request in batch {
-            let request_bytes = request.retained_bytes();
-            let payload_checksum = request.payload.iter().fold(0_u64, |checksum, byte| {
-                checksum.wrapping_mul(16777619) ^ u64::from(*byte)
-            });
-            statistics.service_checksum ^= black_box(payload_checksum);
-            let sequence = request.sequence;
-            let admitted_at = request.admitted_at;
-            let service_done_at = Instant::now();
-            let fill = u8::try_from(sequence % 251).expect("modulo value fits in u8");
-            let mut record = ProbeRecord {
-                sequence,
-                admitted_at,
-                service_done_at,
-                payload: vec![fill; state.config.egress_payload_bytes],
-            };
-            let record_bytes = record.retained_bytes();
-            state.tracker.add(record_bytes);
-            let mut backpressure_started: Option<Instant> = None;
-
-            loop {
-                let was_empty = state.egress.is_empty();
-                match state.egress.try_send(record) {
-                    Ok(()) => {
-                        if was_empty {
-                            state
-                                .counters
-                                .egress_empty_to_nonempty
-                                .fetch_add(1, Ordering::SeqCst);
-                        }
-                        update_max(&state.counters.peak_egress_depth, state.egress.len().max(1));
-                        if let Some(started) = backpressure_started {
-                            statistics.egress_backpressured_records += 1;
-                            statistics.egress_backpressure_ns = statistics
-                                .egress_backpressure_ns
-                                .saturating_add(duration_ns(started.elapsed()));
-                        }
-                        break;
-                    }
-                    Err(TrySendError::Full(returned)) => {
-                        record = returned;
-                        backpressure_started.get_or_insert_with(Instant::now);
-                        retry_pause(state.config.retry_backoff_us);
-                    }
-                    Err(TrySendError::Disconnected(_)) => {
-                        return Err("egress disconnected before publication".to_owned());
-                    }
-                }
-            }
-
-            drop(request);
-            state.tracker.remove(request_bytes);
-            processed += 1;
-        }
-    }
-
-    Ok(statistics)
-}
-
-#[derive(Debug)]
 struct ConsumerStats {
+    completed_records: usize,
     service_latency_ns: Vec<u64>,
     delivery_latency_ns: Vec<u64>,
     sequence_errors: usize,
+    previous_sequence: Option<u64>,
     consumer_checksum: u64,
 }
 
-fn run_consumer(
-    egress: Receiver<ProbeRecord>,
-    start: Arc<Barrier>,
-    accepted_target: Arc<AtomicUsize>,
-    tracker: Arc<EnvelopeTracker>,
-    observer_stall_us: u64,
-) -> Result<ConsumerStats, String> {
-    start.wait();
-    if observer_stall_us > 0 {
-        thread::sleep(Duration::from_micros(observer_stall_us));
-    }
-    let target = accepted_target.load(Ordering::SeqCst);
-    let mut service_latency_ns = Vec::with_capacity(target);
-    let mut delivery_latency_ns = Vec::with_capacity(target);
-    let mut sequence_errors = 0;
-    let mut previous = None;
-    let mut consumer_checksum = 0_u64;
+type ProbeService = NativeService<ProbeRequest, ProbeRecord, String>;
 
-    for _ in 0..target {
-        let record = egress
-            .recv()
-            .map_err(|_| "egress disconnected before target was consumed".to_owned())?;
-        let received_at = Instant::now();
-        if previous.is_some_and(|value| record.sequence != value + 1) {
-            sequence_errors += 1;
+fn consume_records(
+    records: impl IntoIterator<Item = ServiceRecord<ProbeRecord, String>>,
+    stats: &mut ConsumerStats,
+    tracker: &EnvelopeTracker,
+) -> Result<(), String> {
+    for service_record in records {
+        match service_record {
+            ServiceRecord::Lifecycle { .. } => {}
+            ServiceRecord::Completed { output: record, .. } => {
+                let received_at = Instant::now();
+                if record.measured {
+                    if stats
+                        .previous_sequence
+                        .is_some_and(|previous| record.sequence != previous + 1)
+                    {
+                        stats.sequence_errors += 1;
+                    }
+                    stats.previous_sequence = Some(record.sequence);
+                    stats.service_latency_ns.push(duration_ns(
+                        record.service_done_at.duration_since(record.admitted_at),
+                    ));
+                    stats
+                        .delivery_latency_ns
+                        .push(duration_ns(received_at.duration_since(record.admitted_at)));
+                    stats.completed_records += 1;
+                }
+                stats.consumer_checksum ^= record.payload.iter().fold(0_u64, |checksum, byte| {
+                    checksum.wrapping_mul(16_777_619) ^ u64::from(*byte)
+                });
+                let record_bytes = record.retained_bytes();
+                drop(record);
+                tracker.remove(record_bytes);
+            }
+            ServiceRecord::DriverFault { fault, .. } => {
+                return Err(format!("native service driver fault: {fault}"));
+            }
+            ServiceRecord::RuntimeFault { fault, .. }
+            | ServiceRecord::ServiceFault { fault, .. } => {
+                return Err(format!("native service runtime fault: {fault:?}"));
+            }
+            ServiceRecord::Rejected { ticket, reason } => {
+                return Err(format!(
+                    "accepted request {} was rejected during measurement: {reason:?}",
+                    ticket.request_id().get()
+                ));
+            }
         }
-        previous = Some(record.sequence);
-        service_latency_ns.push(duration_ns(
-            record.service_done_at.duration_since(record.admitted_at),
-        ));
-        delivery_latency_ns.push(duration_ns(received_at.duration_since(record.admitted_at)));
-        consumer_checksum ^= record.payload.iter().fold(0_u64, |checksum, byte| {
-            checksum.wrapping_mul(16777619) ^ u64::from(*byte)
-        });
-        let record_bytes = record.retained_bytes();
-        drop(record);
-        tracker.remove(record_bytes);
     }
+    Ok(())
+}
 
-    Ok(ConsumerStats {
-        service_latency_ns,
-        delivery_latency_ns,
-        sequence_errors,
-        consumer_checksum: black_box(consumer_checksum),
-    })
+fn drain_service(
+    service: &ProbeService,
+    stats: &mut ConsumerStats,
+    tracker: &EnvelopeTracker,
+) -> Result<usize, String> {
+    let records = service
+        .drain()
+        .map_err(|error| format!("drain native service readiness: {error}"))?;
+    let count = records.len();
+    consume_records(records, stats, tracker)?;
+    Ok(count)
+}
+
+enum Admission {
+    Accepted,
+    Full(ProbeRequest),
+}
+
+fn try_admit(
+    service: &ProbeService,
+    mut request: ProbeRequest,
+    tracker: &EnvelopeTracker,
+) -> Result<Admission, String> {
+    request.admitted_at = Instant::now();
+    let request_bytes = request.retained_bytes();
+    tracker.add(request_bytes);
+    match service.try_submit(request) {
+        Ok(_) => Ok(Admission::Accepted),
+        Err(AdmissionError::Full(returned)) => {
+            tracker.remove(request_bytes);
+            Ok(Admission::Full(returned))
+        }
+        Err(error) => {
+            tracker.remove(request_bytes);
+            Err(format!(
+                "native service rejected admission unexpectedly: {}",
+                admission_class(&error)
+            ))
+        }
+    }
+}
+
+fn admission_class(error: &AdmissionError<ProbeRequest>) -> &'static str {
+    match error {
+        AdmissionError::Full(_) => "full",
+        AdmissionError::Closing(_) => "closing",
+        AdmissionError::Faulted(_) => "faulted",
+        AdmissionError::Closed(_) => "closed",
+        AdmissionError::RequestIdExhausted(_) => "request-id-exhausted",
+    }
 }
 
 fn retry_pause(microseconds: u64) {
@@ -392,49 +387,23 @@ fn duration_ns(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
 }
 
-fn make_request(sequence: usize, payload_bytes: usize) -> ProbeRequest {
+fn make_request(sequence: usize, payload_bytes: usize, measured: bool) -> ProbeRequest {
+    let sequence = u64::try_from(sequence).expect("message sequence fits in u64");
     let fill = u8::try_from(sequence % 251).expect("modulo value fits in u8");
     ProbeRequest {
-        sequence: u64::try_from(sequence).expect("message sequence fits in u64"),
+        sequence,
+        measured,
         admitted_at: Instant::now(),
         payload: vec![fill; payload_bytes],
     }
 }
 
-fn try_admit(
-    ingress: &Sender<ProbeRequest>,
-    mut request: ProbeRequest,
-    tracker: &EnvelopeTracker,
-    counters: &Counters,
-) -> Result<(), ProbeRequest> {
-    request.admitted_at = Instant::now();
-    let request_bytes = request.retained_bytes();
-    // Account before publication so the owner cannot remove an envelope that
-    // the producer has not recorded yet. A rejected attempt is removed below;
-    // its brief caller-owned allocation may still contribute to the peak.
-    tracker.add(request_bytes);
-    let was_empty = ingress.is_empty();
-    match ingress.try_send(request) {
-        Ok(()) => {
-            if was_empty {
-                counters
-                    .ingress_empty_to_nonempty
-                    .fetch_add(1, Ordering::SeqCst);
-            }
-            update_max(&counters.peak_ingress_depth, ingress.len().max(1));
-            Ok(())
-        }
-        Err(TrySendError::Full(returned)) => {
-            tracker.remove(request_bytes);
-            counters
-                .ingress_full_observations
-                .fetch_add(1, Ordering::SeqCst);
-            Err(returned)
-        }
-        Err(TrySendError::Disconnected(_)) => {
-            tracker.remove(request_bytes);
-            panic!("ingress disconnected during admission");
-        }
+fn make_priming_request(payload_bytes: usize) -> ProbeRequest {
+    ProbeRequest {
+        sequence: u64::MAX,
+        measured: false,
+        admitted_at: Instant::now(),
+        payload: vec![0; payload_bytes],
     }
 }
 
@@ -487,10 +456,10 @@ struct ProbeResult {
     ingress_full_observations: u64,
     completed_records: usize,
     sequence_errors: usize,
-    service_turns: usize,
+    service_turns: u64,
     ingress_empty_to_nonempty_observations: u64,
     egress_empty_to_nonempty_observations: u64,
-    egress_backpressured_records: usize,
+    egress_backpressured_records: u64,
     egress_backpressure_ns: u64,
     peak_ingress_depth: usize,
     peak_egress_depth: usize,
@@ -514,98 +483,138 @@ fn build_endpoint(turn_budget: usize) -> Endpoint {
     .expect("construct probe Endpoint on its owner thread")
 }
 
+fn metric_delta(after: u64, before: u64) -> u64 {
+    after.saturating_sub(before)
+}
+
 fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
-    let (ingress_sender, ingress_receiver) = bounded(config.ingress_capacity);
-    let (egress_sender, egress_receiver) = bounded(config.egress_capacity);
-    let start = Arc::new(Barrier::new(3));
-    let accepted_target = Arc::new(AtomicUsize::new(0));
     let tracker = Arc::new(EnvelopeTracker::default());
-    let counters = Arc::new(Counters::default());
-
-    let consumer = {
-        let start = Arc::clone(&start);
-        let accepted_target = Arc::clone(&accepted_target);
-        let tracker = Arc::clone(&tracker);
-        thread::Builder::new()
-            .name("cpy-capacity-consumer".to_owned())
-            .spawn(move || {
-                run_consumer(
-                    egress_receiver,
-                    start,
-                    accepted_target,
-                    tracker,
-                    config.observer_stall_us,
-                )
-            })
-            .map_err(|error| format!("spawn consumer: {error}"))?
-    };
-
-    let owner = {
-        let start = Arc::clone(&start);
-        let accepted_target = Arc::clone(&accepted_target);
-        let tracker = Arc::clone(&tracker);
-        let counters = Arc::clone(&counters);
-        spawn_owned_thread_task(
-            "cpy-capacity-owner",
-            move || ServiceState {
-                endpoint: build_endpoint(config.turn_budget),
-                ingress: ingress_receiver,
-                egress: egress_sender,
-                start,
-                accepted_target,
-                tracker,
-                counters,
-                config,
-            },
-            run_service,
+    let service_checksum = Arc::new(AtomicU64::new(0));
+    let (start_gate, started_receiver, release_sender) =
+        if matches!(config.scenario, Scenario::ColdBurst) {
+            let (started_sender, started_receiver) = sync_channel(1);
+            let (release_sender, release_receiver) = sync_channel(1);
+            (
+                Some(StartGate {
+                    started: started_sender,
+                    release: release_receiver,
+                }),
+                Some(started_receiver),
+                Some(release_sender),
+            )
+        } else {
+            (None, None, None)
+        };
+    let build_tracker = Arc::clone(&tracker);
+    let build_checksum = Arc::clone(&service_checksum);
+    let service = spawn_native_service(
+        "cpy-capacity-owner",
+        ServiceConfig::new(
+            config.ingress_capacity,
+            config.egress_capacity,
+            config.turn_budget,
         )
-        .map_err(|error| format!("spawn owner: {error}"))?
-    };
+        .map_err(|error| format!("capacity configuration: {error}"))?,
+        move || ServiceState {
+            endpoint: build_endpoint(config.turn_budget),
+            start_gate,
+            tracker: build_tracker,
+            service_checksum: build_checksum,
+            egress_payload_bytes: config.egress_payload_bytes,
+        },
+        run_service_turn,
+    )
+    .map_err(|error| format!("spawn native service: {error}"))?;
 
+    let mut consumed = ConsumerStats::default();
+    let startup = service
+        .drain()
+        .map_err(|error| format!("drain service startup: {error}"))?;
+    if !startup.iter().any(|record| {
+        matches!(
+            record,
+            ServiceRecord::Lifecycle {
+                state: ServiceLifecycle::Running,
+                ..
+            }
+        )
+    }) {
+        return Err("native service omitted Running startup record".to_owned());
+    }
+    consume_records(startup, &mut consumed, &tracker)?;
+    let baseline = service.metrics();
     if config.sampling_hold_us > 0 {
         thread::sleep(Duration::from_micros(config.sampling_hold_us));
     }
     let probe_started = Instant::now();
     let mut accepted = 0;
 
-    match config.scenario {
-        Scenario::ColdBurst => {
-            for sequence in 0..config.messages {
-                let request = make_request(sequence, config.ingress_payload_bytes);
-                if try_admit(&ingress_sender, request, &tracker, &counters).is_ok() {
-                    accepted += 1;
-                }
-            }
-            accepted_target.store(accepted, Ordering::SeqCst);
-            start.wait();
+    if matches!(config.scenario, Scenario::ColdBurst) {
+        if !matches!(
+            try_admit(
+                &service,
+                make_priming_request(config.ingress_payload_bytes),
+                &tracker,
+            )?,
+            Admission::Accepted
+        ) {
+            return Err("cold-burst priming request was not accepted".to_owned());
         }
-        Scenario::Sustained | Scenario::ObserverStall => {
-            accepted_target.store(config.messages, Ordering::SeqCst);
-            start.wait();
-            for sequence in 0..config.messages {
-                let mut request = make_request(sequence, config.ingress_payload_bytes);
-                loop {
-                    match try_admit(&ingress_sender, request, &tracker, &counters) {
-                        Ok(()) => {
-                            accepted += 1;
-                            break;
-                        }
-                        Err(returned) => {
-                            request = returned;
+        started_receiver
+            .expect("cold-burst receiver exists")
+            .recv()
+            .map_err(|_| "cold-burst owner did not enter priming turn".to_owned())?;
+        for sequence in 0..config.messages {
+            let request = make_request(sequence, config.ingress_payload_bytes, true);
+            if matches!(try_admit(&service, request, &tracker)?, Admission::Accepted) {
+                accepted += 1;
+            }
+        }
+        release_sender
+            .expect("cold-burst sender exists")
+            .send(())
+            .map_err(|_| "cold-burst owner dropped its release gate".to_owned())?;
+    } else {
+        let observer_release = probe_started + Duration::from_micros(config.observer_stall_us);
+        for sequence in 0..config.messages {
+            let mut request = make_request(sequence, config.ingress_payload_bytes, true);
+            loop {
+                match try_admit(&service, request, &tracker)? {
+                    Admission::Accepted => {
+                        accepted += 1;
+                        break;
+                    }
+                    Admission::Full(returned) => {
+                        request = returned;
+                        let should_pause = if matches!(config.scenario, Scenario::ObserverStall)
+                            && Instant::now() < observer_release
+                        {
+                            true
+                        } else {
+                            drain_service(&service, &mut consumed, &tracker)? == 0
+                        };
+                        if should_pause {
                             retry_pause(config.retry_backoff_us);
                         }
                     }
                 }
             }
         }
+        if matches!(config.scenario, Scenario::ObserverStall) && Instant::now() < observer_release {
+            thread::sleep(observer_release.saturating_duration_since(Instant::now()));
+        }
     }
 
-    let worker = owner
-        .join()
-        .map_err(|error| format!("join owner: {error}"))??;
-    let consumed = consumer
-        .join()
-        .map_err(|_| "consumer thread panicked".to_owned())??;
+    while consumed.completed_records < accepted {
+        if drain_service(&service, &mut consumed, &tracker)? == 0 {
+            retry_pause(config.retry_backoff_us);
+        }
+    }
+    let metrics = service.metrics();
+    let shutdown_records = service
+        .shutdown()
+        .map_err(|error| format!("shutdown native service: {error}"))?;
+    consume_records(shutdown_records, &mut consumed, &tracker)?;
     let probe_duration_ns = duration_ns(probe_started.elapsed());
     if config.sampling_hold_us > 0 {
         thread::sleep(Duration::from_micros(config.sampling_hold_us));
@@ -616,35 +625,57 @@ fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
         Scenario::Sustained | Scenario::ObserverStall => 0,
     };
     Ok(ProbeResult {
-        schema_version: "CPY-CAPACITY-PROBE-1",
-        workload: "bounded-crossbeam-transport-with-empty-endpoint-safe-turn",
-        retained_bytes_scope: "owned caller/service/queue request and record structs plus payload capacities; channel allocator and process overhead excluded",
+        schema_version: "CPY-CAPACITY-PROBE-2",
+        workload: "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness",
+        retained_bytes_scope: "owned probe request and result structs plus payload capacities; native service/channel/readiness allocation and process overhead excluded",
         config,
         offered_requests: config.messages,
         accepted_requests: accepted,
         terminal_admission_rejections,
-        ingress_full_observations: counters.ingress_full_observations.load(Ordering::SeqCst),
-        completed_records: consumed.delivery_latency_ns.len(),
+        ingress_full_observations: metric_delta(
+            metrics.ingress_full_observations,
+            baseline.ingress_full_observations,
+        ),
+        completed_records: consumed.completed_records,
         sequence_errors: consumed.sequence_errors,
-        service_turns: worker.service_turns,
-        ingress_empty_to_nonempty_observations: counters
-            .ingress_empty_to_nonempty
-            .load(Ordering::SeqCst),
-        egress_empty_to_nonempty_observations: counters
-            .egress_empty_to_nonempty
-            .load(Ordering::SeqCst),
-        egress_backpressured_records: worker.egress_backpressured_records,
-        egress_backpressure_ns: worker.egress_backpressure_ns,
-        peak_ingress_depth: counters.peak_ingress_depth.load(Ordering::SeqCst),
-        peak_egress_depth: counters.peak_egress_depth.load(Ordering::SeqCst),
+        service_turns: metric_delta(metrics.service_turns, baseline.service_turns),
+        ingress_empty_to_nonempty_observations: metric_delta(
+            metrics.ingress_empty_to_nonempty_observations,
+            baseline.ingress_empty_to_nonempty_observations,
+        ),
+        egress_empty_to_nonempty_observations: metric_delta(
+            metrics.readiness_notifications,
+            baseline.readiness_notifications,
+        ),
+        egress_backpressured_records: metric_delta(
+            metrics.egress_backpressured_records,
+            baseline.egress_backpressured_records,
+        ),
+        egress_backpressure_ns: metric_delta(
+            metrics.egress_backpressure_ns,
+            baseline.egress_backpressure_ns,
+        ),
+        peak_ingress_depth: metrics.peak_ingress_depth,
+        peak_egress_depth: metrics.peak_egress_depth,
         peak_owned_envelope_bytes: tracker.peak_bytes.load(Ordering::SeqCst),
         owned_envelope_bytes_at_end: tracker.live_bytes.load(Ordering::SeqCst),
         service_latency: Distribution::from_samples(consumed.service_latency_ns),
         delivery_latency: Distribution::from_samples(consumed.delivery_latency_ns),
         probe_duration_ns,
-        service_checksum: worker.service_checksum,
-        consumer_checksum: consumed.consumer_checksum,
+        service_checksum: service_checksum.load(Ordering::SeqCst),
+        consumer_checksum: black_box(consumed.consumer_checksum),
     })
+}
+
+fn update_max(target: &AtomicUsize, candidate: usize) {
+    let mut observed = target.load(Ordering::Relaxed);
+    while candidate > observed {
+        match target.compare_exchange_weak(observed, candidate, Ordering::SeqCst, Ordering::Relaxed)
+        {
+            Ok(_) => return,
+            Err(actual) => observed = actual,
+        }
+    }
 }
 
 fn main() -> ExitCode {

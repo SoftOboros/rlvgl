@@ -28,9 +28,18 @@ PROBE_MANIFEST = "runtime-std/Cargo.toml"
 ORCHESTRATOR_SOURCE = "scripts/cpy_capacity_probe.py"
 SCENARIOS = ("cold-burst", "sustained", "observer-stall")
 DEFAULT_CANDIDATES = ((8, 16, 4), (16, 32, 8), (32, 64, 16), (64, 128, 32))
-SOURCE_PATHS = (
+LEGACY_SOURCE_PATHS = (
     PROBE_SOURCE,
     "runtime-std/src/lib.rs",
+    PROBE_MANIFEST,
+    ORCHESTRATOR_SOURCE,
+    "docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json",
+)
+SERVICE_SOURCE_PATHS = (
+    PROBE_SOURCE,
+    "runtime-std/src/lib.rs",
+    "runtime-std/src/readiness.rs",
+    "runtime-std/src/service.rs",
     PROBE_MANIFEST,
     ORCHESTRATOR_SOURCE,
     "docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json",
@@ -106,7 +115,15 @@ def _source_records(commit: str) -> list[dict[str, str]]:
     """Hash the probe's authored sources at one immutable commit."""
 
     records = []
-    for path in SOURCE_PATHS:
+    service_source = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}:runtime-std/src/service.rs"],
+        cwd=REPO_ROOT,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+    paths = SERVICE_SOURCE_PATHS if service_source else LEGACY_SOURCE_PATHS
+    for path in paths:
         data = _git("show", f"{commit}:{path}", text=False)
         assert isinstance(data, bytes)
         records.append({"path": path, "sha256": _sha256(data)})
@@ -384,8 +401,15 @@ def _validate_distribution(distribution: dict[str, Any], samples: int) -> None:
 def _validate_probe(probe: dict[str, Any]) -> None:
     """Validate one raw native-probe result semantically."""
 
-    if probe.get("schema_version") != "CPY-CAPACITY-PROBE-1":
+    version = probe.get("schema_version")
+    expected_workloads = {
+        "CPY-CAPACITY-PROBE-1": "bounded-crossbeam-transport-with-empty-endpoint-safe-turn",
+        "CPY-CAPACITY-PROBE-2": "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness",
+    }
+    if version not in expected_workloads:
         raise EvidenceError("unexpected native probe schema")
+    if probe.get("workload") != expected_workloads[version]:
+        raise EvidenceError("native probe workload does not match its schema version")
     config = probe.get("config")
     if not isinstance(config, dict) or config.get("scenario") not in SCENARIOS:
         raise EvidenceError("native probe scenario is invalid")
@@ -649,9 +673,9 @@ def capture(arguments: argparse.Namespace) -> Path:
             "scenarios": list(SCENARIOS),
             "candidates": candidate_records,
             "limitations": [
-                "Transport-only workload executes an empty neutral Endpoint Safe Turn; it does not measure actor, render, frame, input, Python, PyO3, or OS-readiness work.",
-                "Owned-envelope bytes exclude Crossbeam channel allocation and process overhead; peak RSS separately measures the whole native process.",
-                "Empty-to-nonempty values are observed queue transitions, not eventfd or self-pipe wakeup counts.",
+                "Native-service workload executes an empty neutral Endpoint Safe Turn; it does not measure actor, render, frame, input, Python, or PyO3 work.",
+                "Owned-envelope bytes exclude native service, channel, and readiness allocation; peak RSS separately measures the whole native process.",
+                "Readiness values count successful producer-side coalesced eventfd or self-pipe notifications, not consumer wakeups.",
                 "Candidate values are evidence inputs and this bundle makes no default, maximum, budget, or ratification decision.",
                 "Host results cannot satisfy the CPY-01 embedded-Linux reference-board requirement.",
             ],

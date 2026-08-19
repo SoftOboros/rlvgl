@@ -84,17 +84,20 @@ artifact names; it does not overwrite historical evidence.
 
 ## CPY-03 capacity evidence
 
-The native probe constructs the non-`Send` Endpoint on its owner thread and
-uses bounded Crossbeam channels around empty neutral Safe Turns. It records
-cold-burst admission, sustained retry pressure, and a 50 ms stalled observer.
-Owned-envelope accounting, whole-process peak RSS, completion count, ordering,
-queue-depth bounds, observed empty-to-nonempty transitions, and latency
+The retained v1 probe constructs the non-`Send` Endpoint on its owner thread
+and uses bounded Crossbeam channels around empty neutral Safe Turns. The v2
+probe drives the production `NativeService`, including its typed admission,
+turn batching, terminal records, close sequence, and Unix OS readiness. Both
+record cold-burst admission, sustained retry pressure, and a 50 ms stalled
+observer. Owned-envelope accounting, whole-process peak RSS, completion count,
+ordering, queue-depth bounds, readiness/transition counts, and latency
 distributions are retained for every run.
 
 The committed host bundle is `diagnostic-host` with
 `normative_decision: false`. It cannot close `PCDN-CPY-03-002`: the workload
-does not yet include representative actor/render/frame/input/readiness work,
-and the same committed probe has not yet run on the CPY-01 BeagleBone Black.
+is the v1 transport-only workload and does not include the implemented OS
+readiness boundary or representative actor/render/frame/input work. The v2
+service workload also has not yet run on the CPY-01 BeagleBone Black.
 
 Validate the retained bundle:
 

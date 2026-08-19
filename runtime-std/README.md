@@ -1,5 +1,5 @@
 <!--
-README.md - Scope and use of the native-only rlvgl std runtime scaffold.
+README.md - Scope and use of the native-only rlvgl std runtime boundary.
 -->
 
 # rlvgl-runtime-std
@@ -9,16 +9,24 @@ the CPY initiative. Its eventual consumers are the CPython adapter, a native
 daemon, and headless/native host tools. It must never contain PyO3,
 MicroPython ABI objects, or callbacks into a language runtime.
 
-The initial `0.0.0` crate is deliberately a non-publishable scaffold. It
-proves that non-`Send` neutral runtime state can be constructed, used, and
-destroyed entirely on one native thread while only a `Send` result crosses the
-join boundary. The placeholder version does not resolve
+The `0.0.0` crate is deliberately non-publishable. It proves that non-`Send`
+neutral runtime state can be constructed, used, and destroyed entirely on one
+native thread. Its first CPY-03 service also provides explicit bounded
+ingress/egress, deterministic turn batches, typed admission outcomes,
+process-local epochs, ordered close/fault records, metrics, and a pollable
+readiness signal. The placeholder version does not resolve
 `PCDN-CPY-09-004`; publication stays blocked until CPY selects a truthful
 release line.
 
-This slice does not define the CPY-03 service lifecycle, ingress/egress
-capacities, readiness primitive, frame slots, cadence, or close policy. Those
-surfaces remain gated by CPY-03/05 measurements and ratification.
+Linux readiness uses a nonblocking close-on-exec `eventfd`; other selected Unix
+hosts use a nonblocking close-on-exec self-pipe. Crossbeam and Rustix stay
+behind CPY-owned types. The service contains no PyO3 or MicroPython object and
+does not call a language runtime.
+
+Capacities remain required constructor inputs, not defaults. This slice does
+not yet define semantic record loss classes, frame slots, platform cadence,
+render/present work, or Python finalization behavior. Those surfaces remain
+gated by CPY-03/05/06 measurements and integration.
 
 ```rust
 use rlvgl_runtime_std::spawn_owned_thread_task;
@@ -36,12 +44,34 @@ The integration test uses an actual non-`Send` `rlvgl_core::endpoint::Endpoint`
 as the owned state. This is a native headless proof, not a Python or display
 test.
 
+The bounded service takes one result per admitted request and faults rather
+than silently losing an incomplete turn:
+
+```rust
+use rlvgl_runtime_std::{ServiceConfig, spawn_native_service};
+
+let service = spawn_native_service(
+    "rlvgl-native-service",
+    ServiceConfig::new(16, 32, 8)?,
+    || String::from("owner-thread state"),
+    |state, requests: Vec<usize>| {
+        requests.into_iter().map(|value| Ok::<_, ()>(value + state.len())).collect()
+    },
+)?;
+let _ticket = service.try_submit(1).expect("explicit capacity admits request");
+let records = service.shutdown()?;
+assert!(!records.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## Capacity probe
 
-The `cpy_capacity_probe` example is a diagnostic CPY-03 measurement target. It
-uses bounded Crossbeam channels around an owner-thread `Endpoint`, exercises
-cold bursts, sustained admission, and a stalled egress observer, and emits one
-JSON result. Its candidate values are inputs, not runtime defaults:
+The `cpy_capacity_probe` example is a diagnostic CPY-03 measurement target. Its
+v2 workload drives the production `NativeService` around an owner-thread
+`Endpoint`, including OS readiness, bounded admission, exact terminal records,
+and ordered shutdown. It exercises cold bursts, sustained admission, and a
+stalled egress observer, then emits one JSON result. Candidate values are
+inputs, not runtime defaults:
 
 ```bash
 cargo run --release -p rlvgl-runtime-std \

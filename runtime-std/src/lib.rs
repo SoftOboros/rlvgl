@@ -1,14 +1,25 @@
-//! Native-thread ownership scaffold for interpreter-neutral rlvgl state.
+//! Native-thread ownership and service boundary for interpreter-neutral rlvgl state.
 //!
-//! This first CPY-02 migration slice proves a narrow property: state that is
-//! intentionally not [`Send`] can be constructed, used, and destroyed on one
-//! native thread without crossing the join boundary. It does not yet define
-//! the CPY-03 service lifecycle, queues, readiness, frames, or shutdown.
+//! The one-shot task proves the CPY-02 ownership boundary. The service module
+//! adds the first CPY-03 native lifecycle: bounded interpreter-neutral queues,
+//! one owner thread, deterministic batches, Unix readiness, observable
+//! admission failure, and ordered shutdown. Frame leases, platform cadence,
+//! and language bindings remain outside this crate slice.
 
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
 use std::{fmt, io, thread};
+
+mod readiness;
+mod service;
+
+pub use readiness::{ReadinessKind, ReadinessSignal};
+pub use service::{
+    AdmissionError, NativeService, RequestId, RuntimeFault, ServiceConfig, ServiceConfigError,
+    ServiceEpoch, ServiceJoinError, ServiceLifecycle, ServiceMetricsSnapshot, ServiceRecord,
+    ServiceRejection, ServiceStartError, ServiceTicket, spawn_native_service,
+};
 
 /// A joinable one-shot task whose state remains entirely on its owner thread.
 ///

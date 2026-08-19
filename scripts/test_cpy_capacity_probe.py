@@ -192,6 +192,18 @@ class EvidenceTests(unittest.TestCase):
         cpy_capacity_probe._validate_schema(bundle)
         cpy_capacity_probe.validate_bundle_value(bundle)
 
+    def test_native_service_probe_version_passes(self) -> None:
+        """The production-service workload is distinct from retained v1 evidence."""
+
+        bundle = _bundle()
+        for run in bundle["runs"]:
+            run["probe"]["schema_version"] = "CPY-CAPACITY-PROBE-2"
+            run["probe"]["workload"] = (
+                "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness"
+            )
+        cpy_capacity_probe._validate_schema(bundle)
+        cpy_capacity_probe.validate_bundle_value(bundle)
+
     def test_missing_iteration_is_rejected(self) -> None:
         """A partial candidate/scenario matrix cannot be summarized as evidence."""
 

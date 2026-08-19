@@ -458,10 +458,16 @@
       ],
       "properties": {
         "schema_version": {
-          "const": "CPY-CAPACITY-PROBE-1"
+          "enum": [
+            "CPY-CAPACITY-PROBE-1",
+            "CPY-CAPACITY-PROBE-2"
+          ]
         },
         "workload": {
-          "const": "bounded-crossbeam-transport-with-empty-endpoint-safe-turn"
+          "enum": [
+            "bounded-crossbeam-transport-with-empty-endpoint-safe-turn",
+            "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness"
+          ]
         },
         "retained_bytes_scope": {
           "type": "string",

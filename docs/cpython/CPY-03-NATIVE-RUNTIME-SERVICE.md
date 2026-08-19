@@ -7,11 +7,11 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 **Document ID:** CPY-03-NATIVE-RUNTIME-SERVICE
 
 **Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18; native
-owner proof and host diagnostic capacity matrix complete;
-`PCDN-CPY-03-002` remains representative-service/board measurement-blocked.
-Not ratified.
+service lifecycle, bounded queues, ownership, Unix readiness, and host v1
+diagnostic capacity matrix implemented; `PCDN-CPY-03-002` remains v2
+representative-workload/board measurement-blocked. Not ratified.
 
-**Revision:** 0.3.0
+**Revision:** 0.4.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -275,6 +275,15 @@ macOS host cannot supply constrained-board memory or cadence evidence. The
 same committed probe plus representative service workload must run on the
 CPY-01 BeagleBone Black before `PCDN-CPY-03-002` can close.
 
+The current 0.4.0 implementation replaces the parallel v1 transport harness
+with the production `NativeService`. It adds bounded CPY-owned admission and
+egress, one exact terminal record per accepted request, service epochs and
+request ids, close/fault fences, non-droppable publication, metrics, Linux
+`eventfd`, and a macOS/other-Unix self-pipe. Its v2 probe still executes an
+empty Endpoint Safe Turn, so it is more representative of CPY-03 lifecycle and
+readiness but not yet of Actor, render, frame, input, Python, or PyO3 work.
+No capacity value becomes a default from this implementation.
+
 ## 12. Acceptance Checklist
 
 - [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open.
@@ -296,6 +305,9 @@ CPY-01 BeagleBone Black before `PCDN-CPY-03-002` can close.
 | `docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md` | Safe Turn, cues, bounded scheduling |
 | `examples/beaglebone-black/src/main.rs` | Existing Linux input/render/present cadence evidence |
 | `runtime-std/examples/cpy_capacity_probe.rs` | Native transport/capacity measurement executable |
+| `runtime-std/src/service.rs` | Bounded owner-thread lifecycle, admission, records, close/fault, and metrics |
+| `runtime-std/src/readiness.rs` | Linux `eventfd`, Unix self-pipe, and race-safe coalescing |
+| `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, and fault evidence |
 | `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
 | `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
 | CPython thread-state documentation | External wait/thread/finalization authority |
@@ -304,12 +316,48 @@ CPY-01 BeagleBone Black before `PCDN-CPY-03-002` can close.
 
 Four policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
 Draft. Ratification is blocked by representative host and physical-board
-capacity evidence in `PCDN-CPY-03-002` plus the remaining lifecycle,
-ordering, readiness, and close acceptance evidence. Ratification would unblock
+capacity evidence in `PCDN-CPY-03-002` plus semantic record classes,
+representative native cadence, restart/stale-handle evidence, and
+binding-finalization stress. Ratification would unblock
 the CPY-04 binding and CPY-05 frame integration; it would not authorize device
 access.
 
 ## 15. Change Log
+
+### 0.4.0 — 2026-08-18 — bounded native service and OS readiness
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-2, INV-CPY-03-3, INV-CPY-03-4,
+INV-CPY-03-5, INV-CPY-03-6, INV-CPY-03-7, PCDN-CPY-03-001,
+PCDN-CPY-03-002, PCDN-CPY-03-004, §5, §6, §7, §8, §11, §12, §13,
+§14
+
+**Commits:** pending; the next retained v2 evidence bundle names its exact
+clean source commit
+
+**Summary:** Implements the first Python-neutral bounded owner service,
+Unix readiness, exact request-terminal accounting, ordered close/fault paths,
+and a v2 service-backed capacity probe without selecting capacities.
+
+#### Rationale
+
+The board matrix must measure the boundary the CPython adapter will actually
+use. A production service ahead of PyO3 proves that the non-`Send` Endpoint,
+bounded queues, lifecycle, readiness descriptor, and close fence remain
+language-neutral and testable on all selected Unix targets.
+
+Considered and rejected: measuring the parallel v1 harness again on the BBB,
+exposing Crossbeam senders or Rustix descriptors as the public contract,
+adding queue defaults before measurement, or treating readiness bytes as
+semantic records.
+
+What deliberately did not change: the driver still executes an empty Endpoint
+Safe Turn; semantic record loss/reservation classes, native input/render/
+present cadence, frames, Python/PyO3, physical board evidence, capacity
+defaults/maxima, and CPY-03 ratification remain open.
 
 ### 0.3.0 — 2026-08-18 — diagnostic host capacity matrix
 
