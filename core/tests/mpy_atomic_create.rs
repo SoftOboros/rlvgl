@@ -16,9 +16,10 @@ use rlvgl_core::{
     },
     direction::{
         ActorDirection, BatchCreateDestination, BatchObjectReference, BatchStageDirection,
-        CreateDirection, CreateField, OwnedValue, RuntimeFlag,
+        CreateDirection, CreateField, OwnedValue, RequestedLayout, RuntimeFlag,
     },
     event::Event,
+    layout::{Dimension, FlexConfig, GridAlign, GridConfig, GridTrack, ItemHints},
     object::{ObjectFlags, ObjectStates},
     renderer::Renderer,
     widget::{Rect, Widget},
@@ -196,6 +197,78 @@ fn limits() -> RegistryLimits {
 
 fn registry() -> StageRegistry {
     StageRegistry::new(StageId::new(91).unwrap(), &CATALOG, limits()).unwrap()
+}
+
+fn flex_layout() -> RequestedLayout {
+    RequestedLayout::Flex(FlexConfig {
+        gap_main: -3,
+        gap_cross: -5,
+        ..FlexConfig::default()
+    })
+}
+
+fn grid_layout() -> RequestedLayout {
+    RequestedLayout::Grid(GridConfig {
+        col_tracks: vec![GridTrack::Px(8), GridTrack::Fr(2)],
+        row_tracks: vec![GridTrack::Content],
+        col_gap: -7,
+        row_gap: -11,
+        col_align: GridAlign::Center,
+        row_align: GridAlign::End,
+    })
+}
+
+fn item_layout() -> RequestedLayout {
+    RequestedLayout::Item(ItemHints {
+        width: Dimension::Px(-50),
+        height: Dimension::Content,
+        flex_grow: 2,
+        col_pos: 1,
+        col_span: 2,
+        row_pos: 3,
+        min_width: Some(4),
+        max_width: Some(40),
+        min_height: Some(5),
+        max_height: Some(50),
+        ..ItemHints::default()
+    })
+}
+
+fn none_layout_body() -> Vec<u8> {
+    vec![0]
+}
+
+fn flex_layout_body() -> Vec<u8> {
+    vec![
+        1, 0, 0, 0, 0, 0xfd, 0xff, 0xff, 0xff, 0xfb, 0xff, 0xff, 0xff,
+    ]
+}
+
+fn grid_layout_body() -> Vec<u8> {
+    vec![
+        2, 2, 0, 0, 8, 0, 0, 0, 1, 2, 1, 0, 2, 0xf9, 0xff, 0xff, 0xff, 0xf5, 0xff, 0xff, 0xff, 1, 2,
+    ]
+}
+
+fn item_layout_body() -> Vec<u8> {
+    vec![
+        3, 0, 0xce, 0xff, 0xff, 0xff, 2, 2, 0, 1, 0, 2, 0, 3, 0, 1, 0, 3, 3, 1, 4, 0, 0, 0, 1, 40,
+        0, 0, 0, 1, 5, 0, 0, 0, 1, 50, 0, 0, 0,
+    ]
+}
+
+fn assert_layout_outputs(
+    outputs: &[rlvgl_core::actor::RequestedLayoutOutput],
+    expected: &[(u16, Vec<u8>)],
+) {
+    assert_eq!(outputs.len(), expected.len());
+    assert_eq!(
+        outputs
+            .iter()
+            .map(|output| (output.operation_index, output.body.clone()))
+            .collect::<Vec<_>>(),
+        expected
+    );
 }
 
 fn create_stable_container(
@@ -4452,4 +4525,446 @@ fn retained_preconstructed_actor_borrow_rejects_without_publication_and_retries(
     let committed = committed.unwrap();
     assert_eq!(registry.children(stable).unwrap().len(), 1);
     registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn requested_layout_echoes_stable_targets_and_commits_last_write_once() {
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "layout" },
+    );
+    let label = create_stable_label(&mut registry, root);
+    let flex = flex_layout();
+    let grid = grid_layout();
+    let item = item_layout();
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(root),
+                layout: RequestedLayout::None,
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(root),
+                layout: flex,
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(root),
+                layout: grid.clone(),
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(label),
+                layout: RequestedLayout::None,
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(label),
+                layout: item.clone(),
+            },
+        ])
+        .unwrap();
+    assert_eq!(
+        registry.requested_layout(root).unwrap(),
+        RequestedLayout::None
+    );
+    assert_eq!(
+        registry.requested_layout(label).unwrap(),
+        RequestedLayout::None
+    );
+
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_batch(prepared));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let mut committed = committed.unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert!(committed.create_outputs().is_empty());
+    let expected_outputs = vec![
+        (0, none_layout_body()),
+        (1, flex_layout_body()),
+        (2, grid_layout_body()),
+        (3, none_layout_body()),
+        (4, item_layout_body()),
+    ];
+    assert_layout_outputs(committed.requested_layout_outputs(), &expected_outputs);
+    assert_eq!(registry.requested_layout(root).unwrap(), grid);
+    assert_eq!(registry.requested_layout(label).unwrap(), item);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    let (outputs, allocations, deallocations) =
+        count_allocator_operations(|| committed.take_requested_layout_outputs());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_layout_outputs(&outputs, &expected_outputs);
+    registry.release_committed_batch(committed).unwrap();
+    drop(outputs);
+
+    let revision = registry.revision();
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+            object: BatchObjectReference::Stable(root),
+            layout: grid_layout(),
+        }])
+        .unwrap();
+    let committed = registry.commit_prepared_batch(prepared).unwrap();
+    assert_eq!(committed.revision().get(), revision.get() + 1);
+    assert_layout_outputs(
+        committed.requested_layout_outputs(),
+        &[(0, grid_layout_body())],
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn requested_layout_echoes_every_earlier_created_target_in_operation_order() {
+    let container = descriptor("container::Container");
+    let label = descriptor("label::Label");
+    let mut registry = registry();
+    let stable_parent = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "parent" },
+    );
+    let starting_revision = registry.revision();
+    let prepared = registry
+        .prepare_atomic_batch(vec![
+            create(
+                1,
+                container,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::Stable(stable_parent),
+                },
+                vec![],
+            ),
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(1),
+                layout: RequestedLayout::None,
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(1),
+                layout: flex_layout(),
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(1),
+                layout: grid_layout(),
+            },
+            create(
+                2,
+                label,
+                BatchCreateDestination::Child {
+                    parent: BatchObjectReference::EarlierBatch(1),
+                },
+                vec![CreateField {
+                    id: field(label, "text"),
+                    value: OwnedValue::Text("earlier".into()),
+                }],
+            ),
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(2),
+                layout: RequestedLayout::None,
+            },
+            BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(2),
+                layout: item_layout(),
+            },
+        ])
+        .unwrap();
+    let mut committed = registry.commit_prepared_batch(prepared).unwrap();
+
+    assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+    assert_eq!(
+        committed
+            .create_outputs()
+            .iter()
+            .map(|output| (output.operation_index, output.batch_ref))
+            .collect::<Vec<_>>(),
+        [(0, 1), (4, 2)]
+    );
+    assert_layout_outputs(
+        committed.requested_layout_outputs(),
+        &[
+            (1, none_layout_body()),
+            (2, flex_layout_body()),
+            (3, grid_layout_body()),
+            (5, none_layout_body()),
+            (6, item_layout_body()),
+        ],
+    );
+    let created = committed.take_create_outputs();
+    assert_eq!(
+        registry.requested_layout(created[0].object_id).unwrap(),
+        grid_layout()
+    );
+    assert_eq!(
+        registry.requested_layout(created[1].object_id).unwrap(),
+        item_layout()
+    );
+    assert_eq!(
+        registry.last_commit_effects(),
+        MutationEffects::DRAW
+            .union(MutationEffects::TREE)
+            .union(MutationEffects::LAYOUT)
+            .union(MutationEffects::SNAPSHOT)
+    );
+    assert_eq!(registry.last_invalidations(), [BOUNDS]);
+    registry.release_committed_batch(committed).unwrap();
+}
+
+#[test]
+fn requested_layout_validation_precedes_capacity_and_rolls_back_the_whole_batch() {
+    let container = descriptor("container::Container");
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "root" },
+    );
+    let label = create_stable_label(&mut registry, root);
+    let stale = create_stable_label(&mut registry, root);
+    registry.delete(stale).unwrap();
+    let starting_revision = registry.revision();
+    let starting_usage = registry.usage();
+    let starting_effects = registry.last_commit_effects();
+    let starting_invalidations = registry.last_invalidations().to_vec();
+    let invalid_grid = RequestedLayout::Grid(GridConfig {
+        col_tracks: vec![GridTrack::Fr(0)],
+        row_tracks: vec![],
+        ..GridConfig::default()
+    });
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(stale),
+                layout: invalid_grid.clone(),
+            }])
+            .unwrap_err(),
+        RegistryError::StaleObject { object_id: stale }
+    );
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::EarlierBatch(99),
+                layout: invalid_grid.clone(),
+            }])
+            .unwrap_err(),
+        RegistryError::BatchInvalid
+    );
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(label),
+                layout: invalid_grid.clone(),
+            }])
+            .unwrap_err(),
+        RegistryError::Unsupported
+    );
+
+    for invalid in [
+        invalid_grid,
+        RequestedLayout::Grid(GridConfig {
+            col_tracks: vec![GridTrack::Px(-1)],
+            row_tracks: vec![GridTrack::Content],
+            ..GridConfig::default()
+        }),
+    ] {
+        assert_eq!(
+            registry
+                .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(root),
+                    layout: invalid,
+                }])
+                .unwrap_err(),
+            RegistryError::RangeValue
+        );
+    }
+    for hints in [
+        ItemHints {
+            col_span: 0,
+            ..ItemHints::default()
+        },
+        ItemHints {
+            min_height: Some(8),
+            max_height: Some(7),
+            ..ItemHints::default()
+        },
+    ] {
+        assert_eq!(
+            registry
+                .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(label),
+                    layout: RequestedLayout::Item(hints),
+                }])
+                .unwrap_err(),
+            RegistryError::RangeValue
+        );
+    }
+    assert_eq!(
+        RegistryError::RangeValue.error_class(),
+        rlvgl_api::protocol::ErrorClass::Range
+    );
+
+    assert_eq!(
+        registry
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(root),
+                    layout: flex_layout(),
+                },
+                BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(label),
+                    layout: RequestedLayout::Grid(GridConfig::default()),
+                },
+            ])
+            .unwrap_err(),
+        RegistryError::Unsupported
+    );
+    assert_eq!(
+        registry.requested_layout(root).unwrap(),
+        RequestedLayout::None
+    );
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(registry.usage(), starting_usage);
+    assert_eq!(registry.last_commit_effects(), starting_effects);
+    assert_eq!(registry.last_invalidations(), starting_invalidations);
+
+    let tight_limits = RegistryLimits {
+        max_roots: 2,
+        max_actors: 1,
+        ..limits()
+    };
+    let mut constrained =
+        StageRegistry::new(StageId::new(92).unwrap(), &CATALOG, tight_limits).unwrap();
+    let constrained_root = create_stable_container(
+        &mut constrained,
+        rlvgl_core::actor::CreateDestination::Root { name: "only" },
+    );
+    let constrained_revision = constrained.revision();
+    assert_eq!(
+        constrained
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(constrained_root),
+                    layout: RequestedLayout::Grid(GridConfig {
+                        col_tracks: vec![GridTrack::Fr(0)],
+                        row_tracks: vec![GridTrack::Content],
+                        ..GridConfig::default()
+                    }),
+                },
+                create(
+                    9,
+                    container,
+                    BatchCreateDestination::Root {
+                        name: "overflow".into(),
+                    },
+                    vec![],
+                ),
+            ])
+            .unwrap_err(),
+        RegistryError::RangeValue
+    );
+    assert_eq!(
+        constrained
+            .prepare_atomic_batch(vec![
+                BatchStageDirection::SetRequestedLayout {
+                    object: BatchObjectReference::Stable(constrained_root),
+                    layout: flex_layout(),
+                },
+                create(
+                    9,
+                    container,
+                    BatchCreateDestination::Root {
+                        name: "overflow".into(),
+                    },
+                    vec![],
+                ),
+            ])
+            .unwrap_err(),
+        RegistryError::Capacity {
+            kind: CapacityKind::Actors
+        }
+    );
+    assert_eq!(constrained.revision(), constrained_revision);
+    assert_eq!(
+        constrained.requested_layout(constrained_root).unwrap(),
+        RequestedLayout::None
+    );
+}
+
+#[test]
+fn requested_layout_output_remains_owned_across_busy_and_stale_commit_rejection() {
+    let mut registry = registry();
+    let root = create_stable_container(
+        &mut registry,
+        rlvgl_core::actor::CreateDestination::Root { name: "root" },
+    );
+    let starting_revision = registry.revision();
+    let starting_effects = registry.last_commit_effects();
+    let starting_invalidations = registry.last_invalidations().to_vec();
+    let prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+            object: BatchObjectReference::Stable(root),
+            layout: flex_layout(),
+        }])
+        .unwrap();
+    let widget = registry.node(root).unwrap().widget().clone();
+    let borrow = widget.borrow_mut();
+
+    let (error, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_batch(prepared).unwrap_err());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(error.cause(), RegistryError::DispatchBusy);
+    assert_eq!(registry.revision(), starting_revision);
+    assert_eq!(
+        registry.requested_layout(root).unwrap(),
+        RequestedLayout::None
+    );
+    assert_eq!(registry.last_commit_effects(), starting_effects);
+    assert_eq!(registry.last_invalidations(), starting_invalidations);
+
+    drop(borrow);
+    let (committed, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_batch(error.into_prepared()));
+    assert_eq!((allocations, deallocations), (0, 0));
+    let committed = committed.unwrap();
+    assert_layout_outputs(
+        committed.requested_layout_outputs(),
+        &[(0, flex_layout_body())],
+    );
+    assert_eq!(registry.requested_layout(root).unwrap(), flex_layout());
+    registry.release_committed_batch(committed).unwrap();
+
+    let stale_prepared = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+            object: BatchObjectReference::Stable(root),
+            layout: RequestedLayout::None,
+        }])
+        .unwrap();
+    let intervening = registry
+        .prepare_atomic_batch(vec![BatchStageDirection::SetFlag {
+            object: BatchObjectReference::Stable(root),
+            flag: RuntimeFlag::Hidden,
+            enabled: false,
+        }])
+        .unwrap();
+    let intervening = registry.commit_prepared_batch(intervening).unwrap();
+    registry.release_committed_batch(intervening).unwrap();
+    let (error, allocations, deallocations) =
+        count_allocator_operations(|| registry.commit_prepared_batch(stale_prepared).unwrap_err());
+    assert_eq!((allocations, deallocations), (0, 0));
+    assert_eq!(error.cause(), RegistryError::BatchInvalid);
+    assert_eq!(registry.requested_layout(root).unwrap(), flex_layout());
+    drop(error.into_prepared());
 }

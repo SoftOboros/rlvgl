@@ -3,11 +3,13 @@
 use rlvgl_api::protocol::{
     Batch, BatchBudget, BatchSuccess, Capabilities, CodecError, Command, Completion,
     CompletionStatus, CreateDestinationRef, CreatePayload, Cue, DiscriminantDomain, ErrorClass,
-    FieldList, FieldRef, FrameRef, Hello, InvokeActionPayload, Limits, MPY_V1,
+    FieldList, FieldRef, FrameRef, Hello, InvokeActionPayload, LayoutDimension, LayoutFlexAlign,
+    LayoutFlexFlow, LayoutGridAlign, LayoutGridTrack, LayoutGridTrackList, Limits, MPY_V1,
     MutationTargetEnvelope, ObjectReference, ObjectReferenceError, OpcodeList, OperationList,
     OperationRef, OperationResultList, OperationResultRef, PromoteRootPayload, PropertyIdList,
-    ProtocolVersion, ReorderPayload, ReparentPayload, ResetPropertiesPayload, RuntimeFlag,
-    RuntimeNotice, SetFlagPayload, SetPropertiesPayload, ValueList, ValueRef, ValueTag,
+    ProtocolVersion, ReorderPayload, ReparentPayload, RequestedFlexLayout, RequestedGridLayout,
+    RequestedItemLayout, RequestedLayoutRef, ResetPropertiesPayload, RuntimeFlag, RuntimeNotice,
+    SetFlagPayload, SetPropertiesPayload, SetRequestedLayoutPayload, ValueList, ValueRef, ValueTag,
     create_result_object, decode_batch_success, decode_batch_success_with_limits,
     decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
     decode_delete_operation, decode_delete_payload, decode_field_list,
@@ -18,12 +20,15 @@ use rlvgl_api::protocol::{
     decode_operation_list, decode_operation_list_with_limit, decode_promote_root_operation,
     decode_promote_root_operation_with_limits, decode_promote_root_payload,
     decode_promote_root_payload_with_limits, decode_reorder_operation, decode_reorder_payload,
-    decode_reparent_operation, decode_reparent_payload, decode_reset_properties_operation,
+    decode_reparent_operation, decode_reparent_payload, decode_requested_layout_body,
+    decode_requested_layout_body_with_limits, decode_reset_properties_operation,
     decode_reset_properties_operation_with_limits, decode_reset_properties_payload,
     decode_reset_properties_payload_with_limits, decode_set_flag_operation,
     decode_set_flag_payload, decode_set_properties_operation,
     decode_set_properties_operation_with_limits, decode_set_properties_payload,
-    decode_set_properties_payload_with_limits, decode_value, decode_value_list,
+    decode_set_properties_payload_with_limits, decode_set_requested_layout_operation,
+    decode_set_requested_layout_operation_with_limits, decode_set_requested_layout_payload,
+    decode_set_requested_layout_payload_with_limits, decode_value, decode_value_list,
     decode_value_list_with_limits, encode_batch_success, encode_batch_success_with_limit,
     encode_batch_success_with_limits, encode_create_payload, encode_create_payload_with_limits,
     encode_delete_payload, encode_field_list, encode_field_list_with_limit,
@@ -32,14 +37,17 @@ use rlvgl_api::protocol::{
     encode_mutation_target_envelope, encode_object_reference, encode_operation_list,
     encode_operation_list_with_limit, encode_promote_root_payload,
     encode_promote_root_payload_with_limits, encode_reorder_payload, encode_reparent_payload,
+    encode_requested_layout_body, encode_requested_layout_body_with_limits,
     encode_reset_properties_payload, encode_reset_properties_payload_with_limits,
     encode_set_flag_payload, encode_set_properties_payload,
-    encode_set_properties_payload_with_limits, encode_value, encode_value_list,
+    encode_set_properties_payload_with_limits, encode_set_requested_layout_payload,
+    encode_set_requested_layout_payload_with_limits, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
-    validate_delete_result_absent, validate_invoke_action_result_absent,
-    validate_promote_root_result_absent, validate_reorder_result_absent,
-    validate_reparent_result_absent, validate_reset_properties_result_absent,
-    validate_set_flag_result_absent, validate_set_properties_result_absent,
+    requested_layout_body_encoded_len, validate_delete_result_absent,
+    validate_invoke_action_result_absent, validate_promote_root_result_absent,
+    validate_reorder_result_absent, validate_reparent_result_absent,
+    validate_reset_properties_result_absent, validate_set_flag_result_absent,
+    validate_set_properties_result_absent, validate_set_requested_layout_result_echo,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -138,6 +146,12 @@ const INVOKE_ACTION_ARGUMENTS: &[ValueRef<'static>] = &[
     ValueRef::Object(0x0000_0002_0000_0001),
 ];
 const INVOKE_ACTION_BATCH_ARGUMENTS: &[ValueRef<'static>] = &[ValueRef::BatchObject(6)];
+const LAYOUT_COLUMN_TRACKS: &[LayoutGridTrack] = &[
+    LayoutGridTrack::Px(12),
+    LayoutGridTrack::Fr(2),
+    LayoutGridTrack::Content,
+];
+const LAYOUT_ROW_TRACKS: &[LayoutGridTrack] = &[LayoutGridTrack::Fr(1)];
 const CREATE_RESULT_VALUES: &[ValueRef<'static>] = &[ValueRef::Object(0x0000_0002_0000_0001)];
 const MUTATION_OPCODES: &[u32] = &[
     opcode::SET_PROPERTIES,
@@ -168,6 +182,47 @@ fn limits() -> Limits {
         max_items_per_command: 8,
         max_values_per_result: 8,
     }
+}
+
+fn requested_flex_layout() -> RequestedLayoutRef<'static> {
+    RequestedLayoutRef::Flex(RequestedFlexLayout {
+        flow: LayoutFlexFlow::ColumnWrapReverse,
+        main_align: LayoutFlexAlign::SpaceBetween,
+        cross_align: LayoutFlexAlign::Center,
+        track_cross_align: LayoutFlexAlign::SpaceAround,
+        gap_main: -3,
+        gap_cross: 4,
+    })
+}
+
+fn requested_grid_layout() -> RequestedLayoutRef<'static> {
+    RequestedLayoutRef::Grid(RequestedGridLayout {
+        col_tracks: LayoutGridTrackList::from_slice(LAYOUT_COLUMN_TRACKS),
+        row_tracks: LayoutGridTrackList::from_slice(LAYOUT_ROW_TRACKS),
+        col_gap: -1,
+        row_gap: 8,
+        col_align: LayoutGridAlign::SpaceEvenly,
+        row_align: LayoutGridAlign::SpaceBetween,
+    })
+}
+
+fn requested_item_layout() -> RequestedLayoutRef<'static> {
+    RequestedLayoutRef::Item(RequestedItemLayout {
+        width: LayoutDimension::Pct(50),
+        height: LayoutDimension::Content,
+        flex_grow: 3,
+        self_align: Some(LayoutFlexAlign::End),
+        col_pos: 2,
+        col_span: 3,
+        row_pos: 4,
+        row_span: 5,
+        col_align: LayoutGridAlign::Center,
+        row_align: LayoutGridAlign::Stretch,
+        min_width: Some(-10),
+        max_width: None,
+        min_height: None,
+        max_height: Some(20),
+    })
 }
 
 fn values() -> Vec<(&'static str, ValueRef<'static>)> {
@@ -2797,6 +2852,703 @@ fn invoke_action_transactional_empty_results_are_outputless_with_ordered_errors(
 }
 
 #[test]
+fn requested_layout_bodies_freeze_variants_ordinals_and_zero_copy_tracks() {
+    assert_eq!(
+        [
+            LayoutFlexFlow::Row as u8,
+            LayoutFlexFlow::Column as u8,
+            LayoutFlexFlow::RowWrap as u8,
+            LayoutFlexFlow::RowReverse as u8,
+            LayoutFlexFlow::RowWrapReverse as u8,
+            LayoutFlexFlow::ColumnWrap as u8,
+            LayoutFlexFlow::ColumnReverse as u8,
+            LayoutFlexFlow::ColumnWrapReverse as u8,
+        ],
+        [0, 1, 2, 3, 4, 5, 6, 7]
+    );
+    assert_eq!(
+        [
+            LayoutFlexAlign::Start as u8,
+            LayoutFlexAlign::End as u8,
+            LayoutFlexAlign::Center as u8,
+            LayoutFlexAlign::SpaceEvenly as u8,
+            LayoutFlexAlign::SpaceAround as u8,
+            LayoutFlexAlign::SpaceBetween as u8,
+        ],
+        [0, 1, 2, 3, 4, 5]
+    );
+    assert_eq!(
+        [
+            LayoutGridAlign::Start as u8,
+            LayoutGridAlign::Center as u8,
+            LayoutGridAlign::End as u8,
+            LayoutGridAlign::Stretch as u8,
+            LayoutGridAlign::SpaceEvenly as u8,
+            LayoutGridAlign::SpaceAround as u8,
+            LayoutGridAlign::SpaceBetween as u8,
+        ],
+        [0, 1, 2, 3, 4, 5, 6]
+    );
+
+    for (layout, fixture_name, expected_length) in [
+        (RequestedLayoutRef::None, "layout.requested_none", 1),
+        (requested_flex_layout(), "layout.requested_flex", 13),
+        (requested_grid_layout(), "layout.requested_grid", 25),
+        (requested_item_layout(), "layout.requested_item", 30),
+    ] {
+        let mut encoded = [0u8; 64];
+        assert_eq!(
+            requested_layout_body_encoded_len(layout),
+            Ok(expected_length)
+        );
+        let length = encode_requested_layout_body(layout, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_requested_layout_body(&encoded[..length]), Ok(layout));
+        assert_eq!(
+            decode_requested_layout_body_with_limits(&encoded[..length], limits()),
+            Ok(layout)
+        );
+        assert_eq!(
+            encode_requested_layout_body_with_limits(layout, limits(), &mut encoded),
+            Ok(length)
+        );
+    }
+
+    let grid_fixture = fixture("layout.requested_grid");
+    let decoded = decode_requested_layout_body(&grid_fixture).unwrap();
+    let RequestedLayoutRef::Grid(grid) = decoded else {
+        panic!("grid fixture decoded to another layout variant");
+    };
+    assert_eq!(grid.col_tracks.len(), 3);
+    assert_eq!(grid.row_tracks.len(), 1);
+    assert_eq!(grid.col_tracks.iter().len(), 3);
+    assert_eq!(
+        grid.col_tracks.iter().collect::<Vec<_>>(),
+        LAYOUT_COLUMN_TRACKS
+    );
+    assert_eq!(
+        grid.row_tracks.iter().collect::<Vec<_>>(),
+        LAYOUT_ROW_TRACKS
+    );
+
+    let RequestedLayoutRef::Item(mut pixel_item) = requested_item_layout() else {
+        unreachable!();
+    };
+    pixel_item.width = LayoutDimension::Px(-2);
+    pixel_item.height = LayoutDimension::Pct(125);
+    pixel_item.self_align = None;
+    let pixel_item = RequestedLayoutRef::Item(pixel_item);
+    let mut encoded = [0u8; 64];
+    let length = encode_requested_layout_body(pixel_item, &mut encoded).unwrap();
+    assert_eq!(
+        decode_requested_layout_body(&encoded[..length]),
+        Ok(pixel_item)
+    );
+}
+
+#[test]
+fn requested_layout_body_rejects_malformed_and_applies_independent_limits() {
+    assert_eq!(
+        decode_requested_layout_body(&[]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        decode_requested_layout_body(&[0, 0]),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        decode_requested_layout_body(&[0xff]),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::RequestedLayoutKind,
+            value: 0xff,
+        })
+    );
+
+    let mut flex = fixture("layout.requested_flex");
+    flex.pop();
+    assert_eq!(
+        decode_requested_layout_body(&flex),
+        Err(CodecError::InvalidFrame)
+    );
+    let mut flex = fixture("layout.requested_flex");
+    flex[1] = 8;
+    assert_eq!(
+        decode_requested_layout_body(&flex),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutFlexFlow,
+            value: 8,
+        })
+    );
+    let mut flex = fixture("layout.requested_flex");
+    flex[2] = 6;
+    assert_eq!(
+        decode_requested_layout_body(&flex),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutFlexAlign,
+            value: 6,
+        })
+    );
+
+    let mut grid = fixture("layout.requested_grid");
+    grid[3] = 3;
+    assert_eq!(
+        decode_requested_layout_body(&grid),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutGridTrack,
+            value: 3,
+        })
+    );
+    let mut grid = fixture("layout.requested_grid");
+    let grid_align = grid.len() - 2;
+    grid[grid_align] = 7;
+    assert_eq!(
+        decode_requested_layout_body(&grid),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutGridAlign,
+            value: 7,
+        })
+    );
+
+    let mut item = fixture("layout.requested_item");
+    item[1] = 3;
+    assert_eq!(
+        decode_requested_layout_body(&item),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutDimension,
+            value: 3,
+        })
+    );
+    let mut item = fixture("layout.requested_item");
+    item[6] = 2;
+    assert_eq!(
+        decode_requested_layout_body(&item),
+        Err(CodecError::InvalidFrame)
+    );
+    let mut item = fixture("layout.requested_item");
+    item[18] = 2;
+    assert_eq!(
+        decode_requested_layout_body(&item),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let mut tiny_bytes = limits();
+    tiny_bytes.max_byte_payload = 12;
+    let flex = requested_flex_layout();
+    assert_eq!(
+        encode_requested_layout_body_with_limits(flex, tiny_bytes, &mut [0; 64]),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_requested_layout_body_with_limits(&fixture("layout.requested_flex"), tiny_bytes),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let mut two_tracks = limits();
+    two_tracks.max_items_per_command = 2;
+    let grid = requested_grid_layout();
+    assert_eq!(
+        encode_requested_layout_body_with_limits(grid, two_tracks, &mut [0; 64]),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_requested_layout_body_with_limits(&fixture("layout.requested_grid"), two_tracks),
+        Err(CodecError::LimitExceeded)
+    );
+
+    let two_columns = [LayoutGridTrack::Px(1), LayoutGridTrack::Px(2)];
+    let two_rows = [LayoutGridTrack::Fr(1), LayoutGridTrack::Content];
+    let independently_bounded = RequestedLayoutRef::Grid(RequestedGridLayout {
+        col_tracks: LayoutGridTrackList::from_slice(&two_columns),
+        row_tracks: LayoutGridTrackList::from_slice(&two_rows),
+        col_gap: 0,
+        row_gap: 0,
+        col_align: LayoutGridAlign::Stretch,
+        row_align: LayoutGridAlign::Stretch,
+    });
+    let mut encoded = [0u8; 64];
+    assert!(
+        encode_requested_layout_body_with_limits(independently_bounded, two_tracks, &mut encoded,)
+            .is_ok(),
+        "column and row TrackList limits are independent, not summed"
+    );
+
+    let mut zero_limits = limits();
+    zero_limits.max_byte_payload = 0;
+    zero_limits.max_items_per_command = 0;
+    assert_eq!(
+        decode_requested_layout_body_with_limits(&[0, 0], zero_limits),
+        Err(CodecError::InvalidFrame),
+        "complete body structure precedes byte and track limits"
+    );
+    let mut malformed_grid = fixture("layout.requested_grid");
+    malformed_grid[3] = 0xff;
+    assert_eq!(
+        decode_requested_layout_body_with_limits(&malformed_grid, zero_limits),
+        Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutGridTrack,
+            value: 0xff,
+        }),
+        "track structure precedes byte and item limits"
+    );
+}
+
+#[test]
+fn requested_layout_codec_preserves_semantic_range_inputs_for_endpoint() {
+    let range_tracks = [LayoutGridTrack::Px(-1), LayoutGridTrack::Fr(0)];
+    let structural_grid = RequestedLayoutRef::Grid(RequestedGridLayout {
+        col_tracks: LayoutGridTrackList::from_slice(&[]),
+        row_tracks: LayoutGridTrackList::from_slice(&range_tracks),
+        col_gap: -4,
+        row_gap: -5,
+        col_align: LayoutGridAlign::Start,
+        row_align: LayoutGridAlign::End,
+    });
+    let mut encoded = [0u8; 64];
+    let length = encode_requested_layout_body(structural_grid, &mut encoded).unwrap();
+    assert_eq!(
+        decode_requested_layout_body(&encoded[..length]),
+        Ok(structural_grid),
+        "empty axes, negative Px, and Fr(0) are structurally canonical"
+    );
+
+    let structural_item = RequestedLayoutRef::Item(RequestedItemLayout {
+        width: LayoutDimension::Px(-10),
+        height: LayoutDimension::Px(-20),
+        flex_grow: 0,
+        self_align: None,
+        col_pos: 0,
+        col_span: 0,
+        row_pos: 0,
+        row_span: 0,
+        col_align: LayoutGridAlign::Stretch,
+        row_align: LayoutGridAlign::Stretch,
+        min_width: Some(-1),
+        max_width: Some(-2),
+        min_height: Some(-3),
+        max_height: None,
+    });
+    let length = encode_requested_layout_body(structural_item, &mut encoded).unwrap();
+    assert_eq!(
+        decode_requested_layout_body(&encoded[..length]),
+        Ok(structural_item),
+        "zero spans and min-greater-than-max remain Endpoint Range semantics"
+    );
+}
+
+#[test]
+fn set_requested_layout_payloads_are_exact_target_plus_canonical_bytes() {
+    let none = fixture("layout.requested_none");
+    let flex = fixture("layout.requested_flex");
+    let grid = fixture("layout.requested_grid");
+    let item = fixture("layout.requested_item");
+    let cases = [
+        (
+            SetRequestedLayoutPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                layout: &none,
+            },
+            RequestedLayoutRef::None,
+            "payload.set_requested_layout_object_none",
+            15,
+        ),
+        (
+            SetRequestedLayoutPayload {
+                target: ObjectReference::BatchObject(7),
+                layout: &none,
+            },
+            RequestedLayoutRef::None,
+            "payload.set_requested_layout_batch_none",
+            9,
+        ),
+        (
+            SetRequestedLayoutPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                layout: &flex,
+            },
+            requested_flex_layout(),
+            "payload.set_requested_layout_object_flex",
+            27,
+        ),
+        (
+            SetRequestedLayoutPayload {
+                target: ObjectReference::BatchObject(7),
+                layout: &grid,
+            },
+            requested_grid_layout(),
+            "payload.set_requested_layout_batch_grid",
+            33,
+        ),
+        (
+            SetRequestedLayoutPayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                layout: &item,
+            },
+            requested_item_layout(),
+            "payload.set_requested_layout_object_item",
+            44,
+        ),
+    ];
+
+    for (payload, expected_layout, fixture_name, expected_length) in cases {
+        let mut encoded = [0u8; 64];
+        let length = encode_set_requested_layout_payload(payload, &mut encoded).unwrap();
+        assert_eq!(length, expected_length);
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(
+            decode_set_requested_layout_payload(&encoded[..length]),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_set_requested_layout_payload_with_limits(&encoded[..length], limits()),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_requested_layout_body(payload.layout),
+            Ok(expected_layout)
+        );
+        assert_eq!(
+            decode_set_requested_layout_operation(OperationRef {
+                opcode: opcode::SET_REQUESTED_LAYOUT,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_set_requested_layout_operation_with_limits(
+                OperationRef {
+                    opcode: opcode::SET_REQUESTED_LAYOUT,
+                    flags: 0,
+                    payload: &encoded[..length],
+                },
+                limits(),
+            ),
+            Ok(payload)
+        );
+    }
+}
+
+#[test]
+fn set_requested_layout_rejects_bad_bytes_body_trailing_envelope_and_limits() {
+    assert_eq!(
+        decode_set_requested_layout_payload(&[]),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        decode_set_requested_layout_payload(&[ValueTag::Bool as u8, 1]),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+
+    let target = [ValueTag::BatchObject as u8, 7, 0];
+    let mut wrong_layout_tag = target.to_vec();
+    wrong_layout_tag.extend_from_slice(&[ValueTag::Bool as u8, 1]);
+    assert_eq!(
+        decode_set_requested_layout_payload(&wrong_layout_tag),
+        Err(ObjectReferenceError::TypeMismatch {
+            actual: ValueTag::Bool,
+        })
+    );
+    let mut unknown_layout_tag = target.to_vec();
+    unknown_layout_tag.push(0xff);
+    assert_eq!(
+        decode_set_requested_layout_payload(&unknown_layout_tag),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::ValueTag,
+                value: 0xff,
+            }
+        ))
+    );
+    let mut empty_body = target.to_vec();
+    empty_body.extend_from_slice(&[ValueTag::Bytes as u8, 0, 0, 0, 0]);
+    assert_eq!(
+        decode_set_requested_layout_payload(&empty_body),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    let mut unknown_body = target.to_vec();
+    unknown_body.extend_from_slice(&[ValueTag::Bytes as u8, 1, 0, 0, 0, 0xff]);
+    assert_eq!(
+        decode_set_requested_layout_payload(&unknown_body),
+        Err(ObjectReferenceError::Codec(
+            CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::RequestedLayoutKind,
+                value: 0xff,
+            }
+        ))
+    );
+    let mut trailing = fixture("payload.set_requested_layout_batch_none");
+    trailing.push(0);
+    assert_eq!(
+        decode_set_requested_layout_payload(&trailing),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    for payload in [
+        SetRequestedLayoutPayload {
+            target: ObjectReference::Object(1),
+            layout: &[0],
+        },
+        SetRequestedLayoutPayload {
+            target: ObjectReference::BatchObject(7),
+            layout: &[],
+        },
+        SetRequestedLayoutPayload {
+            target: ObjectReference::BatchObject(7),
+            layout: &[0, 0],
+        },
+    ] {
+        assert_eq!(
+            encode_set_requested_layout_payload(payload, &mut [0; 32]),
+            Err(CodecError::InvalidFrame)
+        );
+    }
+    assert_eq!(
+        encode_set_requested_layout_payload(
+            SetRequestedLayoutPayload {
+                target: ObjectReference::BatchObject(7),
+                layout: &[0],
+            },
+            &mut [0; 8],
+        ),
+        Err(CodecError::BufferTooSmall)
+    );
+
+    let valid = fixture("payload.set_requested_layout_object_none");
+    for (operation_opcode, flags) in [
+        (opcode::CREATE, 0),
+        (opcode::SET_FLAG, 0),
+        (opcode::SET_REQUESTED_LAYOUT, 1),
+    ] {
+        let operation = OperationRef {
+            opcode: operation_opcode,
+            flags,
+            payload: &valid,
+        };
+        assert_eq!(
+            decode_set_requested_layout_operation(operation),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+        assert_eq!(
+            decode_set_requested_layout_operation_with_limits(operation, limits()),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+
+    let mut tiny_bytes = limits();
+    tiny_bytes.max_byte_payload = 12;
+    let flex = fixture("layout.requested_flex");
+    let payload = SetRequestedLayoutPayload {
+        target: ObjectReference::BatchObject(7),
+        layout: &flex,
+    };
+    assert_eq!(
+        encode_set_requested_layout_payload_with_limits(payload, tiny_bytes, &mut [0; 64]),
+        Err(CodecError::LimitExceeded)
+    );
+    let encoded = fixture("payload.set_requested_layout_object_flex");
+    assert_eq!(
+        decode_set_requested_layout_payload_with_limits(&encoded, tiny_bytes),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    let mut zero_limits = limits();
+    zero_limits.max_byte_payload = 0;
+    zero_limits.max_items_per_command = 0;
+    assert_eq!(
+        encode_set_requested_layout_payload_with_limits(
+            SetRequestedLayoutPayload {
+                target: ObjectReference::BatchObject(7),
+                layout: &[0, 0],
+            },
+            zero_limits,
+            &mut [0; 32],
+        ),
+        Err(CodecError::InvalidFrame),
+        "layout structure precedes byte and track limits"
+    );
+}
+
+#[test]
+fn set_requested_layout_echo_is_exact_and_errors_are_operation_attributed() {
+    let none = fixture("layout.requested_none");
+    let echo_values = [ValueRef::Bytes(&none)];
+    let echo_results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&echo_values),
+    }];
+    let success = BatchSuccess {
+        result_revision: 27,
+        results: OperationResultList::from_slice(&echo_results),
+    };
+    let mut encoded = [0u8; 128];
+    let length = encode_batch_success_with_limits(success, 1, limits(), &mut encoded).unwrap();
+    assert_eq!(length, 20);
+    assert_eq!(
+        &encoded[..length],
+        fixture("payload.set_requested_layout_success_none")
+    );
+    let decoded = decode_batch_success_with_limits(&encoded[..length], 1, limits()).unwrap();
+    assert_eq!(
+        validate_set_requested_layout_result_echo(decoded, 1, 0, &none),
+        Ok(())
+    );
+
+    let other_values = [ValueRef::Object(0x0000_0002_0000_0001)];
+    let mixed_results = [
+        OperationResultRef {
+            operation_index: 0,
+            values: ValueList::from_slice(&echo_values),
+        },
+        OperationResultRef {
+            operation_index: 1,
+            values: ValueList::from_slice(&other_values),
+        },
+    ];
+    assert_eq!(
+        validate_set_requested_layout_result_echo(
+            BatchSuccess {
+                result_revision: 28,
+                results: OperationResultList::from_slice(&mixed_results),
+            },
+            2,
+            0,
+            &none,
+        ),
+        Ok(())
+    );
+
+    let wrong_type_values = [ValueRef::Bool(false)];
+    let wrong_type_results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&wrong_type_values),
+    }];
+    assert_eq!(
+        validate_set_requested_layout_result_echo(
+            BatchSuccess {
+                result_revision: 28,
+                results: OperationResultList::from_slice(&wrong_type_results),
+            },
+            1,
+            0,
+            &none,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    let wrong_bytes = [1u8];
+    let wrong_body_values = [ValueRef::Bytes(&wrong_bytes)];
+    let wrong_body_results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&wrong_body_values),
+    }];
+    assert_eq!(
+        validate_set_requested_layout_result_echo(
+            BatchSuccess {
+                result_revision: 28,
+                results: OperationResultList::from_slice(&wrong_body_results),
+            },
+            1,
+            0,
+            &none,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    let two_values = [ValueRef::Bytes(&none), ValueRef::Bool(false)];
+    let two_value_results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&two_values),
+    }];
+    assert_eq!(
+        validate_set_requested_layout_result_echo(
+            BatchSuccess {
+                result_revision: 28,
+                results: OperationResultList::from_slice(&two_value_results),
+            },
+            1,
+            0,
+            &none,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_set_requested_layout_result_echo(
+            BatchSuccess {
+                result_revision: 28,
+                results: OperationResultList::from_slice(&[]),
+            },
+            1,
+            0,
+            &none,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+    assert_eq!(
+        validate_set_requested_layout_result_echo(success, 1, 1, &none),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let grid = fixture("layout.requested_grid");
+    let grid_values = [ValueRef::Bytes(&grid)];
+    let grid_results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&grid_values),
+    }];
+    let grid_success = BatchSuccess {
+        result_revision: 28,
+        results: OperationResultList::from_slice(&grid_results),
+    };
+    let mut undersized_result = limits();
+    undersized_result.max_byte_payload = 24;
+    assert_eq!(
+        encode_batch_success_with_limits(grid_success, 1, undersized_result, &mut encoded),
+        Err(CodecError::LimitExceeded),
+        "exact echo capacity is validated before Stage publication"
+    );
+
+    for (status, diagnostic, fixture_name) in [
+        (
+            ErrorClass::StaleObject,
+            "target",
+            "frame.set_requested_layout_stale_target",
+        ),
+        (
+            ErrorClass::BatchInvalid,
+            "target-ref",
+            "frame.set_requested_layout_batch_target",
+        ),
+        (
+            ErrorClass::Unsupported,
+            "layout",
+            "frame.set_requested_layout_unsupported",
+        ),
+        (
+            ErrorClass::Range,
+            "layout",
+            "frame.set_requested_layout_range",
+        ),
+        (
+            ErrorClass::Capacity,
+            "result",
+            "frame.set_requested_layout_capacity",
+        ),
+    ] {
+        let error = FrameRef::Result(Completion {
+            request_id: 1,
+            status: CompletionStatus::Error(status),
+            operation_index: Some(0),
+            field_id: None,
+            diagnostic,
+            payload: &[],
+        });
+        let length = encode_frame(MPY_V1, error, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], fixture(fixture_name));
+        assert_eq!(decode_frame(&encoded[..length]).unwrap().frame, error);
+    }
+}
+
+#[test]
 fn set_flag_payloads_freeze_ids_boolean_bytes_and_reference_forms() {
     let cases = [
         (
@@ -3970,6 +4722,87 @@ fn eight_minimal_invoke_action_operations_fit_the_floor() {
     assert_eq!(stable_length, 15);
     let stable_operation = OperationRef {
         opcode: opcode::INVOKE_ACTION,
+        flags: 0,
+        payload: &stable_payload[..stable_length],
+    };
+    let stable_operations = [stable_operation; 8];
+    let stable_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&stable_operations),
+    });
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, limits(), &mut encoded),
+        Ok(254)
+    );
+
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 253;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, stable_target_frame, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_none_set_requested_layout_operations_fit_the_floor() {
+    let none = [0u8];
+
+    let mut batch_payload = [0u8; 9];
+    let batch_length = encode_set_requested_layout_payload_with_limits(
+        SetRequestedLayoutPayload {
+            target: ObjectReference::BatchObject(7),
+            layout: &none,
+        },
+        limits(),
+        &mut batch_payload,
+    )
+    .unwrap();
+    assert_eq!(batch_length, 9);
+    let batch_operation = OperationRef {
+        opcode: opcode::SET_REQUESTED_LAYOUT,
+        flags: 0,
+        payload: &batch_payload[..batch_length],
+    };
+    let batch_operations = [batch_operation; 8];
+    let batch_target_frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&batch_operations),
+    });
+    let mut encoded = [0u8; 256];
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, batch_target_frame, limits(), &mut encoded),
+        Ok(206)
+    );
+
+    let mut stable_payload = [0u8; 15];
+    let stable_length = encode_set_requested_layout_payload_with_limits(
+        SetRequestedLayoutPayload {
+            target: ObjectReference::Object(0x0000_0002_0000_0001),
+            layout: &none,
+        },
+        limits(),
+        &mut stable_payload,
+    )
+    .unwrap();
+    assert_eq!(stable_length, 15);
+    let stable_operation = OperationRef {
+        opcode: opcode::SET_REQUESTED_LAYOUT,
         flags: 0,
         payload: &stable_payload[..stable_length],
     };

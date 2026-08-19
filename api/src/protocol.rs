@@ -261,6 +261,18 @@ pub enum DiscriminantDomain {
     CreateDestination,
     /// Runtime-owned flag selected by SetFlag.
     RuntimeFlag,
+    /// SetRequestedLayout body variant.
+    RequestedLayoutKind,
+    /// Requested layout dimension variant.
+    LayoutDimension,
+    /// Requested flex flow.
+    LayoutFlexFlow,
+    /// Requested flex alignment.
+    LayoutFlexAlign,
+    /// Requested grid track variant.
+    LayoutGridTrack,
+    /// Requested grid alignment.
+    LayoutGridAlign,
 }
 
 /// Canonical codec failure.
@@ -292,7 +304,7 @@ pub struct Limits {
     pub max_text_bytes: u32,
     /// Maximum bytes in one opaque byte value.
     pub max_byte_payload: u32,
-    /// Maximum typed fields or Batch operations in one command envelope.
+    /// Maximum items in each opcode-owned request list or Batch operation list.
     pub max_items_per_command: u16,
     /// Maximum typed values in one result.
     pub max_values_per_result: u16,
@@ -571,6 +583,333 @@ impl<'a> Iterator for ValueIter<'a> {
 }
 
 impl ExactSizeIterator for ValueIter<'_> {}
+
+/// Opcode-owned requested-layout dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayoutDimension {
+    /// Fixed pixel dimension.
+    Px(i32),
+    /// Percentage of the parent content dimension.
+    Pct(u16),
+    /// Content-derived dimension.
+    Content,
+}
+
+/// Stable SetRequestedLayout flex-flow registry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LayoutFlexFlow {
+    /// Horizontal forward flow.
+    Row = 0,
+    /// Vertical forward flow.
+    Column = 1,
+    /// Horizontal forward flow with wrapping.
+    RowWrap = 2,
+    /// Horizontal reverse flow.
+    RowReverse = 3,
+    /// Horizontal reverse flow with wrapping.
+    RowWrapReverse = 4,
+    /// Vertical forward flow with wrapping.
+    ColumnWrap = 5,
+    /// Vertical reverse flow.
+    ColumnReverse = 6,
+    /// Vertical reverse flow with wrapping.
+    ColumnWrapReverse = 7,
+}
+
+impl LayoutFlexFlow {
+    fn decode(value: u8) -> Result<Self, CodecError> {
+        match value {
+            0 => Ok(Self::Row),
+            1 => Ok(Self::Column),
+            2 => Ok(Self::RowWrap),
+            3 => Ok(Self::RowReverse),
+            4 => Ok(Self::RowWrapReverse),
+            5 => Ok(Self::ColumnWrap),
+            6 => Ok(Self::ColumnReverse),
+            7 => Ok(Self::ColumnWrapReverse),
+            value => Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::LayoutFlexFlow,
+                value,
+            }),
+        }
+    }
+}
+
+/// Stable SetRequestedLayout flex-alignment registry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LayoutFlexAlign {
+    /// Pack toward the start.
+    Start = 0,
+    /// Pack toward the end.
+    End = 1,
+    /// Center within the available space.
+    Center = 2,
+    /// Distribute equal space around every item.
+    SpaceEvenly = 3,
+    /// Distribute half-space at the outer edges.
+    SpaceAround = 4,
+    /// Distribute space only between items.
+    SpaceBetween = 5,
+}
+
+impl LayoutFlexAlign {
+    fn decode(value: u8) -> Result<Self, CodecError> {
+        match value {
+            0 => Ok(Self::Start),
+            1 => Ok(Self::End),
+            2 => Ok(Self::Center),
+            3 => Ok(Self::SpaceEvenly),
+            4 => Ok(Self::SpaceAround),
+            5 => Ok(Self::SpaceBetween),
+            value => Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::LayoutFlexAlign,
+                value,
+            }),
+        }
+    }
+}
+
+/// Stable SetRequestedLayout grid-alignment registry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LayoutGridAlign {
+    /// Pack toward the start.
+    Start = 0,
+    /// Center within the available space.
+    Center = 1,
+    /// Pack toward the end.
+    End = 2,
+    /// Stretch to the available space.
+    Stretch = 3,
+    /// Distribute equal space around every item.
+    SpaceEvenly = 4,
+    /// Distribute half-space at the outer edges.
+    SpaceAround = 5,
+    /// Distribute space only between items.
+    SpaceBetween = 6,
+}
+
+impl LayoutGridAlign {
+    fn decode(value: u8) -> Result<Self, CodecError> {
+        match value {
+            0 => Ok(Self::Start),
+            1 => Ok(Self::Center),
+            2 => Ok(Self::End),
+            3 => Ok(Self::Stretch),
+            4 => Ok(Self::SpaceEvenly),
+            5 => Ok(Self::SpaceAround),
+            6 => Ok(Self::SpaceBetween),
+            value => Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::LayoutGridAlign,
+                value,
+            }),
+        }
+    }
+}
+
+/// One opcode-owned requested-layout grid track.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayoutGridTrack {
+    /// Fixed pixel track.
+    Px(i32),
+    /// Fractional free-space track.
+    Fr(u8),
+    /// Content-derived track.
+    Content,
+}
+
+#[derive(Clone, Copy)]
+enum LayoutGridTrackSource<'a> {
+    Native(&'a [LayoutGridTrack]),
+    Wire { count: usize, tracks: &'a [u8] },
+}
+
+/// Borrowed native or zero-copy wire-backed grid track list.
+#[derive(Clone, Copy)]
+pub struct LayoutGridTrackList<'a> {
+    source: LayoutGridTrackSource<'a>,
+}
+
+impl<'a> LayoutGridTrackList<'a> {
+    /// Build a track list from native borrowed tracks for encoding.
+    pub const fn from_slice(tracks: &'a [LayoutGridTrack]) -> Self {
+        Self {
+            source: LayoutGridTrackSource::Native(tracks),
+        }
+    }
+
+    fn from_wire(count: usize, tracks: &'a [u8]) -> Self {
+        Self {
+            source: LayoutGridTrackSource::Wire { count, tracks },
+        }
+    }
+
+    /// Return the exact track count.
+    pub fn len(self) -> usize {
+        match self.source {
+            LayoutGridTrackSource::Native(tracks) => tracks.len(),
+            LayoutGridTrackSource::Wire { count, .. } => count,
+        }
+    }
+
+    /// Return whether this track list is empty.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterate tracks in canonical order.
+    pub fn iter(self) -> LayoutGridTrackIter<'a> {
+        let source = match self.source {
+            LayoutGridTrackSource::Native(tracks) => {
+                LayoutGridTrackIterSource::Native(tracks.iter())
+            }
+            LayoutGridTrackSource::Wire { count, tracks } => LayoutGridTrackIterSource::Wire {
+                remaining: count,
+                reader: Reader::new(tracks),
+            },
+        };
+        LayoutGridTrackIter { source }
+    }
+}
+
+impl fmt::Debug for LayoutGridTrackList<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl PartialEq for LayoutGridTrackList<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
+impl Eq for LayoutGridTrackList<'_> {}
+
+enum LayoutGridTrackIterSource<'a> {
+    Native(core::slice::Iter<'a, LayoutGridTrack>),
+    Wire {
+        remaining: usize,
+        reader: Reader<'a>,
+    },
+}
+
+/// Iterator over one requested-layout grid track list.
+pub struct LayoutGridTrackIter<'a> {
+    source: LayoutGridTrackIterSource<'a>,
+}
+
+impl Iterator for LayoutGridTrackIter<'_> {
+    type Item = LayoutGridTrack;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.source {
+            LayoutGridTrackIterSource::Native(tracks) => tracks.next().copied(),
+            LayoutGridTrackIterSource::Wire { remaining, reader } => {
+                if *remaining == 0 {
+                    return None;
+                }
+                *remaining -= 1;
+                Some(
+                    decode_layout_grid_track_from_reader(reader)
+                        .expect("wire layout track list was validated"),
+                )
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match &self.source {
+            LayoutGridTrackIterSource::Native(tracks) => tracks.len(),
+            LayoutGridTrackIterSource::Wire { remaining, .. } => *remaining,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for LayoutGridTrackIter<'_> {}
+
+/// Canonical requested flex-container body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RequestedFlexLayout {
+    /// Main-axis flow.
+    pub flow: LayoutFlexFlow,
+    /// Main-axis item alignment.
+    pub main_align: LayoutFlexAlign,
+    /// Cross-axis item alignment.
+    pub cross_align: LayoutFlexAlign,
+    /// Cross-axis track alignment.
+    pub track_cross_align: LayoutFlexAlign,
+    /// Main-axis item gap in pixels.
+    pub gap_main: i32,
+    /// Cross-axis track gap in pixels.
+    pub gap_cross: i32,
+}
+
+/// Canonical requested grid-container body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RequestedGridLayout<'a> {
+    /// Ordered column tracks.
+    pub col_tracks: LayoutGridTrackList<'a>,
+    /// Ordered row tracks.
+    pub row_tracks: LayoutGridTrackList<'a>,
+    /// Column gap in pixels.
+    pub col_gap: i32,
+    /// Row gap in pixels.
+    pub row_gap: i32,
+    /// Column alignment.
+    pub col_align: LayoutGridAlign,
+    /// Row alignment.
+    pub row_align: LayoutGridAlign,
+}
+
+/// Canonical requested item-hints body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RequestedItemLayout {
+    /// Preferred width.
+    pub width: LayoutDimension,
+    /// Preferred height.
+    pub height: LayoutDimension,
+    /// Flex growth factor.
+    pub flex_grow: u8,
+    /// Optional per-item flex cross-axis alignment.
+    pub self_align: Option<LayoutFlexAlign>,
+    /// Explicit zero-based grid column.
+    pub col_pos: u16,
+    /// Grid column span.
+    pub col_span: u16,
+    /// Explicit zero-based grid row.
+    pub row_pos: u16,
+    /// Grid row span.
+    pub row_span: u16,
+    /// Per-item grid column alignment.
+    pub col_align: LayoutGridAlign,
+    /// Per-item grid row alignment.
+    pub row_align: LayoutGridAlign,
+    /// Optional minimum width in pixels.
+    pub min_width: Option<i32>,
+    /// Optional maximum width in pixels.
+    pub max_width: Option<i32>,
+    /// Optional minimum height in pixels.
+    pub min_height: Option<i32>,
+    /// Optional maximum height in pixels.
+    pub max_height: Option<i32>,
+}
+
+/// Parsed canonical SetRequestedLayout Bytes body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RequestedLayoutRef<'a> {
+    /// Clear the actor's requested layout role.
+    None,
+    /// Replace it with flex-container configuration.
+    Flex(RequestedFlexLayout),
+    /// Replace it with grid-container configuration.
+    Grid(RequestedGridLayout<'a>),
+    /// Replace it with child item hints.
+    Item(RequestedItemLayout),
+}
 
 #[derive(Clone, Copy)]
 enum FieldSource<'a> {
@@ -969,6 +1308,18 @@ pub struct InvokeActionPayload<'a> {
 
 /// Structural or contextual failure while decoding an InvokeAction payload.
 pub type InvokeActionPayloadError = ObjectReferenceError;
+
+/// Complete Batch-only SetRequestedLayout payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SetRequestedLayoutPayload<'a> {
+    /// Stable or earlier-created actor whose requested layout is replaced.
+    pub target: ObjectReference,
+    /// Complete canonical opcode-owned body carried by one Bytes value.
+    pub layout: &'a [u8],
+}
+
+/// Structural or contextual failure while decoding SetRequestedLayout.
+pub type SetRequestedLayoutPayloadError = ObjectReferenceError;
 
 /// Stable runtime-owned object metadata flags writable through SetFlag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1728,6 +2079,207 @@ fn decode_value_list_inner(input: &[u8]) -> Result<ValueList<'_>, CodecError> {
     Ok(ValueList::from_wire(count, &input[values_start..]))
 }
 
+/// Return the exact canonical byte length of one requested-layout body.
+///
+/// This validates native track-list count structure but applies no negotiated
+/// byte or item limit.
+pub fn requested_layout_body_encoded_len(
+    layout: RequestedLayoutRef<'_>,
+) -> Result<usize, CodecError> {
+    validate_requested_layout_structure(layout)?;
+    match layout {
+        RequestedLayoutRef::None => Ok(1),
+        RequestedLayoutRef::Flex(_) => Ok(13),
+        RequestedLayoutRef::Grid(layout) => {
+            let columns = layout_grid_track_list_encoded_len(layout.col_tracks)?;
+            let rows = layout_grid_track_list_encoded_len(layout.row_tracks)?;
+            1usize
+                .checked_add(columns)
+                .and_then(|length| length.checked_add(rows))
+                .and_then(|length| length.checked_add(10))
+                .ok_or(CodecError::InvalidFrame)
+        }
+        RequestedLayoutRef::Item(layout) => {
+            let width = layout_dimension_encoded_len(layout.width);
+            let height = layout_dimension_encoded_len(layout.height);
+            let self_align = if layout.self_align.is_some() { 2 } else { 1 };
+            let option_i32_bytes = [
+                layout.min_width,
+                layout.max_width,
+                layout.min_height,
+                layout.max_height,
+            ]
+            .into_iter()
+            .try_fold(0usize, |length, value| {
+                length
+                    .checked_add(if value.is_some() { 5 } else { 1 })
+                    .ok_or(CodecError::InvalidFrame)
+            })?;
+            1usize
+                .checked_add(width)
+                .and_then(|length| length.checked_add(height))
+                .and_then(|length| length.checked_add(1 + self_align + 8 + 2))
+                .and_then(|length| length.checked_add(option_i32_bytes))
+                .ok_or(CodecError::InvalidFrame)
+        }
+    }
+}
+
+/// Encode one canonical opcode-owned requested-layout Bytes body.
+///
+/// This public structural helper is intentionally separate from the outer
+/// target-plus-Bytes payload encoder so runtimes can pre-encode exact echo
+/// bytes during atomic Stage preparation.
+pub fn encode_requested_layout_body(
+    layout: RequestedLayoutRef<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    let _ = requested_layout_body_encoded_len(layout)?;
+    let mut writer = Writer::new(output);
+    encode_requested_layout_body_into(layout, &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode one requested-layout body under active byte and track-list limits.
+///
+/// Complete structure is validated before `max_byte_payload` and the
+/// independently applied column/row `max_items_per_command` limits.
+pub fn encode_requested_layout_body_with_limits(
+    layout: RequestedLayoutRef<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    let body_length = requested_layout_body_encoded_len(layout)?;
+    validate_requested_layout_limits(layout, body_length, limits)?;
+    encode_requested_layout_body(layout, output)
+}
+
+/// Decode one complete canonical opcode-owned requested-layout Bytes body.
+pub fn decode_requested_layout_body(input: &[u8]) -> Result<RequestedLayoutRef<'_>, CodecError> {
+    decode_requested_layout_body_inner(input).map_err(nested_frame_error)
+}
+
+/// Decode one requested-layout body under active byte and track-list limits.
+///
+/// Complete structural decoding precedes every limit decision.
+pub fn decode_requested_layout_body_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<RequestedLayoutRef<'_>, CodecError> {
+    let layout = decode_requested_layout_body(input)?;
+    validate_requested_layout_limits(layout, input.len(), limits)?;
+    Ok(layout)
+}
+
+fn decode_requested_layout_body_inner(input: &[u8]) -> Result<RequestedLayoutRef<'_>, CodecError> {
+    let mut reader = Reader::new(input);
+    let layout = match reader.u8()? {
+        0 => RequestedLayoutRef::None,
+        1 => RequestedLayoutRef::Flex(RequestedFlexLayout {
+            flow: LayoutFlexFlow::decode(reader.u8()?)?,
+            main_align: LayoutFlexAlign::decode(reader.u8()?)?,
+            cross_align: LayoutFlexAlign::decode(reader.u8()?)?,
+            track_cross_align: LayoutFlexAlign::decode(reader.u8()?)?,
+            gap_main: reader.i32()?,
+            gap_cross: reader.i32()?,
+        }),
+        2 => RequestedLayoutRef::Grid(RequestedGridLayout {
+            col_tracks: decode_layout_grid_track_list_from_reader(&mut reader)?,
+            row_tracks: decode_layout_grid_track_list_from_reader(&mut reader)?,
+            col_gap: reader.i32()?,
+            row_gap: reader.i32()?,
+            col_align: LayoutGridAlign::decode(reader.u8()?)?,
+            row_align: LayoutGridAlign::decode(reader.u8()?)?,
+        }),
+        3 => RequestedLayoutRef::Item(RequestedItemLayout {
+            width: decode_layout_dimension_from_reader(&mut reader)?,
+            height: decode_layout_dimension_from_reader(&mut reader)?,
+            flex_grow: reader.u8()?,
+            self_align: decode_optional_layout_flex_align(&mut reader)?,
+            col_pos: reader.u16()?,
+            col_span: reader.u16()?,
+            row_pos: reader.u16()?,
+            row_span: reader.u16()?,
+            col_align: LayoutGridAlign::decode(reader.u8()?)?,
+            row_align: LayoutGridAlign::decode(reader.u8()?)?,
+            min_width: decode_optional_i32(&mut reader)?,
+            max_width: decode_optional_i32(&mut reader)?,
+            min_height: decode_optional_i32(&mut reader)?,
+            max_height: decode_optional_i32(&mut reader)?,
+        }),
+        value => {
+            return Err(CodecError::UnsupportedDiscriminant {
+                domain: DiscriminantDomain::RequestedLayoutKind,
+                value,
+            });
+        }
+    };
+    if reader.position != input.len() {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(layout)
+}
+
+fn decode_layout_dimension_from_reader(
+    reader: &mut Reader<'_>,
+) -> Result<LayoutDimension, CodecError> {
+    match reader.u8()? {
+        0 => Ok(LayoutDimension::Px(reader.i32()?)),
+        1 => Ok(LayoutDimension::Pct(reader.u16()?)),
+        2 => Ok(LayoutDimension::Content),
+        value => Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutDimension,
+            value,
+        }),
+    }
+}
+
+fn decode_layout_grid_track_from_reader(
+    reader: &mut Reader<'_>,
+) -> Result<LayoutGridTrack, CodecError> {
+    match reader.u8()? {
+        0 => Ok(LayoutGridTrack::Px(reader.i32()?)),
+        1 => Ok(LayoutGridTrack::Fr(reader.u8()?)),
+        2 => Ok(LayoutGridTrack::Content),
+        value => Err(CodecError::UnsupportedDiscriminant {
+            domain: DiscriminantDomain::LayoutGridTrack,
+            value,
+        }),
+    }
+}
+
+fn decode_layout_grid_track_list_from_reader<'a>(
+    reader: &mut Reader<'a>,
+) -> Result<LayoutGridTrackList<'a>, CodecError> {
+    let count = reader.u16()? as usize;
+    let start = reader.position;
+    for _ in 0..count {
+        let _ = decode_layout_grid_track_from_reader(reader)?;
+    }
+    Ok(LayoutGridTrackList::from_wire(
+        count,
+        &reader.input[start..reader.position],
+    ))
+}
+
+fn decode_optional_layout_flex_align(
+    reader: &mut Reader<'_>,
+) -> Result<Option<LayoutFlexAlign>, CodecError> {
+    match reader.u8()? {
+        0 => Ok(None),
+        1 => Ok(Some(LayoutFlexAlign::decode(reader.u8()?)?)),
+        _ => Err(CodecError::InvalidFrame),
+    }
+}
+
+fn decode_optional_i32(reader: &mut Reader<'_>) -> Result<Option<i32>, CodecError> {
+    match reader.u8()? {
+        0 => Ok(None),
+        1 => Ok(Some(reader.i32()?)),
+        _ => Err(CodecError::InvalidFrame),
+    }
+}
+
 /// Encode a complete counted canonical typed field list.
 pub fn encode_field_list(fields: FieldList<'_>, output: &mut [u8]) -> Result<usize, CodecError> {
     validate_field_list_structure(fields)?;
@@ -2453,6 +3005,94 @@ pub fn decode_invoke_action_operation_with_limits(
     decode_invoke_action_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete SetRequestedLayout target-plus-Bytes payload.
+///
+/// The layout slice must already contain one canonical opcode-owned body.
+/// Request acceptance should use
+/// [`encode_set_requested_layout_payload_with_limits`].
+pub fn encode_set_requested_layout_payload(
+    payload: SetRequestedLayoutPayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_requested_layout_payload_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    encode_value_into(ValueRef::Bytes(payload.layout), &mut writer)?;
+    Ok(writer.position)
+}
+
+/// Encode one SetRequestedLayout payload under byte and track-list limits.
+///
+/// Complete target, Bytes, and opcode-body structure precedes every limit.
+pub fn encode_set_requested_layout_payload_with_limits(
+    payload: SetRequestedLayoutPayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_requested_layout_payload_structure(payload)?;
+    let layout = decode_requested_layout_body(payload.layout)?;
+    validate_requested_layout_limits(layout, payload.layout.len(), limits)?;
+    encode_set_requested_layout_payload(payload, output)
+}
+
+/// Decode one complete SetRequestedLayout target-plus-Bytes payload.
+pub fn decode_set_requested_layout_payload(
+    input: &[u8],
+) -> Result<SetRequestedLayoutPayload<'_>, SetRequestedLayoutPayloadError> {
+    let (target, target_consumed) =
+        decode_object_reference(input).map_err(nested_mutation_target_error)?;
+    let remainder = &input[target_consumed..];
+    let (value, consumed) =
+        decode_value(remainder).map_err(|error| nested_mutation_target_error(error.into()))?;
+    if consumed != remainder.len() {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    let layout = match value {
+        ValueRef::Bytes(layout) => layout,
+        value => {
+            return Err(ObjectReferenceError::TypeMismatch {
+                actual: value.tag(),
+            });
+        }
+    };
+    let _ = decode_requested_layout_body(layout)?;
+    Ok(SetRequestedLayoutPayload { target, layout })
+}
+
+/// Decode one SetRequestedLayout payload under byte and track-list limits.
+///
+/// Complete structural decoding precedes every limit decision.
+pub fn decode_set_requested_layout_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<SetRequestedLayoutPayload<'_>, SetRequestedLayoutPayloadError> {
+    let payload = decode_set_requested_layout_payload(input)?;
+    let layout = decode_requested_layout_body(payload.layout)?;
+    validate_requested_layout_limits(layout, payload.layout.len(), limits)?;
+    Ok(payload)
+}
+
+/// Decode one exact zero-flag SetRequestedLayout Batch operation.
+pub fn decode_set_requested_layout_operation(
+    operation: OperationRef<'_>,
+) -> Result<SetRequestedLayoutPayload<'_>, SetRequestedLayoutPayloadError> {
+    if operation.opcode != opcode::SET_REQUESTED_LAYOUT || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_requested_layout_payload(operation.payload)
+}
+
+/// Decode one SetRequestedLayout Batch operation under negotiated limits.
+pub fn decode_set_requested_layout_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<SetRequestedLayoutPayload<'_>, SetRequestedLayoutPayloadError> {
+    if operation.opcode != opcode::SET_REQUESTED_LAYOUT || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_requested_layout_payload_with_limits(operation.payload, limits)
+}
+
 /// Encode one complete SetFlag payload.
 ///
 /// No negotiated variable-size limit applies to this fixed-size payload. The
@@ -2710,6 +3350,46 @@ pub fn validate_invoke_action_result_absent(
     {
         return Err(CodecError::InvalidFrame);
     }
+    Ok(())
+}
+
+/// Validate one exact correlated SetRequestedLayout Bytes echo.
+///
+/// The caller MUST already have correlated `operation_index` to a submitted
+/// opcode [`opcode::SET_REQUESTED_LAYOUT`] and retained the structurally and
+/// semantically accepted canonical body. This helper validates BatchSuccess
+/// structure and requires exactly one result value: a Bytes value byte-equal to
+/// `accepted_layout`. Other operation results may coexist. It does not prove
+/// opcode correlation, validate their result schemas, or apply negotiated
+/// limits to the accepted or echoed body.
+pub fn validate_set_requested_layout_result_echo(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    operation_index: u16,
+    accepted_layout: &[u8],
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if operation_index >= submitted_operation_count {
+        return Err(CodecError::InvalidFrame);
+    }
+    let result = success
+        .results
+        .iter()
+        .find(|result| result.operation_index == operation_index)
+        .ok_or(CodecError::InvalidFrame)?;
+    let mut values = result.values.iter();
+    match (values.next(), values.next()) {
+        (Some(ValueRef::Bytes(layout)), None) if layout == accepted_layout => Ok(()),
+        _ => Err(CodecError::InvalidFrame),
+    }
+}
+
+fn validate_set_requested_layout_payload_structure(
+    payload: SetRequestedLayoutPayload<'_>,
+) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    validate_value_structure(ValueRef::Bytes(payload.layout))?;
+    let _ = decode_requested_layout_body(payload.layout)?;
     Ok(())
 }
 
@@ -3313,6 +3993,135 @@ fn encode_value_list_into(
     Ok(())
 }
 
+fn encode_requested_layout_body_into(
+    layout: RequestedLayoutRef<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    match layout {
+        RequestedLayoutRef::None => writer.u8(0),
+        RequestedLayoutRef::Flex(layout) => {
+            writer.u8(1)?;
+            writer.u8(layout.flow as u8)?;
+            writer.u8(layout.main_align as u8)?;
+            writer.u8(layout.cross_align as u8)?;
+            writer.u8(layout.track_cross_align as u8)?;
+            writer.i32(layout.gap_main)?;
+            writer.i32(layout.gap_cross)
+        }
+        RequestedLayoutRef::Grid(layout) => {
+            writer.u8(2)?;
+            encode_layout_grid_track_list_into(layout.col_tracks, writer)?;
+            encode_layout_grid_track_list_into(layout.row_tracks, writer)?;
+            writer.i32(layout.col_gap)?;
+            writer.i32(layout.row_gap)?;
+            writer.u8(layout.col_align as u8)?;
+            writer.u8(layout.row_align as u8)
+        }
+        RequestedLayoutRef::Item(layout) => {
+            writer.u8(3)?;
+            encode_layout_dimension_into(layout.width, writer)?;
+            encode_layout_dimension_into(layout.height, writer)?;
+            writer.u8(layout.flex_grow)?;
+            encode_optional_layout_flex_align(layout.self_align, writer)?;
+            writer.u16(layout.col_pos)?;
+            writer.u16(layout.col_span)?;
+            writer.u16(layout.row_pos)?;
+            writer.u16(layout.row_span)?;
+            writer.u8(layout.col_align as u8)?;
+            writer.u8(layout.row_align as u8)?;
+            encode_optional_i32(layout.min_width, writer)?;
+            encode_optional_i32(layout.max_width, writer)?;
+            encode_optional_i32(layout.min_height, writer)?;
+            encode_optional_i32(layout.max_height, writer)
+        }
+    }
+}
+
+fn encode_layout_dimension_into(
+    dimension: LayoutDimension,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    match dimension {
+        LayoutDimension::Px(value) => {
+            writer.u8(0)?;
+            writer.i32(value)
+        }
+        LayoutDimension::Pct(value) => {
+            writer.u8(1)?;
+            writer.u16(value)
+        }
+        LayoutDimension::Content => writer.u8(2),
+    }
+}
+
+fn encode_layout_grid_track_list_into(
+    tracks: LayoutGridTrackList<'_>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    writer.u16(u16::try_from(tracks.len()).map_err(|_| CodecError::InvalidFrame)?)?;
+    for track in tracks.iter() {
+        match track {
+            LayoutGridTrack::Px(value) => {
+                writer.u8(0)?;
+                writer.i32(value)?;
+            }
+            LayoutGridTrack::Fr(value) => {
+                writer.u8(1)?;
+                writer.u8(value)?;
+            }
+            LayoutGridTrack::Content => writer.u8(2)?,
+        }
+    }
+    Ok(())
+}
+
+fn encode_optional_layout_flex_align(
+    value: Option<LayoutFlexAlign>,
+    writer: &mut Writer<'_>,
+) -> Result<(), CodecError> {
+    match value {
+        None => writer.u8(0),
+        Some(value) => {
+            writer.u8(1)?;
+            writer.u8(value as u8)
+        }
+    }
+}
+
+fn encode_optional_i32(value: Option<i32>, writer: &mut Writer<'_>) -> Result<(), CodecError> {
+    match value {
+        None => writer.u8(0),
+        Some(value) => {
+            writer.u8(1)?;
+            writer.i32(value)
+        }
+    }
+}
+
+const fn layout_dimension_encoded_len(dimension: LayoutDimension) -> usize {
+    match dimension {
+        LayoutDimension::Px(_) => 5,
+        LayoutDimension::Pct(_) => 3,
+        LayoutDimension::Content => 1,
+    }
+}
+
+fn layout_grid_track_list_encoded_len(
+    tracks: LayoutGridTrackList<'_>,
+) -> Result<usize, CodecError> {
+    let mut length = 2usize;
+    for track in tracks.iter() {
+        length = length
+            .checked_add(match track {
+                LayoutGridTrack::Px(_) => 5,
+                LayoutGridTrack::Fr(_) => 2,
+                LayoutGridTrack::Content => 1,
+            })
+            .ok_or(CodecError::InvalidFrame)?;
+    }
+    Ok(length)
+}
+
 fn encode_field_list_into(
     fields: FieldList<'_>,
     writer: &mut Writer<'_>,
@@ -3436,6 +4245,31 @@ fn validate_value_list_structure(values: ValueList<'_>) -> Result<(), CodecError
     let _ = u16::try_from(values.len()).map_err(|_| CodecError::InvalidFrame)?;
     for value in values.iter() {
         validate_value_structure(value)?;
+    }
+    Ok(())
+}
+
+fn validate_requested_layout_structure(layout: RequestedLayoutRef<'_>) -> Result<(), CodecError> {
+    if let RequestedLayoutRef::Grid(layout) = layout {
+        let _ = u16::try_from(layout.col_tracks.len()).map_err(|_| CodecError::InvalidFrame)?;
+        let _ = u16::try_from(layout.row_tracks.len()).map_err(|_| CodecError::InvalidFrame)?;
+    }
+    Ok(())
+}
+
+fn validate_requested_layout_limits(
+    layout: RequestedLayoutRef<'_>,
+    body_length: usize,
+    limits: Limits,
+) -> Result<(), CodecError> {
+    if body_length > limits.max_byte_payload as usize {
+        return Err(CodecError::LimitExceeded);
+    }
+    if let RequestedLayoutRef::Grid(layout) = layout
+        && (layout.col_tracks.len() > limits.max_items_per_command as usize
+            || layout.row_tracks.len() > limits.max_items_per_command as usize)
+    {
+        return Err(CodecError::LimitExceeded);
     }
     Ok(())
 }

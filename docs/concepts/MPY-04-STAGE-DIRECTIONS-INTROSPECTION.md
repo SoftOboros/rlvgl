@@ -22,7 +22,9 @@ proof. ResetProperties now has an exact nonempty property-ID payload,
 structural-before-limit validation, stable/Batch target vectors, and outputless
 result proof. InvokeAction now has an exact typed-argument request and
 outputless result proof for Transactional actions whose descriptors declare no
-results. Complete Endpoint dispatch remains deferred.
+results. SetRequestedLayout now has exact None/Flex/Grid/Item Bytes bodies,
+independent body/track limits, and a byte-exact requested-state echo. Complete
+Endpoint dispatch remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -121,7 +123,7 @@ to operation-specific PCDNs.
 | `RESET_PROPERTIES` | Actor whose properties are reset | Exact nonempty ordered property IDs and outputless success; §5.8 |
 | `INVOKE_ACTION` | Actor owning the descriptor action | Exact action ID and typed arguments; outputless Transactional/empty-result slice; §5.9 |
 | `SET_FLAG` | Actor owning runtime metadata | Exact flag ID plus canonical Boolean and outputless success; §5.6 |
-| `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Layout value and success echo deferred |
+| `SET_REQUESTED_LAYOUT` | Actor receiving director-authored layout | Exact None/Flex/Grid/Item Bytes body and one-Bytes echo; §5.10 |
 | `REPARENT` | Actor subtree being moved | Exact parent plus `u32` index and outputless success; §5.4 |
 | `PROMOTE_ROOT` | Actor becoming or moving as a named root | Exact UTF-8 name plus `u32` index and outputless success; §5.5 |
 | `REORDER` | Actor moving within its current owner | Exact `u32` index and outputless success; §5.3 |
@@ -756,6 +758,124 @@ contextual target and Object-argument resolution, descriptor and capability
 lookup, transaction/result-class admission, collective prepared execution,
 error attribution, lifecycle/cue ordering, and retained-storage release.
 
+### 5.10 SetRequestedLayout body, limits, and exact echo
+
+SetRequestedLayout specializes the common target envelope with exactly one
+canonical MPY-02 Bytes value. Those Bytes contain the complete opcode-owned
+requested-layout body:
+
+```text
+set_requested_layout_payload = target:ObjectReference | layout:Bytes
+
+layout_body = None | Flex | Grid | Item
+None = kind:00
+Flex = kind:01 | flow:u8 | main_align:u8 | cross_align:u8 |
+       track_cross_align:u8 | gap_main:i32-le | gap_cross:i32-le
+Grid = kind:02 | col_tracks:TrackList | row_tracks:TrackList |
+       col_gap:i32-le | row_gap:i32-le | col_align:u8 | row_align:u8
+Item = kind:03 | width:Dimension | height:Dimension | flex_grow:u8 |
+       self_align:Option<FlexAlign> | col_pos:u16-le | col_span:u16-le |
+       row_pos:u16-le | row_span:u16-le | col_align:u8 | row_align:u8 |
+       min_width:Option<i32-le> | max_width:Option<i32-le> |
+       min_height:Option<i32-le> | max_height:Option<i32-le>
+
+TrackList = count:u16-le | track[count]
+track = 00 | pixels:i32-le
+      | 01 | fraction:u8
+      | 02
+Dimension = 00 | pixels:i32-le
+          | 01 | percent:u16-le
+          | 02
+Option<T> = 00 | 01 | value:T
+```
+
+The exact stable ordinal registries are independent of Rust declaration layout:
+
+| Registry | Ordinals |
+|---|---|
+| Layout kind | `None=0`, `Flex=1`, `Grid=2`, `Item=3` |
+| FlexFlow | `Row=0`, `Column=1`, `RowWrap=2`, `RowReverse=3`, `RowWrapReverse=4`, `ColumnWrap=5`, `ColumnReverse=6`, `ColumnWrapReverse=7` |
+| FlexAlign | `Start=0`, `End=1`, `Center=2`, `SpaceEvenly=3`, `SpaceAround=4`, `SpaceBetween=5` |
+| GridTrack | `Px=0`, `Fr=1`, `Content=2` |
+| GridAlign | `Start=0`, `Center=1`, `End=2`, `Stretch=3`, `SpaceEvenly=4`, `SpaceAround=5`, `SpaceBetween=6` |
+| Dimension | `Px=0`, `Pct=1`, `Content=2` |
+
+The operation opcode is exactly `SET_REQUESTED_LAYOUT` (`0x0000_0006`) and
+flags are `0`. The target and one Bytes value consume the complete operation
+payload, and the layout body consumes every byte in that Bytes value. A known
+non-Bytes layout value is `TypeMismatch`; an unknown MPY value tag is
+`Unsupported`. A missing or truncated target, Bytes value, body field, track,
+dimension, or option is `InvalidFrame`. Option markers other than `0` and `1`,
+and any trailing operation or body byte, are `InvalidFrame`. Unknown layout,
+flow, dimension, track, or alignment ordinals are `Unsupported`, never
+truncated or mapped to a native default. A Command carrying
+SetRequestedLayout is `Unsupported`.
+
+Both stable `Object` and earlier unique `BatchObject` targets are permitted.
+After complete structural and negotiated-limit validation, Endpoint resolves
+the target first. A stale stable target is `StaleObject`; an unbound or forward
+Batch target is `BatchInvalid`. `None` clears the requested layout role on every
+actor. `Flex`, `Grid`, and `Item` require the corresponding catalog-proven
+layout capability; absence produces `Unsupported`. All these errors are
+operation-attributed with `field_id = None` because this payload has positional
+fields rather than registered keyed fields.
+
+The body codec is deliberately structural. Grid lists may structurally encode
+zero tracks, `Px` and gaps carry the full signed `i32` domain, `Fr` carries the
+full `u8` domain, spans carry the full `u16` domain, and each optional bound is
+independent. Semantic `Range` is restricted to these cases:
+
+- either Grid track list is empty;
+- a Grid `Px` track is negative or a Grid `Fr` track is zero;
+- an Item column or row span is zero; or
+- an Item minimum exceeds its matching maximum.
+
+Negative Flex or Grid gaps, negative `Dimension::Px` values, and standalone
+negative Item minima or maxima are accepted unless a present minimum exceeds
+its matching maximum. Those semantic `Range` failures are also attributed to
+the operation with `field_id = None`.
+
+The unbounded body and outer-payload codecs are structural/tooling helpers.
+Post-negotiation acceptance MUST use their `with_limits` forms. Complete body
+structure is validated before any capacity decision. `max_byte_payload`
+applies to the layout body byte length, excluding the MPY Bytes tag and length
+prefix. For Grid, `max_items_per_command` then applies independently to the
+column TrackList and the row TrackList; the two counts are not summed. The
+enclosing Batch independently enforces `max_frame_bytes`.
+
+Success contains exactly one `OperationResult` at the SetRequestedLayout
+operation index and exactly one value in that record. The value is Bytes and is
+byte-for-byte identical to the accepted canonical body. It echoes requested
+director state, never computed geometry. Other output-bearing operations retain
+their increasing records. Missing the correlated record, adding a second
+value, using another value tag, or changing one body byte is `InvalidFrame`
+under this result schema.
+
+Endpoint MUST use the public opcode-owned body encoder and exact-length helper
+to materialize and reserve the echo before publishing Stage state. Failure to
+reserve the complete echo is operation-attributed `Capacity` with
+`field_id = None` and leaves the Stage unchanged. The narrow API echo validator
+requires the caller to have already correlated the opcode and retained the
+accepted canonical body. It validates BatchSuccess structure and the one exact
+Bytes record only; it does not prove opcode correlation, validate other result
+schemas, or apply negotiated limits.
+
+Replacing requested layout with its already-current byte-equivalent value is a
+valid no-op direction. It remains part of the accepted mutation Batch, whose
+visible commit advances `StageRevision` exactly once for the complete Batch,
+including when that no-op SetRequestedLayout is its only direction. The exact
+echo carries the accepted requested state under that revision.
+
+The None body is one byte, so the smallest structural payload is nine bytes
+with a BatchObject target or fifteen bytes with a stable Object target. Eight
+such operation records produce 206-byte and 254-byte Batch frames,
+respectively, both within the conservative 256-byte floor. One successful None
+echo is exactly 20 bytes as a BatchSuccess payload. These figures are wire-size
+evidence, not catalog execution evidence. Complete Endpoint integration remains
+responsible for target resolution, capability and semantic validation,
+prepublication echo reservation, prepared atomic commit, layout/invalidation
+ordering, result correlation, and retained-storage release.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -839,8 +959,9 @@ The neutral layout schema maps without semantic changes to LPAR-10:
 - item width/height, grow, self alignment, grid position/span/alignment; and
 - minimum/maximum width and height.
 
-Numeric enum domains come from descriptors. Grid track arrays and text-like
-data obey MPY-02 capacity limits.
+The exact enum domains and wire schema are frozen in §5.10. The complete body
+obeys `max_byte_payload`, while each Grid track array independently obeys
+`max_items_per_command`; this body carries no Text value.
 
 ### 7.2 Computed geometry
 
@@ -995,6 +1116,13 @@ material, but they MUST preserve the same ordering and visible semantics.
   and closes outputless success only for Transactional descriptors declaring
   no results. BatchForbidden actions are BatchInvalid; result-bearing and
   deferred actions remain later evidence-gated work.
+- **PCDN-MPY-04-013 — Closed by owner acceptance 2026-08-19:** §5.10 freezes
+  SetRequestedLayout as a contextual target plus one Bytes value containing an
+  exact None/Flex/Grid/Item body. It fixes enum ordinals, canonical dimensions,
+  options, and Grid TrackLists; validates full structure before body/list/frame
+  limits; distinguishes structural domains from the four semantic Range cases;
+  and requires one byte-identical requested-state Bytes echo reserved before
+  Stage publication. Complete Endpoint execution remains evidence-gated.
 
 ## 12. Acceptance Checklist
 
@@ -1004,7 +1132,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-012 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-013 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -1025,12 +1153,13 @@ material, but they MUST preserve the same ordering and visible semantics.
 
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
 PromoteRoot, SetFlag, SetProperties, ResetProperties, and the outputless
-Transactional InvokeAction slice now unblock the remaining operation-specific
-payload/result PCDNs and Endpoint orchestration without authorizing guessed
-remainder or deferred/result-bearing action schemas. After those codecs and
-endpoint integration are implemented, MPY-04 provides the complete stage
-mutation/introspection surface consumed by MPY-06 and the deterministic
-snapshot oracle consumed by MPY-07/09.
+Transactional InvokeAction slice, plus exact SetRequestedLayout request/echo,
+now unblock the remaining operation-specific payload/result PCDNs and Endpoint
+orchestration without authorizing guessed remainder, computed-geometry, or
+deferred/result-bearing action schemas. After those codecs and endpoint
+integration are implemented, MPY-04 provides the complete stage mutation/
+introspection surface consumed by MPY-06 and the deterministic snapshot oracle
+consumed by MPY-07/09.
 
 ## 15. Change Log
 
@@ -1344,7 +1473,7 @@ and outer frame limits keep minimum-profile behavior explicit.
 
 **Touches:** PCDN-MPY-04-012, INV-MPY-04-1, INV-MPY-04-3, §0, §5, §6, §11–§15
 
-**Commits:** pending
+**Commits:** `9281fe7`
 
 **Summary:** Freezes InvokeAction as a contextual target, nonzero raw action ID,
 and canonical possibly-empty argument ValueList. Adds allocation-free
@@ -1362,3 +1491,29 @@ failures a deterministic order without treating BatchObject as an untyped
 escape. This slice admits only Transactional descriptors with empty results, so
 outputless success can use the common Batch revision while BatchForbidden,
 result-bearing, and deferred contracts remain explicit later gates.
+
+### 0.12.0 — 2026-08-19 — SetRequestedLayout wire and echo ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-013, INV-MPY-04-2, INV-MPY-04-3, §0, §5, §7, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes SetRequestedLayout as a contextual target plus one Bytes
+value containing an exact None/Flex/Grid/Item body. Adds stable enum registries,
+zero-copy Grid TrackLists, public exact body sizing/encoding, structural and
+negotiated-limit payload codecs, a one-Bytes byte-exact echo validator,
+malformed/error fixtures, and exact 9/15-byte payload, 20-byte echo, and
+206/254-byte frame evidence.
+
+#### Rationale
+
+An opcode-owned Bytes body keeps the MPY value registry closed while making the
+complete requested-layout replacement language-neutral and byte-echoable.
+Separating structural domains from descriptor semantics preserves signed layout
+intent and restricts Range to the accepted invalid combinations. Exact body
+sizing before publication makes result capacity atomic, while independent body,
+column-track, row-track, and outer-frame limits retain the conservative profile.

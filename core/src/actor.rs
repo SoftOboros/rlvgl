@@ -8,7 +8,12 @@
 use alloc::{boxed::Box, rc::Rc, string::String, vec::Vec};
 use core::cell::RefCell;
 
-use rlvgl_api::protocol::{CodecError, decode_value, encode_value};
+use rlvgl_api::protocol::{
+    CodecError, LayoutDimension, LayoutFlexAlign, LayoutFlexFlow, LayoutGridAlign,
+    LayoutGridTrack as ApiGridTrack, LayoutGridTrackList, RequestedFlexLayout, RequestedGridLayout,
+    RequestedItemLayout, RequestedLayoutRef, decode_value, encode_requested_layout_body,
+    encode_value, requested_layout_body_encoded_len,
+};
 pub use rlvgl_api::protocol::{ErrorClass, ValueRef, ValueTag};
 
 use crate::{
@@ -18,7 +23,9 @@ use crate::{
         SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken, StageDirection,
         StageRevision,
     },
-    layout::{EngineConfig, GridTrack, LayoutRole, LayoutState},
+    layout::{
+        Dimension, EngineConfig, FlexAlign, FlexFlow, GridAlign, GridTrack, LayoutRole, LayoutState,
+    },
     object::{
         CompletedObjectDispatch, DispatchInput, DispatchPhase, NativeEventObserver,
         ObjectDispatchError, ObjectDispatchObservationPlans, ObjectEvent, ObjectFlags, ObjectNode,
@@ -547,6 +554,137 @@ fn prepared_layout_state(
         computed: current.0.then_some(current.1).flatten(),
         layout_dirty: true,
     }))
+}
+
+fn encode_requested_layout_echo(layout: &RequestedLayout) -> Result<Vec<u8>, RegistryError> {
+    match layout {
+        RequestedLayout::None => encode_requested_layout_ref(RequestedLayoutRef::None),
+        RequestedLayout::Flex(config) => {
+            encode_requested_layout_ref(RequestedLayoutRef::Flex(RequestedFlexLayout {
+                flow: api_flex_flow(config.flow),
+                main_align: api_flex_align(config.main_align),
+                cross_align: api_flex_align(config.cross_align),
+                track_cross_align: api_flex_align(config.track_cross_align),
+                gap_main: config.gap_main,
+                gap_cross: config.gap_cross,
+            }))
+        }
+        RequestedLayout::Grid(config) => {
+            let columns = api_grid_tracks(&config.col_tracks)?;
+            let rows = api_grid_tracks(&config.row_tracks)?;
+            encode_requested_layout_ref(RequestedLayoutRef::Grid(RequestedGridLayout {
+                col_tracks: LayoutGridTrackList::from_slice(&columns),
+                row_tracks: LayoutGridTrackList::from_slice(&rows),
+                col_gap: config.col_gap,
+                row_gap: config.row_gap,
+                col_align: api_grid_align(config.col_align),
+                row_align: api_grid_align(config.row_align),
+            }))
+        }
+        RequestedLayout::Item(hints) => {
+            encode_requested_layout_ref(RequestedLayoutRef::Item(RequestedItemLayout {
+                width: api_dimension(hints.width),
+                height: api_dimension(hints.height),
+                flex_grow: hints.flex_grow,
+                self_align: hints.self_align.map(api_flex_align),
+                col_pos: hints.col_pos,
+                col_span: hints.col_span,
+                row_pos: hints.row_pos,
+                row_span: hints.row_span,
+                col_align: api_grid_align(hints.col_align),
+                row_align: api_grid_align(hints.row_align),
+                min_width: hints.min_width,
+                max_width: hints.max_width,
+                min_height: hints.min_height,
+                max_height: hints.max_height,
+            }))
+        }
+    }
+}
+
+fn encode_requested_layout_ref(layout: RequestedLayoutRef<'_>) -> Result<Vec<u8>, RegistryError> {
+    let length = requested_layout_body_encoded_len(layout).map_err(layout_encoding_error)?;
+    let mut body = Vec::new();
+    body.try_reserve_exact(length)
+        .map_err(|_| RegistryError::Capacity {
+            kind: CapacityKind::ResultOutputs,
+        })?;
+    body.resize(length, 0);
+    let written = encode_requested_layout_body(layout, &mut body).map_err(layout_encoding_error)?;
+    if written != length {
+        return Err(RegistryError::Internal);
+    }
+    Ok(body)
+}
+
+fn layout_encoding_error(error: CodecError) -> RegistryError {
+    match error {
+        CodecError::BufferTooSmall | CodecError::InvalidFrame => RegistryError::Capacity {
+            kind: CapacityKind::ResultOutputs,
+        },
+        _ => RegistryError::Internal,
+    }
+}
+
+const fn api_dimension(dimension: Dimension) -> LayoutDimension {
+    match dimension {
+        Dimension::Px(value) => LayoutDimension::Px(value),
+        Dimension::Pct(value) => LayoutDimension::Pct(value),
+        Dimension::Content => LayoutDimension::Content,
+    }
+}
+
+const fn api_flex_flow(flow: FlexFlow) -> LayoutFlexFlow {
+    match flow {
+        FlexFlow::Row => LayoutFlexFlow::Row,
+        FlexFlow::Column => LayoutFlexFlow::Column,
+        FlexFlow::RowWrap => LayoutFlexFlow::RowWrap,
+        FlexFlow::RowReverse => LayoutFlexFlow::RowReverse,
+        FlexFlow::RowWrapReverse => LayoutFlexFlow::RowWrapReverse,
+        FlexFlow::ColumnWrap => LayoutFlexFlow::ColumnWrap,
+        FlexFlow::ColumnReverse => LayoutFlexFlow::ColumnReverse,
+        FlexFlow::ColumnWrapReverse => LayoutFlexFlow::ColumnWrapReverse,
+    }
+}
+
+const fn api_flex_align(align: FlexAlign) -> LayoutFlexAlign {
+    match align {
+        FlexAlign::Start => LayoutFlexAlign::Start,
+        FlexAlign::End => LayoutFlexAlign::End,
+        FlexAlign::Center => LayoutFlexAlign::Center,
+        FlexAlign::SpaceEvenly => LayoutFlexAlign::SpaceEvenly,
+        FlexAlign::SpaceAround => LayoutFlexAlign::SpaceAround,
+        FlexAlign::SpaceBetween => LayoutFlexAlign::SpaceBetween,
+    }
+}
+
+const fn api_grid_align(align: GridAlign) -> LayoutGridAlign {
+    match align {
+        GridAlign::Start => LayoutGridAlign::Start,
+        GridAlign::Center => LayoutGridAlign::Center,
+        GridAlign::End => LayoutGridAlign::End,
+        GridAlign::Stretch => LayoutGridAlign::Stretch,
+        GridAlign::SpaceEvenly => LayoutGridAlign::SpaceEvenly,
+        GridAlign::SpaceAround => LayoutGridAlign::SpaceAround,
+        GridAlign::SpaceBetween => LayoutGridAlign::SpaceBetween,
+    }
+}
+
+fn api_grid_tracks(tracks: &[GridTrack]) -> Result<Vec<ApiGridTrack>, RegistryError> {
+    let mut encoded = Vec::new();
+    encoded
+        .try_reserve_exact(tracks.len())
+        .map_err(|_| RegistryError::Capacity {
+            kind: CapacityKind::ResultOutputs,
+        })?;
+    for track in tracks {
+        encoded.push(match track {
+            GridTrack::Px(value) => ApiGridTrack::Px(*value),
+            GridTrack::Fr(value) => ApiGridTrack::Fr(*value),
+            GridTrack::Content => ApiGridTrack::Content,
+        });
+    }
+    Ok(encoded)
 }
 
 fn validate_property_constraint(
@@ -1820,6 +1958,10 @@ pub enum RegistryError {
         /// Field outside its range.
         field_id: u32,
     },
+    /// An operation-scoped, unkeyed command value is outside its semantic range.
+    ///
+    /// This variant deliberately carries no descriptor field identifier.
+    RangeValue,
     /// Attempted mutation targets a read-only descriptor field.
     ReadOnlyField {
         /// Descriptor-local field identifier.
@@ -1883,7 +2025,7 @@ impl RegistryError {
                 ErrorClass::InvalidFrame
             }
             Self::TypeMismatch { .. } => ErrorClass::TypeMismatch,
-            Self::Range { .. } => ErrorClass::Range,
+            Self::Range { .. } | Self::RangeValue => ErrorClass::Range,
             Self::ReadOnlyField { .. } | Self::ReadOnly => ErrorClass::ReadOnly,
             Self::Unsupported | Self::UnsupportedAction { .. } => ErrorClass::Unsupported,
             Self::BatchInvalid | Self::BatchInvalidField { .. } => ErrorClass::BatchInvalid,
@@ -2000,6 +2142,19 @@ pub struct CreateOutput {
     pub object_id: ObjectId,
 }
 
+/// One committed requested-layout echo correlated to its submitted operation.
+///
+/// `body` is the exact canonical success body encoded during atomic
+/// preparation. Keeping the owned bytes in the prepared transaction makes
+/// publication and later result access allocation-free.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestedLayoutOutput {
+    /// Submitted zero-based operation index.
+    pub operation_index: u16,
+    /// Exact canonical result body for the accepted requested layout.
+    pub body: Vec<u8>,
+}
+
 enum PreparedStageOperation {
     Direction(StageDirection),
     Create(usize),
@@ -2018,6 +2173,7 @@ pub struct PreparedStageBatch {
     operations: Vec<PreparedStageOperation>,
     creates: Vec<PreparedCreate>,
     create_outputs: Vec<CreateOutput>,
+    requested_layout_outputs: Vec<RequestedLayoutOutput>,
     actor_groups: Vec<PreparedActorGroup>,
     layout_mutations: Vec<PreparedLayoutMutation>,
     final_usage: RegistryUsage,
@@ -2103,6 +2259,16 @@ impl CommittedStageBatch {
     /// Move all Create mappings out without allocating or releasing batch scratch.
     pub fn take_create_outputs(&mut self) -> Vec<CreateOutput> {
         core::mem::take(&mut self.prepared.create_outputs)
+    }
+
+    /// Borrow committed requested-layout echoes in submitted operation order.
+    pub fn requested_layout_outputs(&self) -> &[RequestedLayoutOutput] {
+        &self.prepared.requested_layout_outputs
+    }
+
+    /// Move all requested-layout echoes out without allocating.
+    pub fn take_requested_layout_outputs(&mut self) -> Vec<RequestedLayoutOutput> {
+        core::mem::take(&mut self.prepared.requested_layout_outputs)
     }
 }
 
@@ -3500,6 +3666,7 @@ impl StageRegistry {
                 .collect(),
             creates: Vec::new(),
             create_outputs: Vec::new(),
+            requested_layout_outputs: Vec::new(),
             actor_groups: prepared,
             layout_mutations,
             final_usage,
@@ -3549,6 +3716,7 @@ impl StageRegistry {
             .map_err(|_| RegistryError::Capacity {
                 kind: CapacityKind::ResultOutputs,
             })?;
+        let mut requested_layout_outputs = Vec::new();
         let mut bindings: Vec<(u16, ObjectId, usize)> = Vec::new();
         bindings
             .try_reserve_exact(directions.len())
@@ -3729,6 +3897,16 @@ impl StageRegistry {
                 StageDirection::SetRequestedLayout { object_id, layout } => {
                     let descriptor = tree_shadow.actor(*object_id)?.descriptor;
                     validate_requested_layout_descriptor(descriptor, layout)?;
+                    requested_layout_outputs.try_reserve_exact(1).map_err(|_| {
+                        RegistryError::Capacity {
+                            kind: CapacityKind::ResultOutputs,
+                        }
+                    })?;
+                    let body = encode_requested_layout_echo(layout)?;
+                    requested_layout_outputs.push(RequestedLayoutOutput {
+                        operation_index,
+                        body,
+                    });
                     let state = if let Some((_, present, computed)) = layout_presence
                         .iter()
                         .find(|(candidate, _, _)| candidate == object_id)
@@ -3957,6 +4135,7 @@ impl StageRegistry {
             operations,
             creates,
             create_outputs,
+            requested_layout_outputs,
             actor_groups: prepared_actor_groups,
             layout_mutations,
             final_usage,
@@ -3991,6 +4170,7 @@ impl StageRegistry {
             operations: Vec::new(),
             creates: Vec::new(),
             create_outputs: Vec::new(),
+            requested_layout_outputs: Vec::new(),
             actor_groups: Vec::new(),
             layout_mutations: Vec::new(),
             final_usage: RegistryUsage::default(),
@@ -5102,7 +5282,7 @@ fn validate_requested_layout_descriptor(
                 .zip(hints.max_height)
                 .is_some_and(|(min, max)| min > max))
     {
-        return Err(RegistryError::Range { field_id: 0 });
+        return Err(RegistryError::RangeValue);
     }
     if let RequestedLayout::Grid(config) = layout
         && (config.col_tracks.is_empty()
@@ -5116,7 +5296,7 @@ fn validate_requested_layout_descriptor(
                         || matches!(track, GridTrack::Fr(0))
                 }))
     {
-        return Err(RegistryError::Range { field_id: 0 });
+        return Err(RegistryError::RangeValue);
     }
     Ok(())
 }
@@ -5436,7 +5616,7 @@ mod prepared_geometry_tests {
 
     use super::*;
     use crate::event::Event;
-    use crate::layout::FlexConfig;
+    use crate::layout::{FlexConfig, GridConfig, GridTrack};
     use crate::renderer::Renderer;
 
     struct TrackingAllocator;
@@ -5507,7 +5687,7 @@ mod prepared_geometry_tests {
         actions: &[],
         events: &[],
         child_policy: ChildPolicy::AnyActor,
-        layout: LayoutCapabilities::FLEX_CONTAINER,
+        layout: LayoutCapabilities::FLEX_CONTAINER.union(LayoutCapabilities::GRID_CONTAINER),
         resource_cost: ResourceCost {
             text_bytes: 0,
             resources: 0,
@@ -5810,5 +5990,76 @@ mod prepared_geometry_tests {
 
         drop(retained_borrow);
         drop(error.into_prepared());
+    }
+
+    #[test]
+    fn atomic_requested_layout_echo_preserves_separate_computed_geometry() {
+        let mut registry = registry();
+        let root = create_container(&mut registry);
+        registry
+            .apply_batch(&[StageDirection::SetRequestedLayout {
+                object_id: root,
+                layout: RequestedLayout::Flex(FlexConfig::default()),
+            }])
+            .unwrap();
+        let computed = Rect {
+            x: 3,
+            y: 4,
+            width: 30,
+            height: 40,
+        };
+        registry
+            .node_mut(root)
+            .unwrap()
+            .layout
+            .as_deref_mut()
+            .unwrap()
+            .computed = Some(computed);
+        let grid = RequestedLayout::Grid(GridConfig {
+            col_tracks: vec![GridTrack::Content],
+            row_tracks: vec![GridTrack::Content],
+            ..GridConfig::default()
+        });
+        let starting_revision = registry.revision();
+        let prepared = registry
+            .prepare_atomic_batch(vec![BatchStageDirection::SetRequestedLayout {
+                object: BatchObjectReference::Stable(root),
+                layout: grid.clone(),
+            }])
+            .unwrap();
+
+        assert_eq!(
+            registry.requested_layout(root).unwrap(),
+            RequestedLayout::Flex(FlexConfig::default())
+        );
+        assert_eq!(registry.geometry(root).unwrap().effective_bounds, computed);
+        let (committed, allocations, deallocations) =
+            count_allocator_operations(|| registry.commit_prepared_batch(prepared));
+        assert_eq!((allocations, deallocations), (0, 0));
+        let committed = committed.unwrap();
+
+        assert_eq!(committed.revision().get(), starting_revision.get() + 1);
+        assert_eq!(
+            committed.requested_layout_outputs(),
+            [RequestedLayoutOutput {
+                operation_index: 0,
+                body: vec![2, 1, 0, 2, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3],
+            }]
+        );
+        assert_eq!(registry.requested_layout(root).unwrap(), grid);
+        let geometry = registry.geometry(root).unwrap();
+        assert_eq!(
+            geometry.intrinsic_bounds,
+            Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 10,
+            }
+        );
+        assert_eq!(geometry.effective_bounds, computed);
+        assert_eq!(geometry.layout_role, GeometryRole::Container);
+        assert_eq!(geometry.revision, committed.revision());
+        registry.release_committed_batch(committed).unwrap();
     }
 }
