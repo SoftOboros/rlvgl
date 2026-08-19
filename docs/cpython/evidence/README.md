@@ -18,6 +18,8 @@ do not satisfy embedded-Linux, physical-board, Python, frame, or release gates.
 | [`_generated/CPY-GRAPH-0cf406b.json`](_generated/CPY-GRAPH-0cf406b.json) | Normalized workspace packages, features, local dependency edges, public-path hashes, and governed publish order. |
 | [`CPY-CAPACITY-HOST-2026-08-18.json`](CPY-CAPACITY-HOST-2026-08-18.json) | CPY-03 diagnostic host matrix: four ingress/egress/turn candidates, three bounded-channel stress scenarios, and five retained iterations per row. It explicitly makes no capacity decision. |
 | [`_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock) | Detached resolver snapshot for the capacity probe, including Crossbeam Channel 0.5.16. |
+| [`CPY-CAPACITY-SERVICE-HOST-2026-08-18.json`](CPY-CAPACITY-SERVICE-HOST-2026-08-18.json) | CPY-03 v2 diagnostic host matrix over the production native service, exact terminal records, close lifecycle, and Unix readiness. It explicitly makes no capacity decision. |
+| [`_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock) | Detached resolver snapshot for the v2 service probe, including production Crossbeam Channel and Rustix dependencies. |
 
 The immutable source authority is commit
 `0cf406bb22509f1040af6a772d0476a614c7bd9c`. The baseline hashes all 53
@@ -96,8 +98,14 @@ distributions are retained for every run.
 The committed host bundle is `diagnostic-host` with
 `normative_decision: false`. It cannot close `PCDN-CPY-03-002`: the workload
 is the v1 transport-only workload and does not include the implemented OS
-readiness boundary or representative actor/render/frame/input work. The v2
-service workload also has not yet run on the CPY-01 BeagleBone Black.
+readiness boundary or representative actor/render/frame/input work.
+
+The v2 host bundle is also `diagnostic-host` with
+`normative_decision: false`. All 60 runs used the production service and
+completed with exact terminal accounting, clean ordering, bounded depths,
+released tracked envelopes, and a drainable readiness path. It still executes
+an empty Endpoint Safe Turn, and it has not run on the CPY-01 BeagleBone Black,
+so it also cannot close the PCDN or select defaults/maxima.
 
 Validate the retained bundle:
 

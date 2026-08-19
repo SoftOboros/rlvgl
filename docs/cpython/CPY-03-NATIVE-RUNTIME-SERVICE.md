@@ -7,11 +7,11 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 **Document ID:** CPY-03-NATIVE-RUNTIME-SERVICE
 
 **Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18; native
-service lifecycle, bounded queues, ownership, Unix readiness, and host v1
-diagnostic capacity matrix implemented; `PCDN-CPY-03-002` remains v2
-representative-workload/board measurement-blocked. Not ratified.
+service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
+diagnostic capacity matrices complete; `PCDN-CPY-03-002` remains
+representative-semantic-workload/board measurement-blocked. Not ratified.
 
-**Revision:** 0.4.0
+**Revision:** 0.5.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -284,6 +284,24 @@ empty Endpoint Safe Turn, so it is more representative of CPY-03 lifecycle and
 readiness but not yet of Actor, render, frame, input, Python, or PyO3 work.
 No capacity value becomes a default from this implementation.
 
+The retained v2 host bundle
+[`CPY-CAPACITY-SERVICE-HOST-2026-08-18.json`](evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json)
+is sourced from clean commit `c994f163687c6483607f5c3340d885d9c1be210d`.
+It repeats the four candidates, three scenarios, one warmup, and five retained
+iterations per row through the production service. All 60 runs produced one
+terminal record per accepted request, preserved order, stayed within ingress/
+egress bounds, released tracked envelope bytes, and completed without a
+service/readiness fault.
+
+Across its 12 summaries, median peak RSS ranged from 811,008 through 999,424
+bytes and median tracked peak envelope bytes from 3,120 through 52,280 bytes.
+Sustained median p95 delivery ranged from 110,843 through 186,312 ns. Every
+observer-stall run recorded egress backpressure; per-candidate median p99
+delivery ranged from 49,916,679 through 50,110,232 ns for the requested 50 ms
+stall. These remain host diagnostics, not budgets. The empty Safe Turn omits
+representative Actor/render/frame/input work, and the same clean source has not
+run on the BBB.
+
 ## 12. Acceptance Checklist
 
 - [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open.
@@ -310,19 +328,50 @@ No capacity value becomes a default from this implementation.
 | `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, and fault evidence |
 | `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
 | `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
+| `docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json` | Production-service v2 host matrix |
 | CPython thread-state documentation | External wait/thread/finalization authority |
 
 ## 14. Unblocks
 
 Four policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
-Draft. Ratification is blocked by representative host and physical-board
-capacity evidence in `PCDN-CPY-03-002` plus semantic record classes,
+Draft. Ratification is blocked by representative semantic-workload and
+physical-board capacity evidence in `PCDN-CPY-03-002` plus semantic record classes,
 representative native cadence, restart/stale-handle evidence, and
 binding-finalization stress. Ratification would unblock
 the CPY-04 binding and CPY-05 frame integration; it would not authorize device
 access.
 
 ## 15. Change Log
+
+### 0.5.0 — 2026-08-18 — service-backed host capacity matrix
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** evidence
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-3, INV-CPY-03-4, INV-CPY-03-5,
+INV-CPY-03-6, PCDN-CPY-03-002, §8, §11, §12, §13, §14
+
+**Commits:** `c994f163` (service/probe source; the retained bundle names this
+exact authority)
+
+**Summary:** Retains a 60-run v2 host matrix over the production bounded
+service and Unix readiness path without selecting capacities.
+
+#### Rationale
+
+The v1 transport result could not establish that lifecycle, terminal records,
+and OS readiness preserve bounded behavior. Repeating the same candidate
+matrix through the production service isolates that implementation cost before
+adding representative semantic/frame work and the constrained board.
+
+Considered and rejected: replacing the v1 artifact, combining v1 and v2
+results as if they were one workload, or choosing a default from host-only
+latency and RSS.
+
+What deliberately did not change: no candidate is a default, maximum, budget,
+or ratification decision. Actor/render/frame/input, Python/PyO3, native cadence,
+and BBB measurements remain open.
 
 ### 0.4.0 — 2026-08-18 — bounded native service and OS readiness
 
@@ -335,8 +384,7 @@ INV-CPY-03-5, INV-CPY-03-6, INV-CPY-03-7, PCDN-CPY-03-001,
 PCDN-CPY-03-002, PCDN-CPY-03-004, §5, §6, §7, §8, §11, §12, §13,
 §14
 
-**Commits:** pending; the next retained v2 evidence bundle names its exact
-clean source commit
+**Commits:** `c994f163`
 
 **Summary:** Implements the first Python-neutral bounded owner service,
 Unix readiness, exact request-terminal accounting, ordered close/fault paths,

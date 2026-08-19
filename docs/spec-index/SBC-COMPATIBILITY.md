@@ -91,9 +91,11 @@ new behavior change.
 ## Current Open Gates
 
 - **CPY:** CPY-00 is ratified with `PCDN-CPY-00-001` through
-  `PCDN-CPY-00-003` accepted as amended. CPY-01 through CPY-09 remain Draft;
-  CPY-01's six baseline selections and CPY-02's six topology decisions are
-  resolved, CPY-03 has resolved four runtime-policy decisions, CPY-04 has
+  `PCDN-CPY-00-003` accepted as amended. CPY-01 and CPY-02 are also ratified;
+  CPY-03 through CPY-09 remain Draft. CPY-03 has resolved four runtime-policy
+  decisions and now has a bounded native service, Unix readiness, and retained
+  v1/v2 host capacity matrices, while semantic-workload and BBB capacity
+  evidence remain open. CPY-04 has
   resolved all six director-binding policy decisions, and CPY-05 has resolved
   five frame-policy decisions while retaining measured slot capacities.
   CPY-06 has resolved all six embedded-Linux policy decisions, and CPY-07 has
@@ -101,8 +103,8 @@ new behavior change.
   CPY-08 has resolved all six packaging-policy decisions, and CPY-09 has
   resolved three closure policies while retaining three evidence/release
   decisions. The exact
-  manifest/rootfs/board artifacts, an actual MPY Handoff Record, measured
-  queue/performance budgets, binding implementation/conformance evidence, and
+  remaining target/rootfs/board execution artifacts, measured queue/performance
+  budgets, binding implementation/conformance evidence, and
   per-phase ratification remain open. CPY planning leads the future shared
   crate topology, but CPY-00 authorizes no code or changes the active MPY/WLD
   authorities.
