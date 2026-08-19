@@ -6,12 +6,12 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 
 **Document ID:** CPY-03-NATIVE-RUNTIME-SERVICE
 
-**Status:** Draft 2026-08-18. Four policy PCDNs resolved 2026-08-18; native
+**Status:** Draft 2026-08-19. All five policy PCDNs are resolved; native
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
-diagnostic capacity matrices complete; `PCDN-CPY-03-002` remains
-representative-semantic-workload/board measurement-blocked. Not ratified.
+diagnostic capacity matrices are complete. Representative native-workload and
+physical-board qualification evidence remains open. Not ratified.
 
-**Revision:** 0.5.0
+**Revision:** 0.6.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -157,9 +157,14 @@ reorder already committed records.
 Ingress and egress use `crossbeam_channel::bounded` behind CPY-owned queue
 types. The public/runtime contract exposes admission, capacity, close, and
 accounting semantics rather than Crossbeam senders or receivers. No unbounded
-channel and no async runtime is admitted in the Host Runtime Crate. Exact
-default and maximum capacities remain `PCDN-CPY-03-002`; queue type selection
-does not resolve those measured values.
+channel and no async runtime is admitted in the Host Runtime Crate.
+
+CPY-03 defines no implicit ingress, egress, or per-turn capacity. Every service
+construction MUST supply explicit positive values. CPY-03 qualification
+evidence records target-qualified development tuples and the tested candidate
+envelope; those records are conformance inputs, not public defaults or supported
+maxima. CPY-09 owns release-profile defaults and maxima after representative
+CPY-03, CPY-05, and CPY-06 evidence exists.
 
 Ingress admission MUST return a typed capacity/closing/fault outcome before
 claiming acceptance. Egress saturation MUST follow the record's registered
@@ -224,6 +229,18 @@ Thread itself has no Python thread state.
   Linux `eventfd`, and a nonblocking self-pipe on other admitted Unix hosts as
   specified in §8. No Tokio/async runtime, unbounded channel, or semantic data
   in the readiness signal is admitted.
+- **PCDN-CPY-03-002 — Initial capacities — Accepted as amended
+  2026-08-19.** CPY-03 has no implicit capacity defaults. Construction requires
+  explicit positive ingress, egress, and per-turn values. CPY-03 qualifies one
+  or more development tuples per admitted host/board target with a
+  Python-independent workload covering neutral Stage/Actor directions, native
+  input, Safe Turns, results/cues, readiness, fixed native cadence, rendering
+  into a private non-exported flattened buffer, backpressure, close, and
+  restart. PyO3/thread-state behavior, Python buffer export and Frame Leases,
+  and physical device presentation are owned by CPY-04, CPY-05, and CPY-06
+  respectively and are not CPY-03 qualification prerequisites. CPY-09 later
+  selects public release defaults and maxima from the combined CPY-03/05/06
+  evidence. No candidate tuple becomes normative through this acceptance.
 - **PCDN-CPY-03-003 — Presenter topology — Accepted as amended
   2026-08-18.** Use one Service Thread for runtime, rendering, backend
   dispatch, and native presentation initially. A later backend-required split
@@ -238,11 +255,11 @@ Thread itself has no Python thread state.
   support is a separately qualified profile requiring per-interpreter module,
   callback, handle, service, and finalization isolation.
 
-### 11.3 Open Decision
+### 11.3 Open Decisions
 
-| PCDN | Question | Current disposition | Blocks |
-|---|---|---|---|
-| `PCDN-CPY-03-002` | What are initial ingress/egress and per-turn capacities? | Remains open. Record candidate values only after native scenario traces measure burst depth, retained bytes, wakeups, latency, and constrained-board memory; CPY-09 must close the selected defaults/maxima. | CPY-03 ratification and CPY-09 budgets |
+None. Target-qualified capacity tuples remain implementation and ratification
+evidence under the accepted `PCDN-CPY-03-002` policy; they do not require a new
+policy decision unless the ownership or explicit-configuration rule changes.
 
 ### 11.4 Measurement Progress
 
@@ -268,12 +285,13 @@ stall remained visible in median p99 delivery latency for every candidate
 (53.09 through 57.84 ms), while ingress-full and egress-backpressure counters
 remained observable.
 
-This is diagnostic transport evidence, not the capacity decision. It excludes
-representative Actor, render, frame, input, Python/PyO3, and OS-readiness work;
-its queue-transition counts are not `eventfd`/self-pipe wakeup counts; and a
-macOS host cannot supply constrained-board memory or cadence evidence. The
-same committed probe plus representative service workload must run on the
-CPY-01 BeagleBone Black before `PCDN-CPY-03-002` can close.
+This is diagnostic transport evidence, not target qualification. It excludes
+representative Actor, render, frame, input, and OS-readiness work; its
+queue-transition counts are not `eventfd`/self-pipe wakeup counts; and a macOS
+host cannot supply constrained-board memory or cadence evidence. The production
+service plus the representative Python-independent workload defined by the
+accepted `PCDN-CPY-03-002` must run on the CPY-01 BeagleBone Black before the
+CPY-03 qualification evidence can pass.
 
 The current 0.4.0 implementation replaces the parallel v1 transport harness
 with the production `NativeService`. It adds bounded CPY-owned admission and
@@ -281,8 +299,10 @@ egress, one exact terminal record per accepted request, service epochs and
 request ids, close/fault fences, non-droppable publication, metrics, Linux
 `eventfd`, and a macOS/other-Unix self-pipe. Its v2 probe still executes an
 empty Endpoint Safe Turn, so it is more representative of CPY-03 lifecycle and
-readiness but not yet of Actor, render, frame, input, Python, or PyO3 work.
-No capacity value becomes a default from this implementation.
+readiness but not yet of Actor, render, frame, or input work. Python/PyO3 and
+Frame Lease behavior are deliberately later-phase evidence rather than CPY-03
+qualification requirements. No capacity value becomes a default from this
+implementation.
 
 The retained v2 host bundle
 [`CPY-CAPACITY-SERVICE-HOST-2026-08-18.json`](evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json)
@@ -298,18 +318,20 @@ bytes and median tracked peak envelope bytes from 3,120 through 52,280 bytes.
 Sustained median p95 delivery ranged from 110,843 through 186,312 ns. Every
 observer-stall run recorded egress backpressure; per-candidate median p99
 delivery ranged from 49,916,679 through 50,110,232 ns for the requested 50 ms
-stall. These remain host diagnostics, not budgets. The empty Safe Turn omits
-representative Actor/render/frame/input work, and the same clean source has not
-run on the BBB.
+stall. These remain host diagnostics, not budgets or target qualification. The
+empty Safe Turn omits representative Actor/render/frame/input work, and the
+same clean source has not run on the BBB.
 
 ## 12. Acceptance Checklist
 
-- [ ] Every PCDN in §§11.2–11.3 is resolved; `PCDN-CPY-03-002` remains open.
+- [x] Every policy PCDN in §§11.2–11.3 is resolved.
+- [ ] The representative Python-independent service workload qualifies at
+      least one explicit development tuple on both the host and physical BBB.
 - [ ] Lifecycle and Service Turn state machines are complete and deterministic.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
       capacity probe before PyO3 lands.
-- [ ] Close/finalization and restart/epoch rules are exact.
+- [ ] Native close and restart/epoch rules are exact under stress tests.
 - [x] The dependency firewall and runtime crate graph contain no Python or
       PyO3 dependency.
 - [ ] The owner records ratification in §15.
@@ -333,15 +355,53 @@ run on the BBB.
 
 ## 14. Unblocks
 
-Four policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
-Draft. Ratification is blocked by representative semantic-workload and
-physical-board capacity evidence in `PCDN-CPY-03-002` plus semantic record classes,
-representative native cadence, restart/stale-handle evidence, and
-binding-finalization stress. Ratification would unblock
-the CPY-04 binding and CPY-05 frame integration; it would not authorize device
-access.
+All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
+Draft. Ratification is blocked by representative Python-independent semantic
+workload and physical-board capacity qualification, semantic record classes,
+representative native cadence, and restart/stale-handle evidence. CPY-04 owns
+binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
+lifetime and slot counts, and CPY-06 owns physical device presentation; none is
+a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
+binding and CPY-05 frame integration without authorizing device access or
+release defaults.
 
 ## 15. Change Log
+
+### 0.6.0 — 2026-08-19 — explicit qualification envelope
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-2, INV-CPY-03-3, INV-CPY-03-4,
+INV-CPY-03-5, INV-CPY-03-6, INV-CPY-03-7, PCDN-CPY-03-002, §8, §11,
+§12, §14
+
+**Commits:** pending
+
+**Summary:** Accepts `PCDN-CPY-03-002` as amended by requiring explicit
+capacities, moving release defaults/maxima to CPY-09, and narrowing CPY-03
+qualification to a representative Python-independent host/BBB workload.
+
+#### Rationale
+
+Requiring CPY-09 to close CPY-03 capacities created a cycle because CPY-09
+depends on CPY-04 through CPY-08 while CPY-04/05 depend on CPY-03. Requiring
+PyO3 finalization or exported Frame Lease evidence inside CPY-03 would create
+the same cycle across ownership boundaries. A native qualified development
+tuple proves that the service can carry the neutral workload; later phases can
+then measure the adapter, exported frame slots, and physical presentation
+before CPY-09 selects release policy.
+
+Considered and rejected: selecting a tuple from host-only empty-turn evidence,
+making a provisional tuple an implicit API default, requiring PyO3 or Frame
+Lease implementation before the native service phase can ratify, or postponing
+all capacity evidence until CPY-09.
+
+What deliberately did not change: no numeric tuple, public default, supported
+maximum, Frame Slot count, Python lifetime rule, device backend, or release
+budget is selected. Representative host and physical BBB qualification remains
+required before CPY-03 ratification.
 
 ### 0.5.0 — 2026-08-18 — service-backed host capacity matrix
 
