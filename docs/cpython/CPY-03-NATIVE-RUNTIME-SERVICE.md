@@ -10,10 +10,12 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
 diagnostic capacity matrices are complete. Typed restart/stale-epoch
 validation and active-turn close-fence stress evidence are complete.
-The representative v3 workload implementation and clean-source host matrix are
-complete; physical-board qualification evidence remains open. Not ratified.
+Owner-destruction fencing and deterministic bounded-turn trace validation are
+complete. The representative v3 workload implementation and clean-source host
+matrix are complete; physical-board qualification evidence remains open. Not
+ratified.
 
-**Revision:** 0.10.0
+**Revision:** 0.11.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -370,7 +372,7 @@ Python export nor a Frame Lease, and the probe does not present it to a device.
       clean-source host matrix over every declared candidate tuple.
 - [ ] The same committed representative workload qualifies at least one
       explicit development tuple on the physical BBB.
-- [ ] Lifecycle and Service Turn state machines are complete and deterministic.
+- [x] Lifecycle and Service Turn state machines are complete and deterministic.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
       capacity probe before PyO3 lands.
@@ -405,8 +407,7 @@ Python export nor a Frame Lease, and the probe does not present it to a device.
 
 All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
 Draft. Ratification is blocked by physical-board representative-workload
-capacity and cadence qualification, semantic record classes, and lifecycle/
-Service Turn state-machine closure. CPY-04 owns
+capacity and cadence qualification and semantic record classes. CPY-04 owns
 binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
 lifetime and slot counts, and CPY-06 owns physical device presentation; none is
 a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
@@ -414,6 +415,44 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.11.0 — 2026-08-19 — fence destruction before Closed
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-3, INV-CPY-03-4, INV-CPY-03-7,
+§5, §6, §7, §12, §13, §14
+
+**Commits:** pending
+
+**Summary:** Makes native owner-state destruction precede observable `Closed`
+and proves stable-backlog FIFO batching against the explicit Service Turn
+budget.
+
+#### Rationale
+
+`Closed` promises that no Endpoint, actor, render state, or presenter remains
+owned. The implementation previously stored `Closed` and could block while
+publishing its terminal record before the owner state left the stack. A
+one-record egress test made that interval deterministic and failed before the
+fix. Normal close, fault, readiness-fault, disconnect, and startup paths now
+destroy owner state before storing or publishing `Closed`, while retaining it
+through required terminal accounting.
+
+The bounded-turn proof holds one initial turn active, fills a stable FIFO
+backlog, then requires exact batches of three and exact ordered terminal
+results. This separates deterministic batching from producer scheduling and
+proves the configured turn budget is a hard upper bound.
+
+Considered and rejected: treating thread return as sufficient even while
+`Closed` was already observable, exposing internal state pointers for tests,
+or adding semantic Stage/style records to the CPY-owned service trace.
+
+What deliberately did not change: MPY request/result/style semantics, queue
+capacities, record loss classes, Python/PyO3 behavior, Frame Leases, device
+presentation, and physical BBB evidence remain unchanged or open.
 
 ### 0.10.0 — 2026-08-19 — retain the representative host matrix
 

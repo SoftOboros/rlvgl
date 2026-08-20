@@ -732,6 +732,7 @@ where
                     state: ServiceLifecycle::Running,
                 },
             ) {
+                drop(state);
                 owner_shared.set_lifecycle(ServiceLifecycle::Closed);
                 let kind = match error {
                     PublishError::Disconnected => io::ErrorKind::BrokenPipe,
@@ -741,6 +742,7 @@ where
                 return;
             }
             if initialized_sender.send(Ok(())).is_err() {
+                drop(state);
                 owner_shared.set_lifecycle(ServiceLifecycle::Closed);
                 return;
             }
@@ -790,7 +792,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn run_owner<State, Request, Output, Fault, RunTurn>(
-    mut state: State,
+    state: State,
     mut run_turn: RunTurn,
     config: ServiceConfig,
     epoch: ServiceEpoch,
@@ -802,16 +804,19 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
 ) where
     RunTurn: FnMut(&mut State, Vec<Request>) -> Vec<Result<Output, Fault>>,
 {
+    // Terminal helpers retain state through lifecycle/rejection accounting,
+    // then take it immediately before making `Closed` observable.
+    let mut state = Some(state);
     loop {
         let first = select_biased! {
             recv(close) -> _ => {
-                close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing);
+                close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing, &mut state);
                 return;
             }
             recv(ingress) -> request => match request {
                 Ok(request) => request,
                 Err(_) => {
-                    close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing);
+                    close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing, &mut state);
                     return;
                 }
             }
@@ -831,7 +836,12 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
             .into_iter()
             .map(|envelope| envelope.request)
             .collect();
-        let outcomes = catch_unwind(AssertUnwindSafe(|| run_turn(&mut state, requests)));
+        let outcomes = catch_unwind(AssertUnwindSafe(|| {
+            run_turn(
+                state.as_mut().expect("owner state exists during a turn"),
+                requests,
+            )
+        }));
         let disposition = match outcomes {
             Ok(outcomes) if outcomes.len() == tickets.len() => {
                 publish_outcomes(tickets, outcomes, &egress, &notifier, &shared.metrics)
@@ -856,7 +866,7 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
         match disposition {
             Ok(false) => {}
             Ok(true) => {
-                fault_owner(epoch, &ingress, &egress, &notifier, &shared);
+                fault_owner(epoch, &ingress, &egress, &notifier, &shared, &mut state);
                 return;
             }
             Err(PublishError::Readiness(kind)) => {
@@ -867,11 +877,12 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
                     &egress,
                     &notifier,
                     &shared,
+                    &mut state,
                 );
                 return;
             }
             Err(PublishError::Disconnected) => {
-                shared.set_lifecycle(ServiceLifecycle::Closed);
+                finish_disconnected(&mut state, &shared);
                 return;
             }
         }
@@ -936,13 +947,14 @@ fn publish_runtime_faults<Output, Fault>(
     publication_error.map_or(Ok(()), Err)
 }
 
-fn infrastructure_fault_owner<Request, Output, Fault>(
+fn infrastructure_fault_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     fault: RuntimeFault,
     ingress: &Receiver<RequestEnvelope<Request>>,
     egress: &Sender<ServiceRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    state: &mut Option<State>,
 ) {
     {
         let _gate = shared
@@ -973,15 +985,16 @@ fn infrastructure_fault_owner<Request, Output, Fault>(
         &shared.metrics,
         ServiceRejection::ServiceFaulted,
     );
-    finish_closed(epoch, egress, notifier, shared);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
 }
 
-fn fault_owner<Request, Output, Fault>(
+fn fault_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     ingress: &Receiver<RequestEnvelope<Request>>,
     egress: &Sender<ServiceRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    state: &mut Option<State>,
 ) {
     {
         let _gate = shared
@@ -1002,7 +1015,7 @@ fn fault_owner<Request, Output, Fault>(
         ),
         Err(PublishError::Disconnected)
     ) {
-        shared.set_lifecycle(ServiceLifecycle::Closed);
+        finish_disconnected(state, shared);
         return;
     }
     reject_queued(
@@ -1012,16 +1025,18 @@ fn fault_owner<Request, Output, Fault>(
         &shared.metrics,
         ServiceRejection::ServiceFaulted,
     );
-    finish_closed(epoch, egress, notifier, shared);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
 }
 
-fn close_owner<Request, Output, Fault>(
+#[allow(clippy::too_many_arguments)]
+fn close_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     ingress: &Receiver<RequestEnvelope<Request>>,
     egress: &Sender<ServiceRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
     reason: ServiceRejection,
+    state: &mut Option<State>,
 ) {
     {
         let _gate = shared
@@ -1042,11 +1057,11 @@ fn close_owner<Request, Output, Fault>(
         ),
         Err(PublishError::Disconnected)
     ) {
-        shared.set_lifecycle(ServiceLifecycle::Closed);
+        finish_disconnected(state, shared);
         return;
     }
     reject_queued(ingress, egress, notifier, &shared.metrics, reason);
-    finish_closed(epoch, egress, notifier, shared);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
 }
 
 fn reject_queued<Request, Output, Fault>(
@@ -1091,6 +1106,22 @@ fn finish_closed<Output, Fault>(
             state: ServiceLifecycle::Closed,
         },
     );
+}
+
+fn finish_closed_after_destruction<State, Output, Fault>(
+    state: &mut Option<State>,
+    epoch: ServiceEpoch,
+    egress: &Sender<ServiceRecord<Output, Fault>>,
+    notifier: &Notifier,
+    shared: &Shared,
+) {
+    drop(state.take());
+    finish_closed(epoch, egress, notifier, shared);
+}
+
+fn finish_disconnected<State>(state: &mut Option<State>, shared: &Shared) {
+    drop(state.take());
+    shared.set_lifecycle(ServiceLifecycle::Closed);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

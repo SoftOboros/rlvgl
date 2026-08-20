@@ -1,7 +1,10 @@
 //! CPY-03 native lifecycle, capacity, readiness, fault, and ownership proofs.
 
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::{self, ThreadId},
     time::{Duration, Instant},
 };
@@ -26,6 +29,16 @@ struct OwnerState {
 impl Drop for OwnerState {
     fn drop(&mut self) {
         *self.dropped_on.lock().expect("drop record lock poisoned") = Some(thread::current().id());
+    }
+}
+
+struct DropFlagState {
+    dropped: Arc<AtomicBool>,
+}
+
+impl Drop for DropFlagState {
+    fn drop(&mut self) {
+        self.dropped.store(true, Ordering::Release);
     }
 }
 
@@ -146,6 +159,116 @@ fn endpoint_turns_and_drop_remain_on_one_owner_thread() {
             ..
         })
     ));
+}
+
+#[test]
+fn closed_is_observable_only_after_owner_state_destruction() {
+    let dropped = Arc::new(AtomicBool::new(false));
+    let owner_dropped = Arc::clone(&dropped);
+    let service = spawn_native_service(
+        "cpy-closed-after-drop",
+        ServiceConfig::new(1, 1, 1).expect("valid explicit capacities"),
+        move || DropFlagState {
+            dropped: owner_dropped,
+        },
+        |_, requests: Vec<u64>| requests.into_iter().map(Ok::<_, &'static str>).collect(),
+    )
+    .expect("spawn owner-destruction service");
+
+    let startup = service.drain().expect("drain Running lifecycle");
+    assert!(matches!(
+        startup.as_slice(),
+        [ServiceRecord::Lifecycle {
+            state: ServiceLifecycle::Running,
+            ..
+        }]
+    ));
+    assert!(service.request_close());
+    wait_until(|| service.lifecycle() == ServiceLifecycle::Closed);
+    let dropped_before_closed = dropped.load(Ordering::Acquire);
+    let records = service.shutdown().expect("join closed service");
+
+    assert!(
+        dropped_before_closed,
+        "Closed became observable before owner state destruction"
+    );
+    assert_eq!(
+        records
+            .iter()
+            .filter_map(|record| match record {
+                ServiceRecord::Lifecycle { state, .. } => Some(*state),
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        vec![ServiceLifecycle::Closing, ServiceLifecycle::Closed]
+    );
+}
+
+#[test]
+fn stable_backlog_forms_deterministic_fifo_turns_within_budget() {
+    let (batch_sender, batch_receiver) = bounded(3);
+    let (release_sender, release_receiver) = bounded(1);
+    let service = spawn_native_service(
+        "cpy-deterministic-turns",
+        ServiceConfig::new(8, 16, 3).expect("valid explicit capacities"),
+        || (),
+        move |_, requests: Vec<u64>| {
+            batch_sender
+                .send(requests.clone())
+                .expect("record committed turn batch");
+            if requests == [0] {
+                release_receiver.recv().expect("release first turn");
+            }
+            requests.into_iter().map(Ok::<_, &'static str>).collect()
+        },
+    )
+    .expect("spawn deterministic-turn service");
+
+    let mut tickets = vec![service.try_submit(0).expect("admit first request")];
+    assert_eq!(
+        batch_receiver.recv().expect("first turn committed"),
+        vec![0]
+    );
+    tickets.extend(
+        (1_u64..=6).map(|request| service.try_submit(request).expect("admit stable backlog")),
+    );
+    release_sender.send(()).expect("release first turn");
+
+    assert_eq!(
+        batch_receiver.recv().expect("second turn committed"),
+        vec![1, 2, 3]
+    );
+    assert_eq!(
+        batch_receiver.recv().expect("third turn committed"),
+        vec![4, 5, 6]
+    );
+    wait_until(|| service.metrics().completed_requests == 7);
+    let mut records = service.drain().expect("drain turn records");
+    let metrics = service.metrics();
+    records.extend(
+        service
+            .shutdown()
+            .expect("close deterministic-turn service"),
+    );
+
+    assert_eq!(metrics.service_turns, 3);
+    assert_eq!(
+        records
+            .iter()
+            .filter_map(|record| match record {
+                ServiceRecord::Completed { output, .. } => Some(*output),
+                _ => None,
+            })
+            .collect::<Vec<_>>(),
+        (0_u64..=6).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        records
+            .iter()
+            .filter_map(ServiceRecord::ticket)
+            .collect::<Vec<_>>(),
+        tickets
+    );
 }
 
 #[test]

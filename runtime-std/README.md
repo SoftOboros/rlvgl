@@ -14,7 +14,9 @@ neutral runtime state can be constructed, used, and destroyed entirely on one
 native thread. Its first CPY-03 service also provides explicit bounded
 ingress/egress, deterministic turn batches, typed admission outcomes,
 process-local epochs, ordered close/fault records, metrics, and a pollable
-readiness signal. The placeholder version does not resolve
+readiness signal. Owner state is destroyed before `Closed` becomes observable,
+and the stable-backlog proof requires FIFO batches to stay within the explicit
+per-turn budget. The placeholder version does not resolve
 `PCDN-CPY-09-004`; publication stays blocked until CPY selects a truthful
 release line.
 
