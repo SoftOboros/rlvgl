@@ -487,65 +487,45 @@ pub fn resolve_layout_style(
         return LayoutStyle::default();
     };
 
-    // Walk patches in precedence order: local first, then added.
-    // Within each tier, last-added wins (reverse iteration).
-    let mut out = LayoutStyle::default();
+    // Walk the same MPY-local, native-local, added, and theme tiers as the
+    // visual/text resolver. Presence is tracked independently from the value,
+    // so an explicit zero remains a winning override.
+    #[derive(Default)]
+    struct Winners {
+        padding_top: Option<i32>,
+        padding_bottom: Option<i32>,
+        padding_left: Option<i32>,
+        padding_right: Option<i32>,
+        margin_top: Option<i32>,
+        margin_bottom: Option<i32>,
+        margin_left: Option<i32>,
+        margin_right: Option<i32>,
+        gap_row: Option<i32>,
+        gap_col: Option<i32>,
+    }
+    let mut winners = Winners::default();
 
-    // Helper: apply a patch's layout fields into `out` (first-wins within each tier).
+    // Helper: record the first present value in the already ordered cascade.
     macro_rules! apply_patch {
         ($patch:expr) => {{
             let p: &crate::style_cascade::StylePatch = $patch;
-            if out.padding_top == 0 {
-                if let Some(v) = p.padding_top {
-                    out.padding_top = v;
-                }
-            }
-            if out.padding_bottom == 0 {
-                if let Some(v) = p.padding_bottom {
-                    out.padding_bottom = v;
-                }
-            }
-            if out.padding_left == 0 {
-                if let Some(v) = p.padding_left {
-                    out.padding_left = v;
-                }
-            }
-            if out.padding_right == 0 {
-                if let Some(v) = p.padding_right {
-                    out.padding_right = v;
-                }
-            }
-            if out.margin_top == 0 {
-                if let Some(v) = p.margin_top {
-                    out.margin_top = v;
-                }
-            }
-            if out.margin_bottom == 0 {
-                if let Some(v) = p.margin_bottom {
-                    out.margin_bottom = v;
-                }
-            }
-            if out.margin_left == 0 {
-                if let Some(v) = p.margin_left {
-                    out.margin_left = v;
-                }
-            }
-            if out.margin_right == 0 {
-                if let Some(v) = p.margin_right {
-                    out.margin_right = v;
-                }
-            }
-            if out.gap_row == 0 {
-                if let Some(v) = p.gap_row {
-                    out.gap_row = v;
-                }
-            }
-            if out.gap_col == 0 {
-                if let Some(v) = p.gap_col {
-                    out.gap_col = v;
-                }
-            }
+            winners.padding_top = winners.padding_top.or(p.padding_top);
+            winners.padding_bottom = winners.padding_bottom.or(p.padding_bottom);
+            winners.padding_left = winners.padding_left.or(p.padding_left);
+            winners.padding_right = winners.padding_right.or(p.padding_right);
+            winners.margin_top = winners.margin_top.or(p.margin_top);
+            winners.margin_bottom = winners.margin_bottom.or(p.margin_bottom);
+            winners.margin_left = winners.margin_left.or(p.margin_left);
+            winners.margin_right = winners.margin_right.or(p.margin_right);
+            winners.gap_row = winners.gap_row.or(p.gap_row);
+            winners.gap_col = winners.gap_col.or(p.gap_col);
         }};
+    }
+
+    for (selector, patch) in ss.mpy_local_entries().iter().rev() {
+        if selector.matches(part, states) {
+            apply_patch!(patch);
+        }
     }
 
     // Local styles: last-added wins (iterate in reverse).
@@ -564,7 +544,24 @@ pub fn resolve_layout_style(
         }
     }
 
-    out
+    for (selector, patch) in ss.theme_entries().iter().rev() {
+        if selector.matches(part, states) {
+            apply_patch!(patch);
+        }
+    }
+
+    LayoutStyle {
+        padding_top: winners.padding_top.unwrap_or_default(),
+        padding_bottom: winners.padding_bottom.unwrap_or_default(),
+        padding_left: winners.padding_left.unwrap_or_default(),
+        padding_right: winners.padding_right.unwrap_or_default(),
+        margin_top: winners.margin_top.unwrap_or_default(),
+        margin_bottom: winners.margin_bottom.unwrap_or_default(),
+        margin_left: winners.margin_left.unwrap_or_default(),
+        margin_right: winners.margin_right.unwrap_or_default(),
+        gap_row: winners.gap_row.unwrap_or_default(),
+        gap_col: winners.gap_col.unwrap_or_default(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1984,6 +1981,83 @@ mod tests {
         assert_eq!(ls.padding_top, 8);
         assert_eq!(ls.padding_left, 4);
         assert_eq!(ls.padding_bottom, 0);
+    }
+
+    #[test]
+    fn layout_style_preserves_explicit_mpy_zero_then_reveals_theme() {
+        use crate::style_cascade::{
+            MpyStyleUpdate, Part, Selector, StyleProperty, StylePropertyValue, StyleState,
+            push_local, push_theme,
+        };
+
+        let selector = Selector::part(Part::MAIN);
+        let mut state = StyleState::new();
+        push_theme(
+            &mut state,
+            crate::style_cascade::StylePatch {
+                padding_top: Some(9),
+                ..crate::style_cascade::StylePatch::new()
+            },
+            selector,
+        );
+        push_local(
+            &mut state,
+            crate::style_cascade::StylePatch {
+                padding_top: Some(7),
+                ..crate::style_cascade::StylePatch::new()
+            },
+            selector,
+        );
+        let prepared = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::PaddingTop,
+                MpyStyleUpdate::Set(StylePropertyValue::I32(0)),
+                1,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(prepared).unwrap();
+        state.release_mpy_local_update(committed);
+        assert_eq!(
+            resolve_layout_style(
+                Some(&state),
+                Part::MAIN,
+                crate::object::ObjectStates::DEFAULT
+            )
+            .padding_top,
+            0
+        );
+
+        let prepared = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::PaddingTop,
+                MpyStyleUpdate::Remove,
+                1,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(prepared).unwrap();
+        state.release_mpy_local_update(committed);
+        assert_eq!(
+            resolve_layout_style(
+                Some(&state),
+                Part::MAIN,
+                crate::object::ObjectStates::DEFAULT
+            )
+            .padding_top,
+            7
+        );
+
+        crate::style_cascade::remove_all_local(&mut state);
+        assert_eq!(
+            resolve_layout_style(
+                Some(&state),
+                Part::MAIN,
+                crate::object::ObjectStates::DEFAULT
+            )
+            .padding_top,
+            9
+        );
     }
 
     #[test]

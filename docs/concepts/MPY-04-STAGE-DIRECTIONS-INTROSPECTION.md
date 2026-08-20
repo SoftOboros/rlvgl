@@ -24,7 +24,9 @@ result proof. InvokeAction now has an exact typed-argument request and
 outputless result proof for Transactional actions whose descriptors declare no
 results. SetRequestedLayout now has exact None/Flex/Grid/Item Bytes bodies,
 independent body/track limits, and a byte-exact requested-state echo. Complete
-Endpoint dispatch remains deferred.
+Endpoint dispatch remains deferred. The local-style prerequisite now has a
+stable global property registry, actor-local applicability, exact sparse MPY
+storage, and a prepared commit seam; opcode `0x0000_000b` remains deferred.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -876,6 +878,100 @@ responsible for target resolution, capability and semantic validation,
 prepublication echo reservation, prepared atomic commit, layout/invalidation
 ordering, result correlation, and retained-storage release.
 
+### 5.11 Local-style registry and storage prerequisite
+
+PCDN-MPY-04-014 freezes the descriptor and storage prerequisite for a later
+SetLocalStyle operation. It does **not** freeze or implement the opcode
+`SET_LOCAL_STYLE` (`0x0000_000b`), a set/remove wire marker, a Batch result,
+Stage mutation, Endpoint admission, or a MicroPython binding.
+
+A local-style selector has exact identity `(PartId, StateMask)`. Named parts
+are `MAIN=0`, `SCROLLBAR=1`, `INDICATOR=2`, `KNOB=3`, `SELECTED=4`, `ITEMS=5`,
+and `CURSOR=6`; part `7` is reserved; part IDs at or above `8` are custom and
+must be declared by the owning actor descriptor. Registered state bits are
+`DISABLED=1`, `FOCUSED=2`, `PRESSED=4`, `CHECKED=8`, and `EDITED=16`. A zero
+mask is the exact DEFAULT selector. It is never an MPY mutation wildcard.
+Unknown bits are rejected rather than truncated at the descriptor boundary.
+Declaring CHECKED applicability means the actor owns the corresponding checked
+semantics; none of the initial five proof actors declares it.
+
+The global style-property namespace is separate from actor properties:
+
+| ID | Name | Value | Constraint | Mutation effects |
+|---:|---|---|---|---|
+| 1 | `bg_color` | Color | — | DRAW, SNAPSHOT |
+| 2 | `border_color` | Color | — | DRAW, SNAPSHOT |
+| 3 | `border_width` | U32 | 0–255 | DRAW, SNAPSHOT |
+| 4 | `alpha` | U32 | 0–255 | DRAW, SNAPSHOT |
+| 5 | `radius` | U32 | 0–255 | DRAW, SNAPSHOT |
+| 6 | `text_color` | Color | — | DRAW, SNAPSHOT |
+| 7 | `font_id` | U32 | 0–65535 | DRAW, LAYOUT, SNAPSHOT |
+| 8 | `letter_spacing` | I32 | -128–127 | DRAW, LAYOUT, SNAPSHOT |
+| 9 | `line_spacing` | I32 | -128–127 | DRAW, LAYOUT, SNAPSHOT |
+| 10 | `text_align` | Enum domain 1 | Left=0, Center=1, Right=2, Auto=3 | DRAW, SNAPSHOT |
+| 11 | `padding_top` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 12 | `padding_bottom` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 13 | `padding_left` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 14 | `padding_right` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 15 | `margin_top` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 16 | `margin_bottom` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 17 | `margin_left` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 18 | `margin_right` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 19 | `gap_row` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+| 20 | `gap_col` | I32 | full domain | DRAW, LAYOUT, SNAPSHOT |
+
+Each actor descriptor lists applicable parts, the state bits admitted for each
+part, and properties drawn from the exact global rows, including their
+constraints and effects. The initial Container and Label expose all twenty
+properties on MAIN for DEFAULT and DISABLED selectors. Button, Slider, and
+List additionally admit FOCUSED, PRESSED, and EDITED selectors. The finite
+descriptor/state-bit product supplies the maximum number of MPY-owned selector
+patches; capacity is checked before publication.
+
+MPY owns at most one sparse patch per exact selector. Set inserts or replaces
+only the selected property. Remove clears only that property and prunes the
+patch only when it becomes empty. Sibling properties, other exact selectors,
+native local entries, added/shared entries, theme entries, and transition
+state remain unchanged. An explicit numeric zero is present data, not absence.
+Removing an MPY property reveals the next value in this precedence order:
+
+```text
+transition > MPY local > native local > added/shared > theme > inherited/default
+```
+
+Visual, text, and layout resolution use that same order. Layout resolution
+tracks presence independently from the numeric value and therefore preserves
+an explicit zero; it also includes the theme tier before the default.
+
+Preparation validates and converts the typed property, reserves and constructs
+the complete replacement MPY-local vector, and records a private storage
+owner identity and revision. The final guarded commit only swaps retained
+vectors and stores the next revision: it performs no allocation, deallocation,
+callback, or fallible native work. A wrong-owner or stale preparation returns
+ownership without mutation. Explicit release performs deferred destruction
+after publication or rollback.
+
+The frozen prerequisite invariants are:
+
+- **INV-MPY-04-STYLE-1:** property IDs, names, types, domains, constraints,
+  storage keys, and effects are globally unique and catalog-validated;
+- **INV-MPY-04-STYLE-2:** MPY set/remove uses exact selector equality, including
+  DEFAULT mask zero;
+- **INV-MPY-04-STYLE-3:** one property mutation cannot alter an unrelated MPY
+  property/selector or any native/shared/theme entry;
+- **INV-MPY-04-STYLE-4:** explicit zero and removal resolve identically across
+  visual, text, and layout cascade paths; and
+- **INV-MPY-04-STYLE-5:** invalid, capacity-rejected, or stale work publishes no
+  partial storage change.
+
+PCDN-MPY-04-015 remains responsible for opcode `0x0000_000b`, its exact
+set/remove encoding, contextual stable/Batch targets, negotiated limits and
+error attribution, success schema, Stage revision/effects/invalidation,
+snapshot style projection, Endpoint integration, and MicroPython bindings. It
+also retains production non-MAIN draw integration, descendant inheritance
+invalidation, transitions beyond the existing visual tier, shared/theme writes,
+and broader future style properties.
+
 ## 6. Frozen Decisions — Properties and Actions
 
 ### 6.1 Property behavior
@@ -937,7 +1033,9 @@ Style commands address
 `(ObjectId, PartId, StateMask, StylePropertyId)`. `StylePropertyId` has one
 stable semantic meaning across actors and parts; `PartId` and `StateMask` are
 independent selector context and are never fused into the property ID.
-`StateMask::DEFAULT` is zero and preserves the native match-any-state rule.
+`StateMask::DEFAULT` is zero: cascade resolution preserves the native
+match-any-state rule, while MPY set/remove treats the zero-mask selector as one
+exact storage identity rather than a wildcard.
 
 Actor descriptors enumerate supported parts, properties, selector masks, value
 types, and Mutation Effects. Unknown IDs, unknown state bits, and unsupported
@@ -1123,6 +1221,11 @@ material, but they MUST preserve the same ordering and visible semantics.
   limits; distinguishes structural domains from the four semantic Range cases;
   and requires one byte-identical requested-state Bytes echo reserved before
   Stage publication. Complete Endpoint execution remains evidence-gated.
+- **PCDN-MPY-04-014 — Closed by owner acceptance 2026-08-19:** §5.11 freezes
+  the stable twenty-property local-style registry, exact named/custom part and
+  state-mask applicability, sparse per-selector MPY storage, cascade parity,
+  and allocation-free guarded commit with deferred release. The opcode, wire,
+  Stage/Endpoint path, binding, and broader style integration remain 04-015.
 
 ## 12. Acceptance Checklist
 
@@ -1132,7 +1235,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-013 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-014 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -1154,8 +1257,9 @@ material, but they MUST preserve the same ordering and visible semantics.
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
 PromoteRoot, SetFlag, SetProperties, ResetProperties, and the outputless
 Transactional InvokeAction slice, plus exact SetRequestedLayout request/echo,
-now unblock the remaining operation-specific payload/result PCDNs and Endpoint
-orchestration without authorizing guessed remainder, computed-geometry, or
+and the local-style registry/storage prerequisite now unblock the remaining
+operation-specific payload/result PCDNs and Endpoint orchestration without
+authorizing guessed remainder, computed-geometry, local-style opcode, or
 deferred/result-bearing action schemas. After those codecs and endpoint
 integration are implemented, MPY-04 provides the complete stage mutation/
 introspection surface consumed by MPY-06 and the deterministic snapshot oracle
@@ -1500,7 +1604,7 @@ result-bearing, and deferred contracts remain explicit later gates.
 
 **Touches:** PCDN-MPY-04-013, INV-MPY-04-2, INV-MPY-04-3, §0, §5, §7, §11–§15
 
-**Commits:** pending
+**Commits:** `f5ab2fa`
 
 **Summary:** Freezes SetRequestedLayout as a contextual target plus one Bytes
 value containing an exact None/Flex/Grid/Item body. Adds stable enum registries,
@@ -1517,3 +1621,32 @@ Separating structural domains from descriptor semantics preserves signed layout
 intent and restricts Range to the accepted invalid combinations. Exact body
 sizing before publication makes result capacity atomic, while independent body,
 column-track, row-track, and outer-frame limits retain the conservative profile.
+
+### 0.13.0 — 2026-08-19 — Local-style registry and storage prerequisite ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic prerequisite and implementation
+
+**Touches:** PCDN-MPY-04-014, INV-MPY-04-STYLE-1 through
+INV-MPY-04-STYLE-5, §0, §5, §11–§15
+
+**Commits:** pending
+
+**Summary:** Freezes twenty stable global style-property rows, exact named and
+actor-scoped custom part selectors, registered state-mask applicability, and
+finite per-actor selector bounds. Adds one sparse MPY-owned patch per exact
+selector, per-property set/remove with empty-patch pruning, the accepted
+transition/MPY/native/shared/theme/default cascade, presence-aware layout
+resolution, and an owned prepare/commit/release transaction.
+
+#### Rationale
+
+Separating descriptor/storage proof from opcode design prevents the future
+wire from choosing semantics the native cascade cannot uphold. Exact selector
+identity makes DEFAULT mask zero usable without turning it into a removal
+wildcard, while sparse per-property storage preserves unrelated native and MPY
+state. Completing allocation and conversion before an infallible vector swap
+makes the prerequisite composable with the existing Stage Safe Turn without
+claiming that opcode, Stage, Endpoint, result, snapshot, or binding integration
+already exists.

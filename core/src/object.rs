@@ -463,10 +463,23 @@ impl ObjectStates {
     pub const CHECKED: Self = Self(1 << 3);
     /// Edited state for text or value editing modes.
     pub const EDITED: Self = Self(1 << 4);
+    /// Every state bit registered by the current object-state schema.
+    pub const ALL: Self = Self(
+        Self::DISABLED.0 | Self::FOCUSED.0 | Self::PRESSED.0 | Self::CHECKED.0 | Self::EDITED.0,
+    );
 
     /// Return a state set from raw bits, dropping unknown bits.
     pub const fn from_bits_truncate(bits: u32) -> Self {
         Self(bits & Self::all_bits())
+    }
+
+    /// Construct a state set only when every bit is registered.
+    pub const fn from_bits(bits: u32) -> Option<Self> {
+        if bits & !Self::all_bits() == 0 {
+            Some(Self(bits))
+        } else {
+            None
+        }
     }
 
     /// Return the raw state bits.
@@ -477,6 +490,11 @@ impl ObjectStates {
     /// Return `true` when all state bits in `other` are set.
     pub const fn contains(self, other: Self) -> bool {
         (self.0 & other.0) == other.0
+    }
+
+    /// Return the union of two state sets.
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
     }
 
     /// Insert all state bits in `other`.
@@ -499,7 +517,7 @@ impl ObjectStates {
     }
 
     const fn all_bits() -> u32 {
-        Self::DISABLED.0 | Self::FOCUSED.0 | Self::PRESSED.0 | Self::CHECKED.0 | Self::EDITED.0
+        Self::ALL.0
     }
 }
 

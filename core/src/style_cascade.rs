@@ -13,12 +13,14 @@
 //!
 //! 0. **Transition override** (Tier 0) — highest precedence, set during
 //!    an active style transition via [`start_transition`].
-//! 1. **Local styles** — last-added wins among matching selectors.
-//! 2. **Added (shared) styles** — last-added wins among matching selectors.
-//! 3. For inheritable properties (`alpha` plus LPAR-08 text properties), take
+//! 1. **MPY local styles** — one sparse patch per exact selector.
+//! 2. **Native local styles** — last-added wins among matching selectors.
+//! 3. **Added (shared) styles** — last-added wins among matching selectors.
+//! 4. **Theme styles** — last-added wins among matching selectors.
+//! 5. For inheritable properties (`alpha` plus LPAR-08 text properties), take
 //!    the value from the [`InheritedContext`] propagated top-down from
 //!    ancestors.
-//! 4. Property default value (from [`Style::default()`]).
+//! 6. Property default value (from [`Style::default()`]).
 //!
 //! # Top-down inheritance (§7.3)
 //!
@@ -341,6 +343,139 @@ pub struct StylePatch {
     pub gap_col: Option<i32>,
 }
 
+/// One of the twenty globally registered MPY local-style properties.
+///
+/// The stable numeric identifiers live in the MPY actor registry rather than
+/// in this enum's Rust discriminants. This enum is the typed storage key used
+/// after descriptor validation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StyleProperty {
+    /// Background color.
+    BgColor,
+    /// Border color.
+    BorderColor,
+    /// Border width.
+    BorderWidth,
+    /// Overall alpha.
+    Alpha,
+    /// Corner radius.
+    Radius,
+    /// Text color.
+    TextColor,
+    /// Font registry identifier.
+    FontId,
+    /// Inter-glyph spacing.
+    LetterSpacing,
+    /// Inter-line spacing.
+    LineSpacing,
+    /// Horizontal text alignment.
+    TextAlign,
+    /// Top padding.
+    PaddingTop,
+    /// Bottom padding.
+    PaddingBottom,
+    /// Left padding.
+    PaddingLeft,
+    /// Right padding.
+    PaddingRight,
+    /// Top margin.
+    MarginTop,
+    /// Bottom margin.
+    MarginBottom,
+    /// Left margin.
+    MarginLeft,
+    /// Right margin.
+    MarginRight,
+    /// Row gap.
+    GapRow,
+    /// Column gap.
+    GapCol,
+}
+
+/// Typed value accepted by the local-style storage prerequisite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StylePropertyValue {
+    /// ARGB-converted native color.
+    Color(Color),
+    /// Unsigned scalar.
+    U32(u32),
+    /// Signed scalar.
+    I32(i32),
+    /// Registered text alignment.
+    TextAlign(TextAlign),
+}
+
+/// Exact mutation of one MPY-owned property at one selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MpyStyleUpdate {
+    /// Set or replace the property.
+    Set(StylePropertyValue),
+    /// Remove only the MPY-owned property.
+    Remove,
+}
+
+/// Failure while preparing or committing MPY-owned local-style storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MpyStyleStorageError {
+    /// The typed value does not match the selected property.
+    TypeMismatch,
+    /// The scalar is outside the native field's exact range.
+    Range,
+    /// Required retained storage could not be reserved.
+    Capacity,
+    /// The style storage changed after preparation.
+    Stale,
+    /// The private storage revision cannot advance without wrapping.
+    RevisionExhausted,
+}
+
+/// Fully prepared exact MPY local-style update.
+///
+/// All vector growth and patch conversion occur before this value is returned.
+/// The value intentionally exposes no mutable storage.
+#[derive(Debug)]
+pub struct PreparedMpyStyleMutation {
+    owner: Rc<RefCell<TransitionOverride>>,
+    expected_revision: u64,
+    next_revision: u64,
+    changed: bool,
+    next_local: Vec<(Selector, StylePatch)>,
+}
+
+/// Successful MPY local-style storage commit awaiting explicit release.
+#[derive(Debug)]
+pub struct CommittedMpyStyleMutation {
+    committed_revision: u64,
+    retired: PreparedMpyStyleMutation,
+}
+
+/// Owning stale-commit error for one prepared MPY local-style update.
+pub struct MpyStyleCommitError {
+    cause: MpyStyleStorageError,
+    prepared: PreparedMpyStyleMutation,
+}
+
+impl MpyStyleCommitError {
+    /// Return the rejection cause.
+    pub const fn cause(&self) -> MpyStyleStorageError {
+        self.cause
+    }
+
+    /// Recover the prepared update for retry or deferred release.
+    pub fn into_prepared(self) -> PreparedMpyStyleMutation {
+        self.prepared
+    }
+}
+
+impl core::fmt::Debug for MpyStyleCommitError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("MpyStyleCommitError")
+            .field("cause", &self.cause)
+            .finish_non_exhaustive()
+    }
+}
+
 impl StylePatch {
     /// Return a new empty patch (all fields `None`).
     pub const fn new() -> Self {
@@ -371,6 +506,187 @@ impl StylePatch {
     /// Return a builder for constructing a patch via method chaining.
     pub fn builder() -> StylePatchBuilder {
         StylePatchBuilder(Self::new())
+    }
+
+    /// Return whether this patch contains no property override.
+    pub const fn is_empty(&self) -> bool {
+        self.bg_color.is_none()
+            && self.border_color.is_none()
+            && self.border_width.is_none()
+            && self.alpha.is_none()
+            && self.radius.is_none()
+            && self.text_color.is_none()
+            && self.font_id.is_none()
+            && self.letter_spacing.is_none()
+            && self.line_spacing.is_none()
+            && self.text_align.is_none()
+            && self.padding_top.is_none()
+            && self.padding_bottom.is_none()
+            && self.padding_left.is_none()
+            && self.padding_right.is_none()
+            && self.margin_top.is_none()
+            && self.margin_bottom.is_none()
+            && self.margin_left.is_none()
+            && self.margin_right.is_none()
+            && self.gap_row.is_none()
+            && self.gap_col.is_none()
+    }
+
+    /// Read one typed property from this sparse patch.
+    pub const fn property(&self, property: StyleProperty) -> Option<StylePropertyValue> {
+        match property {
+            StyleProperty::BgColor => color_value(self.bg_color),
+            StyleProperty::BorderColor => color_value(self.border_color),
+            StyleProperty::BorderWidth => u8_value(self.border_width),
+            StyleProperty::Alpha => u8_value(self.alpha),
+            StyleProperty::Radius => u8_value(self.radius),
+            StyleProperty::TextColor => color_value(self.text_color),
+            StyleProperty::FontId => match self.font_id {
+                Some(value) => Some(StylePropertyValue::U32(value.0 as u32)),
+                None => None,
+            },
+            StyleProperty::LetterSpacing => i8_value(self.letter_spacing),
+            StyleProperty::LineSpacing => i8_value(self.line_spacing),
+            StyleProperty::TextAlign => match self.text_align {
+                Some(value) => Some(StylePropertyValue::TextAlign(value)),
+                None => None,
+            },
+            StyleProperty::PaddingTop => i32_value(self.padding_top),
+            StyleProperty::PaddingBottom => i32_value(self.padding_bottom),
+            StyleProperty::PaddingLeft => i32_value(self.padding_left),
+            StyleProperty::PaddingRight => i32_value(self.padding_right),
+            StyleProperty::MarginTop => i32_value(self.margin_top),
+            StyleProperty::MarginBottom => i32_value(self.margin_bottom),
+            StyleProperty::MarginLeft => i32_value(self.margin_left),
+            StyleProperty::MarginRight => i32_value(self.margin_right),
+            StyleProperty::GapRow => i32_value(self.gap_row),
+            StyleProperty::GapCol => i32_value(self.gap_col),
+        }
+    }
+
+    fn set_property(
+        &mut self,
+        property: StyleProperty,
+        value: StylePropertyValue,
+    ) -> Result<(), MpyStyleStorageError> {
+        match (property, value) {
+            (StyleProperty::BgColor, StylePropertyValue::Color(value)) => {
+                self.bg_color = Some(value);
+            }
+            (StyleProperty::BorderColor, StylePropertyValue::Color(value)) => {
+                self.border_color = Some(value);
+            }
+            (StyleProperty::BorderWidth, StylePropertyValue::U32(value)) => {
+                self.border_width =
+                    Some(u8::try_from(value).map_err(|_| MpyStyleStorageError::Range)?);
+            }
+            (StyleProperty::Alpha, StylePropertyValue::U32(value)) => {
+                self.alpha = Some(u8::try_from(value).map_err(|_| MpyStyleStorageError::Range)?);
+            }
+            (StyleProperty::Radius, StylePropertyValue::U32(value)) => {
+                self.radius = Some(u8::try_from(value).map_err(|_| MpyStyleStorageError::Range)?);
+            }
+            (StyleProperty::TextColor, StylePropertyValue::Color(value)) => {
+                self.text_color = Some(value);
+            }
+            (StyleProperty::FontId, StylePropertyValue::U32(value)) => {
+                self.font_id = Some(FontId(
+                    u16::try_from(value).map_err(|_| MpyStyleStorageError::Range)?,
+                ));
+            }
+            (StyleProperty::LetterSpacing, StylePropertyValue::I32(value)) => {
+                self.letter_spacing =
+                    Some(i8::try_from(value).map_err(|_| MpyStyleStorageError::Range)?);
+            }
+            (StyleProperty::LineSpacing, StylePropertyValue::I32(value)) => {
+                self.line_spacing =
+                    Some(i8::try_from(value).map_err(|_| MpyStyleStorageError::Range)?);
+            }
+            (StyleProperty::TextAlign, StylePropertyValue::TextAlign(value)) => {
+                self.text_align = Some(value);
+            }
+            (StyleProperty::PaddingTop, StylePropertyValue::I32(value)) => {
+                self.padding_top = Some(value)
+            }
+            (StyleProperty::PaddingBottom, StylePropertyValue::I32(value)) => {
+                self.padding_bottom = Some(value)
+            }
+            (StyleProperty::PaddingLeft, StylePropertyValue::I32(value)) => {
+                self.padding_left = Some(value)
+            }
+            (StyleProperty::PaddingRight, StylePropertyValue::I32(value)) => {
+                self.padding_right = Some(value)
+            }
+            (StyleProperty::MarginTop, StylePropertyValue::I32(value)) => {
+                self.margin_top = Some(value)
+            }
+            (StyleProperty::MarginBottom, StylePropertyValue::I32(value)) => {
+                self.margin_bottom = Some(value)
+            }
+            (StyleProperty::MarginLeft, StylePropertyValue::I32(value)) => {
+                self.margin_left = Some(value)
+            }
+            (StyleProperty::MarginRight, StylePropertyValue::I32(value)) => {
+                self.margin_right = Some(value)
+            }
+            (StyleProperty::GapRow, StylePropertyValue::I32(value)) => self.gap_row = Some(value),
+            (StyleProperty::GapCol, StylePropertyValue::I32(value)) => self.gap_col = Some(value),
+            _ => return Err(MpyStyleStorageError::TypeMismatch),
+        }
+        Ok(())
+    }
+
+    fn clear_property(&mut self, property: StyleProperty) {
+        match property {
+            StyleProperty::BgColor => self.bg_color = None,
+            StyleProperty::BorderColor => self.border_color = None,
+            StyleProperty::BorderWidth => self.border_width = None,
+            StyleProperty::Alpha => self.alpha = None,
+            StyleProperty::Radius => self.radius = None,
+            StyleProperty::TextColor => self.text_color = None,
+            StyleProperty::FontId => self.font_id = None,
+            StyleProperty::LetterSpacing => self.letter_spacing = None,
+            StyleProperty::LineSpacing => self.line_spacing = None,
+            StyleProperty::TextAlign => self.text_align = None,
+            StyleProperty::PaddingTop => self.padding_top = None,
+            StyleProperty::PaddingBottom => self.padding_bottom = None,
+            StyleProperty::PaddingLeft => self.padding_left = None,
+            StyleProperty::PaddingRight => self.padding_right = None,
+            StyleProperty::MarginTop => self.margin_top = None,
+            StyleProperty::MarginBottom => self.margin_bottom = None,
+            StyleProperty::MarginLeft => self.margin_left = None,
+            StyleProperty::MarginRight => self.margin_right = None,
+            StyleProperty::GapRow => self.gap_row = None,
+            StyleProperty::GapCol => self.gap_col = None,
+        }
+    }
+}
+
+const fn color_value(value: Option<Color>) -> Option<StylePropertyValue> {
+    match value {
+        Some(value) => Some(StylePropertyValue::Color(value)),
+        None => None,
+    }
+}
+
+const fn u8_value(value: Option<u8>) -> Option<StylePropertyValue> {
+    match value {
+        Some(value) => Some(StylePropertyValue::U32(value as u32)),
+        None => None,
+    }
+}
+
+const fn i8_value(value: Option<i8>) -> Option<StylePropertyValue> {
+    match value {
+        Some(value) => Some(StylePropertyValue::I32(value as i32)),
+        None => None,
+    }
+}
+
+const fn i32_value(value: Option<i32>) -> Option<StylePropertyValue> {
+    match value {
+        Some(value) => Some(StylePropertyValue::I32(value)),
+        None => None,
     }
 }
 
@@ -546,14 +862,18 @@ impl InheritedContext {
 ///
 /// - **Transition override** (Tier 0) — highest precedence; written by
 ///   active [`start_transition`] animations.
-/// - **Local entries** are owned by the node (`add_local_style`). They take
-///   priority over added entries.
+/// - **MPY local entries** are one sparse patch per exact selector and take
+///   priority over native local entries.
+/// - **Native local entries** are owned by the node (`add_local_style`). They
+///   take priority over added entries.
 /// - **Added (shared) entries** are `'static` references (`add_style`).
 ///   Lower precedence than local entries.
 ///
 /// Within each tier, the last-added entry wins for a given matching selector
 /// (§7.2 reverse-registration-order rule).
 pub struct StyleState {
+    /// MPY-owned local style patches, one per exact selector.
+    mpy_local: Vec<(Selector, StylePatch)>,
     /// Local style entries: `(selector, patch)` in registration order.
     local: Vec<(Selector, StylePatch)>,
     /// Added/shared style references: `(selector, patch)` in registration order.
@@ -568,16 +888,20 @@ pub struct StyleState {
     /// closures can write interpolated values without holding a borrow on
     /// the owning node.
     pub(crate) transition_override: Rc<RefCell<TransitionOverride>>,
+    /// Freshness guard for prepared MPY-local transactions.
+    mpy_revision: u64,
 }
 
 impl StyleState {
     /// Create an empty style state with an empty transition override slot.
     pub fn new() -> Self {
         Self {
+            mpy_local: Vec::new(),
             local: Vec::new(),
             added: Vec::new(),
             theme: Vec::new(),
             transition_override: Rc::new(RefCell::new(TransitionOverride::default())),
+            mpy_revision: 0,
         }
     }
 
@@ -602,12 +926,144 @@ impl StyleState {
         &self.local
     }
 
+    /// Return MPY-owned local patches in selector registration order.
+    pub fn mpy_local_entries(&self) -> &[(Selector, StylePatch)] {
+        &self.mpy_local
+    }
+
     /// Return the added (shared) style entries as a `(Selector, &StylePatch)` slice.
     ///
     /// Used by [`crate::layout::resolve_layout_style`] to iterate added entries
     /// in precedence order.
     pub fn added_entries(&self) -> &[(Selector, &'static StylePatch)] {
         &self.added
+    }
+
+    /// Return default-theme entries in registration order.
+    pub fn theme_entries(&self) -> &[(Selector, StylePatch)] {
+        &self.theme
+    }
+
+    /// Return the current private MPY-local storage revision.
+    pub const fn mpy_revision(&self) -> u64 {
+        self.mpy_revision
+    }
+
+    /// Prepare one exact MPY-local property set or removal.
+    ///
+    /// `maximum_selectors` is derived from the actor's finite applicability
+    /// descriptor. All allocation and value conversion completes here.
+    pub fn prepare_mpy_local_update(
+        &self,
+        selector: Selector,
+        property: StyleProperty,
+        update: MpyStyleUpdate,
+        maximum_selectors: usize,
+    ) -> Result<PreparedMpyStyleMutation, MpyStyleStorageError> {
+        let validated_patch = match update {
+            MpyStyleUpdate::Set(value) => {
+                let mut patch = StylePatch::new();
+                patch.set_property(property, value)?;
+                Some(patch)
+            }
+            MpyStyleUpdate::Remove => None,
+        };
+        let mut next_local = Vec::new();
+        next_local
+            .try_reserve_exact(self.mpy_local.len().saturating_add(1))
+            .map_err(|_| MpyStyleStorageError::Capacity)?;
+        next_local.extend_from_slice(&self.mpy_local);
+
+        let position = next_local
+            .iter()
+            .position(|(candidate, _)| *candidate == selector);
+        match (position, update, validated_patch) {
+            (Some(index), MpyStyleUpdate::Set(value), _) => {
+                next_local[index].1.set_property(property, value)?;
+            }
+            (Some(index), MpyStyleUpdate::Remove, _) => {
+                next_local[index].1.clear_property(property);
+                if next_local[index].1.is_empty() {
+                    next_local.remove(index);
+                }
+            }
+            (None, MpyStyleUpdate::Set(_), Some(patch)) => {
+                if next_local.len() >= maximum_selectors {
+                    return Err(MpyStyleStorageError::Capacity);
+                }
+                next_local.push((selector, patch));
+            }
+            (None, MpyStyleUpdate::Remove, _) => {}
+            (None, MpyStyleUpdate::Set(_), None) => {
+                return Err(MpyStyleStorageError::TypeMismatch);
+            }
+        }
+
+        let changed = next_local != self.mpy_local;
+        let next_revision = if changed {
+            self.mpy_revision
+                .checked_add(1)
+                .ok_or(MpyStyleStorageError::RevisionExhausted)?
+        } else {
+            self.mpy_revision
+        };
+        Ok(PreparedMpyStyleMutation {
+            owner: Rc::clone(&self.transition_override),
+            expected_revision: self.mpy_revision,
+            next_revision,
+            changed,
+            next_local,
+        })
+    }
+
+    /// Commit a prepared MPY-local update using only swaps and scalar stores.
+    pub fn commit_mpy_local_update(
+        &mut self,
+        mut prepared: PreparedMpyStyleMutation,
+    ) -> Result<CommittedMpyStyleMutation, MpyStyleCommitError> {
+        if !Rc::ptr_eq(&self.transition_override, &prepared.owner)
+            || self.mpy_revision != prepared.expected_revision
+        {
+            return Err(MpyStyleCommitError {
+                cause: MpyStyleStorageError::Stale,
+                prepared,
+            });
+        }
+        core::mem::swap(&mut self.mpy_local, &mut prepared.next_local);
+        self.mpy_revision = prepared.next_revision;
+        Ok(CommittedMpyStyleMutation {
+            committed_revision: self.mpy_revision,
+            retired: prepared,
+        })
+    }
+
+    /// Release an uncommitted preparation after rejection or caller rollback.
+    pub fn release_prepared_mpy_local_update(&self, prepared: PreparedMpyStyleMutation) {
+        drop(prepared);
+    }
+
+    /// Release retained pre-commit storage after publication is complete.
+    pub fn release_mpy_local_update(&self, committed: CommittedMpyStyleMutation) {
+        drop(committed);
+    }
+}
+
+impl PreparedMpyStyleMutation {
+    /// Return whether this update changes durable MPY-owned storage.
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+}
+
+impl CommittedMpyStyleMutation {
+    /// Return the committed private storage revision.
+    pub const fn revision(&self) -> u64 {
+        self.committed_revision
+    }
+
+    /// Return whether durable MPY-owned storage changed.
+    pub const fn changed(&self) -> bool {
+        self.retired.changed
     }
 }
 
@@ -766,9 +1222,9 @@ pub fn resolve_styles(
     part: Part,
     inherited: &InheritedContext,
 ) -> ResolvedStyles {
-    // Walk the tiers in precedence order (transition override first, then
-    // local, then added), in reverse-registration order within each tier
-    // (last added wins).  We collect the first `Some` for each property.
+    // Walk the tiers in precedence order (transition override, MPY local,
+    // native local, added, then theme), in reverse-registration order within
+    // each tier. We collect the first `Some` for each property.
     let mut winners = CascadeWinners::default();
 
     if let Some(s) = node_style {
@@ -792,21 +1248,28 @@ pub fn resolve_styles(
             }
         }
 
-        // --- Tier 1: local entries (reverse registration order = last added wins) ---
+        // --- Tier 1: MPY-owned local entries ---
+        for (sel, patch) in s.mpy_local.iter().rev() {
+            if sel.matches(part, node_states) {
+                winners.fill_from_patch(patch);
+            }
+        }
+
+        // --- Tier 2: native local entries ---
         for (sel, patch) in s.local.iter().rev() {
             if sel.matches(part, node_states) {
                 winners.fill_from_patch(patch);
             }
         }
 
-        // --- Tier 2: added entries (reverse registration order) ---
+        // --- Tier 3: added entries (reverse registration order) ---
         for (sel, patch) in s.added.iter().rev() {
             if sel.matches(part, node_states) {
                 winners.fill_from_patch(patch);
             }
         }
 
-        // --- Tier 3: default-theme entries (LPAR-07 §9.1, lowest style tier) ---
+        // --- Tier 4: default-theme entries (LPAR-07 §9.1, lowest style tier) ---
         // Consulted below local and added styles so widget/application styles
         // always win over the theme regardless of registration order.
         for (sel, patch) in s.theme.iter().rev() {
@@ -816,7 +1279,7 @@ pub fn resolve_styles(
         }
     }
 
-    // --- Tier 4: take inheritable values from inherited context ---
+    // --- Tier 5: take inheritable values from inherited context ---
     if winners.alpha.is_none() {
         winners.alpha = inherited.alpha;
     }
@@ -836,7 +1299,7 @@ pub fn resolve_styles(
         winners.text_align = inherited.text_align;
     }
 
-    // --- Tier 5: property defaults (§7.4) ---
+    // --- Tier 6: property defaults (§7.4) ---
     let defaults = Style::default();
     let text_defaults = TextStyle::default();
     let style = Style {
@@ -1370,6 +1833,7 @@ mod tests {
         node.add_local_style(
             StylePatch {
                 bg_color: Some(green()),
+                letter_spacing: Some(9),
                 ..StylePatch::new()
             },
             Selector::part(Part::SCROLLBAR),
@@ -1995,5 +2459,263 @@ mod tests {
         };
 
         assert_eq!(sample(), sample(), "transitions are deterministic");
+    }
+
+    #[test]
+    fn mpy_local_updates_are_exact_sparse_and_reveal_lower_tiers() {
+        static ADDED: StylePatch = StylePatch {
+            bg_color: Some(Color(0, 0, 255, 255)),
+            ..StylePatch::new()
+        };
+        let selector = Selector::part(Part::MAIN);
+        let pressed = Selector::new(Part::MAIN, ObjectStates::PRESSED);
+        let mut state = StyleState::new();
+        push_theme(
+            &mut state,
+            StylePatch {
+                bg_color: Some(green()),
+                ..StylePatch::new()
+            },
+            selector,
+        );
+        push_added(&mut state, &ADDED, selector);
+        push_local(
+            &mut state,
+            StylePatch {
+                bg_color: Some(red()),
+                border_width: Some(7),
+                letter_spacing: Some(7),
+                ..StylePatch::new()
+            },
+            selector,
+        );
+
+        let prepared = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::BgColor,
+                MpyStyleUpdate::Set(StylePropertyValue::Color(Color(1, 2, 3, 4))),
+                2,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(prepared).unwrap();
+        assert!(committed.changed());
+        state.release_mpy_local_update(committed);
+
+        let resolved = resolve_styles(
+            Some(&state),
+            ObjectStates::PRESSED,
+            Part::MAIN,
+            &InheritedContext::EMPTY,
+        );
+        assert_eq!(resolved.style.bg_color, Color(1, 2, 3, 4));
+        assert_eq!(resolved.style.border_width, 7);
+
+        let pressed_update = state
+            .prepare_mpy_local_update(
+                pressed,
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(0)),
+                2,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(pressed_update).unwrap();
+        state.release_mpy_local_update(committed);
+        let text_zero = state
+            .prepare_mpy_local_update(
+                pressed,
+                StyleProperty::LetterSpacing,
+                MpyStyleUpdate::Set(StylePropertyValue::I32(0)),
+                2,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(text_zero).unwrap();
+        state.release_mpy_local_update(committed);
+        assert_eq!(state.mpy_local_entries().len(), 2);
+
+        let revision = state.mpy_revision();
+        let unchanged = state
+            .prepare_mpy_local_update(
+                pressed,
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(0)),
+                2,
+            )
+            .unwrap();
+        assert!(!unchanged.changed());
+        let committed = state.commit_mpy_local_update(unchanged).unwrap();
+        assert_eq!(committed.revision(), revision);
+        state.release_mpy_local_update(committed);
+
+        let remove = state
+            .prepare_mpy_local_update(selector, StyleProperty::BgColor, MpyStyleUpdate::Remove, 2)
+            .unwrap();
+        let committed = state.commit_mpy_local_update(remove).unwrap();
+        state.release_mpy_local_update(committed);
+        assert_eq!(state.mpy_local_entries().len(), 1);
+        assert_eq!(state.local_entries().len(), 1);
+        assert_eq!(state.added_entries().len(), 1);
+        assert_eq!(state.theme_entries().len(), 1);
+        let resolved = resolve_styles(
+            Some(&state),
+            ObjectStates::PRESSED,
+            Part::MAIN,
+            &InheritedContext::EMPTY,
+        );
+        assert_eq!(resolved.style.bg_color, red());
+        assert_eq!(resolved.style.alpha, 0);
+        assert_eq!(resolved.text.letter_spacing, 0);
+
+        let remove_text = state
+            .prepare_mpy_local_update(
+                pressed,
+                StyleProperty::LetterSpacing,
+                MpyStyleUpdate::Remove,
+                2,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(remove_text).unwrap();
+        state.release_mpy_local_update(committed);
+        let resolved = resolve_styles(
+            Some(&state),
+            ObjectStates::PRESSED,
+            Part::MAIN,
+            &InheritedContext::EMPTY,
+        );
+        assert_eq!(resolved.text.letter_spacing, 7);
+    }
+
+    #[test]
+    fn mpy_local_prepare_rejects_type_range_capacity_and_stale_commit() {
+        let selector = Selector::part(Part::MAIN);
+        let mut state = StyleState::new();
+        assert_eq!(
+            state
+                .prepare_mpy_local_update(
+                    selector,
+                    StyleProperty::BgColor,
+                    MpyStyleUpdate::Set(StylePropertyValue::U32(1)),
+                    1,
+                )
+                .unwrap_err(),
+            MpyStyleStorageError::TypeMismatch
+        );
+        assert_eq!(
+            state
+                .prepare_mpy_local_update(
+                    selector,
+                    StyleProperty::Alpha,
+                    MpyStyleUpdate::Set(StylePropertyValue::U32(256)),
+                    1,
+                )
+                .unwrap_err(),
+            MpyStyleStorageError::Range
+        );
+
+        let first = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(1)),
+                1,
+            )
+            .unwrap();
+        let stale = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(2)),
+                1,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(first).unwrap();
+        state.release_mpy_local_update(committed);
+        let error = state.commit_mpy_local_update(stale).unwrap_err();
+        assert_eq!(error.cause(), MpyStyleStorageError::Stale);
+        drop(error.into_prepared());
+
+        assert_eq!(
+            state
+                .prepare_mpy_local_update(
+                    Selector::new(Part::MAIN, ObjectStates::PRESSED),
+                    StyleProperty::Alpha,
+                    MpyStyleUpdate::Set(StylePropertyValue::U32(3)),
+                    1,
+                )
+                .unwrap_err(),
+            MpyStyleStorageError::Capacity
+        );
+
+        let foreign = state
+            .prepare_mpy_local_update(
+                selector,
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(4)),
+                1,
+            )
+            .unwrap();
+        let mut other = StyleState::new();
+        let error = other.commit_mpy_local_update(foreign).unwrap_err();
+        assert_eq!(error.cause(), MpyStyleStorageError::Stale);
+        assert!(other.mpy_local_entries().is_empty());
+        let committed = state
+            .commit_mpy_local_update(error.into_prepared())
+            .unwrap();
+        state.release_mpy_local_update(committed);
+    }
+
+    #[test]
+    fn all_twenty_style_properties_round_trip_through_one_sparse_patch() {
+        let selector = Selector::part(Part::MAIN);
+        let values = [
+            (StyleProperty::BgColor, StylePropertyValue::Color(red())),
+            (
+                StyleProperty::BorderColor,
+                StylePropertyValue::Color(blue()),
+            ),
+            (StyleProperty::BorderWidth, StylePropertyValue::U32(0)),
+            (StyleProperty::Alpha, StylePropertyValue::U32(128)),
+            (StyleProperty::Radius, StylePropertyValue::U32(255)),
+            (StyleProperty::TextColor, StylePropertyValue::Color(green())),
+            (StyleProperty::FontId, StylePropertyValue::U32(65_535)),
+            (StyleProperty::LetterSpacing, StylePropertyValue::I32(-128)),
+            (StyleProperty::LineSpacing, StylePropertyValue::I32(127)),
+            (
+                StyleProperty::TextAlign,
+                StylePropertyValue::TextAlign(TextAlign::Auto),
+            ),
+            (StyleProperty::PaddingTop, StylePropertyValue::I32(1)),
+            (StyleProperty::PaddingBottom, StylePropertyValue::I32(2)),
+            (StyleProperty::PaddingLeft, StylePropertyValue::I32(3)),
+            (StyleProperty::PaddingRight, StylePropertyValue::I32(4)),
+            (StyleProperty::MarginTop, StylePropertyValue::I32(5)),
+            (StyleProperty::MarginBottom, StylePropertyValue::I32(6)),
+            (StyleProperty::MarginLeft, StylePropertyValue::I32(7)),
+            (StyleProperty::MarginRight, StylePropertyValue::I32(8)),
+            (StyleProperty::GapRow, StylePropertyValue::I32(9)),
+            (StyleProperty::GapCol, StylePropertyValue::I32(10)),
+        ];
+        let mut state = StyleState::new();
+        for (property, value) in values {
+            let prepared = state
+                .prepare_mpy_local_update(selector, property, MpyStyleUpdate::Set(value), 1)
+                .unwrap();
+            let committed = state.commit_mpy_local_update(prepared).unwrap();
+            state.release_mpy_local_update(committed);
+            assert_eq!(
+                state.mpy_local_entries()[0].1.property(property),
+                Some(value)
+            );
+        }
+        assert_eq!(state.mpy_local_entries().len(), 1);
+
+        for (property, _) in values {
+            let prepared = state
+                .prepare_mpy_local_update(selector, property, MpyStyleUpdate::Remove, 1)
+                .unwrap();
+            let committed = state.commit_mpy_local_update(prepared).unwrap();
+            state.release_mpy_local_update(committed);
+        }
+        assert!(state.mpy_local_entries().is_empty());
     }
 }

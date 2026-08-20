@@ -31,6 +31,10 @@ use crate::{
         ObjectDispatchError, ObjectDispatchObservationPlans, ObjectEvent, ObjectFlags, ObjectNode,
         ObjectStates, ResolvedObjectDispatch, resolve_object_dispatch,
     },
+    style_cascade::{
+        MpyStyleStorageError, MpyStyleUpdate, Part, PreparedMpyStyleMutation, Selector,
+        StyleProperty, StyleState,
+    },
     widget::{Rect, Widget},
 };
 
@@ -1801,6 +1805,334 @@ where
 pub type ActorConstructor =
     for<'a> fn(ConstructorArgs<'a>) -> Result<ConstructedActor, RegistryError>;
 
+/// Stable constraint attached to a globally registered style property.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StyleValueConstraint {
+    /// The property's native type needs no additional scalar check.
+    None,
+    /// Inclusive unsigned scalar range.
+    U32 {
+        /// Inclusive lower bound.
+        min: u32,
+        /// Inclusive upper bound.
+        max: u32,
+    },
+    /// Inclusive signed scalar range.
+    I32 {
+        /// Inclusive lower bound.
+        min: i32,
+        /// Inclusive upper bound.
+        max: i32,
+    },
+    /// Registered numeric enum domain and its accepted values.
+    Enum {
+        /// Stable enum-domain identifier.
+        domain_id: u32,
+        /// Canonical values in declaration order.
+        values: &'static [u32],
+    },
+}
+
+/// One of the twenty globally registered MPY local-style properties.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StylePropertyDescriptor {
+    /// Stable nonzero style-property identifier.
+    pub id: u32,
+    /// Stable source-level name.
+    pub name: &'static str,
+    /// Canonical MPY value tag.
+    pub value_tag: ValueTag,
+    /// Typed sparse-patch storage key.
+    pub storage: StyleProperty,
+    /// Scalar or enum constraint.
+    pub constraint: StyleValueConstraint,
+    /// Effects a future Stage mutation must publish.
+    pub effects: MutationEffects,
+}
+
+/// Actor-local applicability for one exact style part.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StylePartDescriptor {
+    /// Named or actor-scoped custom part.
+    pub part: Part,
+    /// State bits that may appear in an exact selector for this part.
+    pub allowed_states: ObjectStates,
+    /// Globally registered properties applicable to this part.
+    pub properties: &'static [StylePropertyDescriptor],
+}
+
+/// Rejection while resolving an actor-local style applicability row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StyleApplicabilityError {
+    /// Part 7 is reserved or the part is not declared by this actor.
+    UnknownPart,
+    /// The exact selector contains an unknown or actor-disallowed state bit.
+    InvalidStateMask,
+    /// The global property is not applicable to the selected actor part.
+    UnknownProperty,
+}
+
+/// Failure before an actor-applicable local-style update is fully prepared.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StylePreparationError {
+    /// The part, state mask, or property is not applicable to this actor.
+    Applicability(StyleApplicabilityError),
+    /// Typed conversion, capacity, or private revision preparation failed.
+    Storage(MpyStyleStorageError),
+}
+
+/// Stable text-alignment enum domain used by style property 10.
+pub const STYLE_TEXT_ALIGN_DOMAIN_ID: u32 = 1;
+
+/// Canonical text-alignment enum values: Left, Center, Right, Auto.
+pub const STYLE_TEXT_ALIGN_VALUES: [u32; 4] = [0, 1, 2, 3];
+
+const STYLE_DRAW_SNAPSHOT: MutationEffects = MutationEffects::DRAW.union(MutationEffects::SNAPSHOT);
+const STYLE_LAYOUT_EFFECTS: MutationEffects = MutationEffects::DRAW
+    .union(MutationEffects::LAYOUT)
+    .union(MutationEffects::SNAPSHOT);
+
+/// Stable global MPY style-property registry.
+pub const STYLE_PROPERTIES: [StylePropertyDescriptor; 20] = [
+    style_property(
+        1,
+        "bg_color",
+        ValueTag::Color,
+        StyleProperty::BgColor,
+        StyleValueConstraint::None,
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        2,
+        "border_color",
+        ValueTag::Color,
+        StyleProperty::BorderColor,
+        StyleValueConstraint::None,
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        3,
+        "border_width",
+        ValueTag::U32,
+        StyleProperty::BorderWidth,
+        StyleValueConstraint::U32 { min: 0, max: 255 },
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        4,
+        "alpha",
+        ValueTag::U32,
+        StyleProperty::Alpha,
+        StyleValueConstraint::U32 { min: 0, max: 255 },
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        5,
+        "radius",
+        ValueTag::U32,
+        StyleProperty::Radius,
+        StyleValueConstraint::U32 { min: 0, max: 255 },
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        6,
+        "text_color",
+        ValueTag::Color,
+        StyleProperty::TextColor,
+        StyleValueConstraint::None,
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        7,
+        "font_id",
+        ValueTag::U32,
+        StyleProperty::FontId,
+        StyleValueConstraint::U32 {
+            min: 0,
+            max: 65_535,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        8,
+        "letter_spacing",
+        ValueTag::I32,
+        StyleProperty::LetterSpacing,
+        StyleValueConstraint::I32 {
+            min: -128,
+            max: 127,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        9,
+        "line_spacing",
+        ValueTag::I32,
+        StyleProperty::LineSpacing,
+        StyleValueConstraint::I32 {
+            min: -128,
+            max: 127,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        10,
+        "text_align",
+        ValueTag::Enum,
+        StyleProperty::TextAlign,
+        StyleValueConstraint::Enum {
+            domain_id: STYLE_TEXT_ALIGN_DOMAIN_ID,
+            values: &STYLE_TEXT_ALIGN_VALUES,
+        },
+        STYLE_DRAW_SNAPSHOT,
+    ),
+    style_property(
+        11,
+        "padding_top",
+        ValueTag::I32,
+        StyleProperty::PaddingTop,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        12,
+        "padding_bottom",
+        ValueTag::I32,
+        StyleProperty::PaddingBottom,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        13,
+        "padding_left",
+        ValueTag::I32,
+        StyleProperty::PaddingLeft,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        14,
+        "padding_right",
+        ValueTag::I32,
+        StyleProperty::PaddingRight,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        15,
+        "margin_top",
+        ValueTag::I32,
+        StyleProperty::MarginTop,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        16,
+        "margin_bottom",
+        ValueTag::I32,
+        StyleProperty::MarginBottom,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        17,
+        "margin_left",
+        ValueTag::I32,
+        StyleProperty::MarginLeft,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        18,
+        "margin_right",
+        ValueTag::I32,
+        StyleProperty::MarginRight,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        19,
+        "gap_row",
+        ValueTag::I32,
+        StyleProperty::GapRow,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+    style_property(
+        20,
+        "gap_col",
+        ValueTag::I32,
+        StyleProperty::GapCol,
+        StyleValueConstraint::I32 {
+            min: i32::MIN,
+            max: i32::MAX,
+        },
+        STYLE_LAYOUT_EFFECTS,
+    ),
+];
+
+const fn style_property(
+    id: u32,
+    name: &'static str,
+    value_tag: ValueTag,
+    storage: StyleProperty,
+    constraint: StyleValueConstraint,
+    effects: MutationEffects,
+) -> StylePropertyDescriptor {
+    StylePropertyDescriptor {
+        id,
+        name,
+        value_tag,
+        storage,
+        constraint,
+        effects,
+    }
+}
+
+/// MAIN-part profile for non-control proof actors.
+pub const MPY_BASIC_STYLE_PARTS: [StylePartDescriptor; 1] = [StylePartDescriptor {
+    part: Part::MAIN,
+    allowed_states: ObjectStates::DISABLED,
+    properties: &STYLE_PROPERTIES,
+}];
+
+/// MAIN-part profile for proof actors carrying control state.
+pub const MPY_CONTROL_STYLE_PARTS: [StylePartDescriptor; 1] = [StylePartDescriptor {
+    part: Part::MAIN,
+    allowed_states: ObjectStates::DISABLED
+        .union(ObjectStates::FOCUSED)
+        .union(ObjectStates::PRESSED)
+        .union(ObjectStates::EDITED),
+    properties: &STYLE_PROPERTIES,
+}];
+
 /// Canonical actor descriptor consumed by the Stage Registry and bindings.
 #[derive(Clone, Copy, Debug)]
 pub struct TypeDescriptor {
@@ -1824,6 +2156,8 @@ pub struct TypeDescriptor {
     pub actions: &'static [ActionDescriptor],
     /// Event schema owned by MPY-05.
     pub events: &'static [EventDescriptor],
+    /// Exact local-style applicability owned by the MPY-04 prerequisite.
+    pub styles: &'static [StylePartDescriptor],
     /// Allowed script-visible child actors.
     pub child_policy: ChildPolicy,
     /// Layout capabilities exposed for later directions.
@@ -1832,6 +2166,74 @@ pub struct TypeDescriptor {
     pub resource_cost: ResourceCost,
     /// Actor-local native constructor.
     pub constructor: ActorConstructor,
+}
+
+impl TypeDescriptor {
+    /// Resolve one style property from raw part and state identifiers.
+    ///
+    /// Unlike [`ObjectStates::from_bits_truncate`], this checked descriptor
+    /// entry point rejects every unknown state bit.
+    pub fn style_property_for_raw_selector(
+        &self,
+        part_id: u32,
+        state_mask: u32,
+        property_id: u32,
+    ) -> Result<&'static StylePropertyDescriptor, StyleApplicabilityError> {
+        let states =
+            ObjectStates::from_bits(state_mask).ok_or(StyleApplicabilityError::InvalidStateMask)?;
+        self.style_property(Selector::new(Part(part_id), states), property_id)
+    }
+
+    /// Resolve one actor-applicable style property for an exact selector.
+    pub fn style_property(
+        &self,
+        selector: Selector,
+        property_id: u32,
+    ) -> Result<&'static StylePropertyDescriptor, StyleApplicabilityError> {
+        if selector.part.0 == 7 {
+            return Err(StyleApplicabilityError::UnknownPart);
+        }
+        let part = self
+            .styles
+            .iter()
+            .find(|candidate| candidate.part == selector.part)
+            .ok_or(StyleApplicabilityError::UnknownPart)?;
+        if selector.states.bits() & !part.allowed_states.bits() != 0 {
+            return Err(StyleApplicabilityError::InvalidStateMask);
+        }
+        part.properties
+            .iter()
+            .find(|property| property.id == property_id)
+            .ok_or(StyleApplicabilityError::UnknownProperty)
+    }
+
+    /// Return the finite maximum number of exact MPY-owned selector patches.
+    pub fn maximum_style_selectors(&self) -> usize {
+        self.styles.iter().fold(0usize, |total, part| {
+            total.saturating_add(1usize << part.allowed_states.bits().count_ones())
+        })
+    }
+
+    /// Validate actor applicability and prepare one exact local-style update.
+    pub fn prepare_style_update(
+        &self,
+        state: &StyleState,
+        selector: Selector,
+        property_id: u32,
+        update: MpyStyleUpdate,
+    ) -> Result<PreparedMpyStyleMutation, StylePreparationError> {
+        let property = self
+            .style_property(selector, property_id)
+            .map_err(StylePreparationError::Applicability)?;
+        state
+            .prepare_mpy_local_update(
+                selector,
+                property.storage,
+                update,
+                self.maximum_style_selectors(),
+            )
+            .map_err(StylePreparationError::Storage)
+    }
 }
 
 /// Destination for one generic actor Create operation.
@@ -5302,7 +5704,7 @@ fn validate_requested_layout_descriptor(
 }
 
 fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
-    if catalog.is_empty() {
+    if catalog.is_empty() || !style_registry_is_valid() {
         return Err(RegistryError::InvalidCatalog);
     }
     for (index, descriptor) in catalog.iter().enumerate() {
@@ -5388,8 +5790,61 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
                 return Err(RegistryError::InvalidCatalog);
             }
         }
+        for (part_index, part) in descriptor.styles.iter().enumerate() {
+            if part.part.0 == 7
+                || part.allowed_states.bits() & !ObjectStates::ALL.bits() != 0
+                || part.properties.is_empty()
+                || descriptor.styles[..part_index]
+                    .iter()
+                    .any(|prior| prior.part == part.part)
+            {
+                return Err(RegistryError::InvalidCatalog);
+            }
+            for (property_index, property) in part.properties.iter().enumerate() {
+                if part.properties[..property_index]
+                    .iter()
+                    .any(|prior| prior.id == property.id)
+                    || STYLE_PROPERTIES
+                        .iter()
+                        .find(|registered| registered.id == property.id)
+                        != Some(property)
+                {
+                    return Err(RegistryError::InvalidCatalog);
+                }
+            }
+        }
     }
     Ok(())
+}
+
+fn style_registry_is_valid() -> bool {
+    STYLE_PROPERTIES
+        .iter()
+        .enumerate()
+        .all(|(index, property)| {
+            property.id == index as u32 + 1
+                && !property.name.is_empty()
+                && STYLE_PROPERTIES[..index]
+                    .iter()
+                    .all(|prior| prior.name != property.name && prior.storage != property.storage)
+                && match property.constraint {
+                    StyleValueConstraint::None => property.value_tag == ValueTag::Color,
+                    StyleValueConstraint::U32 { min, max } => {
+                        property.value_tag == ValueTag::U32 && min <= max
+                    }
+                    StyleValueConstraint::I32 { min, max } => {
+                        property.value_tag == ValueTag::I32 && min <= max
+                    }
+                    StyleValueConstraint::Enum { domain_id, values } => {
+                        property.value_tag == ValueTag::Enum
+                            && domain_id != 0
+                            && !values.is_empty()
+                            && values.iter().enumerate().all(|(value_index, value)| {
+                                values[..value_index].iter().all(|prior| prior != value)
+                            })
+                    }
+                }
+        })
 }
 
 fn minimum_event_payload_bytes(tags: &[ValueTag]) -> Option<u32> {
@@ -5686,6 +6141,7 @@ mod prepared_geometry_tests {
         properties: &[],
         actions: &[],
         events: &[],
+        styles: &[],
         child_policy: ChildPolicy::AnyActor,
         layout: LayoutCapabilities::FLEX_CONTAINER.union(LayoutCapabilities::GRID_CONTAINER),
         resource_cost: ResourceCost {
@@ -5872,6 +6328,153 @@ mod prepared_geometry_tests {
                     ..TEST_DESCRIPTOR
                 }]),
                 Ok(())
+            );
+        }
+    }
+
+    #[test]
+    fn style_registry_and_actor_applicability_are_stable_and_exact() {
+        assert!(style_registry_is_valid());
+        assert_eq!(STYLE_PROPERTIES.len(), 20);
+        assert_eq!(STYLE_PROPERTIES[0].name, "bg_color");
+        assert_eq!(STYLE_PROPERTIES[9].name, "text_align");
+        assert_eq!(STYLE_PROPERTIES[19].name, "gap_col");
+        assert_eq!(STYLE_PROPERTIES[9].value_tag, ValueTag::Enum);
+        assert_eq!(
+            STYLE_PROPERTIES[9].constraint,
+            StyleValueConstraint::Enum {
+                domain_id: STYLE_TEXT_ALIGN_DOMAIN_ID,
+                values: &STYLE_TEXT_ALIGN_VALUES,
+            }
+        );
+
+        static CUSTOM_PROPERTIES: [StylePropertyDescriptor; 1] = [style_property(
+            1,
+            "bg_color",
+            ValueTag::Color,
+            StyleProperty::BgColor,
+            StyleValueConstraint::None,
+            STYLE_DRAW_SNAPSHOT,
+        )];
+        static CUSTOM_PARTS: [StylePartDescriptor; 2] = [
+            StylePartDescriptor {
+                part: Part::MAIN,
+                allowed_states: ObjectStates::DISABLED,
+                properties: &STYLE_PROPERTIES,
+            },
+            StylePartDescriptor {
+                part: Part::custom(8),
+                allowed_states: ObjectStates::CHECKED,
+                properties: &CUSTOM_PROPERTIES,
+            },
+        ];
+        let descriptor = TypeDescriptor {
+            styles: &CUSTOM_PARTS,
+            ..TEST_DESCRIPTOR
+        };
+        assert_eq!(validate_catalog(&[descriptor]), Ok(()));
+        assert_eq!(descriptor.maximum_style_selectors(), 4);
+        assert_eq!(
+            descriptor
+                .style_property(Selector::part(Part::MAIN), 1)
+                .unwrap()
+                .storage,
+            StyleProperty::BgColor
+        );
+        assert!(
+            descriptor
+                .style_property(Selector::new(Part::custom(8), ObjectStates::CHECKED), 1)
+                .is_ok()
+        );
+        assert_eq!(
+            descriptor.style_property(Selector::new(Part::MAIN, ObjectStates::PRESSED), 1),
+            Err(StyleApplicabilityError::InvalidStateMask)
+        );
+        assert_eq!(
+            descriptor.style_property(Selector::part(Part::custom(9)), 1),
+            Err(StyleApplicabilityError::UnknownPart)
+        );
+        assert_eq!(
+            descriptor.style_property(Selector::part(Part::MAIN), 99),
+            Err(StyleApplicabilityError::UnknownProperty)
+        );
+        let state = StyleState::new();
+        assert!(
+            descriptor
+                .prepare_style_update(
+                    &state,
+                    Selector::part(Part::MAIN),
+                    1,
+                    MpyStyleUpdate::Set(crate::style_cascade::StylePropertyValue::Color(
+                        crate::widget::Color(1, 2, 3, 4,)
+                    ),),
+                )
+                .is_ok()
+        );
+        assert_eq!(
+            descriptor
+                .prepare_style_update(
+                    &state,
+                    Selector::new(Part::MAIN, ObjectStates::PRESSED),
+                    1,
+                    MpyStyleUpdate::Remove,
+                )
+                .unwrap_err(),
+            StylePreparationError::Applicability(StyleApplicabilityError::InvalidStateMask)
+        );
+        assert_eq!(
+            descriptor
+                .prepare_style_update(
+                    &state,
+                    Selector::part(Part::MAIN),
+                    4,
+                    MpyStyleUpdate::Set(crate::style_cascade::StylePropertyValue::U32(256)),
+                )
+                .unwrap_err(),
+            StylePreparationError::Storage(MpyStyleStorageError::Range)
+        );
+        assert_eq!(
+            descriptor.style_property_for_raw_selector(Part::MAIN.0, 1 << 31, 1),
+            Err(StyleApplicabilityError::InvalidStateMask)
+        );
+    }
+
+    #[test]
+    fn catalog_rejects_reserved_duplicate_and_nonregistered_style_rows() {
+        static RESERVED: [StylePartDescriptor; 1] = [StylePartDescriptor {
+            part: Part::custom(7),
+            allowed_states: ObjectStates::DEFAULT,
+            properties: &STYLE_PROPERTIES,
+        }];
+        static DUPLICATE: [StylePartDescriptor; 2] = [
+            StylePartDescriptor {
+                part: Part::MAIN,
+                allowed_states: ObjectStates::DEFAULT,
+                properties: &STYLE_PROPERTIES,
+            },
+            StylePartDescriptor {
+                part: Part::MAIN,
+                allowed_states: ObjectStates::DISABLED,
+                properties: &STYLE_PROPERTIES,
+            },
+        ];
+        static ALTERED_PROPERTY: [StylePropertyDescriptor; 1] = [StylePropertyDescriptor {
+            effects: MutationEffects::NONE,
+            ..STYLE_PROPERTIES[0]
+        }];
+        static ALTERED: [StylePartDescriptor; 1] = [StylePartDescriptor {
+            part: Part::MAIN,
+            allowed_states: ObjectStates::DEFAULT,
+            properties: &ALTERED_PROPERTY,
+        }];
+
+        for styles in [&RESERVED[..], &DUPLICATE[..], &ALTERED[..]] {
+            assert_eq!(
+                validate_catalog(&[TypeDescriptor {
+                    styles,
+                    ..TEST_DESCRIPTOR
+                }]),
+                Err(RegistryError::InvalidCatalog)
             );
         }
     }

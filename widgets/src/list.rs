@@ -3,10 +3,10 @@ use alloc::{string::String, vec::Vec};
 use rlvgl_core::actor::{
     ActionDescriptor, ActionTransaction, ActorCapabilities, ActorFamily, ActorPreparation,
     ChildPolicy, ConstructedActor, ConstructorArgs, ConstructorFieldDescriptor, EventDelivery,
-    EventDescriptor, EventFilterSet, EventPhaseSet, LayoutCapabilities, MpyActor, MutationEffects,
-    NativeEventKind, PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor,
-    RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag,
-    construct_native_actor, encode_event_values,
+    EventDescriptor, EventFilterSet, EventPhaseSet, LayoutCapabilities, MPY_CONTROL_STYLE_PARTS,
+    MpyActor, MutationEffects, NativeEventKind, PropertyAccess, PropertyConstraint,
+    PropertyDefault, PropertyDescriptor, RegistryError, ResourceCost, TargetSet, TypeDescriptor,
+    TypeId, ValueRef, ValueTag, construct_native_actor, encode_event_values,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
@@ -223,7 +223,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::list::List",
-    schema_revision: 2,
+    schema_revision: 3,
     family: ActorFamily::Composite,
     capabilities: ActorCapabilities::TEXT
         .union(ActorCapabilities::CONTROL)
@@ -238,6 +238,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     properties: &MPY_PROPERTIES,
     actions: &MPY_ACTIONS,
     events: &MPY_EVENTS,
+    styles: &MPY_CONTROL_STYLE_PARTS,
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
     resource_cost: ResourceCost {

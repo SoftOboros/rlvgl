@@ -1,8 +1,9 @@
 //! Simple container grouping child widgets.
 use rlvgl_core::actor::{
     ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
-    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MpyActor, RegistryError,
-    ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag, construct_native_actor,
+    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MPY_BASIC_STYLE_PARTS,
+    MpyActor, RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag,
+    construct_native_actor,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
@@ -37,7 +38,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0001);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::container::Container",
-    schema_revision: 1,
+    schema_revision: 2,
     family: ActorFamily::Container,
     capabilities: ActorCapabilities::STAGE_ROOT.union(ActorCapabilities::CHILDREN),
     targets: TargetSet::ALL,
@@ -50,6 +51,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     properties: &[],
     actions: &[],
     events: &[],
+    styles: &MPY_BASIC_STYLE_PARTS,
     child_policy: ChildPolicy::AnyActor,
     layout: LayoutCapabilities::FLEX_CONTAINER
         .union(LayoutCapabilities::GRID_CONTAINER)

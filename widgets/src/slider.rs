@@ -2,10 +2,10 @@
 use rlvgl_core::actor::{
     ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
     ConstructorArgs, ConstructorFieldDescriptor, EventDelivery, EventDescriptor, EventFilterSet,
-    EventPhaseSet, LayoutCapabilities, MpyActor, MutationEffects, NativeEventKind, PropertyAccess,
-    PropertyConstraint, PropertyDefault, PropertyDescriptor, RegistryError, ResourceCost,
-    TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag, construct_native_actor,
-    encode_event_values,
+    EventPhaseSet, LayoutCapabilities, MPY_CONTROL_STYLE_PARTS, MpyActor, MutationEffects,
+    NativeEventKind, PropertyAccess, PropertyConstraint, PropertyDefault, PropertyDescriptor,
+    RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueRef, ValueTag,
+    construct_native_actor, encode_event_values,
 };
 use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::{draw_widget_bg, fill_rounded_rect};
@@ -141,7 +141,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0004);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::slider::Slider",
-    schema_revision: 2,
+    schema_revision: 3,
     family: ActorFamily::Control,
     capabilities: ActorCapabilities::CONTROL,
     targets: TargetSet::ALL,
@@ -174,6 +174,7 @@ pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     properties: &MPY_PROPERTIES,
     actions: &[],
     events: &MPY_EVENTS,
+    styles: &MPY_CONTROL_STYLE_PARTS,
     child_policy: ChildPolicy::None,
     layout: LayoutCapabilities::ITEM_HINTS,
     resource_cost: ResourceCost {

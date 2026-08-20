@@ -2,8 +2,10 @@
 
 use rlvgl_core::actor::{
     CapacityKind, ConstructorInput, CreateDestination, RegistryError, RegistryLimits, StageId,
-    StageRegistry, TypeDescriptor, TypeId, ValueRef, ValueTag,
+    StageRegistry, StyleApplicabilityError, TypeDescriptor, TypeId, ValueRef, ValueTag,
 };
+use rlvgl_core::object::ObjectStates;
+use rlvgl_core::style_cascade::{Part, Selector};
 use rlvgl_core::widget::Rect;
 use rlvgl_widgets::mpy::CATALOG;
 
@@ -100,17 +102,48 @@ fn catalog_enumerates_five_actor_local_schemas() {
                 .contains(rlvgl_core::actor::TargetSet::ALL)
         );
         let expected = match descriptor.stable_name.rsplit("::").next().unwrap() {
-            "Container" => (1, 0, 0, 0),
-            "Label" => (1, 1, 0, 0),
-            "Button" => (2, 1, 0, 1),
-            "Slider" => (2, 3, 0, 1),
-            "List" => (2, 1, 5, 1),
+            "Container" => (2, 0, 0, 0),
+            "Label" => (2, 1, 0, 0),
+            "Button" => (3, 1, 0, 1),
+            "Slider" => (3, 3, 0, 1),
+            "List" => (3, 1, 5, 1),
             _ => unreachable!(),
         };
         assert_eq!(descriptor.schema_revision, expected.0);
         assert_eq!(descriptor.properties.len(), expected.1);
         assert_eq!(descriptor.actions.len(), expected.2);
         assert_eq!(descriptor.events.len(), expected.3);
+        assert_eq!(descriptor.styles.len(), 1);
+        assert_eq!(descriptor.styles[0].properties.len(), 20);
+        assert_eq!(descriptor.styles[0].part, Part::MAIN);
+        assert!(
+            descriptor
+                .style_property(Selector::part(Part::MAIN), 1)
+                .is_ok()
+        );
+        assert!(
+            descriptor
+                .style_property(Selector::new(Part::MAIN, ObjectStates::DISABLED), 20)
+                .is_ok()
+        );
+        let is_control = matches!(
+            descriptor.stable_name.rsplit("::").next().unwrap(),
+            "Button" | "Slider" | "List"
+        );
+        assert_eq!(
+            descriptor.maximum_style_selectors(),
+            if is_control { 16 } else { 2 }
+        );
+        assert_eq!(
+            descriptor
+                .style_property(Selector::new(Part::MAIN, ObjectStates::PRESSED), 1)
+                .is_ok(),
+            is_control
+        );
+        assert_eq!(
+            descriptor.style_property(Selector::new(Part::MAIN, ObjectStates::CHECKED), 1),
+            Err(StyleApplicabilityError::InvalidStateMask)
+        );
     }
 }
 
