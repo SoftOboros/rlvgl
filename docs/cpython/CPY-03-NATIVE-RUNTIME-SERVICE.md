@@ -12,10 +12,11 @@ diagnostic capacity matrices are complete. Typed restart/stale-epoch
 validation and active-turn close-fence stress evidence are complete.
 Owner-destruction fencing and deterministic bounded-turn trace validation are
 complete. The representative v3 workload implementation and clean-source host
-matrix are complete; physical-board qualification evidence remains open. Not
-ratified.
+matrix are complete. Canonical Endpoint record projection, semantic class
+mapping, strict sequence validation, and protected terminal capacity are
+complete; physical-board qualification evidence remains open. Not ratified.
 
-**Revision:** 0.11.0
+**Revision:** 0.12.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -164,6 +165,13 @@ The service MUST NOT use Python polling frequency as its logical clock or frame
 cadence. Callback processing delay may increase egress pressure but cannot
 reorder already committed records.
 
+Within one implemented Endpoint Service Turn, request terminal records are
+published in admitted-ticket order, followed by the exact cue/RuntimeNotice
+prefix returned by the canonical Endpoint drain. Endpoint sequences MUST be
+strictly increasing across turns in one Service Epoch. A duplicate or
+regression faults every request in the offending turn and publishes none of
+its Endpoint records; CPY does not repair, sort, or silently discard them.
+
 ## 8. Frozen Decisions — Backpressure and Readiness
 
 Ingress and egress use `crossbeam_channel::bounded` behind CPY-owned queue
@@ -183,6 +191,26 @@ claiming acceptance. Egress saturation MUST follow the record's registered
 loss class: non-droppable results/faults reserve capacity; coalescible records
 carry observable counts/ranges; unsupported loss is terminal rather than
 silent.
+
+The implemented semantic egress maps records as follows:
+
+| Neutral/service record | CPY transport class | Saturation behavior |
+|---|---|---|
+| Lifecycle, result, driver/runtime/service fault, rejection | Critical | Non-droppable; may use ordinary capacity, then protected capacity. |
+| Endpoint `RuntimeNotice` | Critical | Non-droppable; preserves the notice and its exact loss metadata. |
+| Endpoint Cue with `CueDelivery::Critical` | Critical | Non-droppable; preserves the canonical Cue record. |
+| Endpoint Cue with `CueDelivery::Ordered` | Ordered | Cannot use protected capacity; owner-thread backpressure, no CPY-side loss. |
+| Endpoint Cue with `CueDelivery::LatestValueCoalescible` | Latest-value coalescible | Cannot use protected capacity; CPY preserves the Endpoint-produced first/last sequence, merge count, and payload and does not coalesce again. |
+
+`EndpointServiceConfig` requires an explicit positive critical reserve smaller
+than total egress capacity and at least as large as the Service Turn budget.
+Before an Endpoint Service Turn enters native execution, the owner reserves one
+protected permit per admitted request. Ordinary Endpoint records cannot borrow
+those permits. This ensures that an earlier ordinary backlog cannot consume
+the terminal capacity promised to the admitted turn. Critical records remain
+non-droppable and block when both ordinary and protected capacity are occupied.
+The legacy service constructor emits service-owned Critical records only and
+retains its unpartitioned bounded behavior for the retained capacity probe.
 
 The Readiness Signal carries no count or semantic payload. Draining records and
 rechecking state MUST be race-safe if readiness coalesces. An asyncio adapter
@@ -373,7 +401,7 @@ Python export nor a Frame Lease, and the probe does not present it to a device.
 - [ ] The same committed representative workload qualifies at least one
       explicit development tuple on the physical BBB.
 - [x] Lifecycle and Service Turn state machines are complete and deterministic.
-- [ ] Queue loss/reservation classes map to neutral record semantics.
+- [x] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
       capacity probe before PyO3 lands.
 - [x] Native close rules finish the active turn, reject every queued request
@@ -396,7 +424,7 @@ Python export nor a Frame Lease, and the probe does not present it to a device.
 | `runtime-std/examples/cpy_capacity_probe.rs` | Representative native Stage/input/Cue/private-frame capacity executable |
 | `runtime-std/src/service.rs` | Bounded owner-thread lifecycle, admission, records, close/fault, and metrics |
 | `runtime-std/src/readiness.rs` | Linux `eventfd`, Unix self-pipe, and race-safe coalescing |
-| `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, fault, and restart/stale-epoch evidence |
+| `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, semantic record preservation, protected-reserve pressure, saturation, close, fault, and restart/stale-epoch evidence |
 | `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
 | `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
 | `docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json` | Production-service v2 host matrix |
@@ -407,7 +435,7 @@ Python export nor a Frame Lease, and the probe does not present it to a device.
 
 All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
 Draft. Ratification is blocked by physical-board representative-workload
-capacity and cadence qualification and semantic record classes. CPY-04 owns
+capacity and cadence qualification plus the owner ratification record. CPY-04 owns
 binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
 lifetime and slot counts, and CPY-06 owns physical device presentation; none is
 a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
@@ -415,6 +443,56 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.12.0 — 2026-08-19 — map semantic egress and protect terminal capacity
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-3, INV-CPY-03-4, INV-CPY-03-5,
+PCDN-CPY-03-002, §7, §8, §12, §13, §14
+
+**Commits:** pending
+
+**Summary:** Projects canonical Endpoint cues and RuntimeNotices through the
+native service, derives their transport class without reinterpretation, and
+protects one terminal egress slot per maximum-size admitted turn.
+
+#### Rationale
+
+The CPython adapter needs results and the same neutral cue/loss records already
+consumed by MicroPython, but CPY cannot become a second semantic queue. The new
+Endpoint service path therefore accepts the owned canonical drain, validates
+strict sequence order across turns, publishes exact records, and treats a
+duplicate/regression as a terminal runtime fault. Critical service records,
+Critical Cues, and RuntimeNotices are non-droppable. Ordered and already
+coalescible Cues cannot consume the explicit critical reserve and experience
+owner-thread backpressure instead of CPY-side loss or coalescing.
+
+The reserve must be positive, smaller than egress capacity, and no smaller than
+the turn budget. A deterministic four-Cue pressure proof drains only the first
+terminal record, confirms that the blocked fourth ordinary Cue cannot borrow
+the released protected permit, then releases one ordinary slot and observes the
+next turn's terminal result enter the still-protected lane. Metadata projection
+also proves exact Critical/Ordered/coalescible/RuntimeNotice classes, coalesced
+sequence range, merge count, and payload. Reversed Endpoint order faults rather
+than being silently sorted or dropped.
+
+The semantic negative control temporarily classified `CueDelivery::Ordered`
+as Critical. The focused reserve-pressure test timed out waiting for the next
+terminal result because the fourth ordinary Cue consumed the released
+protected permit. Restoring the exact class mapping makes the proof pass.
+
+Considered and rejected: copying MPY coalescing into CPY, exposing multiple
+semantic queues, allowing ordinary records to borrow the reserve, selecting an
+implicit reserve, treating all Endpoint records as Critical, or changing the
+retained capacity-evidence schema.
+
+What deliberately did not change: MPY CueQueue admission/coalescing/loss
+semantics, capacity defaults/maxima, retained host evidence, Python/PyO3,
+Frame Leases, platform presentation, physical BBB evidence, and CPY-03
+ratification remain unchanged or open.
 
 ### 0.11.0 — 2026-08-19 — fence destruction before Closed
 

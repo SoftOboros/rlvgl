@@ -15,6 +15,7 @@ use std::{
 use crossbeam_channel::{
     Receiver, SendError, Sender, TryRecvError, TrySendError, bounded, select_biased,
 };
+use rlvgl_core::cue::{CueDelivery, EndpointRecord};
 
 use crate::readiness::{Notifier, ReadinessSignal, new_pair};
 
@@ -160,6 +161,92 @@ impl fmt::Display for ServiceConfigError {
 
 impl std::error::Error for ServiceConfigError {}
 
+/// Explicit protected-capacity policy for services that project Endpoint records.
+///
+/// The reserve must hold one terminal record for every request in the largest
+/// admitted turn. Ordinary Endpoint records cannot consume these slots.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EndpointServiceConfig {
+    service: ServiceConfig,
+    critical_egress_reserve: NonZeroUsize,
+}
+
+impl EndpointServiceConfig {
+    /// Validate one explicit critical reserve against the service capacities.
+    pub fn new(
+        service: ServiceConfig,
+        critical_egress_reserve: usize,
+    ) -> Result<Self, EndpointServiceConfigError> {
+        let critical_egress_reserve = NonZeroUsize::new(critical_egress_reserve)
+            .ok_or(EndpointServiceConfigError::ZeroCriticalEgressReserve)?;
+        if critical_egress_reserve.get() >= service.egress_capacity() {
+            return Err(EndpointServiceConfigError::NoOrdinaryEgressCapacity);
+        }
+        if critical_egress_reserve.get() < service.turn_budget() {
+            return Err(EndpointServiceConfigError::ReserveBelowTurnBudget {
+                reserve: critical_egress_reserve.get(),
+                turn_budget: service.turn_budget(),
+            });
+        }
+        Ok(Self {
+            service,
+            critical_egress_reserve,
+        })
+    }
+
+    /// Return the shared ingress, egress, and turn capacities.
+    pub fn service(self) -> ServiceConfig {
+        self.service
+    }
+
+    /// Return the egress slots protected from ordinary Endpoint records.
+    pub fn critical_egress_reserve(self) -> usize {
+        self.critical_egress_reserve.get()
+    }
+
+    /// Return the egress slots available to ordinary Endpoint records.
+    pub fn ordinary_egress_capacity(self) -> usize {
+        self.service.egress_capacity() - self.critical_egress_reserve.get()
+    }
+}
+
+/// Invalid protected-capacity policy for an Endpoint-record service.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EndpointServiceConfigError {
+    /// At least one slot must be protected from ordinary Endpoint records.
+    ZeroCriticalEgressReserve,
+    /// The reserve must leave at least one slot for ordinary Endpoint records.
+    NoOrdinaryEgressCapacity,
+    /// The reserve cannot hold one terminal record per maximum-size turn.
+    ReserveBelowTurnBudget {
+        /// Configured protected egress slots.
+        reserve: usize,
+        /// Configured maximum requests per turn.
+        turn_budget: usize,
+    },
+}
+
+impl fmt::Display for EndpointServiceConfigError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroCriticalEgressReserve => {
+                formatter.write_str("Endpoint service critical egress reserve must be positive")
+            }
+            Self::NoOrdinaryEgressCapacity => formatter
+                .write_str("Endpoint service critical reserve must leave ordinary capacity"),
+            Self::ReserveBelowTurnBudget {
+                reserve,
+                turn_budget,
+            } => write!(
+                formatter,
+                "Endpoint service critical reserve {reserve} is below turn budget {turn_budget}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for EndpointServiceConfigError {}
+
 /// Closed lifecycle of one native service epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -210,8 +297,30 @@ pub enum RuntimeFault {
         /// Number of outcomes returned by the turn.
         actual: usize,
     },
+    /// Endpoint records were not strictly increasing in canonical sequence order.
+    EndpointRecordOrder {
+        /// Last accepted Endpoint sequence in this service epoch.
+        previous: u32,
+        /// Regressed or duplicated Endpoint sequence offered next.
+        offered: u32,
+    },
     /// The operating-system readiness primitive failed.
     Readiness(io::ErrorKind),
+}
+
+/// CPY transport class derived from one neutral egress record.
+///
+/// Classification never authorizes CPY-side cue coalescing. It preserves the
+/// class already selected by the canonical Endpoint queue; any represented
+/// loss or coalescing remains encoded in that owned neutral record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServiceRecordClass {
+    /// Lifecycle, result, fault, rejection, RuntimeNotice, or Critical Cue.
+    Critical,
+    /// An admitted Cue that must remain ordered and non-coalesced.
+    Ordered,
+    /// A Cue already coalesced, when applicable, by the canonical Endpoint.
+    LatestValueCoalescible,
 }
 
 /// Ordered egress record emitted by a native service.
@@ -259,13 +368,22 @@ pub enum ServiceRecord<Output, Fault> {
         /// Fence that prevented the request's turn from beginning.
         reason: ServiceRejection,
     },
+    /// Canonical cue or RuntimeNotice drained from the owned Endpoint.
+    Endpoint {
+        /// Service instance that owns the Endpoint drain.
+        epoch: ServiceEpoch,
+        /// Unmodified neutral record with canonical sequence/loss metadata.
+        record: EndpointRecord,
+    },
 }
 
 impl<Output, Fault> ServiceRecord<Output, Fault> {
     /// Return the service epoch that emitted this record.
     pub fn epoch(&self) -> ServiceEpoch {
         match self {
-            Self::Lifecycle { epoch, .. } | Self::ServiceFault { epoch, .. } => *epoch,
+            Self::Lifecycle { epoch, .. }
+            | Self::ServiceFault { epoch, .. }
+            | Self::Endpoint { epoch, .. } => *epoch,
             Self::Completed { ticket, .. }
             | Self::DriverFault { ticket, .. }
             | Self::RuntimeFault { ticket, .. }
@@ -276,12 +394,81 @@ impl<Output, Fault> ServiceRecord<Output, Fault> {
     /// Return the request ticket when this is a terminal request record.
     pub fn ticket(&self) -> Option<ServiceTicket> {
         match self {
-            Self::Lifecycle { .. } | Self::ServiceFault { .. } => None,
+            Self::Lifecycle { .. } | Self::ServiceFault { .. } | Self::Endpoint { .. } => None,
             Self::Completed { ticket, .. }
             | Self::DriverFault { ticket, .. }
             | Self::RuntimeFault { ticket, .. }
             | Self::Rejected { ticket, .. } => Some(*ticket),
         }
+    }
+
+    /// Return the canonical Endpoint record, when this is an Endpoint projection.
+    pub fn endpoint_record(&self) -> Option<&EndpointRecord> {
+        match self {
+            Self::Endpoint { record, .. } => Some(record),
+            _ => None,
+        }
+    }
+
+    /// Derive the non-droppable or ordinary transport class for this record.
+    pub fn class(&self) -> ServiceRecordClass {
+        match self {
+            Self::Endpoint {
+                record: EndpointRecord::Cue(cue),
+                ..
+            } => match cue.delivery() {
+                CueDelivery::Critical => ServiceRecordClass::Critical,
+                CueDelivery::Ordered => ServiceRecordClass::Ordered,
+                CueDelivery::LatestValueCoalescible => ServiceRecordClass::LatestValueCoalescible,
+            },
+            Self::Endpoint {
+                record: EndpointRecord::RuntimeNotice(_),
+                ..
+            }
+            | Self::Lifecycle { .. }
+            | Self::Completed { .. }
+            | Self::DriverFault { .. }
+            | Self::RuntimeFault { .. }
+            | Self::ServiceFault { .. }
+            | Self::Rejected { .. } => ServiceRecordClass::Critical,
+        }
+    }
+}
+
+/// Output of one Endpoint-owning native service turn.
+///
+/// Outcomes correspond positionally to admitted requests. Endpoint records
+/// must remain in the exact order returned by the canonical Endpoint drain.
+#[derive(Debug, PartialEq, Eq)]
+pub struct EndpointServiceTurn<Output, Fault> {
+    outcomes: Vec<Result<Output, Fault>>,
+    endpoint_records: Vec<EndpointRecord>,
+}
+
+impl<Output, Fault> EndpointServiceTurn<Output, Fault> {
+    /// Construct one turn from terminal outcomes and an owned Endpoint drain.
+    pub fn new(
+        outcomes: Vec<Result<Output, Fault>>,
+        endpoint_records: Vec<EndpointRecord>,
+    ) -> Self {
+        Self {
+            outcomes,
+            endpoint_records,
+        }
+    }
+
+    /// Borrow the positional terminal outcomes.
+    pub fn outcomes(&self) -> &[Result<Output, Fault>] {
+        &self.outcomes
+    }
+
+    /// Borrow the canonical Endpoint records in drain order.
+    pub fn endpoint_records(&self) -> &[EndpointRecord] {
+        &self.endpoint_records
+    }
+
+    fn into_parts(self) -> (Vec<Result<Output, Fault>>, Vec<EndpointRecord>) {
+        (self.outcomes, self.endpoint_records)
     }
 }
 
@@ -397,9 +584,9 @@ pub struct ServiceMetricsSnapshot {
     pub peak_ingress_depth: usize,
     /// Maximum sampled egress depth.
     pub peak_egress_depth: usize,
-    /// Egress publications that encountered a full queue.
+    /// Egress publications that waited for queue or class-lane capacity.
     pub egress_backpressured_records: u64,
-    /// Time spent waiting to publish non-droppable egress records.
+    /// Time spent waiting for bounded egress capacity.
     pub egress_backpressure_ns: u64,
     /// Successful empty-to-nonempty/coalesced readiness writes.
     pub readiness_notifications: u64,
@@ -471,6 +658,142 @@ impl Shared {
     }
 }
 
+#[derive(Debug)]
+struct EgressPermit {
+    release: Sender<()>,
+}
+
+impl Drop for EgressPermit {
+    fn drop(&mut self) {
+        let _ = self.release.try_send(());
+    }
+}
+
+#[derive(Debug)]
+struct QueuedRecord<Output, Fault> {
+    record: ServiceRecord<Output, Fault>,
+    _permit: EgressPermit,
+}
+
+impl<Output, Fault> QueuedRecord<Output, Fault> {
+    fn into_record(self) -> ServiceRecord<Output, Fault> {
+        self.record
+    }
+}
+
+#[derive(Debug)]
+struct PermitLane {
+    available: Receiver<()>,
+    release: Sender<()>,
+}
+
+impl PermitLane {
+    fn new(capacity: usize) -> Self {
+        let (release, available) = bounded(capacity);
+        for _ in 0..capacity {
+            release
+                .send(())
+                .expect("new permit lane retains its receiver");
+        }
+        Self { available, release }
+    }
+
+    fn try_acquire(&self) -> Result<Option<EgressPermit>, PublishError> {
+        match self.available.try_recv() {
+            Ok(()) => Ok(Some(EgressPermit {
+                release: self.release.clone(),
+            })),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(PublishError::Disconnected),
+        }
+    }
+
+    fn acquire(&self, metrics: &Metrics) -> Result<EgressPermit, PublishError> {
+        if let Some(permit) = self.try_acquire()? {
+            return Ok(permit);
+        }
+
+        let started = Instant::now();
+        metrics
+            .egress_backpressured_records
+            .fetch_add(1, Ordering::Relaxed);
+        self.available
+            .recv()
+            .map_err(|_| PublishError::Disconnected)?;
+        metrics
+            .egress_backpressure_ns
+            .fetch_add(duration_ns(started.elapsed()), Ordering::Relaxed);
+        Ok(EgressPermit {
+            release: self.release.clone(),
+        })
+    }
+}
+
+#[derive(Debug)]
+struct EgressPermits {
+    ordinary: Option<PermitLane>,
+    critical: PermitLane,
+}
+
+#[derive(Debug)]
+enum TerminalPermits {
+    OnDemand,
+    Reserved(Vec<EgressPermit>),
+}
+
+impl EgressPermits {
+    fn unpartitioned(capacity: usize) -> Self {
+        Self {
+            ordinary: None,
+            critical: PermitLane::new(capacity),
+        }
+    }
+
+    fn endpoint(config: EndpointServiceConfig) -> Self {
+        Self {
+            ordinary: Some(PermitLane::new(config.ordinary_egress_capacity())),
+            critical: PermitLane::new(config.critical_egress_reserve()),
+        }
+    }
+
+    fn acquire(
+        &self,
+        class: ServiceRecordClass,
+        metrics: &Metrics,
+    ) -> Result<EgressPermit, PublishError> {
+        match class {
+            ServiceRecordClass::Critical => {
+                if let Some(ordinary) = &self.ordinary
+                    && let Some(permit) = ordinary.try_acquire()?
+                {
+                    return Ok(permit);
+                }
+                self.critical.acquire(metrics)
+            }
+            ServiceRecordClass::Ordered | ServiceRecordClass::LatestValueCoalescible => self
+                .ordinary
+                .as_ref()
+                .expect("ordinary records require partitioned egress")
+                .acquire(metrics),
+        }
+    }
+
+    fn reserve_terminals(
+        &self,
+        count: usize,
+        metrics: &Metrics,
+    ) -> Result<TerminalPermits, PublishError> {
+        if self.ordinary.is_none() {
+            return Ok(TerminalPermits::OnDemand);
+        }
+        Ok(TerminalPermits::Reserved(
+            (0..count)
+                .map(|_| self.critical.acquire(metrics))
+                .collect::<Result<_, _>>()?,
+        ))
+    }
+}
+
 /// Running Python-neutral native service and its single ordered egress queue.
 ///
 /// The service owns no Python objects and invokes no language callback. The
@@ -480,8 +803,9 @@ impl Shared {
 pub struct NativeService<Request, Output, Fault> {
     epoch: ServiceEpoch,
     config: ServiceConfig,
+    endpoint_config: Option<EndpointServiceConfig>,
     ingress: Sender<RequestEnvelope<Request>>,
-    egress: Receiver<ServiceRecord<Output, Fault>>,
+    egress: Receiver<QueuedRecord<Output, Fault>>,
     close: Sender<()>,
     shared: Arc<Shared>,
     readiness: ReadinessSignal,
@@ -525,6 +849,11 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
     /// Return the explicit capacities used by this service.
     pub fn config(&self) -> ServiceConfig {
         self.config
+    }
+
+    /// Return protected Endpoint-record capacity when this is an Endpoint service.
+    pub fn endpoint_config(&self) -> Option<EndpointServiceConfig> {
+        self.endpoint_config
     }
 
     /// Return the current lifecycle state.
@@ -625,13 +954,30 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
 
     /// Drain every record currently visible after clearing readiness.
     pub fn drain(&self) -> io::Result<Vec<ServiceRecord<Output, Fault>>> {
+        self.drain_records(usize::MAX)
+    }
+
+    /// Drain at most the positive caller-supplied number of ordered records.
+    pub fn drain_up_to(
+        &self,
+        limit: NonZeroUsize,
+    ) -> io::Result<Vec<ServiceRecord<Output, Fault>>> {
+        self.drain_records(limit.get())
+    }
+
+    fn drain_records(&self, limit: usize) -> io::Result<Vec<ServiceRecord<Output, Fault>>> {
         let _gate = self
             .shared
             .drain_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.readiness.clear_before_drain()?;
-        let records: Vec<_> = self.egress.try_iter().collect();
+        let records: Vec<_> = self
+            .egress
+            .try_iter()
+            .take(limit)
+            .map(QueuedRecord::into_record)
+            .collect();
         self.readiness.finish_drain(!self.egress.is_empty())?;
         Ok(records)
     }
@@ -644,7 +990,8 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
         self.request_close();
         let mut records = Vec::new();
         let mut saw_closed = false;
-        while let Ok(record) = self.egress.recv() {
+        while let Ok(queued) = self.egress.recv() {
+            let record = queued.into_record();
             saw_closed |= matches!(
                 record,
                 ServiceRecord::Lifecycle {
@@ -654,7 +1001,7 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
             );
             records.push(record);
             if saw_closed {
-                records.extend(self.egress.try_iter());
+                records.extend(self.egress.try_iter().map(QueuedRecord::into_record));
                 break;
             }
         }
@@ -697,6 +1044,63 @@ where
     Build: FnOnce() -> State + Send + 'static,
     RunTurn: FnMut(&mut State, Vec<Request>) -> Vec<Result<Output, Fault>> + Send + 'static,
 {
+    let mut run_turn = run_turn;
+    spawn_service(
+        name,
+        config,
+        None,
+        EgressPermits::unpartitioned(config.egress_capacity()),
+        build,
+        move |state, requests| EndpointServiceTurn::new(run_turn(state, requests), Vec::new()),
+    )
+}
+
+/// Spawn a bounded native service that projects canonical Endpoint records.
+///
+/// One protected critical permit is reserved before native execution for each
+/// admitted request. The turn closure returns exactly one positional terminal
+/// outcome per request plus Endpoint records in canonical drain order. CPY
+/// transports those records without coalescing or dropping them.
+pub fn spawn_native_endpoint_service<State, Request, Output, Fault, Build, RunTurn>(
+    name: impl Into<String>,
+    config: EndpointServiceConfig,
+    build: Build,
+    run_turn: RunTurn,
+) -> Result<NativeService<Request, Output, Fault>, ServiceStartError>
+where
+    State: 'static,
+    Request: Send + 'static,
+    Output: Send + 'static,
+    Fault: Send + 'static,
+    Build: FnOnce() -> State + Send + 'static,
+    RunTurn: FnMut(&mut State, Vec<Request>) -> EndpointServiceTurn<Output, Fault> + Send + 'static,
+{
+    spawn_service(
+        name,
+        config.service(),
+        Some(config),
+        EgressPermits::endpoint(config),
+        build,
+        run_turn,
+    )
+}
+
+fn spawn_service<State, Request, Output, Fault, Build, RunTurn>(
+    name: impl Into<String>,
+    config: ServiceConfig,
+    endpoint_config: Option<EndpointServiceConfig>,
+    permits: EgressPermits,
+    build: Build,
+    run_turn: RunTurn,
+) -> Result<NativeService<Request, Output, Fault>, ServiceStartError>
+where
+    State: 'static,
+    Request: Send + 'static,
+    Output: Send + 'static,
+    Fault: Send + 'static,
+    Build: FnOnce() -> State + Send + 'static,
+    RunTurn: FnMut(&mut State, Vec<Request>) -> EndpointServiceTurn<Output, Fault> + Send + 'static,
+{
     let epoch = next_epoch().ok_or(ServiceStartError::EpochExhausted)?;
     let (ingress_sender, ingress_receiver) = bounded(config.ingress_capacity());
     let (egress_sender, egress_receiver) = bounded(config.egress_capacity());
@@ -727,6 +1131,7 @@ where
                 &egress_sender,
                 &notifier,
                 &owner_shared.metrics,
+                &permits,
                 ServiceRecord::Lifecycle {
                     epoch,
                     state: ServiceLifecycle::Running,
@@ -756,6 +1161,7 @@ where
                 close_receiver,
                 notifier,
                 owner_shared,
+                permits,
             );
         })
         .map_err(ServiceStartError::Io)?;
@@ -764,6 +1170,7 @@ where
         Ok(Ok(())) => Ok(NativeService {
             epoch,
             config,
+            endpoint_config,
             ingress: ingress_sender,
             egress: egress_receiver,
             close: close_sender,
@@ -797,26 +1204,28 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
     config: ServiceConfig,
     epoch: ServiceEpoch,
     ingress: Receiver<RequestEnvelope<Request>>,
-    egress: Sender<ServiceRecord<Output, Fault>>,
+    egress: Sender<QueuedRecord<Output, Fault>>,
     close: Receiver<()>,
     notifier: Notifier,
     shared: Arc<Shared>,
+    permits: EgressPermits,
 ) where
-    RunTurn: FnMut(&mut State, Vec<Request>) -> Vec<Result<Output, Fault>>,
+    RunTurn: FnMut(&mut State, Vec<Request>) -> EndpointServiceTurn<Output, Fault>,
 {
     // Terminal helpers retain state through lifecycle/rejection accounting,
     // then take it immediately before making `Closed` observable.
     let mut state = Some(state);
+    let mut last_endpoint_sequence = None;
     loop {
         let first = select_biased! {
             recv(close) -> _ => {
-                close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing, &mut state);
+                close_owner(epoch, &ingress, &egress, &notifier, &shared, &permits, ServiceRejection::ServiceClosing, &mut state);
                 return;
             }
             recv(ingress) -> request => match request {
                 Ok(request) => request,
                 Err(_) => {
-                    close_owner(epoch, &ingress, &egress, &notifier, &shared, ServiceRejection::ServiceClosing, &mut state);
+                    close_owner(epoch, &ingress, &egress, &notifier, &shared, &permits, ServiceRejection::ServiceClosing, &mut state);
                     return;
                 }
             }
@@ -832,41 +1241,98 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
         }
         shared.metrics.service_turns.fetch_add(1, Ordering::Relaxed);
         let tickets: Vec<_> = envelopes.iter().map(|envelope| envelope.ticket).collect();
+        let terminal_permits = match permits.reserve_terminals(tickets.len(), &shared.metrics) {
+            Ok(permits) => permits,
+            Err(PublishError::Disconnected | PublishError::Readiness(_)) => {
+                finish_disconnected(&mut state, &shared);
+                return;
+            }
+        };
         let requests = envelopes
             .into_iter()
             .map(|envelope| envelope.request)
             .collect();
-        let outcomes = catch_unwind(AssertUnwindSafe(|| {
+        let turn = catch_unwind(AssertUnwindSafe(|| {
             run_turn(
                 state.as_mut().expect("owner state exists during a turn"),
                 requests,
             )
         }));
-        let disposition = match outcomes {
-            Ok(outcomes) if outcomes.len() == tickets.len() => {
-                publish_outcomes(tickets, outcomes, &egress, &notifier, &shared.metrics)
-            }
-            Ok(outcomes) => {
-                let fault = RuntimeFault::OutcomeCountMismatch {
-                    expected: tickets.len(),
-                    actual: outcomes.len(),
-                };
-                publish_runtime_faults(tickets, fault, &egress, &notifier, &shared.metrics)
+        let disposition = match turn {
+            Ok(turn) => {
+                let (outcomes, endpoint_records) = turn.into_parts();
+                if outcomes.len() != tickets.len() {
+                    let fault = RuntimeFault::OutcomeCountMismatch {
+                        expected: tickets.len(),
+                        actual: outcomes.len(),
+                    };
+                    publish_runtime_faults(
+                        tickets,
+                        terminal_permits,
+                        fault,
+                        &egress,
+                        &notifier,
+                        &shared.metrics,
+                        &permits,
+                    )
                     .map(|()| true)
+                } else if let Err(fault) =
+                    validate_endpoint_order(last_endpoint_sequence, &endpoint_records)
+                {
+                    publish_runtime_faults(
+                        tickets,
+                        terminal_permits,
+                        fault,
+                        &egress,
+                        &notifier,
+                        &shared.metrics,
+                        &permits,
+                    )
+                    .map(|()| true)
+                } else {
+                    last_endpoint_sequence = endpoint_records
+                        .last()
+                        .map(|record| record.sequence().get())
+                        .or(last_endpoint_sequence);
+                    match publish_outcomes(
+                        tickets,
+                        outcomes,
+                        terminal_permits,
+                        &egress,
+                        &notifier,
+                        &shared.metrics,
+                        &permits,
+                    ) {
+                        Ok(faulted) => publish_endpoint_records(
+                            epoch,
+                            endpoint_records,
+                            &egress,
+                            &notifier,
+                            &shared.metrics,
+                            &permits,
+                        )
+                        .map(|()| faulted),
+                        Err(error) => Err(error),
+                    }
+                }
             }
             Err(_) => publish_runtime_faults(
                 tickets,
+                terminal_permits,
                 RuntimeFault::TurnPanicked,
                 &egress,
                 &notifier,
                 &shared.metrics,
+                &permits,
             )
             .map(|()| true),
         };
         match disposition {
             Ok(false) => {}
             Ok(true) => {
-                fault_owner(epoch, &ingress, &egress, &notifier, &shared, &mut state);
+                fault_owner(
+                    epoch, &ingress, &egress, &notifier, &shared, &permits, &mut state,
+                );
                 return;
             }
             Err(PublishError::Readiness(kind)) => {
@@ -877,6 +1343,7 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
                     &egress,
                     &notifier,
                     &shared,
+                    &permits,
                     &mut state,
                 );
                 return;
@@ -892,12 +1359,18 @@ fn run_owner<State, Request, Output, Fault, RunTurn>(
 fn publish_outcomes<Output, Fault>(
     tickets: Vec<ServiceTicket>,
     outcomes: Vec<Result<Output, Fault>>,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    terminal_permits: TerminalPermits,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     metrics: &Metrics,
+    permits: &EgressPermits,
 ) -> Result<bool, PublishError> {
     let mut faulted = false;
     let mut publication_error = None;
+    let mut reserved = match terminal_permits {
+        TerminalPermits::OnDemand => None,
+        TerminalPermits::Reserved(permits) => Some(permits.into_iter()),
+    };
     for (ticket, outcome) in tickets.into_iter().zip(outcomes) {
         let record = match outcome {
             Ok(output) => {
@@ -910,7 +1383,17 @@ fn publish_outcomes<Output, Fault>(
                 ServiceRecord::DriverFault { ticket, fault }
             }
         };
-        match publish(egress, notifier, metrics, record) {
+        let publication = match &mut reserved {
+            Some(reserved) => publish_with_permit(
+                egress,
+                notifier,
+                metrics,
+                record,
+                reserved.next().expect("one terminal permit per ticket"),
+            ),
+            None => publish(egress, notifier, metrics, permits, record),
+        };
+        match publication {
             Ok(()) => {}
             Err(PublishError::Readiness(kind)) => {
                 publication_error.get_or_insert(PublishError::Readiness(kind));
@@ -923,19 +1406,58 @@ fn publish_outcomes<Output, Fault>(
 
 fn publish_runtime_faults<Output, Fault>(
     tickets: Vec<ServiceTicket>,
+    terminal_permits: TerminalPermits,
     fault: RuntimeFault,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     metrics: &Metrics,
+    permits: &EgressPermits,
 ) -> Result<(), PublishError> {
     let mut publication_error = None;
+    let mut reserved = match terminal_permits {
+        TerminalPermits::OnDemand => None,
+        TerminalPermits::Reserved(permits) => Some(permits.into_iter()),
+    };
     for ticket in tickets {
         metrics.faulted_requests.fetch_add(1, Ordering::Relaxed);
+        let record = ServiceRecord::RuntimeFault { ticket, fault };
+        let publication = match &mut reserved {
+            Some(reserved) => publish_with_permit(
+                egress,
+                notifier,
+                metrics,
+                record,
+                reserved.next().expect("one terminal permit per ticket"),
+            ),
+            None => publish(egress, notifier, metrics, permits, record),
+        };
+        match publication {
+            Ok(()) => {}
+            Err(PublishError::Readiness(kind)) => {
+                publication_error.get_or_insert(PublishError::Readiness(kind));
+            }
+            Err(PublishError::Disconnected) => return Err(PublishError::Disconnected),
+        }
+    }
+    publication_error.map_or(Ok(()), Err)
+}
+
+fn publish_endpoint_records<Output, Fault>(
+    epoch: ServiceEpoch,
+    records: Vec<EndpointRecord>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
+    notifier: &Notifier,
+    metrics: &Metrics,
+    permits: &EgressPermits,
+) -> Result<(), PublishError> {
+    let mut publication_error = None;
+    for record in records {
         match publish(
             egress,
             notifier,
             metrics,
-            ServiceRecord::RuntimeFault { ticket, fault },
+            permits,
+            ServiceRecord::Endpoint { epoch, record },
         ) {
             Ok(()) => {}
             Err(PublishError::Readiness(kind)) => {
@@ -947,13 +1469,32 @@ fn publish_runtime_faults<Output, Fault>(
     publication_error.map_or(Ok(()), Err)
 }
 
+fn validate_endpoint_order(
+    mut previous: Option<u32>,
+    records: &[EndpointRecord],
+) -> Result<(), RuntimeFault> {
+    for record in records {
+        let offered = record.sequence().get();
+        if previous.is_some_and(|previous| offered <= previous) {
+            return Err(RuntimeFault::EndpointRecordOrder {
+                previous: previous.expect("order regression has a previous sequence"),
+                offered,
+            });
+        }
+        previous = Some(offered);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn infrastructure_fault_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     fault: RuntimeFault,
     ingress: &Receiver<RequestEnvelope<Request>>,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    permits: &EgressPermits,
     state: &mut Option<State>,
 ) {
     {
@@ -967,12 +1508,14 @@ fn infrastructure_fault_owner<State, Request, Output, Fault>(
         egress,
         notifier,
         &shared.metrics,
+        permits,
         ServiceRecord::ServiceFault { epoch, fault },
     );
     let _ = publish(
         egress,
         notifier,
         &shared.metrics,
+        permits,
         ServiceRecord::Lifecycle {
             epoch,
             state: ServiceLifecycle::Faulted,
@@ -983,17 +1526,19 @@ fn infrastructure_fault_owner<State, Request, Output, Fault>(
         egress,
         notifier,
         &shared.metrics,
+        permits,
         ServiceRejection::ServiceFaulted,
     );
-    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared, permits);
 }
 
 fn fault_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     ingress: &Receiver<RequestEnvelope<Request>>,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    permits: &EgressPermits,
     state: &mut Option<State>,
 ) {
     {
@@ -1008,6 +1553,7 @@ fn fault_owner<State, Request, Output, Fault>(
             egress,
             notifier,
             &shared.metrics,
+            permits,
             ServiceRecord::Lifecycle {
                 epoch,
                 state: ServiceLifecycle::Faulted,
@@ -1023,18 +1569,20 @@ fn fault_owner<State, Request, Output, Fault>(
         egress,
         notifier,
         &shared.metrics,
+        permits,
         ServiceRejection::ServiceFaulted,
     );
-    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared, permits);
 }
 
 #[allow(clippy::too_many_arguments)]
 fn close_owner<State, Request, Output, Fault>(
     epoch: ServiceEpoch,
     ingress: &Receiver<RequestEnvelope<Request>>,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    permits: &EgressPermits,
     reason: ServiceRejection,
     state: &mut Option<State>,
 ) {
@@ -1050,6 +1598,7 @@ fn close_owner<State, Request, Output, Fault>(
             egress,
             notifier,
             &shared.metrics,
+            permits,
             ServiceRecord::Lifecycle {
                 epoch,
                 state: ServiceLifecycle::Closing,
@@ -1060,15 +1609,16 @@ fn close_owner<State, Request, Output, Fault>(
         finish_disconnected(state, shared);
         return;
     }
-    reject_queued(ingress, egress, notifier, &shared.metrics, reason);
-    finish_closed_after_destruction(state, epoch, egress, notifier, shared);
+    reject_queued(ingress, egress, notifier, &shared.metrics, permits, reason);
+    finish_closed_after_destruction(state, epoch, egress, notifier, shared, permits);
 }
 
 fn reject_queued<Request, Output, Fault>(
     ingress: &Receiver<RequestEnvelope<Request>>,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     metrics: &Metrics,
+    permits: &EgressPermits,
     reason: ServiceRejection,
 ) {
     while let Ok(envelope) = ingress.try_recv() {
@@ -1078,6 +1628,7 @@ fn reject_queued<Request, Output, Fault>(
                 egress,
                 notifier,
                 metrics,
+                permits,
                 ServiceRecord::Rejected {
                     ticket: envelope.ticket,
                     reason,
@@ -1092,15 +1643,17 @@ fn reject_queued<Request, Output, Fault>(
 
 fn finish_closed<Output, Fault>(
     epoch: ServiceEpoch,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    permits: &EgressPermits,
 ) {
     shared.set_lifecycle(ServiceLifecycle::Closed);
     let _ = publish(
         egress,
         notifier,
         &shared.metrics,
+        permits,
         ServiceRecord::Lifecycle {
             epoch,
             state: ServiceLifecycle::Closed,
@@ -1111,12 +1664,13 @@ fn finish_closed<Output, Fault>(
 fn finish_closed_after_destruction<State, Output, Fault>(
     state: &mut Option<State>,
     epoch: ServiceEpoch,
-    egress: &Sender<ServiceRecord<Output, Fault>>,
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     shared: &Shared,
+    permits: &EgressPermits,
 ) {
     drop(state.take());
-    finish_closed(epoch, egress, notifier, shared);
+    finish_closed(epoch, egress, notifier, shared, permits);
 }
 
 fn finish_disconnected<State>(state: &mut Option<State>, shared: &Shared) {
@@ -1130,25 +1684,30 @@ enum PublishError {
     Readiness(io::ErrorKind),
 }
 
-fn publish<Record>(
-    egress: &Sender<Record>,
+fn publish<Output, Fault>(
+    egress: &Sender<QueuedRecord<Output, Fault>>,
     notifier: &Notifier,
     metrics: &Metrics,
-    record: Record,
+    permits: &EgressPermits,
+    record: ServiceRecord<Output, Fault>,
 ) -> Result<(), PublishError> {
-    let started = Instant::now();
-    let was_full = egress.is_full();
+    let permit = permits.acquire(record.class(), metrics)?;
+    publish_with_permit(egress, notifier, metrics, record, permit)
+}
+
+fn publish_with_permit<Output, Fault>(
+    egress: &Sender<QueuedRecord<Output, Fault>>,
+    notifier: &Notifier,
+    metrics: &Metrics,
+    record: ServiceRecord<Output, Fault>,
+    permit: EgressPermit,
+) -> Result<(), PublishError> {
     egress
-        .send(record)
+        .send(QueuedRecord {
+            record,
+            _permit: permit,
+        })
         .map_err(|SendError(_)| PublishError::Disconnected)?;
-    if was_full {
-        metrics
-            .egress_backpressured_records
-            .fetch_add(1, Ordering::Relaxed);
-        metrics
-            .egress_backpressure_ns
-            .fetch_add(duration_ns(started.elapsed()), Ordering::Relaxed);
-    }
     update_max(&metrics.peak_egress_depth, egress.len().max(1));
     match notifier.notify() {
         Ok(true) => {

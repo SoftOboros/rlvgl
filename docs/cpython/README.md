@@ -8,8 +8,10 @@ README.md - Informative index for the CPython embedded-Linux and host initiative
 are resolved; its bounded native service, Unix readiness, and retained v1/v2
 host capacity matrices are complete, with typed restart/stale-epoch and native
 close-fence stress validation. Owner destruction and deterministic bounded-turn
-traces are complete. Its representative v3 native workload and clean-source
-host matrix are complete; physical BBB qualification remains open. CPY-03
+traces are complete. Canonical Endpoint record classes, strict sequence
+validation, and protected terminal capacity are complete. Its representative
+v3 native workload and clean-source host matrix are complete; physical BBB
+qualification remains open. CPY-03
 through CPY-09 remain Draft and separately evidence-gated.
 
 CPY specifies a full CPython binding over rlvgl's Stage-and-Actors runtime,
@@ -53,7 +55,7 @@ through ratified phase documents and their acceptance gates.
 | [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
 | [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Ratified 2026-08-18; exact baseline retained; runtime qualification remains later-phase evidence |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; graph/firewall/handoff complete; first `runtime-std` slice authorized |
-| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; lifecycle/turn proof and representative host matrix retained; record classes and physical BBB qualification open |
+| [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; lifecycle/turn/record-class proof and representative host matrix retained; physical BBB qualification open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, runtime/backend configuration, transactions, exceptions, callbacks, and typing | Draft; seven binding-policy PCDNs resolved; dependency/implementation evidence open |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
 | [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, copied Python startup configuration, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |

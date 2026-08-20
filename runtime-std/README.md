@@ -16,7 +16,10 @@ ingress/egress, deterministic turn batches, typed admission outcomes,
 process-local epochs, ordered close/fault records, metrics, and a pollable
 readiness signal. Owner state is destroyed before `Closed` becomes observable,
 and the stable-backlog proof requires FIFO batches to stay within the explicit
-per-turn budget. The placeholder version does not resolve
+per-turn budget. Endpoint-owning services additionally project the canonical
+`EndpointRecord` without reinterpretation, preserve Cue/RuntimeNotice sequence
+and loss metadata, and require an explicit critical egress reserve large enough
+for one terminal record per maximum-size turn. The placeholder version does not resolve
 `PCDN-CPY-09-004`; publication stays blocked until CPY selects a truthful
 release line.
 
@@ -25,10 +28,14 @@ hosts use a nonblocking close-on-exec self-pipe. Crossbeam and Rustix stay
 behind CPY-owned types. The service contains no PyO3 or MicroPython object and
 does not call a language runtime.
 
-Capacities remain required constructor inputs, not defaults. This slice does
-not yet define semantic record loss classes, frame slots, platform cadence,
-render/present work, or Python finalization behavior. Those surfaces remain
-gated by CPY-03/05/06 measurements and integration.
+Capacities remain required constructor inputs, not defaults. `ServiceRecord`
+classifies lifecycle/results/faults/rejections, Critical Cues, and
+RuntimeNotices as Critical. Ordered and `LatestValueCoalescible` Cues retain
+their Endpoint-selected class, but CPY never performs a second coalescing pass:
+ordinary records backpressure the owner while the protected terminal reserve
+remains unavailable to them. Frame slots, platform cadence, render/present
+work, and Python finalization behavior remain gated by CPY-05/06 and later
+integration.
 
 Every restarted service receives a strictly newer process-local epoch.
 Adapter-owned handles, request tickets, and retained records must be checked
@@ -74,6 +81,13 @@ let records = service.shutdown()?;
 assert!(!records.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`spawn_native_endpoint_service` is the semantic egress path. Its
+`EndpointServiceConfig` wraps the same explicit service capacities plus a
+positive critical reserve that is at least the turn budget and smaller than
+the total egress capacity. `EndpointServiceTurn` returns positional outcomes
+and the owned records from one canonical Endpoint drain. `drain_up_to` supports
+bounded consumers without creating a second queue.
 
 ## Capacity probe
 

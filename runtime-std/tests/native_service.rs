@@ -1,6 +1,7 @@
 //! CPY-03 native lifecycle, capacity, readiness, fault, and ownership proofs.
 
 use std::{
+    num::NonZeroUsize,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -11,13 +12,20 @@ use std::{
 
 use crossbeam_channel::bounded;
 use rlvgl_core::{
-    cue::{CUE_FRAME_OVERHEAD_BYTES, CueLimits},
+    actor::{ObjectId, StageId},
+    cue::{
+        CUE_FRAME_OVERHEAD_BYTES, CallbackId, CoalescingKey, CueDelivery, CueIdentity, CueInput,
+        CueLimits, CueQueue, DrainBudget, EndpointRecord, EventId, InputClass, InputSequence,
+        NativeEventSequence, SubscriptionId,
+    },
+    direction::StageRevision,
     endpoint::{Endpoint, EndpointLimits},
     subscription::{EndpointEpoch, SubscriptionLimits},
 };
 use rlvgl_runtime_std::{
-    AdmissionError, ReadinessKind, RuntimeFault, ServiceConfig, ServiceLifecycle, ServiceRecord,
-    ServiceRejection, spawn_native_service,
+    AdmissionError, EndpointServiceConfig, EndpointServiceTurn, ReadinessKind, RuntimeFault,
+    ServiceConfig, ServiceLifecycle, ServiceRecord, ServiceRecordClass, ServiceRejection,
+    spawn_native_endpoint_service, spawn_native_service,
 };
 
 struct OwnerState {
@@ -50,6 +58,93 @@ fn build_endpoint() -> Endpoint {
         CueLimits::new(4, 1, 2, 32, CUE_FRAME_OVERHEAD_BYTES + 32).expect("valid cue limits"),
     )
     .expect("headless Endpoint construction")
+}
+
+fn cue_input(event: u32, native_sequence: u64, delivery: CueDelivery, payload: &[u8]) -> CueInput {
+    CueInput::new(
+        CueIdentity::new(
+            StageId::new(1).expect("nonzero Stage id"),
+            ObjectId::new((1_u64 << 32) | 1).expect("nonzero Object id"),
+            SubscriptionId::new(event).expect("nonzero subscription id"),
+            CallbackId::new(event).expect("nonzero callback id"),
+            EventId::new(event).expect("nonzero event id"),
+        ),
+        StageRevision::new(1),
+        NativeEventSequence::new(native_sequence).expect("nonzero native event sequence"),
+        delivery,
+        payload.to_vec(),
+    )
+}
+
+fn ordered_endpoint_records(count: u32) -> Vec<EndpointRecord> {
+    let mut queue = CueQueue::new(
+        CueLimits::new(
+            usize::try_from(count + 2).expect("small queue capacity"),
+            1,
+            usize::try_from(count + 1).expect("small ordinary quota"),
+            8,
+            CUE_FRAME_OVERHEAD_BYTES + 8,
+        )
+        .expect("valid semantic queue limits"),
+    )
+    .expect("construct semantic queue");
+    for event in 1..=count {
+        queue
+            .enqueue(cue_input(
+                event,
+                u64::from(event),
+                CueDelivery::Ordered,
+                &[u8::try_from(event).expect("small event")],
+            ))
+            .expect("enqueue ordered cue");
+    }
+    queue
+        .drain_endpoint(DrainBudget::new(
+            usize::try_from(count).expect("small drain count"),
+            usize::MAX,
+        ))
+        .expect("drain ordered Endpoint records")
+        .records
+}
+
+fn classified_endpoint_records() -> Vec<EndpointRecord> {
+    let mut queue = CueQueue::new(
+        CueLimits::new(8, 2, 6, 8, CUE_FRAME_OVERHEAD_BYTES + 8)
+            .expect("valid semantic queue limits"),
+    )
+    .expect("construct semantic queue");
+    queue
+        .enqueue(cue_input(1, 1, CueDelivery::Critical, &[1]))
+        .expect("enqueue Critical cue");
+    queue
+        .enqueue(cue_input(2, 2, CueDelivery::Ordered, &[2]))
+        .expect("enqueue Ordered cue");
+    queue
+        .enqueue(
+            cue_input(3, 3, CueDelivery::LatestValueCoalescible, &[3])
+                .with_coalescing_key(CoalescingKey::new(7)),
+        )
+        .expect("enqueue coalescible cue");
+    queue
+        .enqueue(
+            cue_input(3, 4, CueDelivery::LatestValueCoalescible, &[4])
+                .with_coalescing_key(CoalescingKey::new(7)),
+        )
+        .expect("coalesce exact cue tail");
+    queue
+        .record_input_overflow(
+            StageId::new(1).expect("nonzero Stage id"),
+            InputClass::new(1).expect("nonzero input class"),
+            InputSequence::new(1).expect("nonzero input sequence"),
+        )
+        .expect("record input loss");
+    queue
+        .enqueue_pending_input_overflow_notice(vec![9])
+        .expect("publish canonical RuntimeNotice");
+    queue
+        .drain_endpoint(DrainBudget::new(8, usize::MAX))
+        .expect("drain classified Endpoint records")
+        .records
 }
 
 fn wait_until(mut predicate: impl FnMut() -> bool) {
@@ -268,6 +363,184 @@ fn stable_backlog_forms_deterministic_fifo_turns_within_budget() {
             .filter_map(ServiceRecord::ticket)
             .collect::<Vec<_>>(),
         tickets
+    );
+}
+
+#[test]
+fn endpoint_records_preserve_canonical_classes_and_metadata() {
+    let expected = classified_endpoint_records();
+    let owner_records = expected.clone();
+    let service_config = ServiceConfig::new(2, 8, 1).expect("valid explicit capacities");
+    let endpoint_config =
+        EndpointServiceConfig::new(service_config, 2).expect("valid protected capacity");
+    let service = spawn_native_endpoint_service(
+        "cpy-endpoint-record-classes",
+        endpoint_config,
+        move || Some(owner_records),
+        |records, requests: Vec<u64>| {
+            EndpointServiceTurn::new(
+                requests.into_iter().map(Ok::<_, &'static str>).collect(),
+                records.take().unwrap_or_default(),
+            )
+        },
+    )
+    .expect("spawn Endpoint-record service");
+
+    assert_eq!(service.config(), service_config);
+    assert_eq!(service.endpoint_config(), Some(endpoint_config));
+    let mut records = service.drain().expect("drain startup lifecycle");
+    let ticket = service.try_submit(7).expect("admit semantic turn");
+    wait_until(|| service.metrics().completed_requests == 1);
+    records.extend(service.shutdown().expect("close semantic service"));
+
+    assert!(
+        records
+            .iter()
+            .all(|record| record.epoch() == ticket.epoch())
+    );
+    assert!(records.iter().all(|record| {
+        record.endpoint_record().is_some() || record.class() == ServiceRecordClass::Critical
+    }));
+    let projected: Vec<_> = records
+        .iter()
+        .filter_map(ServiceRecord::endpoint_record)
+        .cloned()
+        .collect();
+    assert_eq!(projected, expected);
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record.endpoint_record().is_some())
+            .map(ServiceRecord::class)
+            .collect::<Vec<_>>(),
+        vec![
+            ServiceRecordClass::Critical,
+            ServiceRecordClass::Ordered,
+            ServiceRecordClass::LatestValueCoalescible,
+            ServiceRecordClass::Critical,
+        ]
+    );
+    let EndpointRecord::Cue(coalesced) = &projected[2] else {
+        panic!("third projected record must remain a Cue");
+    };
+    assert_eq!(coalesced.first_sequence().get(), 3);
+    assert_eq!(coalesced.last_sequence().get(), 4);
+    assert_eq!(coalesced.merge_count(), 1);
+    assert_eq!(coalesced.payload(), [4]);
+    assert!(matches!(projected[3], EndpointRecord::RuntimeNotice(_)));
+}
+
+#[test]
+fn ordinary_endpoint_pressure_cannot_consume_terminal_reserve() {
+    let ordinary = ordered_endpoint_records(4);
+    let service = spawn_native_endpoint_service(
+        "cpy-protected-terminal-capacity",
+        EndpointServiceConfig::new(
+            ServiceConfig::new(2, 4, 1).expect("valid explicit capacities"),
+            1,
+        )
+        .expect("valid protected capacity"),
+        move || Some(ordinary),
+        |records, requests: Vec<u64>| {
+            EndpointServiceTurn::new(
+                requests.into_iter().map(Ok::<_, &'static str>).collect(),
+                records.take().unwrap_or_default(),
+            )
+        },
+    )
+    .expect("spawn protected-capacity service");
+    assert!(matches!(
+        service.drain().expect("drain Running lifecycle").as_slice(),
+        [ServiceRecord::Lifecycle {
+            state: ServiceLifecycle::Running,
+            ..
+        }]
+    ));
+
+    let first = service.try_submit(1).expect("admit cue-producing turn");
+    wait_until(|| service.metrics().egress_backpressured_records >= 1);
+    let second = service.try_submit(2).expect("queue second turn");
+
+    let first_drain = service
+        .drain_up_to(NonZeroUsize::new(1).expect("positive drain"))
+        .expect("drain first terminal record");
+    assert!(matches!(
+        first_drain.as_slice(),
+        [ServiceRecord::Completed { ticket, output: 1 }] if *ticket == first
+    ));
+    thread::sleep(Duration::from_millis(20));
+    assert_eq!(
+        service.metrics().completed_requests,
+        1,
+        "ordinary Cue must not borrow the released terminal reserve"
+    );
+
+    let second_drain = service
+        .drain_up_to(NonZeroUsize::new(1).expect("positive drain"))
+        .expect("release one ordinary slot");
+    assert!(matches!(
+        second_drain.as_slice(),
+        [ServiceRecord::Endpoint { record: EndpointRecord::Cue(cue), .. }]
+            if cue.delivery() == CueDelivery::Ordered
+    ));
+    wait_until(|| service.metrics().completed_requests == 2);
+    let records = service
+        .shutdown()
+        .expect("close protected-capacity service");
+
+    assert!(records.iter().any(|record| matches!(
+        record,
+        ServiceRecord::Completed { ticket, output: 2 } if *ticket == second
+    )));
+    assert_eq!(
+        first_drain
+            .iter()
+            .chain(&second_drain)
+            .chain(&records)
+            .filter(|record| record.endpoint_record().is_some())
+            .count(),
+        4
+    );
+}
+
+#[test]
+fn regressed_endpoint_order_faults_instead_of_silent_reordering() {
+    let mut endpoint_records = ordered_endpoint_records(2);
+    endpoint_records.reverse();
+    let service = spawn_native_endpoint_service(
+        "cpy-endpoint-order-fault",
+        EndpointServiceConfig::new(
+            ServiceConfig::new(1, 6, 1).expect("valid explicit capacities"),
+            1,
+        )
+        .expect("valid protected capacity"),
+        move || Some(endpoint_records),
+        |records, requests: Vec<u64>| {
+            EndpointServiceTurn::new(
+                requests.into_iter().map(Ok::<_, &'static str>).collect(),
+                records.take().unwrap_or_default(),
+            )
+        },
+    )
+    .expect("spawn Endpoint-order service");
+    let ticket = service.try_submit(1).expect("admit invalid-order turn");
+    wait_until(|| service.lifecycle() == ServiceLifecycle::Closed);
+    let records = service.shutdown().expect("join order-faulted service");
+
+    assert!(records.iter().any(|record| matches!(
+        record,
+        ServiceRecord::RuntimeFault {
+            ticket: actual,
+            fault: RuntimeFault::EndpointRecordOrder {
+                previous: 2,
+                offered: 1,
+            },
+        } if *actual == ticket
+    )));
+    assert!(
+        !records
+            .iter()
+            .any(|record| record.endpoint_record().is_some())
     );
 }
 
@@ -588,4 +861,15 @@ fn zero_capacities_never_become_implicit_defaults() {
     assert!(ServiceConfig::new(0, 1, 1).is_err());
     assert!(ServiceConfig::new(1, 0, 1).is_err());
     assert!(ServiceConfig::new(1, 1, 0).is_err());
+
+    let service = ServiceConfig::new(2, 4, 2).expect("valid service capacities");
+    assert!(EndpointServiceConfig::new(service, 0).is_err());
+    assert!(EndpointServiceConfig::new(service, 1).is_err());
+    assert!(EndpointServiceConfig::new(service, 4).is_err());
+    assert_eq!(
+        EndpointServiceConfig::new(service, 2)
+            .expect("valid explicit reserve")
+            .ordinary_egress_capacity(),
+        2
+    );
 }

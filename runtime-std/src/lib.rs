@@ -3,8 +3,9 @@
 //! The one-shot task proves the CPY-02 ownership boundary. The service module
 //! adds the first CPY-03 native lifecycle: bounded interpreter-neutral queues,
 //! one owner thread, deterministic batches, Unix readiness, observable
-//! admission failure, and ordered shutdown. Frame leases, platform cadence,
-//! and language bindings remain outside this crate slice.
+//! admission failure, canonical Endpoint-record projection, protected terminal
+//! capacity, and ordered shutdown. Frame leases, platform cadence, and language
+//! bindings remain outside this crate slice.
 
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
@@ -16,9 +17,11 @@ mod service;
 
 pub use readiness::{ReadinessKind, ReadinessSignal};
 pub use service::{
-    AdmissionError, NativeService, RequestId, RuntimeFault, ServiceConfig, ServiceConfigError,
-    ServiceEpoch, ServiceEpochMismatch, ServiceJoinError, ServiceLifecycle, ServiceMetricsSnapshot,
-    ServiceRecord, ServiceRejection, ServiceStartError, ServiceTicket, spawn_native_service,
+    AdmissionError, EndpointServiceConfig, EndpointServiceConfigError, EndpointServiceTurn,
+    NativeService, RequestId, RuntimeFault, ServiceConfig, ServiceConfigError, ServiceEpoch,
+    ServiceEpochMismatch, ServiceJoinError, ServiceLifecycle, ServiceMetricsSnapshot,
+    ServiceRecord, ServiceRecordClass, ServiceRejection, ServiceStartError, ServiceTicket,
+    spawn_native_endpoint_service, spawn_native_service,
 };
 
 /// A joinable one-shot task whose state remains entirely on its owner thread.

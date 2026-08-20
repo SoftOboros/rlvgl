@@ -626,6 +626,9 @@ fn consume_records(
                     ticket.request_id().get()
                 ));
             }
+            ServiceRecord::Endpoint { .. } => {
+                return Err("legacy capacity probe received an Endpoint record".to_owned());
+            }
         }
     }
     Ok(())
