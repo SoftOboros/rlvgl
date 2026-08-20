@@ -10,10 +10,10 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
 diagnostic capacity matrices are complete. Typed restart/stale-epoch
 validation and active-turn close-fence stress evidence are complete.
-The representative v3 workload implementation is complete; clean-source host
-and physical-board qualification evidence remains open. Not ratified.
+The representative v3 workload implementation and clean-source host matrix are
+complete; physical-board qualification evidence remains open. Not ratified.
 
-**Revision:** 0.9.0
+**Revision:** 0.10.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -332,7 +332,7 @@ stall. These remain host diagnostics, not budgets or target qualification. The
 empty Safe Turn omits representative Actor/render/frame/input work, and the
 same clean source has not run on the BBB.
 
-The current 0.9.0 implementation upgrades the probe to v3 without relabeling
+The 0.9.0 implementation upgrades the probe to v3 without relabeling
 the retained v1/v2 matrices. Every native service turn now commits one real
 Stage batch over the built-in Slider actor, drains its exact completion,
 dispatches one pointer input and Cue per workload request, acknowledges the
@@ -341,17 +341,35 @@ cadence into a private non-exported 320×240 RGBA buffer. The output records
 Stage, input, Cue, frame, cadence, and checksum accounting, and the evidence
 manifest binds the API/core/widget sources that define those semantics.
 
-This closes the empty-Safe-Turn implementation gap but is not measurement
-evidence by itself. A clean committed v3 matrix must still qualify an explicit
-tuple on the host and physical BeagleBone Black. The private buffer is neither
-a Python export nor a Frame Lease, and the probe does not present it to a
-device.
+The retained representative host bundle
+[`CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json`](evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json)
+is sourced from clean commit
+`8749931931abbd3aa53e97ecf9a95a530439c6bc`. It records 60 retained runs and
+12 summaries across the same four candidates, three scenarios, one warmup,
+and five measured iterations per row. Every summary reports exact
+Stage/input/Cue/private-frame semantics, clean sequence accounting, and full
+owned-envelope release.
+
+Across the representative host summaries, median whole-process peak RSS ranged
+from 1,318,912 through 1,585,152 bytes and median tracked peak envelope bytes
+from 3,120 through 55,864 bytes. Sustained median p95 delivery latency ranged
+from 53,451,889 through 55,282,766 ns. Median cadence misses were one in every
+summary, and ingress saturation remained observable; no summary recorded an
+egress-backpressured record. These values describe the captured host and do
+not select a preferred tuple, default, maximum, or release budget.
+
+This completes the clean-source host half of the representative matrix. The
+same committed workload must still run on the physical CPY-01 BeagleBone Black
+before the paired host/board gate can pass. The private buffer is neither a
+Python export nor a Frame Lease, and the probe does not present it to a device.
 
 ## 12. Acceptance Checklist
 
 - [x] Every policy PCDN in §§11.2–11.3 is resolved.
-- [ ] The representative Python-independent service workload qualifies at
-      least one explicit development tuple on both the host and physical BBB.
+- [x] The representative Python-independent service workload has a retained
+      clean-source host matrix over every declared candidate tuple.
+- [ ] The same committed representative workload qualifies at least one
+      explicit development tuple on the physical BBB.
 - [ ] Lifecycle and Service Turn state machines are complete and deterministic.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
@@ -380,14 +398,15 @@ device.
 | `docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json` | Machine-checkable diagnostic evidence contract |
 | `docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json` | First retained host matrix |
 | `docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json` | Production-service v2 host matrix |
+| `docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json` | Representative v3 Stage/input/Cue/private-frame host matrix |
 | CPython thread-state documentation | External wait/thread/finalization authority |
 
 ## 14. Unblocks
 
 All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
-Draft. Ratification is blocked by representative Python-independent semantic
-workload and physical-board capacity qualification, semantic record classes,
-and representative native cadence. CPY-04 owns
+Draft. Ratification is blocked by physical-board representative-workload
+capacity and cadence qualification, semantic record classes, and lifecycle/
+Service Turn state-machine closure. CPY-04 owns
 binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
 lifetime and slot counts, and CPY-06 owns physical device presentation; none is
 a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
@@ -395,6 +414,38 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.10.0 — 2026-08-19 — retain the representative host matrix
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** evidence
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-3, INV-CPY-03-4, INV-CPY-03-5,
+INV-CPY-03-6, PCDN-CPY-03-002, §8, §11, §12, §13, §14
+
+**Commits:** `87499319` (measured source; the retained bundle names the exact
+authority)
+
+**Summary:** Retains the 60-run representative v3 host matrix over real
+Stage/input/Cue/private-frame work without selecting a capacity or treating a
+host result as physical-board evidence.
+
+#### Rationale
+
+The accepted capacity policy requires the same Python-independent semantic
+workload on a development host and the physical reference board. Capturing the
+host matrix from the clean combined CPY/MPY frontier proves the host half and
+preserves an exact source, resolver, toolchain, environment, and run record for
+comparison with the later board artifact.
+
+Considered and rejected: promoting the lowest-latency or lowest-RSS row to a
+default, treating schema validity alone as a performance budget, or relabeling
+the macOS result as embedded-Linux qualification.
+
+What deliberately did not change: every capacity remains explicit, the
+artifact is `diagnostic-host` with `normative_decision: false`, and physical
+BBB, Python/PyO3, Frame Lease, and presentation evidence remain open.
 
 ### 0.9.0 — 2026-08-19 — replace the empty Safe Turn with representative work
 

@@ -20,6 +20,8 @@ do not satisfy embedded-Linux, physical-board, Python, frame, or release gates.
 | [`_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-9382b050.lock) | Detached resolver snapshot for the capacity probe, including Crossbeam Channel 0.5.16. |
 | [`CPY-CAPACITY-SERVICE-HOST-2026-08-18.json`](CPY-CAPACITY-SERVICE-HOST-2026-08-18.json) | CPY-03 v2 diagnostic host matrix over the production native service, exact terminal records, close lifecycle, and Unix readiness. It explicitly makes no capacity decision. |
 | [`_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock) | Detached resolver snapshot for the v2 service probe, including production Crossbeam Channel and Rustix dependencies. |
+| [`CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json`](CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json) | CPY-03 v3 diagnostic host matrix over representative Stage/input/Cue/private-frame work. It completes the host half of the paired host/physical-board evidence gate without selecting a capacity. |
+| [`_generated/CPY-CAPACITY-CARGO-LOCK-87499319.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-87499319.lock) | Detached resolver snapshot for the v3 representative host matrix from clean combined source `87499319`. |
 
 The immutable source authority is commit
 `0cf406bb22509f1040af6a772d0476a614c7bd9c`. The baseline hashes all 53
@@ -107,11 +109,25 @@ released tracked envelopes, and a drainable readiness path. It still executes
 an empty Endpoint Safe Turn, and it has not run on the CPY-01 BeagleBone Black,
 so it also cannot close the PCDN or select defaults/maxima.
 
+The v3 representative host bundle remains `diagnostic-host` with
+`normative_decision: false`. Its 60 retained runs cover the same four
+candidates and three scenarios while adding real Stage mutation/completion,
+pointer input and Cue accounting, fixed native cadence, and private flattened
+RGBA rendering. Every one of its 12 summaries reports exact representative
+semantics, clean sequence accounting, and full owned-envelope release. It
+completes the host half of the accepted paired matrix, but the physical
+BeagleBone Black run remains required and no row is a public default, maximum,
+or release budget.
+
 Validate the retained bundle:
 
 ```bash
 python3 scripts/cpy_capacity_probe.py validate \
   docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json
+python3 scripts/cpy_capacity_probe.py validate \
+  docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json
+python3 scripts/cpy_capacity_probe.py validate \
+  docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json
 python3 scripts/test_cpy_capacity_probe.py
 ```
 
@@ -127,3 +143,14 @@ python3 scripts/cpy_capacity_probe.py capture \
 An embedded run additionally requires `--profile embedded-linux-direct` and
 `--physical-board`. Those flags identify the environment; they do not promote
 candidate measurements into defaults or a release budget.
+
+Run the paired physical-board capture from a clean checkout of the committed
+representative workload on the CPY-01 reference board:
+
+```bash
+python3 scripts/cpy_capacity_probe.py capture \
+  --profile embedded-linux-direct \
+  --physical-board \
+  --hardware-label "BeagleBone Black + NHD-7.0CTP-CAPE-P" \
+  --output docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-BBB-<date>.json
+```
