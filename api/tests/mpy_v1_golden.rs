@@ -9,11 +9,11 @@ use rlvgl_api::protocol::{
     OperationRef, OperationResultList, OperationResultRef, PromoteRootPayload, PropertyIdList,
     ProtocolVersion, ReorderPayload, ReparentPayload, RequestedFlexLayout, RequestedGridLayout,
     RequestedItemLayout, RequestedLayoutRef, ResetPropertiesPayload, RuntimeFlag, RuntimeNotice,
-    SetFlagPayload, SetPropertiesPayload, SetRequestedLayoutPayload, ValueList, ValueRef, ValueTag,
-    create_result_object, decode_batch_success, decode_batch_success_with_limits,
-    decode_create_operation_with_limits, decode_create_payload, decode_create_payload_with_limits,
-    decode_delete_operation, decode_delete_payload, decode_field_list,
-    decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
+    SetFlagPayload, SetLocalStylePayload, SetPropertiesPayload, SetRequestedLayoutPayload,
+    ValueList, ValueRef, ValueTag, create_result_object, decode_batch_success,
+    decode_batch_success_with_limits, decode_create_operation_with_limits, decode_create_payload,
+    decode_create_payload_with_limits, decode_delete_operation, decode_delete_payload,
+    decode_field_list, decode_field_list_with_limits, decode_frame, decode_frame_with_limits,
     decode_invoke_action_operation, decode_invoke_action_operation_with_limits,
     decode_invoke_action_payload, decode_invoke_action_payload_with_limits,
     decode_mutation_operation_target, decode_mutation_target_envelope, decode_object_reference,
@@ -24,7 +24,9 @@ use rlvgl_api::protocol::{
     decode_requested_layout_body_with_limits, decode_reset_properties_operation,
     decode_reset_properties_operation_with_limits, decode_reset_properties_payload,
     decode_reset_properties_payload_with_limits, decode_set_flag_operation,
-    decode_set_flag_payload, decode_set_properties_operation,
+    decode_set_flag_payload, decode_set_local_style_operation,
+    decode_set_local_style_operation_with_limits, decode_set_local_style_payload,
+    decode_set_local_style_payload_with_limits, decode_set_properties_operation,
     decode_set_properties_operation_with_limits, decode_set_properties_payload,
     decode_set_properties_payload_with_limits, decode_set_requested_layout_operation,
     decode_set_requested_layout_operation_with_limits, decode_set_requested_layout_payload,
@@ -39,7 +41,8 @@ use rlvgl_api::protocol::{
     encode_promote_root_payload_with_limits, encode_reorder_payload, encode_reparent_payload,
     encode_requested_layout_body, encode_requested_layout_body_with_limits,
     encode_reset_properties_payload, encode_reset_properties_payload_with_limits,
-    encode_set_flag_payload, encode_set_properties_payload,
+    encode_set_flag_payload, encode_set_local_style_payload,
+    encode_set_local_style_payload_with_limits, encode_set_properties_payload,
     encode_set_properties_payload_with_limits, encode_set_requested_layout_payload,
     encode_set_requested_layout_payload_with_limits, encode_value, encode_value_list,
     encode_value_list_with_limit, encode_value_list_with_limits, is_batch_mutation_opcode, opcode,
@@ -47,7 +50,8 @@ use rlvgl_api::protocol::{
     validate_invoke_action_result_absent, validate_promote_root_result_absent,
     validate_reorder_result_absent, validate_reparent_result_absent,
     validate_reset_properties_result_absent, validate_set_flag_result_absent,
-    validate_set_properties_result_absent, validate_set_requested_layout_result_echo,
+    validate_set_local_style_result_absent, validate_set_properties_result_absent,
+    validate_set_requested_layout_result_echo,
 };
 
 const OPCODES: &[u32] = &[0x10, 0x1020_3040];
@@ -3549,6 +3553,181 @@ fn set_requested_layout_echo_is_exact_and_errors_are_operation_attributed() {
 }
 
 #[test]
+fn set_local_style_payload_freezes_exact_remove_and_set_forms() {
+    let cases = [
+        (
+            SetLocalStylePayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                part_id: 0,
+                state_mask: 0,
+                property_id: 1,
+                value: None,
+            },
+            "payload.set_local_style_object_remove",
+        ),
+        (
+            SetLocalStylePayload {
+                target: ObjectReference::BatchObject(7),
+                part_id: 0,
+                state_mask: 4,
+                property_id: 1,
+                value: None,
+            },
+            "payload.set_local_style_batch_remove",
+        ),
+        (
+            SetLocalStylePayload {
+                target: ObjectReference::BatchObject(7),
+                part_id: 0,
+                state_mask: 4,
+                property_id: 1,
+                value: Some(ValueRef::Color(0xff11_2233)),
+            },
+            "payload.set_local_style_batch_color",
+        ),
+        (
+            SetLocalStylePayload {
+                target: ObjectReference::Object(0x0000_0002_0000_0001),
+                part_id: 0,
+                state_mask: 0,
+                property_id: 10,
+                value: Some(ValueRef::Enum {
+                    domain: 1,
+                    value: 2,
+                }),
+            },
+            "payload.set_local_style_object_enum",
+        ),
+    ];
+    for (payload, fixture_name) in cases {
+        let expected = fixture(fixture_name);
+        let mut encoded = [0u8; 64];
+        let length = encode_set_local_style_payload(payload, &mut encoded).unwrap();
+        assert_eq!(&encoded[..length], expected);
+        assert_eq!(
+            decode_set_local_style_payload(&encoded[..length]),
+            Ok(payload)
+        );
+        assert_eq!(
+            decode_set_local_style_operation(OperationRef {
+                opcode: opcode::SET_LOCAL_STYLE,
+                flags: 0,
+                payload: &encoded[..length],
+            }),
+            Ok(payload)
+        );
+    }
+}
+
+#[test]
+fn set_local_style_rejects_noncanonical_forms_before_limits() {
+    let remove = fixture("payload.set_local_style_batch_remove");
+    for length in 0..remove.len() {
+        assert!(decode_set_local_style_payload(&remove[..length]).is_err());
+    }
+
+    let mut explicit_none = remove.clone();
+    explicit_none.push(ValueTag::None as u8);
+    assert_eq!(
+        decode_set_local_style_payload(&explicit_none),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+    assert_eq!(
+        encode_set_local_style_payload(
+            SetLocalStylePayload {
+                target: ObjectReference::BatchObject(7),
+                part_id: 0,
+                state_mask: 0,
+                property_id: 1,
+                value: Some(ValueRef::None),
+            },
+            &mut [0; 32],
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+
+    let mut zero_property = remove.clone();
+    zero_property[11..15].copy_from_slice(&0u32.to_le_bytes());
+    assert_eq!(
+        decode_set_local_style_payload(&zero_property),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    let mut trailing = fixture("payload.set_local_style_batch_color");
+    trailing.push(ValueTag::Bool as u8);
+    trailing.push(1);
+    assert_eq!(
+        decode_set_local_style_payload(&trailing),
+        Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+    );
+
+    let text = SetLocalStylePayload {
+        target: ObjectReference::BatchObject(7),
+        part_id: 0,
+        state_mask: 0,
+        property_id: 1,
+        value: Some(ValueRef::Text("abc")),
+    };
+    let mut encoded = [0u8; 64];
+    let length = encode_set_local_style_payload(text, &mut encoded).unwrap();
+    let mut small = limits();
+    small.max_text_bytes = 2;
+    assert_eq!(
+        encode_set_local_style_payload_with_limits(text, small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+    assert_eq!(
+        decode_set_local_style_payload_with_limits(&encoded[..length], small),
+        Err(ObjectReferenceError::Codec(CodecError::LimitExceeded))
+    );
+
+    for (operation_opcode, flags) in [(opcode::CREATE, 0), (opcode::SET_LOCAL_STYLE, 1)] {
+        let operation = OperationRef {
+            opcode: operation_opcode,
+            flags,
+            payload: &remove,
+        };
+        assert_eq!(
+            decode_set_local_style_operation(operation),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+        assert_eq!(
+            decode_set_local_style_operation_with_limits(operation, limits()),
+            Err(ObjectReferenceError::Codec(CodecError::InvalidFrame))
+        );
+    }
+}
+
+#[test]
+fn set_local_style_success_is_outputless() {
+    let encoded = fixture("payload.set_local_style_success");
+    let success = decode_batch_success(&encoded, 1).unwrap();
+    assert_eq!(success.result_revision, 29);
+    assert_eq!(success.results.len(), 0);
+    assert_eq!(
+        validate_set_local_style_result_absent(success, 1, 0),
+        Ok(())
+    );
+
+    let values = [ValueRef::U32(1)];
+    let results = [OperationResultRef {
+        operation_index: 0,
+        values: ValueList::from_slice(&values),
+    }];
+    assert_eq!(
+        validate_set_local_style_result_absent(
+            BatchSuccess {
+                result_revision: 29,
+                results: OperationResultList::from_slice(&results),
+            },
+            1,
+            0,
+        ),
+        Err(CodecError::InvalidFrame)
+    );
+}
+
+#[test]
 fn set_flag_payloads_freeze_ids_boolean_bytes_and_reference_forms() {
     let cases = [
         (
@@ -4828,6 +5007,53 @@ fn eight_none_set_requested_layout_operations_fit_the_floor() {
     too_small.max_frame_bytes = 253;
     assert_eq!(
         encode_frame_with_limits(MPY_V1, stable_target_frame, too_small, &mut encoded),
+        Err(CodecError::LimitExceeded)
+    );
+}
+
+#[test]
+fn eight_batch_local_style_removals_fit_the_floor() {
+    let mut payload = [0u8; 15];
+    let length = encode_set_local_style_payload_with_limits(
+        SetLocalStylePayload {
+            target: ObjectReference::BatchObject(7),
+            part_id: 0,
+            state_mask: 0,
+            property_id: 1,
+            value: None,
+        },
+        limits(),
+        &mut payload,
+    )
+    .unwrap();
+    assert_eq!(length, 15);
+    let operation = OperationRef {
+        opcode: opcode::SET_LOCAL_STYLE,
+        flags: 0,
+        payload: &payload[..length],
+    };
+    let operations = [operation; 8];
+    let frame = FrameRef::Batch(Batch {
+        stage_id: 1,
+        request_id: 1,
+        flags: 0,
+        budget: BatchBudget {
+            actors: 0,
+            text_bytes: 0,
+            resources: 0,
+            result_bytes: 0,
+        },
+        operations: OperationList::from_slice(&operations),
+    });
+    let mut encoded = [0u8; 256];
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, frame, limits(), &mut encoded),
+        Ok(254)
+    );
+    let mut too_small = limits();
+    too_small.max_frame_bytes = 253;
+    assert_eq!(
+        encode_frame_with_limits(MPY_V1, frame, too_small, &mut encoded),
         Err(CodecError::LimitExceeded)
     );
 }

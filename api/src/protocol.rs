@@ -1321,6 +1321,28 @@ pub struct SetRequestedLayoutPayload<'a> {
 /// Structural or contextual failure while decoding SetRequestedLayout.
 pub type SetRequestedLayoutPayloadError = ObjectReferenceError;
 
+/// Complete Batch-only SetLocalStyle payload.
+///
+/// The optional value has one canonical interpretation: `None` removes the
+/// selected MPY-owned property, while `Some(value)` sets it. A tagged
+/// [`ValueRef::None`] is never accepted as a second removal spelling.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SetLocalStylePayload<'a> {
+    /// Stable or earlier-created actor receiving the local-style mutation.
+    pub target: ObjectReference,
+    /// Exact named or actor-scoped custom part identifier.
+    pub part_id: u32,
+    /// Exact native state mask; zero is the DEFAULT selector.
+    pub state_mask: u32,
+    /// Nonzero global style-property identifier.
+    pub property_id: u32,
+    /// Replacement value, or absence to remove only this MPY-owned property.
+    pub value: Option<ValueRef<'a>>,
+}
+
+/// Structural or contextual failure while decoding SetLocalStyle.
+pub type SetLocalStylePayloadError = ObjectReferenceError;
+
 /// Stable runtime-owned object metadata flags writable through SetFlag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -3093,6 +3115,128 @@ pub fn decode_set_requested_layout_operation_with_limits(
     decode_set_requested_layout_payload_with_limits(operation.payload, limits)
 }
 
+/// Encode one complete SetLocalStyle payload without negotiated-limit checks.
+///
+/// The fixed target and selector fields are followed by either no bytes for a
+/// removal or exactly one canonical tagged value for a set. Post-negotiation
+/// acceptance should use [`encode_set_local_style_payload_with_limits`] so a
+/// structurally valid but semantically wrong Text or Bytes value still obeys
+/// its negotiated payload bound before descriptor validation.
+pub fn encode_set_local_style_payload(
+    payload: SetLocalStylePayload<'_>,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_local_style_structure(payload)?;
+    let mut writer = Writer::new(output);
+    encode_value_into(payload.target.as_value(), &mut writer)?;
+    writer.u32(payload.part_id)?;
+    writer.u32(payload.state_mask)?;
+    writer.u32(payload.property_id)?;
+    if let Some(value) = payload.value {
+        encode_value_into(value, &mut writer)?;
+    }
+    Ok(writer.position)
+}
+
+/// Encode one complete SetLocalStyle payload under negotiated value limits.
+///
+/// No item-count limit applies because the payload carries no list. The
+/// enclosing Batch independently enforces operation-count and frame limits.
+pub fn encode_set_local_style_payload_with_limits(
+    payload: SetLocalStylePayload<'_>,
+    limits: Limits,
+    output: &mut [u8],
+) -> Result<usize, CodecError> {
+    validate_set_local_style_structure(payload)?;
+    if let Some(value) = payload.value {
+        validate_value_payload_limits(value, limits)?;
+    }
+    encode_set_local_style_payload(payload, output)
+}
+
+/// Decode one complete SetLocalStyle payload.
+///
+/// Target, selector words, and the optional value are structurally validated
+/// before the caller performs target resolution or descriptor applicability
+/// checks. Empty value bytes mean Remove. A present tagged None, incomplete
+/// value, or any trailing byte is noncanonical.
+pub fn decode_set_local_style_payload(
+    input: &[u8],
+) -> Result<SetLocalStylePayload<'_>, SetLocalStylePayloadError> {
+    let envelope = decode_mutation_target_envelope(input)?;
+    let mut reader = Reader::new(envelope.remainder);
+    let part_id = reader
+        .u32()
+        .map_err(nested_frame_error)
+        .map_err(ObjectReferenceError::from)?;
+    let state_mask = reader
+        .u32()
+        .map_err(nested_frame_error)
+        .map_err(ObjectReferenceError::from)?;
+    let property_id = reader
+        .u32()
+        .map_err(nested_frame_error)
+        .map_err(ObjectReferenceError::from)?;
+    require_nonzero(property_id).map_err(ObjectReferenceError::from)?;
+    let value = if reader.position == reader.input.len() {
+        None
+    } else {
+        let value = decode_value_from_reader(&mut reader)
+            .map_err(nested_frame_error)
+            .map_err(ObjectReferenceError::from)?;
+        if value == ValueRef::None || reader.position != reader.input.len() {
+            return Err(CodecError::InvalidFrame.into());
+        }
+        Some(value)
+    };
+    Ok(SetLocalStylePayload {
+        target: envelope.target,
+        part_id,
+        state_mask,
+        property_id,
+        value,
+    })
+}
+
+/// Decode one complete SetLocalStyle payload under negotiated value limits.
+///
+/// Complete structure is validated before Text or Bytes capacity. Selector,
+/// property, and actor-specific semantic validation remains caller-owned.
+pub fn decode_set_local_style_payload_with_limits(
+    input: &[u8],
+    limits: Limits,
+) -> Result<SetLocalStylePayload<'_>, SetLocalStylePayloadError> {
+    let payload = decode_set_local_style_payload(input)?;
+    if let Some(value) = payload.value {
+        validate_value_payload_limits(value, limits).map_err(ObjectReferenceError::from)?;
+    }
+    Ok(payload)
+}
+
+/// Decode one zero-flag SetLocalStyle operation from a counted Batch list.
+///
+/// There is deliberately no Command counterpart: MPY v1 SetLocalStyle is
+/// Batch-only.
+pub fn decode_set_local_style_operation(
+    operation: OperationRef<'_>,
+) -> Result<SetLocalStylePayload<'_>, SetLocalStylePayloadError> {
+    if operation.opcode != opcode::SET_LOCAL_STYLE || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_local_style_payload(operation.payload)
+}
+
+/// Decode one zero-flag SetLocalStyle operation under negotiated limits.
+pub fn decode_set_local_style_operation_with_limits(
+    operation: OperationRef<'_>,
+    limits: Limits,
+) -> Result<SetLocalStylePayload<'_>, SetLocalStylePayloadError> {
+    if operation.opcode != opcode::SET_LOCAL_STYLE || operation.flags != 0 {
+        return Err(CodecError::InvalidFrame.into());
+    }
+    decode_set_local_style_payload_with_limits(operation.payload, limits)
+}
+
 /// Encode one complete SetFlag payload.
 ///
 /// No negotiated variable-size limit applies to this fixed-size payload. The
@@ -3271,6 +3415,30 @@ pub fn validate_set_flag_result_absent(
             .results
             .iter()
             .any(|result| result.operation_index == set_flag_operation_index)
+    {
+        return Err(CodecError::InvalidFrame);
+    }
+    Ok(())
+}
+
+/// Validate that one correlated SetLocalStyle emitted no result record.
+///
+/// The caller MUST already have correlated `set_local_style_operation_index`
+/// to a submitted opcode [`opcode::SET_LOCAL_STYLE`]. This helper validates
+/// structural [`BatchSuccess`] shape and absence of that one index only. It
+/// does not validate other opcode schemas, negotiated Limits, or the complete
+/// success envelope.
+pub fn validate_set_local_style_result_absent(
+    success: BatchSuccess<'_>,
+    submitted_operation_count: u16,
+    set_local_style_operation_index: u16,
+) -> Result<(), CodecError> {
+    validate_batch_success_structure(success, submitted_operation_count)?;
+    if set_local_style_operation_index >= submitted_operation_count
+        || success
+            .results
+            .iter()
+            .any(|result| result.operation_index == set_local_style_operation_index)
     {
         return Err(CodecError::InvalidFrame);
     }
@@ -4239,6 +4407,18 @@ fn validate_value_structure(value: ValueRef<'_>) -> Result<(), CodecError> {
         | ValueRef::Rect { .. }
         | ValueRef::BatchObject(_) => Ok(()),
     }
+}
+
+fn validate_set_local_style_structure(payload: SetLocalStylePayload<'_>) -> Result<(), CodecError> {
+    validate_value_structure(payload.target.as_value())?;
+    require_nonzero(payload.property_id)?;
+    if let Some(value) = payload.value {
+        if value == ValueRef::None {
+            return Err(CodecError::InvalidFrame);
+        }
+        validate_value_structure(value)?;
+    }
+    Ok(())
 }
 
 fn validate_value_list_structure(values: ValueList<'_>) -> Result<(), CodecError> {

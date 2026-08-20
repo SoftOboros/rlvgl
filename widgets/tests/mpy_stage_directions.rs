@@ -630,14 +630,14 @@ fn list_actions_prepare_transactionally_and_property_matrix_is_descriptor_driven
             actual: rlvgl_core::actor::ValueTag::I32,
         })
     );
-    assert_eq!(
-        registry.apply_batch(&[StageDirection::SetLocalStyle {
+    let style_revision = registry
+        .apply_batch(&[StageDirection::SetLocalStyle {
             object_id: button,
             part_id: 0,
             state_mask: 0,
             property_id: 1,
             value: OwnedValue::Color(0xff00_0000),
-        }]),
-        Err(RegistryError::Unsupported)
-    );
+        }])
+        .unwrap();
+    assert_eq!(style_revision.get(), revision.get() + 1);
 }

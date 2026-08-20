@@ -327,7 +327,7 @@ pub enum BatchStageDirection {
         /// Stable or earlier-created subtree root.
         object: BatchObjectReference,
     },
-    /// Local style addressing remains explicitly unsupported in this slice.
+    /// Set or remove one exact MPY-owned local-style property.
     SetLocalStyle {
         /// Stable or earlier-created target actor.
         object: BatchObjectReference,
@@ -337,7 +337,7 @@ pub enum BatchStageDirection {
         state_mask: u32,
         /// Stable style property identifier.
         property_id: u32,
-        /// Replacement local value.
+        /// Replacement local value, or [`OwnedValue::None`] for removal.
         value: OwnedValue,
     },
 }
@@ -404,7 +404,7 @@ impl RequestedLayout {
     }
 }
 
-/// One atomic stage command. Unsupported local-style mutation is explicit.
+/// One atomic stage command.
 #[derive(Clone, Debug, PartialEq)]
 pub enum StageDirection {
     /// Apply one or more actor-local property/action transitions collectively.
@@ -467,7 +467,7 @@ pub enum StageDirection {
         /// Root of the subtree to delete.
         object_id: ObjectId,
     },
-    /// Local style addressing is reserved but not implemented by this slice.
+    /// Set or remove one exact MPY-owned local-style property.
     SetLocalStyle {
         /// Target actor.
         object_id: ObjectId,
@@ -477,7 +477,7 @@ pub enum StageDirection {
         state_mask: u32,
         /// Stable style property identifier.
         property_id: u32,
-        /// Replacement local value.
+        /// Replacement local value, or [`OwnedValue::None`] for removal.
         value: OwnedValue,
     },
 }
@@ -521,6 +521,19 @@ pub struct SnapshotProperty {
     pub redacted: bool,
 }
 
+/// One sparse MPY-owned local-style value projected into a snapshot.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SnapshotStyleValue {
+    /// Exact actor-local part identifier.
+    pub part_id: u32,
+    /// Exact selector state mask; zero is the DEFAULT selector.
+    pub state_mask: u32,
+    /// Stable global style-property identifier.
+    pub property_id: u32,
+    /// Typed local value without cascade resolution.
+    pub value: OwnedValue,
+}
+
 /// Deterministic snapshot actor record.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SnapshotRecord {
@@ -538,6 +551,12 @@ pub struct SnapshotRecord {
     pub children: Vec<ObjectId>,
     /// Readable actor-owned properties.
     pub properties: Vec<SnapshotProperty>,
+    /// Bounded sparse MPY-owned style values in deterministic order.
+    pub styles: Vec<SnapshotStyleValue>,
+    /// Complete sparse MPY-owned style-value count before bounding.
+    pub total_style_values: usize,
+    /// Whether `styles` is a strict prefix of the complete style projection.
+    pub styles_truncated: bool,
     /// Native object flags.
     pub flags: u32,
     /// Native object states.

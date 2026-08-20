@@ -223,7 +223,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0005);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::list::List",
-    schema_revision: 3,
+    schema_revision: 4,
     family: ActorFamily::Composite,
     capabilities: ActorCapabilities::TEXT
         .union(ActorCapabilities::CONTROL)

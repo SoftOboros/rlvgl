@@ -38,7 +38,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0001);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::container::Container",
-    schema_revision: 2,
+    schema_revision: 3,
     family: ActorFamily::Container,
     capabilities: ActorCapabilities::STAGE_ROOT.union(ActorCapabilities::CHILDREN),
     targets: TargetSet::ALL,

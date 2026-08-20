@@ -283,7 +283,7 @@ fn completion<'a>(
 #[test]
 fn proof_descriptor_matrix_and_payload_adapters_are_canonical() {
     let button_event = &button::MPY_DESCRIPTOR.events[0];
-    assert_eq!(button::MPY_DESCRIPTOR.schema_revision, 3);
+    assert_eq!(button::MPY_DESCRIPTOR.schema_revision, 4);
     assert_eq!(button_event.id, button::MPY_CLICKED_EVENT_ID);
     assert_eq!(button_event.name, "clicked");
     assert_eq!(button_event.payload, &[ValueTag::I32, ValueTag::I32]);
@@ -293,7 +293,7 @@ fn proof_descriptor_matrix_and_payload_adapters_are_canonical() {
     assert!(button_event.requires_widget_invocation);
 
     let slider_event = &slider::MPY_DESCRIPTOR.events[0];
-    assert_eq!(slider::MPY_DESCRIPTOR.schema_revision, 3);
+    assert_eq!(slider::MPY_DESCRIPTOR.schema_revision, 4);
     assert_eq!(slider_event.id, slider::MPY_VALUE_CHANGED_EVENT_ID);
     assert_eq!(slider_event.payload, &[ValueTag::I32]);
     assert_eq!(slider_event.delivery, EventDelivery::Ordered);
@@ -304,7 +304,7 @@ fn proof_descriptor_matrix_and_payload_adapters_are_canonical() {
     );
 
     let list_event = &list::MPY_DESCRIPTOR.events[0];
-    assert_eq!(list::MPY_DESCRIPTOR.schema_revision, 3);
+    assert_eq!(list::MPY_DESCRIPTOR.schema_revision, 4);
     assert_eq!(list_event.id, list::MPY_SELECTION_CHANGED_EVENT_ID);
     assert_eq!(list_event.payload, &[ValueTag::U32]);
     assert_eq!(list_event.delivery, EventDelivery::Ordered);

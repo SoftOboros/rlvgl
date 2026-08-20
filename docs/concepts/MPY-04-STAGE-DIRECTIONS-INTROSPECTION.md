@@ -7,9 +7,9 @@ MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md - Tree, property, action, layout, and s
 **Status:** Ratified 2026-08-16. Normative for tree, property, action, object
 metadata, local-style, requested-layout, computed-geometry, atomic-commit, and
 snapshot semantics. The in-process direction, revision, tree, requested-layout,
-geometry, invalidation, and snapshot substrate has focused implementation
-evidence. Local-style projection, subscription metadata in snapshots, and the
-complete cross-driver conformance gate remain open. The common Batch mutation-
+geometry, invalidation, bounded sparse local-style projection, and snapshot
+substrate has focused implementation evidence. Subscription metadata in
+snapshots and the complete cross-driver conformance gate remain open. The common Batch mutation-
 target envelope and exact Delete payload have allocation-free codecs and golden
 protocol evidence. The exact Reorder and Reparent payloads have the same proof,
 including all four Reparent reference pairs. PromoteRoot now has an exact
@@ -24,9 +24,11 @@ result proof. InvokeAction now has an exact typed-argument request and
 outputless result proof for Transactional actions whose descriptors declare no
 results. SetRequestedLayout now has exact None/Flex/Grid/Item Bytes bodies,
 independent body/track limits, and a byte-exact requested-state echo. Complete
-Endpoint dispatch remains deferred. The local-style prerequisite now has a
-stable global property registry, actor-local applicability, exact sparse MPY
-storage, and a prepared commit seam; opcode `0x0000_000b` remains deferred.
+Endpoint dispatch remains deferred. SetLocalStyle now has an exact set/remove
+payload, outputless success proof, stable/earlier-Batch Stage lowering, grouped
+atomic storage, and revision/effect/invalidation evidence. Borrowed style
+discovery and bounded sparse snapshot projection are implemented without
+claiming an Endpoint or binding wire.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 runtime registry plus the applicable LPAR style/layout/property phases.
@@ -130,7 +132,7 @@ to operation-specific PCDNs.
 | `PROMOTE_ROOT` | Actor becoming or moving as a named root | Exact UTF-8 name plus `u32` index and outputless success; §5.5 |
 | `REORDER` | Actor moving within its current owner | Exact `u32` index and outputless success; §5.3 |
 | `DELETE` | Root of the subtree being deleted | Exact empty remainder and outputless success; §5.2 |
-| `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Selector, property/value or removal, and success values deferred |
+| `SET_LOCAL_STYLE` | Actor receiving a local style mutation | Exact selector/property plus optional set value and outputless success; §5.12 |
 
 This shared envelope does not resolve references. A structurally valid stable
 target is generation-checked later and can return `StaleObject`. A nonzero
@@ -964,13 +966,142 @@ The frozen prerequisite invariants are:
 - **INV-MPY-04-STYLE-5:** invalid, capacity-rejected, or stale work publishes no
   partial storage change.
 
-PCDN-MPY-04-015 remains responsible for opcode `0x0000_000b`, its exact
-set/remove encoding, contextual stable/Batch targets, negotiated limits and
-error attribution, success schema, Stage revision/effects/invalidation,
-snapshot style projection, Endpoint integration, and MicroPython bindings. It
-also retains production non-MAIN draw integration, descendant inheritance
-invalidation, transitions beyond the existing visual tier, shared/theme writes,
-and broader future style properties.
+PCDN-MPY-04-015 closes opcode `0x0000_000b`, its exact set/remove encoding,
+contextual stable/Batch targets, negotiated limits and error attribution,
+outputless success, and Stage revision/effects/invalidation in §5.12.
+PCDN-MPY-04-016 closes bounded borrowed discovery and sparse snapshot
+projection in §5.13. Endpoint integration, MicroPython bindings, production
+non-MAIN draw integration, descendant inheritance invalidation, transitions
+beyond the existing visual tier, shared/theme writes, and broader future style
+properties remain deferred.
+
+### 5.12 SetLocalStyle payload, result, and atomic Stage semantics
+
+PCDN-MPY-04-015 completes the Batch-only `SET_LOCAL_STYLE` operation
+(`0x0000_000b`, flags `0`) without changing the registry and storage contract
+in §5.11:
+
+```text
+set_local_style_payload =
+    target:ObjectReference |
+    part_id:u32-le |
+    state_mask:u32-le |
+    property_id:u32-le |
+    [value:Value]
+```
+
+The three selector/property words are raw little-endian integers. An empty
+remainder after `property_id` means Remove. Exactly one complete canonical
+value means Set. A tagged `None` value is invalid rather than a second removal
+spelling. `property_id` zero, incomplete words, incomplete values, multiple
+values, and trailing bytes are `InvalidFrame`. The target retains the common
+`Object`/`BatchObject` structural classification from §5.1. No item-count
+limit applies because the payload contains no list.
+
+Complete structure is validated before negotiated value capacity. A
+structurally valid Text or Bytes value therefore obeys `max_text_bytes` or
+`max_byte_payload` before actor descriptor validation, even though the initial
+twenty-property registry accepts neither tag. The enclosing operation list and
+frame independently enforce `max_items_per_command` and `max_frame_bytes`.
+After that boundary, semantic validation order is:
+
+1. generation-check a stable target or resolve a nonzero earlier Create
+   binding (`StaleObject` or target-attributed `BatchInvalid`);
+2. validate the exact part/state selector and actor applicability
+   (`Unsupported`, with unknown state bits never truncated);
+3. resolve the nonzero global property (`UnknownProperty` for an unregistered
+   ID; `Unsupported` when a registered property is not actor-applicable);
+4. validate the property tag, enum domain, and scalar constraint
+   (`TypeMismatch` or `Range` at the actual property ID); and
+5. reserve the complete grouped replacement storage (`Capacity` without a
+   fabricated property ID).
+
+The core-owned `OwnedValue::None` is the lowering form for a structurally
+absent wire value; it is not accepted as a Set value. Multiple style operations
+for one actor are prepared into one replacement vector in submitted order, so
+repeated selector/property writes are deterministic last-write-wins. Stable
+actors and earlier-created actors share this path. A created actor receives its
+final sparse patch before publication; no precommit Object identity is exposed.
+
+The final Stage guard validates Stage identity/revision, actor borrows, and
+private style owner/revision for every existing target before changing any
+state. Commit then swaps prepared MPY-local vectors or installs a prepared
+private style slot without allocation, deallocation, callback delivery, or a
+fallible native call. Retired vectors remain owned by the committed batch until
+explicit release. A stale private style preparation returns `DispatchBusy`
+with the owned preparation and leaves every earlier direction unchanged.
+
+SetLocalStyle contributes no `OperationResult` record. Other output-bearing
+operations may still contribute records to the same `BatchSuccess`, whose
+revision is the final committed Stage Revision. Every accepted nonempty Batch
+advances that revision exactly once, including a removal of an absent value or
+a byte-equivalent Set. Effects are the union of the selected property rows;
+invalidation includes the touched actor's deterministic visual extent and any
+layout-derived extent required by that union. Create mappings remain the only
+outputs for mixed Create/SetLocalStyle batches.
+
+A removal payload is exactly 15 bytes with a BatchObject target or 21 bytes
+with a stable Object target. Eight shortest BatchObject removal operation
+records produce a 254-byte Batch frame and therefore fit the conservative
+256-byte floor; eight stable-target removals are not claimed to fit that floor.
+These are structural wire-size proofs, not actor-applicability proofs.
+
+Endpoint operation decoding/lowering, result framing, MicroPython bindings,
+style-transition authoring, shared/theme mutation, resolved-cascade readback,
+and production descendant/non-MAIN draw invalidation remain deferred.
+
+### 5.13 Bounded style discovery and sparse snapshot projection
+
+PCDN-MPY-04-016 adds an in-process borrowed discovery surface without adding a
+new wire schema. The global registries expose stable source names and IDs for
+named parts (`main` through `cursor`), DEFAULT plus all five registered state
+identities, and the twenty §5.11 properties. Actor applicability rows expose
+the stable part name/ID, allowed state-bit set, and a strictly increasing
+borrowed property slice. Custom parts remain actor-scoped and require a unique,
+nonempty stable name in that actor descriptor.
+
+Catalog validation rejects reserved part 7, wrong names for global named
+parts, duplicate or non-increasing part rows, duplicate part names, unknown
+state bits, empty property slices, non-increasing property IDs, and any property
+row that differs from its global registration. Discovery returns these rows
+directly; it never allocates or expands every selector/property pair.
+`maximum_style_selectors` and `maximum_style_values` provide exact finite
+bounds computed from each row's allowed state bits and property count. The
+initial Container and Label profiles expose 2 selectors and 40 values; Button,
+Slider, and List expose 16 selectors and 320 values. Their actor schema
+revisions are respectively 3, 3, 4, 4, and 4.
+
+Each snapshot actor record adds a flat `styles` prefix whose entries are:
+
+```text
+(part_id, state_mask, property_id, OwnedValue)
+```
+
+Only durable MPY-owned sparse local values are projected. Native local,
+added/shared, theme, transition, inherited/default, and resolved cascade values
+never appear. Selectors retain MPY registration order; values within one
+selector are ordered by increasing global property ID. Color is projected as
+canonical ARGB8888, text alignment as Enum domain 1, and scalar values retain
+their registered neutral type. Explicit zero remains present data.
+
+`total_style_values` reports the complete sparse count.
+`max_style_values_per_record` retains at most that many leading entries;
+`styles_truncated` reports a strict prefix and also contributes to the existing
+record-level `truncated` bit. A zero style budget is valid. The legacy
+`snapshot_read` surface delegates with a zero style budget, preserving its
+bounded shape while still reporting the total and truncation truthfully.
+
+Traversal, page, property, child, and style vector reservations complete before
+the cursor advances. A returned allocation failure leaves traversal position
+and page sequence unchanged so the same cursor may retry. Any accepted style
+Batch advances the Stage Revision and therefore makes a previously opened
+cursor return `SnapshotStale`, including a semantic no-op Batch. Selector/value
+capacity is descriptor-bounded rather than negotiated through an invented
+cartesian list.
+
+Discovery/snapshot wire encoding, Endpoint admission, MicroPython projection,
+subscription rows, computed cascade/theme inspection, restoration, and
+cross-driver byte-equivalence remain deferred.
 
 ## 6. Frozen Decisions — Properties and Actions
 
@@ -1092,7 +1223,8 @@ record contains:
 
 - `ObjectId`, `TypeId`, stable type name when names are available;
 - parent/root position and ordered children;
-- readable requested properties, flags, states, styles, and layout;
+- readable requested properties, flags, states, bounded sparse MPY-local
+  styles, and layout;
 - Geometry Result;
 - active subscription metadata without Python callable pointers;
 - unsupported/redacted markers; and
@@ -1115,6 +1247,12 @@ the traversal. `SnapshotEnd`, staleness, Stage teardown, or Endpoint Epoch
 replacement releases the cursor. Larger profiles may retain immutable snapshot
 material, but they MUST preserve the same ordering and visible semantics.
 
+The in-process sparse-style projection in §5.13 uses a separate per-record
+value bound because no snapshot wire is frozen yet. Allocation failure does not
+advance traversal. Successful bounded reads do advance even when the style
+prefix is empty, because `total_style_values` and `styles_truncated` make that
+omission explicit.
+
 ## 9. Frozen Decisions — Invariants
 
 | Invariant | Normative statement | Verification surface |
@@ -1125,6 +1263,9 @@ material, but they MUST preserve the same ordering and visible semantics.
 | **INV-MPY-04-4** | Mutation Effects and actual geometry changes MUST produce deterministic invalidation covering old and new visual extents. | Dirty-region geometry fixtures. |
 | **INV-MPY-04-5** | A snapshot MUST be deterministic at one Stage Revision and MUST explicitly fail or mark truncation rather than mix revisions or omit data silently. | Byte-stable snapshot, paging, mutation-race, and capacity tests. |
 | **INV-MPY-04-6** | Tree commands MUST preserve one-parent/root ownership, cycle rejection, child policy, and unaffected actor identities. | Model-based reparent/reorder/root/delete tests. |
+| **INV-MPY-04-STYLE-6** | SetLocalStyle MUST have one canonical set/remove spelling, prepare all grouped storage before publication, and produce no operation result. | Wire malformed/limit corpus plus stable/earlier target atomic tests. |
+| **INV-MPY-04-STYLE-7** | Style discovery MUST expose bounded borrowed registries/applicability without expanding a selector/property Cartesian product. | Catalog negative matrix and exact five-actor bound tests. |
+| **INV-MPY-04-STYLE-8** | Snapshot style projection MUST contain only sparse MPY-local values in selector/property order and MUST report bounded-prefix truncation explicitly. | Tier-exclusion, zero/partial/full budget, allocation retry, and stale-cursor tests. |
 
 ## 10. Reconciliation Decisions
 
@@ -1224,8 +1365,20 @@ material, but they MUST preserve the same ordering and visible semantics.
 - **PCDN-MPY-04-014 — Closed by owner acceptance 2026-08-19:** §5.11 freezes
   the stable twenty-property local-style registry, exact named/custom part and
   state-mask applicability, sparse per-selector MPY storage, cascade parity,
-  and allocation-free guarded commit with deferred release. The opcode, wire,
-  Stage/Endpoint path, binding, and broader style integration remain 04-015.
+  and allocation-free guarded commit with deferred release.
+- **PCDN-MPY-04-015 — Closed by owner acceptance 2026-08-19:** §5.12 freezes
+  SetLocalStyle as the common target plus three raw selector/property words and
+  one optional canonical value, with empty value bytes as the sole Remove
+  spelling. It requires complete structure and negotiated value limits before
+  target/selector/property/type/range/capacity semantics, admits stable and
+  earlier-created targets, produces no operation record, and commits grouped
+  style storage under one Stage Revision without heap activity.
+- **PCDN-MPY-04-016 — Closed by owner acceptance 2026-08-19:** §5.13 freezes
+  borrowed named-part/state/property registries, actor applicability rows and
+  exact selector/value bounds, plus bounded sparse MPY-local snapshot records
+  with total counts, deterministic prefix order, explicit truncation,
+  allocation retry, and revision staleness. No discovery or snapshot wire is
+  inferred.
 
 ## 12. Acceptance Checklist
 
@@ -1235,7 +1388,7 @@ material, but they MUST preserve the same ordering and visible semantics.
 - [x] `INV-MPY-04-4` invalidation ownership is accepted.
 - [x] `INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted.
 - [x] `INV-MPY-04-6` tree-command integrity is accepted.
-- [x] PCDN-MPY-04-001 through PCDN-MPY-04-014 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
+- [x] PCDN-MPY-04-001 through PCDN-MPY-04-016 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`.
 
 ## 13. Files Cited
 
@@ -1257,13 +1410,13 @@ material, but they MUST preserve the same ordering and visible semantics.
 The common mutation-target envelope plus exact Delete, Reorder, Reparent,
 PromoteRoot, SetFlag, SetProperties, ResetProperties, and the outputless
 Transactional InvokeAction slice, plus exact SetRequestedLayout request/echo,
-and the local-style registry/storage prerequisite now unblock the remaining
-operation-specific payload/result PCDNs and Endpoint orchestration without
-authorizing guessed remainder, computed-geometry, local-style opcode, or
-deferred/result-bearing action schemas. After those codecs and endpoint
-integration are implemented, MPY-04 provides the complete stage mutation/
-introspection surface consumed by MPY-06 and the deterministic snapshot oracle
-consumed by MPY-07/09.
+complete SetLocalStyle request/storage semantics, and bounded style
+discovery/snapshot projection now unblock Endpoint orchestration without
+authorizing a guessed snapshot/discovery wire, computed-geometry mutation, or
+deferred/result-bearing action schema. After Endpoint and binding integration
+are implemented, MPY-04 provides the complete stage mutation/introspection
+surface consumed by MPY-06 and the deterministic snapshot oracle consumed by
+MPY-07/09.
 
 ## 15. Change Log
 
@@ -1631,7 +1784,7 @@ column-track, row-track, and outer-frame limits retain the conservative profile.
 **Touches:** PCDN-MPY-04-014, INV-MPY-04-STYLE-1 through
 INV-MPY-04-STYLE-5, §0, §5, §11–§15
 
-**Commits:** pending
+**Commits:** `03bb821`
 
 **Summary:** Freezes twenty stable global style-property rows, exact named and
 actor-scoped custom part selectors, registered state-mask applicability, and
@@ -1650,3 +1803,58 @@ state. Completing allocation and conversion before an infallible vector swap
 makes the prerequisite composable with the existing Stage Safe Turn without
 claiming that opcode, Stage, Endpoint, result, snapshot, or binding integration
 already exists.
+
+### 0.14.0 — 2026-08-19 — SetLocalStyle wire and Stage semantics ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic and protocol implementation
+
+**Touches:** PCDN-MPY-04-015, INV-MPY-04-3,
+INV-MPY-04-STYLE-1 through INV-MPY-04-STYLE-6, §0, §5, §8–§15
+
+**Commits:** pending
+
+**Summary:** Freezes SetLocalStyle as a contextual target, exact part/state/
+property words, and one optional canonical value whose absence alone means
+Remove. Adds allocation-free structural and negotiated value-limit codecs,
+outputless result validation, stable and BatchObject vectors, exact 15/21-byte
+payload and 254-byte minimum-frame evidence, and grouped atomic Stage
+preparation/commit/release for stable and earlier-created actors.
+
+#### Rationale
+
+An absent trailing value gives removal one byte-minimal canonical spelling
+without extending the closed ValueTag registry or confusing explicit numeric
+zero with absence. Grouping every actor's submitted style operations into one
+prepared replacement preserves deterministic last-write-wins semantics and
+lets the Stage guard validate private storage freshness before any direction
+becomes visible. Outputless success uses the common Batch revision while
+property effects retain deterministic invalidation.
+
+### 0.15.0 — 2026-08-19 — Bounded style discovery and snapshot projection ratified
+
+**Author:** Ira Abbott with OpenAI Codex implementation evidence
+
+**Change kind:** semantic introspection and implementation
+
+**Touches:** PCDN-MPY-04-016, INV-MPY-04-5,
+INV-MPY-04-STYLE-1 through INV-MPY-04-STYLE-8, §0, §5, §8–§15
+
+**Commits:** pending
+
+**Summary:** Adds borrowed global named-part, state, and property registries;
+stable actor applicability rows; exact maximum selector/value bounds; and a
+flat bounded sparse-style snapshot prefix with total/truncation metadata.
+Snapshot evidence covers property ordering, selector registration order,
+explicit zero, tier exclusion, zero/partial/full budgets, allocation retry,
+and Stage-revision staleness.
+
+#### Rationale
+
+Borrowing compact descriptor rows gives bindings enough information to plan
+bounded storage without materializing every possible selector/property pair.
+Projecting only durable MPY-local sparse state makes snapshots deterministic
+and rebuild-oriented while excluding native/theme/transition implementation
+details. Explicit total and truncation fields make a zero budget truthful, and
+delaying cursor advancement until allocation succeeds preserves retry safety.

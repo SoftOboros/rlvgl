@@ -20,8 +20,8 @@ use crate::{
     direction::{
         ActorDirection, BatchCreateDestination, BatchObjectReference, BatchStageDirection,
         GeometryResult, GeometryRole, OwnedValue, RequestedLayout, RuntimeFlag, SnapshotError,
-        SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotToken, StageDirection,
-        StageRevision,
+        SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotStyleValue, SnapshotToken,
+        StageDirection, StageRevision,
     },
     layout::{
         Dimension, EngineConfig, FlexAlign, FlexFlow, GridAlign, GridTrack, LayoutRole, LayoutState,
@@ -32,10 +32,11 @@ use crate::{
         ObjectStates, ResolvedObjectDispatch, resolve_object_dispatch,
     },
     style_cascade::{
-        MpyStyleStorageError, MpyStyleUpdate, Part, PreparedMpyStyleMutation, Selector,
-        StyleProperty, StyleState,
+        CommittedMpyStyleMutation, MpyStyleStorageError, MpyStyleUpdate, Part,
+        PreparedMpyStyleMutation, Selector, StyleProperty, StylePropertyValue, StyleState,
+        TextAlign,
     },
-    widget::{Rect, Widget},
+    widget::{Color, Rect, Widget},
 };
 
 /// Stable nonzero Stage identifier within one endpoint epoch.
@@ -1850,11 +1851,31 @@ pub struct StylePropertyDescriptor {
     pub effects: MutationEffects,
 }
 
+/// One globally registered named style part.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StylePartIdentity {
+    /// Stable native part identifier.
+    pub id: u32,
+    /// Stable source-level name.
+    pub name: &'static str,
+}
+
+/// One globally registered style-state identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StyleStateIdentity {
+    /// Exact state bit, or zero for the DEFAULT selector.
+    pub mask: u32,
+    /// Stable source-level name.
+    pub name: &'static str,
+}
+
 /// Actor-local applicability for one exact style part.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StylePartDescriptor {
     /// Named or actor-scoped custom part.
     pub part: Part,
+    /// Stable actor-visible part name.
+    pub name: &'static str,
     /// State bits that may appear in an exact selector for this part.
     pub allowed_states: ObjectStates,
     /// Globally registered properties applicable to this part.
@@ -1886,6 +1907,81 @@ pub const STYLE_TEXT_ALIGN_DOMAIN_ID: u32 = 1;
 
 /// Canonical text-alignment enum values: Left, Center, Right, Auto.
 pub const STYLE_TEXT_ALIGN_VALUES: [u32; 4] = [0, 1, 2, 3];
+
+/// Stable global named-part registry.
+pub const STYLE_PARTS: [StylePartIdentity; 7] = [
+    StylePartIdentity {
+        id: Part::MAIN.0,
+        name: "main",
+    },
+    StylePartIdentity {
+        id: Part::SCROLLBAR.0,
+        name: "scrollbar",
+    },
+    StylePartIdentity {
+        id: Part::INDICATOR.0,
+        name: "indicator",
+    },
+    StylePartIdentity {
+        id: Part::KNOB.0,
+        name: "knob",
+    },
+    StylePartIdentity {
+        id: Part::SELECTED.0,
+        name: "selected",
+    },
+    StylePartIdentity {
+        id: Part::ITEMS.0,
+        name: "items",
+    },
+    StylePartIdentity {
+        id: Part::CURSOR.0,
+        name: "cursor",
+    },
+];
+
+/// Stable global state registry, including the exact DEFAULT selector.
+pub const STYLE_STATES: [StyleStateIdentity; 6] = [
+    StyleStateIdentity {
+        mask: ObjectStates::DEFAULT.bits(),
+        name: "default",
+    },
+    StyleStateIdentity {
+        mask: ObjectStates::DISABLED.bits(),
+        name: "disabled",
+    },
+    StyleStateIdentity {
+        mask: ObjectStates::FOCUSED.bits(),
+        name: "focused",
+    },
+    StyleStateIdentity {
+        mask: ObjectStates::PRESSED.bits(),
+        name: "pressed",
+    },
+    StyleStateIdentity {
+        mask: ObjectStates::CHECKED.bits(),
+        name: "checked",
+    },
+    StyleStateIdentity {
+        mask: ObjectStates::EDITED.bits(),
+        name: "edited",
+    },
+];
+
+/// Borrow the stable global named-part registry.
+pub const fn style_part_registry() -> &'static [StylePartIdentity] {
+    &STYLE_PARTS
+}
+
+/// Borrow the stable global state registry.
+pub const fn style_state_registry() -> &'static [StyleStateIdentity] {
+    &STYLE_STATES
+}
+
+/// Borrow the stable global style-property registry.
+pub const fn style_property_registry() -> &'static [StylePropertyDescriptor] {
+    &STYLE_PROPERTIES
+}
 
 const STYLE_DRAW_SNAPSHOT: MutationEffects = MutationEffects::DRAW.union(MutationEffects::SNAPSHOT);
 const STYLE_LAYOUT_EFFECTS: MutationEffects = MutationEffects::DRAW
@@ -2119,6 +2215,7 @@ const fn style_property(
 /// MAIN-part profile for non-control proof actors.
 pub const MPY_BASIC_STYLE_PARTS: [StylePartDescriptor; 1] = [StylePartDescriptor {
     part: Part::MAIN,
+    name: "main",
     allowed_states: ObjectStates::DISABLED,
     properties: &STYLE_PROPERTIES,
 }];
@@ -2126,6 +2223,7 @@ pub const MPY_BASIC_STYLE_PARTS: [StylePartDescriptor; 1] = [StylePartDescriptor
 /// MAIN-part profile for proof actors carrying control state.
 pub const MPY_CONTROL_STYLE_PARTS: [StylePartDescriptor; 1] = [StylePartDescriptor {
     part: Part::MAIN,
+    name: "main",
     allowed_states: ObjectStates::DISABLED
         .union(ObjectStates::FOCUSED)
         .union(ObjectStates::PRESSED)
@@ -2212,6 +2310,22 @@ impl TypeDescriptor {
         self.styles.iter().fold(0usize, |total, part| {
             total.saturating_add(1usize << part.allowed_states.bits().count_ones())
         })
+    }
+
+    /// Return the exact maximum number of sparse MPY style values.
+    ///
+    /// The bound is derived without materializing the selector/property
+    /// Cartesian product exposed by the actor applicability rows.
+    pub fn maximum_style_values(&self) -> usize {
+        self.styles.iter().fold(0usize, |total, part| {
+            let selectors = 1usize << part.allowed_states.bits().count_ones();
+            total.saturating_add(selectors.saturating_mul(part.properties.len()))
+        })
+    }
+
+    /// Borrow actor-local style applicability rows without expansion.
+    pub const fn style_applicability(&self) -> &'static [StylePartDescriptor] {
+        self.styles
     }
 
     /// Validate actor applicability and prepare one exact local-style update.
@@ -2302,6 +2416,10 @@ pub enum CapacityKind {
     NativeEventPublications,
     /// Retained output mappings for successful Create operations.
     ResultOutputs,
+    /// Exact MPY-owned local-style selector storage.
+    StyleSelectors,
+    /// Bounded deterministic snapshot projection storage.
+    SnapshotValues,
 }
 
 /// Stage Registry or actor-construction failure.
@@ -2562,6 +2680,26 @@ enum PreparedStageOperation {
     Create(usize),
 }
 
+struct PendingStyleGroup {
+    object_id: ObjectId,
+    create_index: Option<usize>,
+    updates: Vec<(Selector, StyleProperty, MpyStyleUpdate)>,
+}
+
+enum PreparedStageStyleMutation {
+    Existing {
+        object_id: ObjectId,
+        mutation: Option<PreparedMpyStyleMutation>,
+    },
+    Install {
+        object_id: ObjectId,
+        state: Option<Box<StyleState>>,
+    },
+    AbsentNoop {
+        object_id: ObjectId,
+    },
+}
+
 /// Fully validated and allocation-reserved Stage transaction.
 ///
 /// This value is tied to the Stage Revision observed by
@@ -2578,6 +2716,8 @@ pub struct PreparedStageBatch {
     requested_layout_outputs: Vec<RequestedLayoutOutput>,
     actor_groups: Vec<PreparedActorGroup>,
     layout_mutations: Vec<PreparedLayoutMutation>,
+    style_mutations: Vec<PreparedStageStyleMutation>,
+    committed_style_mutations: Vec<CommittedMpyStyleMutation>,
     final_usage: RegistryUsage,
     before_geometry: Vec<(ObjectId, Rect)>,
     geometry_scratch: Vec<(ObjectId, Rect)>,
@@ -3662,6 +3802,26 @@ impl StageRegistry {
         if let Err(cause) = self.preflight_after_geometry_borrows(&prepared) {
             return Err(reject(cause, prepared));
         }
+        for style in &prepared.style_mutations {
+            let current = match style {
+                PreparedStageStyleMutation::Existing {
+                    object_id,
+                    mutation: Some(mutation),
+                } => self
+                    .node(*object_id)
+                    .ok()
+                    .and_then(|node| node.style.as_deref())
+                    .is_some_and(|state| state.prepared_mpy_local_update_is_current(mutation)),
+                PreparedStageStyleMutation::Existing { mutation: None, .. } => false,
+                PreparedStageStyleMutation::Install { object_id, .. }
+                | PreparedStageStyleMutation::AbsentNoop { object_id } => {
+                    self.node(*object_id).is_ok_and(|node| node.style.is_none())
+                }
+            };
+            if !current {
+                return Err(reject(RegistryError::DispatchBusy, prepared));
+            }
+        }
         prepared.geometry_scratch.clear();
 
         for group in &mut prepared.actor_groups {
@@ -3675,6 +3835,41 @@ impl StageRegistry {
                     .as_mut()
                     .expect("prepared actor remains live until its tree direction")
                     .text_bytes = group.final_text_bytes;
+            }
+        }
+        for style in &mut prepared.style_mutations {
+            match style {
+                PreparedStageStyleMutation::Existing {
+                    object_id,
+                    mutation,
+                } => {
+                    let mutation = mutation
+                        .take()
+                        .expect("prepared style mutation passed the final freshness guard");
+                    let committed = self
+                        .node_mut(*object_id)
+                        .expect("prepared style target remains live")
+                        .style
+                        .as_deref_mut()
+                        .expect("prepared style storage remains installed")
+                        .commit_mpy_local_update(mutation)
+                        .expect("prepared style mutation passed the final freshness guard");
+                    debug_assert!(
+                        prepared.committed_style_mutations.len()
+                            < prepared.committed_style_mutations.capacity()
+                    );
+                    prepared.committed_style_mutations.push(committed);
+                }
+                PreparedStageStyleMutation::Install { object_id, state } => {
+                    self.node_mut(*object_id)
+                        .expect("prepared style target remains live")
+                        .style = Some(
+                        state
+                            .take()
+                            .expect("prepared style installation retains owned state"),
+                    );
+                }
+                PreparedStageStyleMutation::AbsentNoop { .. } => {}
             }
         }
 
@@ -3738,9 +3933,8 @@ impl StageRegistry {
                     prepared.delete_groups[delete_index] = ids;
                     delete_index += 1;
                 }
-                StageDirection::MutateActor { .. } => {}
-                StageDirection::SetComputedGeometry { .. }
-                | StageDirection::SetLocalStyle { .. } => {
+                StageDirection::MutateActor { .. } | StageDirection::SetLocalStyle { .. } => {}
+                StageDirection::SetComputedGeometry { .. } => {
                     unreachable!("unsupported directions cannot survive preparation")
                 }
             }
@@ -3865,6 +4059,7 @@ impl StageRegistry {
         let mut touched = Vec::new();
         let mut layout_mutations = Vec::new();
         let mut layout_presence: Vec<(ObjectId, bool, Option<Rect>)> = Vec::new();
+        let mut style_groups = Vec::new();
 
         for direction in &directions {
             match direction {
@@ -3946,10 +4141,30 @@ impl StageRegistry {
                     self.record(*object_id)?;
                     return Err(RegistryError::ReadOnly);
                 }
-                StageDirection::SetLocalStyle { object_id, .. } => {
+                StageDirection::SetLocalStyle {
+                    object_id,
+                    part_id,
+                    state_mask,
+                    property_id,
+                    value,
+                } => {
                     tree_shadow.actor(*object_id)?;
-                    self.record(*object_id)?;
-                    return Err(RegistryError::Unsupported);
+                    let descriptor = self.record(*object_id)?.descriptor;
+                    let (selector, property, update) = validate_style_direction(
+                        descriptor,
+                        *part_id,
+                        *state_mask,
+                        *property_id,
+                        value,
+                    )?;
+                    push_pending_style_update(
+                        &mut style_groups,
+                        *object_id,
+                        None,
+                        (selector, property.storage, update),
+                    )?;
+                    effects = effects.union(property.effects);
+                    push_unique(&mut touched, *object_id);
                 }
                 _ => {
                     tree_shadow.apply(self, direction)?;
@@ -3984,6 +4199,8 @@ impl StageRegistry {
                 final_text_bytes,
             });
         }
+        let (style_mutations, committed_style_mutations) =
+            self.prepare_style_groups(style_groups, &mut [])?;
         let final_text = i64::from(self.usage.text_bytes)
             .checked_add(total_text_delta)
             .filter(|total| *total >= 0 && *total <= i64::from(self.limits.max_text_bytes))
@@ -4071,6 +4288,8 @@ impl StageRegistry {
             requested_layout_outputs: Vec::new(),
             actor_groups: prepared,
             layout_mutations,
+            style_mutations,
+            committed_style_mutations,
             final_usage,
             before_geometry,
             geometry_scratch,
@@ -4130,6 +4349,7 @@ impl StageRegistry {
         let mut touched = Vec::new();
         let mut layout_mutations = Vec::new();
         let mut layout_presence: Vec<(ObjectId, bool, Option<Rect>)> = Vec::new();
+        let mut style_groups = Vec::new();
 
         for (operation_index, direction) in directions.into_iter().enumerate() {
             let operation_index =
@@ -4360,9 +4580,32 @@ impl StageRegistry {
                     tree_shadow.actor(*object_id)?;
                     return Err(RegistryError::ReadOnly);
                 }
-                StageDirection::SetLocalStyle { object_id, .. } => {
-                    tree_shadow.actor(*object_id)?;
-                    return Err(RegistryError::Unsupported);
+                StageDirection::SetLocalStyle {
+                    object_id,
+                    part_id,
+                    state_mask,
+                    property_id,
+                    value,
+                } => {
+                    let descriptor = tree_shadow.actor(*object_id)?.descriptor;
+                    let (selector, property, update) = validate_style_direction(
+                        descriptor,
+                        *part_id,
+                        *state_mask,
+                        *property_id,
+                        value,
+                    )?;
+                    let create_index = bindings.iter().find_map(|(_, candidate, index)| {
+                        (*candidate == *object_id).then_some(*index)
+                    });
+                    push_pending_style_update(
+                        &mut style_groups,
+                        *object_id,
+                        create_index,
+                        (selector, property.storage, update),
+                    )?;
+                    effects = effects.union(property.effects);
+                    push_unique(&mut touched, *object_id);
                 }
                 _ => {
                     let deleted_start = tree_shadow.deleted_object_ids.len();
@@ -4426,6 +4669,8 @@ impl StageRegistry {
                 final_text_bytes,
             });
         }
+        let (style_mutations, committed_style_mutations) =
+            self.prepare_style_groups(style_groups, &mut creates)?;
         for create in &creates {
             let durable_text = create
                 .text_bytes
@@ -4540,6 +4785,8 @@ impl StageRegistry {
             requested_layout_outputs,
             actor_groups: prepared_actor_groups,
             layout_mutations,
+            style_mutations,
+            committed_style_mutations,
             final_usage,
             before_geometry,
             geometry_scratch,
@@ -4575,6 +4822,8 @@ impl StageRegistry {
             requested_layout_outputs: Vec::new(),
             actor_groups: Vec::new(),
             layout_mutations: Vec::new(),
+            style_mutations: Vec::new(),
+            committed_style_mutations: Vec::new(),
             final_usage: RegistryUsage::default(),
             before_geometry: Vec::new(),
             geometry_scratch: Vec::new(),
@@ -4799,6 +5048,21 @@ impl StageRegistry {
         max_records: usize,
         max_text_bytes_per_record: usize,
     ) -> Result<SnapshotPage, SnapshotError> {
+        self.snapshot_read_with_style_limit(token, max_records, max_text_bytes_per_record, 0)
+    }
+
+    /// Read a bounded deterministic snapshot page including sparse MPY styles.
+    ///
+    /// `max_style_values_per_record` bounds only the returned style prefix;
+    /// zero is valid and preserves the legacy snapshot surface. The cursor is
+    /// advanced only after every record and retained style value is prepared.
+    pub fn snapshot_read_with_style_limit(
+        &mut self,
+        token: SnapshotToken,
+        max_records: usize,
+        max_text_bytes_per_record: usize,
+        max_style_values_per_record: usize,
+    ) -> Result<SnapshotPage, SnapshotError> {
         if max_records == 0 {
             return Err(SnapshotError::InvalidLimit);
         }
@@ -4813,7 +5077,14 @@ impl StageRegistry {
                 current: self.revision,
             });
         }
-        let mut traversal = Vec::with_capacity(self.usage.actors);
+        let mut traversal = Vec::new();
+        traversal
+            .try_reserve_exact(self.usage.actors)
+            .map_err(|_| {
+                SnapshotError::Registry(RegistryError::Capacity {
+                    kind: CapacityKind::SnapshotValues,
+                })
+            })?;
         for root in &self.roots {
             collect_preorder_ids(&root.node, &mut traversal).map_err(SnapshotError::Registry)?;
         }
@@ -4821,11 +5092,22 @@ impl StageRegistry {
             .position
             .saturating_add(max_records)
             .min(traversal.len());
-        let mut records = Vec::with_capacity(end.saturating_sub(cursor.position));
+        let mut records = Vec::new();
+        records
+            .try_reserve_exact(end.saturating_sub(cursor.position))
+            .map_err(|_| {
+                SnapshotError::Registry(RegistryError::Capacity {
+                    kind: CapacityKind::SnapshotValues,
+                })
+            })?;
         for object_id in &traversal[cursor.position..end] {
             records.push(
-                self.snapshot_record(*object_id, max_text_bytes_per_record)
-                    .map_err(SnapshotError::Registry)?,
+                self.snapshot_record(
+                    *object_id,
+                    max_text_bytes_per_record,
+                    max_style_values_per_record,
+                )
+                .map_err(SnapshotError::Registry)?,
             );
         }
         let ended = end == traversal.len();
@@ -5204,6 +5486,114 @@ impl StageRegistry {
         validate_requested_layout_descriptor(self.record(object_id)?.descriptor, layout)
     }
 
+    fn prepare_style_groups(
+        &self,
+        groups: Vec<PendingStyleGroup>,
+        creates: &mut [PreparedCreate],
+    ) -> Result<
+        (
+            Vec<PreparedStageStyleMutation>,
+            Vec<CommittedMpyStyleMutation>,
+        ),
+        RegistryError,
+    > {
+        let mut prepared_groups = Vec::new();
+        prepared_groups
+            .try_reserve_exact(groups.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::StyleSelectors,
+            })?;
+        for group in groups {
+            if let Some(create_index) = group.create_index {
+                let create = creates
+                    .get_mut(create_index)
+                    .ok_or(RegistryError::Internal)?;
+                let node = &mut create
+                    .constructed
+                    .as_mut()
+                    .ok_or(RegistryError::Internal)?
+                    .node;
+                if let Some(state) = node.style.as_deref_mut() {
+                    let mutation = state
+                        .prepare_mpy_local_updates(
+                            &group.updates,
+                            create.descriptor.maximum_style_selectors(),
+                        )
+                        .map_err(map_style_storage_error)?;
+                    let committed = state
+                        .commit_mpy_local_update(mutation)
+                        .map_err(|error| map_style_storage_error(error.cause()))?;
+                    state.release_mpy_local_update(committed);
+                } else {
+                    let mut state = Box::new(StyleState::new());
+                    let mutation = state
+                        .prepare_mpy_local_updates(
+                            &group.updates,
+                            create.descriptor.maximum_style_selectors(),
+                        )
+                        .map_err(map_style_storage_error)?;
+                    if mutation.changed() {
+                        let committed = state
+                            .commit_mpy_local_update(mutation)
+                            .map_err(|error| map_style_storage_error(error.cause()))?;
+                        state.release_mpy_local_update(committed);
+                        node.style = Some(state);
+                    } else {
+                        state.release_prepared_mpy_local_update(mutation);
+                    }
+                }
+                continue;
+            }
+
+            let descriptor = self.record(group.object_id)?.descriptor;
+            match self.node(group.object_id)?.style.as_deref() {
+                Some(state) => {
+                    let mutation = state
+                        .prepare_mpy_local_updates(
+                            &group.updates,
+                            descriptor.maximum_style_selectors(),
+                        )
+                        .map_err(map_style_storage_error)?;
+                    prepared_groups.push(PreparedStageStyleMutation::Existing {
+                        object_id: group.object_id,
+                        mutation: Some(mutation),
+                    });
+                }
+                None => {
+                    let mut state = Box::new(StyleState::new());
+                    let mutation = state
+                        .prepare_mpy_local_updates(
+                            &group.updates,
+                            descriptor.maximum_style_selectors(),
+                        )
+                        .map_err(map_style_storage_error)?;
+                    if mutation.changed() {
+                        let committed = state
+                            .commit_mpy_local_update(mutation)
+                            .map_err(|error| map_style_storage_error(error.cause()))?;
+                        state.release_mpy_local_update(committed);
+                        prepared_groups.push(PreparedStageStyleMutation::Install {
+                            object_id: group.object_id,
+                            state: Some(state),
+                        });
+                    } else {
+                        state.release_prepared_mpy_local_update(mutation);
+                        prepared_groups.push(PreparedStageStyleMutation::AbsentNoop {
+                            object_id: group.object_id,
+                        });
+                    }
+                }
+            }
+        }
+        let mut committed = Vec::new();
+        committed
+            .try_reserve_exact(prepared_groups.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::StyleSelectors,
+            })?;
+        Ok((prepared_groups, committed))
+    }
+
     fn reserve_prepared_capacity(
         &mut self,
         prepared: &mut PreparedStageBatch,
@@ -5485,12 +5875,18 @@ impl StageRegistry {
         &self,
         object_id: ObjectId,
         max_text_bytes: usize,
+        max_style_values: usize,
     ) -> Result<SnapshotRecord, RegistryError> {
         let record = self.record(object_id)?;
         let node = self.node(object_id)?;
         let mut text_bytes = 0usize;
         let mut truncated = false;
-        let mut properties = Vec::with_capacity(record.descriptor.properties.len());
+        let mut properties = Vec::new();
+        properties
+            .try_reserve_exact(record.descriptor.properties.len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::SnapshotValues,
+            })?;
         for descriptor in record.descriptor.properties {
             let value =
                 validate_property_readback(descriptor, record.ops.property(descriptor.id)?)?;
@@ -5511,14 +5907,89 @@ impl StageRegistry {
                 });
             }
         }
+        let total_style_values = node.style.as_deref().map_or(0usize, |state| {
+            state
+                .mpy_local_entries()
+                .iter()
+                .map(|(_, patch)| {
+                    STYLE_PROPERTIES
+                        .iter()
+                        .filter(|property| patch.property(property.storage).is_some())
+                        .count()
+                })
+                .sum()
+        });
+        let mut styles = Vec::new();
+        styles
+            .try_reserve_exact(total_style_values.min(max_style_values))
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::SnapshotValues,
+            })?;
+        if let Some(state) = node.style.as_deref() {
+            'selectors: for (selector, patch) in state.mpy_local_entries() {
+                for property in &STYLE_PROPERTIES {
+                    let Some(value) = patch.property(property.storage) else {
+                        continue;
+                    };
+                    if styles.len() == max_style_values {
+                        break 'selectors;
+                    }
+                    styles.push(SnapshotStyleValue {
+                        part_id: selector.part.0,
+                        state_mask: selector.states.bits(),
+                        property_id: property.id,
+                        value: owned_style_value(value),
+                    });
+                }
+            }
+        }
+        let styles_truncated = styles.len() < total_style_values;
+        truncated |= styles_truncated;
+        let mut children = Vec::new();
+        children
+            .try_reserve_exact(node.children().len())
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::SnapshotValues,
+            })?;
+        for child in node.children() {
+            children.push(
+                child
+                    .actor_identity()
+                    .map(|identity| identity.object_id)
+                    .ok_or(RegistryError::Internal)?,
+            );
+        }
+        let position = if let Some(parent) = record.parent {
+            self.node(parent)?
+                .children()
+                .iter()
+                .position(|child| {
+                    child
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .ok_or(RegistryError::Internal)?
+        } else {
+            self.roots
+                .iter()
+                .position(|root| {
+                    root.node
+                        .actor_identity()
+                        .is_some_and(|identity| identity.object_id == object_id)
+                })
+                .ok_or(RegistryError::Internal)?
+        };
         Ok(SnapshotRecord {
             object_id,
             type_id: record.descriptor.type_id,
             stable_type_name: record.descriptor.stable_name,
             parent: record.parent,
-            position: self.position(object_id)?,
-            children: self.children(object_id)?,
+            position,
+            children,
             properties,
+            styles,
+            total_style_values,
+            styles_truncated,
             flags: node.flags().bits(),
             states: node.states().bits(),
             requested_layout: RequestedLayout::from_role(&node.requested_layout_role()),
@@ -5703,6 +6174,156 @@ fn validate_requested_layout_descriptor(
     Ok(())
 }
 
+fn validate_style_direction(
+    descriptor: &TypeDescriptor,
+    part_id: u32,
+    state_mask: u32,
+    property_id: u32,
+    value: &OwnedValue,
+) -> Result<(Selector, &'static StylePropertyDescriptor, MpyStyleUpdate), RegistryError> {
+    let property = descriptor
+        .style_property_for_raw_selector(part_id, state_mask, property_id)
+        .map_err(|error| match error {
+            StyleApplicabilityError::UnknownProperty
+                if !STYLE_PROPERTIES
+                    .iter()
+                    .any(|property| property.id == property_id) =>
+            {
+                RegistryError::UnknownProperty { property_id }
+            }
+            StyleApplicabilityError::UnknownProperty
+            | StyleApplicabilityError::UnknownPart
+            | StyleApplicabilityError::InvalidStateMask => RegistryError::Unsupported,
+        })?;
+    let states = ObjectStates::from_bits(state_mask).ok_or(RegistryError::Unsupported)?;
+    let selector = Selector::new(Part(part_id), states);
+    if matches!(value, OwnedValue::None) {
+        return Ok((selector, property, MpyStyleUpdate::Remove));
+    }
+    let actual = value.tag();
+    if actual != property.value_tag {
+        return Err(RegistryError::TypeMismatch {
+            field_id: property_id,
+            expected: property.value_tag,
+            actual,
+        });
+    }
+    let typed = match value {
+        OwnedValue::Color(value) => StylePropertyValue::Color(Color(
+            ((value >> 16) & 0xff) as u8,
+            ((value >> 8) & 0xff) as u8,
+            (value & 0xff) as u8,
+            ((value >> 24) & 0xff) as u8,
+        )),
+        OwnedValue::U32(value) => StylePropertyValue::U32(*value),
+        OwnedValue::I32(value) => StylePropertyValue::I32(*value),
+        OwnedValue::Enum { domain, value } => {
+            let StyleValueConstraint::Enum { domain_id, values } = property.constraint else {
+                return Err(RegistryError::Internal);
+            };
+            if *domain != domain_id || !values.contains(value) {
+                return Err(RegistryError::Range {
+                    field_id: property_id,
+                });
+            }
+            StylePropertyValue::TextAlign(match value {
+                0 => TextAlign::Left,
+                1 => TextAlign::Center,
+                2 => TextAlign::Right,
+                3 => TextAlign::Auto,
+                _ => {
+                    return Err(RegistryError::Range {
+                        field_id: property_id,
+                    });
+                }
+            })
+        }
+        _ => return Err(RegistryError::Internal),
+    };
+    let in_range = match (property.constraint, typed) {
+        (StyleValueConstraint::None, StylePropertyValue::Color(_)) => true,
+        (StyleValueConstraint::U32 { min, max }, StylePropertyValue::U32(value)) => {
+            value >= min && value <= max
+        }
+        (StyleValueConstraint::I32 { min, max }, StylePropertyValue::I32(value)) => {
+            value >= min && value <= max
+        }
+        (StyleValueConstraint::Enum { .. }, StylePropertyValue::TextAlign(_)) => true,
+        _ => false,
+    };
+    if !in_range {
+        return Err(RegistryError::Range {
+            field_id: property_id,
+        });
+    }
+    Ok((selector, property, MpyStyleUpdate::Set(typed)))
+}
+
+fn owned_style_value(value: StylePropertyValue) -> OwnedValue {
+    match value {
+        StylePropertyValue::Color(value) => OwnedValue::Color(value.to_argb8888()),
+        StylePropertyValue::U32(value) => OwnedValue::U32(value),
+        StylePropertyValue::I32(value) => OwnedValue::I32(value),
+        StylePropertyValue::TextAlign(value) => OwnedValue::Enum {
+            domain: STYLE_TEXT_ALIGN_DOMAIN_ID,
+            value: match value {
+                TextAlign::Left => 0,
+                TextAlign::Center => 1,
+                TextAlign::Right => 2,
+                TextAlign::Auto => 3,
+            },
+        },
+    }
+}
+
+fn push_pending_style_update(
+    groups: &mut Vec<PendingStyleGroup>,
+    object_id: ObjectId,
+    create_index: Option<usize>,
+    update: (Selector, StyleProperty, MpyStyleUpdate),
+) -> Result<(), RegistryError> {
+    if let Some(group) = groups.iter_mut().find(|group| group.object_id == object_id) {
+        group
+            .updates
+            .try_reserve_exact(1)
+            .map_err(|_| RegistryError::Capacity {
+                kind: CapacityKind::StyleSelectors,
+            })?;
+        group.updates.push(update);
+        return Ok(());
+    }
+    groups
+        .try_reserve_exact(1)
+        .map_err(|_| RegistryError::Capacity {
+            kind: CapacityKind::StyleSelectors,
+        })?;
+    let mut updates = Vec::new();
+    updates
+        .try_reserve_exact(1)
+        .map_err(|_| RegistryError::Capacity {
+            kind: CapacityKind::StyleSelectors,
+        })?;
+    updates.push(update);
+    groups.push(PendingStyleGroup {
+        object_id,
+        create_index,
+        updates,
+    });
+    Ok(())
+}
+
+fn map_style_storage_error(error: MpyStyleStorageError) -> RegistryError {
+    match error {
+        MpyStyleStorageError::Capacity => RegistryError::Capacity {
+            kind: CapacityKind::StyleSelectors,
+        },
+        MpyStyleStorageError::Stale => RegistryError::DispatchBusy,
+        MpyStyleStorageError::TypeMismatch
+        | MpyStyleStorageError::Range
+        | MpyStyleStorageError::RevisionExhausted => RegistryError::Internal,
+    }
+}
+
 fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
     if catalog.is_empty() || !style_registry_is_valid() {
         return Err(RegistryError::InvalidCatalog);
@@ -5791,19 +6412,27 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
             }
         }
         for (part_index, part) in descriptor.styles.iter().enumerate() {
+            let registered_name = STYLE_PARTS
+                .iter()
+                .find(|registered| registered.id == part.part.0)
+                .map(|registered| registered.name);
             if part.part.0 == 7
+                || part.name.is_empty()
+                || registered_name.is_some_and(|name| name != part.name)
+                || (part.part.0 >= 8
+                    && STYLE_PARTS
+                        .iter()
+                        .any(|registered| registered.name == part.name))
                 || part.allowed_states.bits() & !ObjectStates::ALL.bits() != 0
                 || part.properties.is_empty()
                 || descriptor.styles[..part_index]
                     .iter()
-                    .any(|prior| prior.part == part.part)
+                    .any(|prior| prior.part.0 >= part.part.0 || prior.name == part.name)
             {
                 return Err(RegistryError::InvalidCatalog);
             }
             for (property_index, property) in part.properties.iter().enumerate() {
-                if part.properties[..property_index]
-                    .iter()
-                    .any(|prior| prior.id == property.id)
+                if property_index > 0 && part.properties[property_index - 1].id >= property.id
                     || STYLE_PROPERTIES
                         .iter()
                         .find(|registered| registered.id == property.id)
@@ -5818,33 +6447,51 @@ fn validate_catalog(catalog: &[TypeDescriptor]) -> Result<(), RegistryError> {
 }
 
 fn style_registry_is_valid() -> bool {
-    STYLE_PROPERTIES
-        .iter()
-        .enumerate()
-        .all(|(index, property)| {
-            property.id == index as u32 + 1
-                && !property.name.is_empty()
-                && STYLE_PROPERTIES[..index]
-                    .iter()
-                    .all(|prior| prior.name != property.name && prior.storage != property.storage)
-                && match property.constraint {
-                    StyleValueConstraint::None => property.value_tag == ValueTag::Color,
-                    StyleValueConstraint::U32 { min, max } => {
-                        property.value_tag == ValueTag::U32 && min <= max
+    let parts_are_valid = STYLE_PARTS.iter().enumerate().all(|(index, part)| {
+        part.id == index as u32
+            && !part.name.is_empty()
+            && STYLE_PARTS[..index]
+                .iter()
+                .all(|prior| prior.name != part.name)
+    });
+    let states_are_valid = STYLE_STATES.iter().enumerate().all(|(index, state)| {
+        !state.name.is_empty()
+            && (index == 0) == (state.mask == 0)
+            && (state.mask == 0 || state.mask.count_ones() == 1)
+            && state.mask & !ObjectStates::ALL.bits() == 0
+            && STYLE_STATES[..index]
+                .iter()
+                .all(|prior| prior.mask != state.mask && prior.name != state.name)
+    });
+    parts_are_valid
+        && states_are_valid
+        && STYLE_PROPERTIES
+            .iter()
+            .enumerate()
+            .all(|(index, property)| {
+                property.id == index as u32 + 1
+                    && !property.name.is_empty()
+                    && STYLE_PROPERTIES[..index].iter().all(|prior| {
+                        prior.name != property.name && prior.storage != property.storage
+                    })
+                    && match property.constraint {
+                        StyleValueConstraint::None => property.value_tag == ValueTag::Color,
+                        StyleValueConstraint::U32 { min, max } => {
+                            property.value_tag == ValueTag::U32 && min <= max
+                        }
+                        StyleValueConstraint::I32 { min, max } => {
+                            property.value_tag == ValueTag::I32 && min <= max
+                        }
+                        StyleValueConstraint::Enum { domain_id, values } => {
+                            property.value_tag == ValueTag::Enum
+                                && domain_id != 0
+                                && !values.is_empty()
+                                && values.iter().enumerate().all(|(value_index, value)| {
+                                    values[..value_index].iter().all(|prior| prior != value)
+                                })
+                        }
                     }
-                    StyleValueConstraint::I32 { min, max } => {
-                        property.value_tag == ValueTag::I32 && min <= max
-                    }
-                    StyleValueConstraint::Enum { domain_id, values } => {
-                        property.value_tag == ValueTag::Enum
-                            && domain_id != 0
-                            && !values.is_empty()
-                            && values.iter().enumerate().all(|(value_index, value)| {
-                                values[..value_index].iter().all(|prior| prior != value)
-                            })
-                    }
-                }
-        })
+            })
 }
 
 fn minimum_event_payload_bytes(tags: &[ValueTag]) -> Option<u32> {
@@ -6151,6 +6798,11 @@ mod prepared_geometry_tests {
         constructor: construct_test_actor,
     };
     static TEST_CATALOG: [TypeDescriptor; 1] = [TEST_DESCRIPTOR];
+    static STYLE_TEST_CATALOG: [TypeDescriptor; 1] = [TypeDescriptor {
+        schema_revision: 2,
+        styles: &MPY_CONTROL_STYLE_PARTS,
+        ..TEST_DESCRIPTOR
+    }];
 
     struct TestActor {
         bounds: Rect,
@@ -6227,6 +6879,22 @@ mod prepared_geometry_tests {
         StageRegistry::new(
             StageId::new(13).unwrap(),
             &TEST_CATALOG,
+            RegistryLimits {
+                max_roots: 2,
+                max_actors: 4,
+                max_tree_depth: 4,
+                max_children_per_actor: 4,
+                max_text_bytes: 64,
+                max_resources: 4,
+            },
+        )
+        .unwrap()
+    }
+
+    fn style_registry() -> StageRegistry {
+        StageRegistry::new(
+            StageId::new(14).unwrap(),
+            &STYLE_TEST_CATALOG,
             RegistryLimits {
                 max_roots: 2,
                 max_actors: 4,
@@ -6335,6 +7003,14 @@ mod prepared_geometry_tests {
     #[test]
     fn style_registry_and_actor_applicability_are_stable_and_exact() {
         assert!(style_registry_is_valid());
+        assert_eq!(style_part_registry(), &STYLE_PARTS);
+        assert_eq!(style_state_registry(), &STYLE_STATES);
+        assert_eq!(style_property_registry(), &STYLE_PROPERTIES);
+        assert_eq!(STYLE_PARTS[0].name, "main");
+        assert_eq!(STYLE_PARTS[6].name, "cursor");
+        assert_eq!(STYLE_STATES[0].mask, 0);
+        assert_eq!(STYLE_STATES[0].name, "default");
+        assert_eq!(STYLE_STATES[5].mask, ObjectStates::EDITED.bits());
         assert_eq!(STYLE_PROPERTIES.len(), 20);
         assert_eq!(STYLE_PROPERTIES[0].name, "bg_color");
         assert_eq!(STYLE_PROPERTIES[9].name, "text_align");
@@ -6359,11 +7035,13 @@ mod prepared_geometry_tests {
         static CUSTOM_PARTS: [StylePartDescriptor; 2] = [
             StylePartDescriptor {
                 part: Part::MAIN,
+                name: "main",
                 allowed_states: ObjectStates::DISABLED,
                 properties: &STYLE_PROPERTIES,
             },
             StylePartDescriptor {
                 part: Part::custom(8),
+                name: "custom_fill",
                 allowed_states: ObjectStates::CHECKED,
                 properties: &CUSTOM_PROPERTIES,
             },
@@ -6374,6 +7052,9 @@ mod prepared_geometry_tests {
         };
         assert_eq!(validate_catalog(&[descriptor]), Ok(()));
         assert_eq!(descriptor.maximum_style_selectors(), 4);
+        assert_eq!(descriptor.maximum_style_values(), 42);
+        assert_eq!(descriptor.style_applicability(), &CUSTOM_PARTS);
+        assert_eq!(descriptor.style_applicability()[1].name, "custom_fill");
         assert_eq!(
             descriptor
                 .style_property(Selector::part(Part::MAIN), 1)
@@ -6443,17 +7124,20 @@ mod prepared_geometry_tests {
     fn catalog_rejects_reserved_duplicate_and_nonregistered_style_rows() {
         static RESERVED: [StylePartDescriptor; 1] = [StylePartDescriptor {
             part: Part::custom(7),
+            name: "reserved",
             allowed_states: ObjectStates::DEFAULT,
             properties: &STYLE_PROPERTIES,
         }];
         static DUPLICATE: [StylePartDescriptor; 2] = [
             StylePartDescriptor {
                 part: Part::MAIN,
+                name: "main",
                 allowed_states: ObjectStates::DEFAULT,
                 properties: &STYLE_PROPERTIES,
             },
             StylePartDescriptor {
                 part: Part::MAIN,
+                name: "main_duplicate",
                 allowed_states: ObjectStates::DISABLED,
                 properties: &STYLE_PROPERTIES,
             },
@@ -6464,11 +7148,32 @@ mod prepared_geometry_tests {
         }];
         static ALTERED: [StylePartDescriptor; 1] = [StylePartDescriptor {
             part: Part::MAIN,
+            name: "main",
             allowed_states: ObjectStates::DEFAULT,
             properties: &ALTERED_PROPERTY,
         }];
+        static WRONG_NAME: [StylePartDescriptor; 1] = [StylePartDescriptor {
+            part: Part::MAIN,
+            name: "body",
+            allowed_states: ObjectStates::DEFAULT,
+            properties: &STYLE_PROPERTIES,
+        }];
+        static UNSORTED_PROPERTIES: [StylePropertyDescriptor; 2] =
+            [STYLE_PROPERTIES[1], STYLE_PROPERTIES[0]];
+        static UNSORTED: [StylePartDescriptor; 1] = [StylePartDescriptor {
+            part: Part::MAIN,
+            name: "main",
+            allowed_states: ObjectStates::DEFAULT,
+            properties: &UNSORTED_PROPERTIES,
+        }];
 
-        for styles in [&RESERVED[..], &DUPLICATE[..], &ALTERED[..]] {
+        for styles in [
+            &RESERVED[..],
+            &DUPLICATE[..],
+            &ALTERED[..],
+            &WRONG_NAME[..],
+            &UNSORTED[..],
+        ] {
             assert_eq!(
                 validate_catalog(&[TypeDescriptor {
                     styles,
@@ -6477,6 +7182,135 @@ mod prepared_geometry_tests {
                 Err(RegistryError::InvalidCatalog)
             );
         }
+    }
+
+    #[test]
+    fn sparse_snapshot_excludes_native_shared_and_theme_style_tiers() {
+        static ADDED: crate::style_cascade::StylePatch = crate::style_cascade::StylePatch {
+            border_color: Some(Color(5, 6, 7, 255)),
+            ..crate::style_cascade::StylePatch::new()
+        };
+
+        let mut registry = style_registry();
+        let root = create_container(&mut registry);
+        {
+            let node = registry.node_mut(root).unwrap();
+            node.add_local_style(
+                crate::style_cascade::StylePatch {
+                    bg_color: Some(Color(1, 2, 3, 255)),
+                    ..crate::style_cascade::StylePatch::new()
+                },
+                Selector::part(Part::MAIN),
+            );
+            node.add_style(&ADDED, Selector::part(Part::MAIN));
+            node.add_theme_style(
+                crate::style_cascade::StylePatch {
+                    radius: Some(9),
+                    ..crate::style_cascade::StylePatch::new()
+                },
+                Selector::part(Part::MAIN),
+            );
+        }
+        registry
+            .apply_batch(&[StageDirection::SetLocalStyle {
+                object_id: root,
+                part_id: Part::MAIN.0,
+                state_mask: 0,
+                property_id: 4,
+                value: OwnedValue::U32(7),
+            }])
+            .unwrap();
+
+        let token = registry.snapshot_begin().unwrap();
+        let page = registry
+            .snapshot_read_with_style_limit(token, 1, 64, 20)
+            .unwrap();
+        assert_eq!(page.records[0].total_style_values, 1);
+        assert_eq!(page.records[0].styles.len(), 1);
+        assert_eq!(page.records[0].styles[0].property_id, 4);
+        assert_eq!(page.records[0].styles[0].value, OwnedValue::U32(7));
+
+        let style = registry.node(root).unwrap().style.as_deref().unwrap();
+        assert_eq!(style.local_entries().len(), 1);
+        assert_eq!(style.added_entries().len(), 1);
+        assert_eq!(style.theme_entries().len(), 1);
+        assert_eq!(style.mpy_local_entries().len(), 1);
+    }
+
+    #[test]
+    fn stale_private_style_storage_rejects_before_any_stage_mutation() {
+        let mut registry = style_registry();
+        let root = create_container(&mut registry);
+        registry
+            .apply_batch(&[StageDirection::SetLocalStyle {
+                object_id: root,
+                part_id: Part::MAIN.0,
+                state_mask: 0,
+                property_id: 4,
+                value: OwnedValue::U32(1),
+            }])
+            .unwrap();
+        let revision = registry.revision();
+        let prepared = registry
+            .prepare_batch(vec![
+                StageDirection::SetFlag {
+                    object_id: root,
+                    flag: RuntimeFlag::Hidden,
+                    enabled: true,
+                },
+                StageDirection::SetLocalStyle {
+                    object_id: root,
+                    part_id: Part::MAIN.0,
+                    state_mask: 0,
+                    property_id: 4,
+                    value: OwnedValue::U32(2),
+                },
+            ])
+            .unwrap();
+
+        let state = registry
+            .node_mut(root)
+            .unwrap()
+            .style
+            .as_deref_mut()
+            .unwrap();
+        let mutation = state
+            .prepare_mpy_local_update(
+                Selector::part(Part::MAIN),
+                StyleProperty::Alpha,
+                MpyStyleUpdate::Set(StylePropertyValue::U32(3)),
+                16,
+            )
+            .unwrap();
+        let committed = state.commit_mpy_local_update(mutation).unwrap();
+        state.release_mpy_local_update(committed);
+
+        let (result, allocations, deallocations) =
+            count_allocator_operations(|| registry.commit_prepared_batch(prepared));
+        assert_eq!((allocations, deallocations), (0, 0));
+        let error = result.unwrap_err();
+        assert_eq!(error.cause(), RegistryError::DispatchBusy);
+        assert_eq!(registry.revision(), revision);
+        assert!(
+            !registry
+                .node(root)
+                .unwrap()
+                .flags()
+                .contains(ObjectFlags::HIDDEN)
+        );
+        assert_eq!(
+            registry
+                .node(root)
+                .unwrap()
+                .style
+                .as_deref()
+                .unwrap()
+                .mpy_local_entries()[0]
+                .1
+                .property(StyleProperty::Alpha),
+            Some(StylePropertyValue::U32(3))
+        );
+        drop(error.into_prepared());
     }
 
     #[test]

@@ -102,11 +102,11 @@ fn catalog_enumerates_five_actor_local_schemas() {
                 .contains(rlvgl_core::actor::TargetSet::ALL)
         );
         let expected = match descriptor.stable_name.rsplit("::").next().unwrap() {
-            "Container" => (2, 0, 0, 0),
-            "Label" => (2, 1, 0, 0),
-            "Button" => (3, 1, 0, 1),
-            "Slider" => (3, 3, 0, 1),
-            "List" => (3, 1, 5, 1),
+            "Container" => (3, 0, 0, 0),
+            "Label" => (3, 1, 0, 0),
+            "Button" => (4, 1, 0, 1),
+            "Slider" => (4, 3, 0, 1),
+            "List" => (4, 1, 5, 1),
             _ => unreachable!(),
         };
         assert_eq!(descriptor.schema_revision, expected.0);
@@ -116,6 +116,7 @@ fn catalog_enumerates_five_actor_local_schemas() {
         assert_eq!(descriptor.styles.len(), 1);
         assert_eq!(descriptor.styles[0].properties.len(), 20);
         assert_eq!(descriptor.styles[0].part, Part::MAIN);
+        assert_eq!(descriptor.styles[0].name, "main");
         assert!(
             descriptor
                 .style_property(Selector::part(Part::MAIN), 1)
@@ -133,6 +134,10 @@ fn catalog_enumerates_five_actor_local_schemas() {
         assert_eq!(
             descriptor.maximum_style_selectors(),
             if is_control { 16 } else { 2 }
+        );
+        assert_eq!(
+            descriptor.maximum_style_values(),
+            if is_control { 320 } else { 40 }
         );
         assert_eq!(
             descriptor

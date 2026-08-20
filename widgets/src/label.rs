@@ -136,7 +136,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0002);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::label::Label",
-    schema_revision: 2,
+    schema_revision: 3,
     family: ActorFamily::Text,
     capabilities: ActorCapabilities::TEXT,
     targets: TargetSet::ALL,

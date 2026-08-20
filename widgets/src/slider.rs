@@ -141,7 +141,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0004);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::slider::Slider",
-    schema_revision: 3,
+    schema_revision: 4,
     family: ActorFamily::Control,
     capabilities: ActorCapabilities::CONTROL,
     targets: TargetSet::ALL,

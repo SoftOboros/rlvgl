@@ -113,7 +113,7 @@ pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0003);
 pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
     type_id: MPY_TYPE_ID,
     stable_name: "rlvgl_widgets::button::Button",
-    schema_revision: 3,
+    schema_revision: 4,
     family: ActorFamily::Control,
     capabilities: ActorCapabilities::TEXT.union(ActorCapabilities::CONTROL),
     targets: TargetSet::ALL,

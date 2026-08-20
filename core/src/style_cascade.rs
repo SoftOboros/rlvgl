@@ -960,42 +960,48 @@ impl StyleState {
         update: MpyStyleUpdate,
         maximum_selectors: usize,
     ) -> Result<PreparedMpyStyleMutation, MpyStyleStorageError> {
-        let validated_patch = match update {
-            MpyStyleUpdate::Set(value) => {
-                let mut patch = StylePatch::new();
-                patch.set_property(property, value)?;
-                Some(patch)
-            }
-            MpyStyleUpdate::Remove => None,
-        };
+        self.prepare_mpy_local_updates(&[(selector, property, update)], maximum_selectors)
+    }
+
+    /// Prepare an ordered group of exact MPY-local property updates.
+    ///
+    /// The group is applied to one owned replacement vector in submitted
+    /// order, so repeated selectors and properties have deterministic
+    /// last-write-wins behavior without allocating between operations.
+    pub fn prepare_mpy_local_updates(
+        &self,
+        updates: &[(Selector, StyleProperty, MpyStyleUpdate)],
+        maximum_selectors: usize,
+    ) -> Result<PreparedMpyStyleMutation, MpyStyleStorageError> {
         let mut next_local = Vec::new();
         next_local
-            .try_reserve_exact(self.mpy_local.len().saturating_add(1))
+            .try_reserve_exact(self.mpy_local.len().saturating_add(updates.len()))
             .map_err(|_| MpyStyleStorageError::Capacity)?;
         next_local.extend_from_slice(&self.mpy_local);
 
-        let position = next_local
-            .iter()
-            .position(|(candidate, _)| *candidate == selector);
-        match (position, update, validated_patch) {
-            (Some(index), MpyStyleUpdate::Set(value), _) => {
-                next_local[index].1.set_property(property, value)?;
-            }
-            (Some(index), MpyStyleUpdate::Remove, _) => {
-                next_local[index].1.clear_property(property);
-                if next_local[index].1.is_empty() {
-                    next_local.remove(index);
+        for (selector, property, update) in updates {
+            let position = next_local
+                .iter()
+                .position(|(candidate, _)| candidate == selector);
+            match (position, *update) {
+                (Some(index), MpyStyleUpdate::Set(value)) => {
+                    next_local[index].1.set_property(*property, value)?;
                 }
-            }
-            (None, MpyStyleUpdate::Set(_), Some(patch)) => {
-                if next_local.len() >= maximum_selectors {
-                    return Err(MpyStyleStorageError::Capacity);
+                (Some(index), MpyStyleUpdate::Remove) => {
+                    next_local[index].1.clear_property(*property);
+                    if next_local[index].1.is_empty() {
+                        next_local.remove(index);
+                    }
                 }
-                next_local.push((selector, patch));
-            }
-            (None, MpyStyleUpdate::Remove, _) => {}
-            (None, MpyStyleUpdate::Set(_), None) => {
-                return Err(MpyStyleStorageError::TypeMismatch);
+                (None, MpyStyleUpdate::Set(value)) => {
+                    if next_local.len() >= maximum_selectors {
+                        return Err(MpyStyleStorageError::Capacity);
+                    }
+                    let mut patch = StylePatch::new();
+                    patch.set_property(*property, value)?;
+                    next_local.push((*selector, patch));
+                }
+                (None, MpyStyleUpdate::Remove) => {}
             }
         }
 
@@ -1016,14 +1022,21 @@ impl StyleState {
         })
     }
 
+    /// Check whether a prepared MPY-local update still owns this storage.
+    pub fn prepared_mpy_local_update_is_current(
+        &self,
+        prepared: &PreparedMpyStyleMutation,
+    ) -> bool {
+        Rc::ptr_eq(&self.transition_override, &prepared.owner)
+            && self.mpy_revision == prepared.expected_revision
+    }
+
     /// Commit a prepared MPY-local update using only swaps and scalar stores.
     pub fn commit_mpy_local_update(
         &mut self,
         mut prepared: PreparedMpyStyleMutation,
     ) -> Result<CommittedMpyStyleMutation, MpyStyleCommitError> {
-        if !Rc::ptr_eq(&self.transition_override, &prepared.owner)
-            || self.mpy_revision != prepared.expected_revision
-        {
+        if !self.prepared_mpy_local_update_is_current(&prepared) {
             return Err(MpyStyleCommitError {
                 cause: MpyStyleStorageError::Stale,
                 prepared,
