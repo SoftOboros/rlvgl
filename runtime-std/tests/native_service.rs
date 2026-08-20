@@ -259,6 +259,99 @@ fn full_and_close_outcomes_preserve_exact_terminal_accounting() {
 }
 
 #[test]
+fn close_stress_finishes_active_turn_and_rejects_every_queued_request_once() {
+    for cycle in 0_u64..64 {
+        let (started_sender, started_receiver) = bounded(1);
+        let (release_sender, release_receiver) = bounded(1);
+        let service = spawn_native_service(
+            "cpy-close-stress",
+            ServiceConfig::new(4, 1, 1).expect("valid explicit capacities"),
+            || (),
+            move |_, requests: Vec<u64>| {
+                started_sender.send(()).expect("announce active turn");
+                release_receiver.recv().expect("release active turn");
+                requests.into_iter().map(Ok::<_, &'static str>).collect()
+            },
+        )
+        .expect("spawn close-stress service");
+
+        let mut records = service.drain().expect("drain startup lifecycle");
+        let active = service
+            .try_submit(cycle)
+            .expect("admit active close-stress request");
+        started_receiver.recv().expect("turn became active");
+        let queued: Vec<_> = (1_u64..=4)
+            .map(|offset| {
+                service
+                    .try_submit(cycle * 10 + offset)
+                    .expect("fill bounded ingress behind active turn")
+            })
+            .collect();
+
+        assert!(service.request_close(), "first caller owns close fence");
+        assert!(!service.request_close(), "close fence is idempotent");
+        assert_eq!(
+            service.try_submit(u64::MAX),
+            Err(AdmissionError::Closing(u64::MAX))
+        );
+        release_sender.send(()).expect("release active turn");
+        records.extend(service.shutdown().expect("ordered close-stress shutdown"));
+
+        let lifecycle: Vec<_> = records
+            .iter()
+            .filter_map(|record| match record {
+                ServiceRecord::Lifecycle { state, .. } => Some(*state),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            lifecycle,
+            vec![
+                ServiceLifecycle::Running,
+                ServiceLifecycle::Closing,
+                ServiceLifecycle::Closed,
+            ]
+        );
+        let terminal_tickets: Vec<_> = records.iter().filter_map(ServiceRecord::ticket).collect();
+        let expected_tickets: Vec<_> = core::iter::once(active)
+            .chain(queued.iter().copied())
+            .collect();
+        assert_eq!(terminal_tickets, expected_tickets);
+        assert_eq!(
+            records
+                .iter()
+                .filter(|record| matches!(
+                    record,
+                    ServiceRecord::Completed { ticket, output } if *ticket == active && *output == cycle
+                ))
+                .count(),
+            1
+        );
+        for queued_ticket in queued {
+            assert_eq!(
+                records
+                    .iter()
+                    .filter(|record| matches!(
+                        record,
+                        ServiceRecord::Rejected {
+                            ticket,
+                            reason: ServiceRejection::ServiceClosing,
+                        } if *ticket == queued_ticket
+                    ))
+                    .count(),
+                1
+            );
+        }
+        assert!(!records.iter().any(|record| matches!(
+            record,
+            ServiceRecord::DriverFault { .. }
+                | ServiceRecord::RuntimeFault { .. }
+                | ServiceRecord::ServiceFault { .. }
+        )));
+    }
+}
+
+#[test]
 fn driver_fault_fences_later_accepted_work() {
     let (started_sender, started_receiver) = bounded(1);
     let (release_sender, release_receiver) = bounded(1);

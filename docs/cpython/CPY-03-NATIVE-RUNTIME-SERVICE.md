@@ -9,11 +9,11 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 **Status:** Draft 2026-08-19. All five policy PCDNs are resolved; native
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
 diagnostic capacity matrices are complete. Typed restart/stale-epoch
-validation and stress evidence are complete. Representative native-workload,
-close stress, and physical-board qualification evidence remains open. Not
-ratified.
+validation and active-turn close-fence stress evidence are complete.
+Representative native-workload and physical-board qualification evidence
+remains open. Not ratified.
 
-**Revision:** 0.7.0
+**Revision:** 0.8.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -341,7 +341,9 @@ same clean source has not run on the BBB.
 - [ ] Queue loss/reservation classes map to neutral record semantics.
 - [x] The Host Runtime Crate has a native-only non-`Send` owner test and
       capacity probe before PyO3 lands.
-- [ ] Native close rules are exact under stress tests.
+- [x] Native close rules finish the active turn, reject every queued request
+      exactly once, and publish ordered lifecycle records under repeated
+      bounded-egress stress.
 - [x] Restart/epoch validation rejects every retained prior epoch, ticket, and
       record under repeated service construction.
 - [x] The dependency firewall and runtime crate graph contain no Python or
@@ -370,7 +372,7 @@ same clean source has not run on the BBB.
 All five policy PCDNs are resolved and CPY-02 is ratified, but CPY-03 remains
 Draft. Ratification is blocked by representative Python-independent semantic
 workload and physical-board capacity qualification, semantic record classes,
-representative native cadence, and close stress evidence. CPY-04 owns
+and representative native cadence. CPY-04 owns
 binding/thread-state/finalization proof, CPY-05 owns exported Frame Lease
 lifetime and slot counts, and CPY-06 owns physical device presentation; none is
 a CPY-03 ratification prerequisite. CPY-03 ratification would unblock CPY-04
@@ -378,6 +380,43 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.8.0 — 2026-08-19 — prove the native close fence under stress
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-3, INV-CPY-03-5, INV-CPY-03-7, §6, §12, §14
+
+**Commits:** pending
+
+**Summary:** Adds a 64-construction close-fence proof with one active request,
+four queued requests, post-fence admission, and a one-record egress queue per
+construction.
+
+#### Rationale
+
+The accepted close policy distinguishes the turn whose native execution has
+begun from requests that remain queued behind the close fence. The stress test
+therefore holds the active turn open, fills ingress, linearizes close, and then
+requires exactly one successful active result followed by `Closing`, exactly
+one `ServiceClosing` rejection per queued ticket, and `Closed`. Constraining
+egress to one record also proves that `shutdown` drains terminal publication
+without dropping or reordering records.
+
+The semantic negative control changed close rejection attribution to
+`ServiceFaulted`. The focused stress test failed on the first queued ticket;
+restoring `ServiceClosing` made all 64 constructions pass.
+
+Considered and rejected: abandoning the active turn, completing requests that
+had not begun, relying only on aggregate counters, or using an unbounded egress
+queue to avoid shutdown pressure.
+
+What deliberately did not change: queue capacities, request ordering, fault
+semantics, MPY Endpoint behavior, Python exception mapping, Frame Lease, and
+device presentation remain unchanged. Representative host/BBB workload and
+semantic record-class evidence remain open.
 
 ### 0.7.0 — 2026-08-19 — reject stale service epochs
 
