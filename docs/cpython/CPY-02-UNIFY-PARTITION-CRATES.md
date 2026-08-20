@@ -7,10 +7,13 @@ CPY-02-UNIFY-PARTITION-CRATES.md - Neutral-contract unification and interpreter/
 **Document ID:** CPY-02-UNIFY-PARTITION-CRATES
 
 **Status:** Ratified 2026-08-18. The topology, Dependency Firewall, baseline
-graph, and first MPY Handoff Record are complete. Shared migration remains
-limited to the paths named by that handoff.
+graph, and first MPY Handoff Record are complete. The first coordinated
+migration wave closed 2026-08-20 at the published implementation frontier
+recorded in
+[`CPY-COORDINATION-CLOSEOUT-2026-08-20.json`](evidence/CPY-COORDINATION-CLOSEOUT-2026-08-20.json).
+Every later shared migration wave requires a new handoff.
 
-**Revision:** 0.3.0
+**Revision:** 0.4.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -323,12 +326,66 @@ publishable Python-extension responsibility. No other new crate is admitted.
 
 ## 14. Unblocks
 
-CPY-02 is ratified. It unblocks the CPY-only Host Runtime crate skeleton under
-the first Handoff Record's exact path set. It does not authorize PyO3,
-interpreter bindings, neutral-semantic edits, platform relocation, or a later
-shared migration wave without a new handoff.
+CPY-02 is ratified, and its first coordinated migration wave is complete. That
+wave produced the CPY-only `rlvgl-runtime-std` crate and its bounded native
+service, readiness, lifecycle, representative host workload, and semantic
+egress projection while preserving the Handoff Record's path and authority
+boundaries.
+
+The wave does not ratify CPY-03, create `rlvgl-cpython`, authorize PyO3 or
+interpreter bindings, close MPY protocol coverage, select board capacities, or
+permit neutral-semantic/platform relocation. Family-owned work may proceed
+independently under its owning phase. Any later change to a shared MPY surface
+requires a new handoff record with exact paths and a clean frontier.
 
 ## 15. Change Log
+
+### 0.4.0 — 2026-08-20 — close the first coordinated migration wave
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** evidence
+
+**Touches:** INV-CPY-02-2, INV-CPY-02-3, INV-CPY-02-4, INV-CPY-02-5,
+INV-CPY-02-6, INV-CPY-02-8, PCDN-CPY-02-001, PCDN-CPY-02-006, §4, §5,
+§8, §12, §14
+
+**Commits:** pending
+
+**Summary:** Closes the first shared MPY/CPY migration wave at its rebased,
+published implementation frontier and returns later CPY and MPY work to their
+separate phase authorities.
+
+#### Rationale
+
+The first handoff authorized only the workspace manifest, ignored resolver
+snapshot, publish-order script, and new `runtime-std/` directory. The completed
+wave stayed inside that boundary while proving the new crate's independent
+native-service consumer, dependency firewall, bounded ownership/lifecycle,
+representative host workload, and language-neutral semantic records.
+
+The implementation series was later rebased over the WLD-owned Wayland
+evidence commit before publication. The retained closeout artifact records the
+pre/post commit map, distinguishes patch-identical source commits from
+regenerated combined-index commits, and records the seven-file WLD/index tree
+delta. Historical capacity artifacts retain the commit identities actually
+measured; the map preserves provenance without relabeling them as a new run.
+
+The truthful closure boundary is the coordinated migration wave, not either
+full language initiative. CPY-03 remains physical-board gated; `rlvgl-cpython`,
+Frame Leases, embedded/host Python integration, PyPI artifacts, and release
+closure remain future CPY phases. MPY-00 through MPY-05 are ratified, but
+coverage is not closed and `PCDN-MPY-04-017` remains proposal-only.
+
+Considered and rejected: declaring CPY or MPY complete from host-only native
+evidence, rewriting immutable measurement commit fields after rebase,
+implicitly accepting `PCDN-MPY-04-017`, merging interpreter adapters, or
+letting the completed handoff authorize later shared-path edits indefinitely.
+
+What deliberately did not change: MPY semantic authority, WLD/platform
+authority, historical evidence qualification, CPY-03 through CPY-09 phase
+status, MPY-06 through MPY-09 phase status, board/PyPI/release claims, and the
+requirement for a new handoff before future shared migration.
 
 ### 0.3.0 — 2026-08-18 — ratified topology and first handoff
 

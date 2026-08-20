@@ -18,6 +18,19 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = REPO_ROOT / "docs/cpython/evidence/CPY-BASELINE-2026-08-18.json"
 SCHEMA_PATH = REPO_ROOT / "docs/cpython/CPY-BASELINE-MANIFEST.schema.json"
 GENERATED_DIR = REPO_ROOT / "docs/cpython/evidence/_generated"
+CLOSEOUT_PATH = (
+    REPO_ROOT / "docs/cpython/evidence/CPY-COORDINATION-CLOSEOUT-2026-08-20.json"
+)
+
+CLOSEOUT_FRONTIER_DELTA = (
+    "docs/spec-index/index/_manifest.json",
+    "docs/spec-index/index/wld.json",
+    "docs/wayland/README.md",
+    "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+    "platform/Cargo.toml",
+    "platform/src/wayland/mod.rs",
+    "platform/tests/wayland_smoke.rs",
+)
 
 REQUIRED_TARGETS = {
     "x86_64-apple-darwin",
@@ -494,6 +507,102 @@ def _verify_handoff(manifest: dict[str, Any], handoff_path: Path) -> None:
         raise EvidenceError("MPY handoff is not acknowledged")
 
 
+def _verify_closeout(manifest: dict[str, Any], closeout: dict[str, Any]) -> None:
+    """Verify the first coordinated migration-wave closeout record."""
+
+    if closeout.get("schema_version") != "CPY-COORDINATION-CLOSEOUT-1":
+        raise EvidenceError("unsupported CPY coordination closeout schema")
+    if closeout.get("state") != "closed":
+        raise EvidenceError("CPY coordination wave is not closed")
+
+    authority = closeout.get("authority", {})
+    if authority.get("handoff_source_commit") != manifest["rlvgl_source"]["commit"]:
+        raise EvidenceError("closeout handoff source does not match the CPY baseline")
+    if set(authority.get("authorized_shared_paths", [])) != ALLOWED_HANDOFF_PATHS:
+        raise EvidenceError("closeout authorized path set changed")
+
+    publication = closeout.get("implementation_publication", {})
+    commit_fields = (
+        "upstream_wayland_commit",
+        "pre_rebase_frontier",
+        "published_implementation_frontier",
+        "implementation_parent_pin_commit",
+        "implementation_parent_gitlink",
+    )
+    for field in commit_fields:
+        if re.fullmatch(r"[0-9a-f]{40}", publication.get(field, "")) is None:
+            raise EvidenceError(f"closeout has invalid Git commit field: {field}")
+    if (
+        publication["implementation_parent_gitlink"]
+        != publication["published_implementation_frontier"]
+    ):
+        raise EvidenceError("parent gitlink does not match the published rlvgl frontier")
+    _git(
+        "merge-base",
+        "--is-ancestor",
+        publication["published_implementation_frontier"],
+        "HEAD",
+    )
+
+    provenance = closeout.get("rebase_provenance", {})
+    source_mappings = provenance.get("source_commit_mappings", [])
+    index_mappings = provenance.get("regenerated_index_commit_mappings", [])
+    if len(source_mappings) != 18 or len(index_mappings) != 10:
+        raise EvidenceError("closeout rebase map must contain 18 source and 10 index commits")
+    mappings = source_mappings + index_mappings
+    before = [mapping.get("before") for mapping in mappings]
+    after = [mapping.get("after") for mapping in mappings]
+    if any(re.fullmatch(r"[0-9a-f]{40}", commit or "") is None for commit in before + after):
+        raise EvidenceError("closeout rebase map contains an invalid Git commit")
+    if len(set(before)) != 28 or len(set(after)) != 28:
+        raise EvidenceError("closeout rebase map contains duplicate commit identities")
+    for mapping in mappings:
+        subject = _git("show", "-s", "--format=%s", mapping["after"])
+        assert isinstance(subject, str)
+        if subject.strip() != mapping.get("subject"):
+            raise EvidenceError(f"closeout rebase subject mismatch: {mapping['after'][:8]}")
+    final_mapping = next(
+        (
+            mapping
+            for mapping in index_mappings
+            if mapping.get("before") == publication["pre_rebase_frontier"]
+        ),
+        None,
+    )
+    if (
+        final_mapping is None
+        or final_mapping.get("after") != publication["published_implementation_frontier"]
+    ):
+        raise EvidenceError("closeout final frontier is absent from the rebase map")
+    if tuple(provenance.get("pre_to_post_frontier_tree_delta", [])) != CLOSEOUT_FRONTIER_DELTA:
+        raise EvidenceError("closeout pre/post frontier tree delta changed")
+
+    cpy = closeout.get("cpy_disposition", {})
+    if set(cpy.get("ratified_phases", [])) != {"CPY-00", "CPY-01", "CPY-02"}:
+        raise EvidenceError("closeout overstates the ratified CPY phase set")
+    if set(cpy.get("draft_phases", [])) != {f"CPY-{phase:02d}" for phase in range(3, 10)}:
+        raise EvidenceError("closeout does not preserve every Draft CPY phase")
+
+    mpy = closeout.get("mpy_disposition", {})
+    if set(mpy.get("ratified_phases", [])) != {f"MPY-{phase:02d}" for phase in range(6)}:
+        raise EvidenceError("closeout overstates the ratified MPY phase set")
+    next_pcdn = mpy.get("next_pcdn", {})
+    if next_pcdn.get("id") != "PCDN-MPY-04-017" or next_pcdn.get("state") != "proposal-only":
+        raise EvidenceError("closeout must preserve PCDN-MPY-04-017 as proposal-only")
+    if mpy.get("coverage_summary") != {"current": 3, "partial": 2, "without_claims": 10}:
+        raise EvidenceError("closeout MPY coverage summary changed")
+
+
+def validate_closeout(
+    manifest: dict[str, Any], closeout_path: Path = CLOSEOUT_PATH
+) -> dict[str, Any]:
+    """Validate and return the coordinated migration-wave closeout."""
+
+    closeout = _load_json(closeout_path)
+    _verify_closeout(manifest, closeout)
+    return closeout
+
+
 def _verify_matrix(manifest: dict[str, Any]) -> None:
     """Verify required interpreter, rootfs, profile, and board selections."""
 
@@ -557,6 +666,7 @@ def validate_baseline(manifest_path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
     _verify_graph(manifest, artifacts["cargo-graph"])
     _verify_handoff(manifest, artifacts["mpy-handoff"])
     _verify_matrix(manifest)
+    validate_closeout(manifest)
     return manifest
 
 

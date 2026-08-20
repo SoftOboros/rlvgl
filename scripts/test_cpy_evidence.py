@@ -38,6 +38,22 @@ class BaselineTests(unittest.TestCase):
         with self.assertRaises(cpy_evidence.EvidenceError):
             cpy_evidence._validate_schema(manifest)
 
+    def test_coordination_closeout_is_valid(self) -> None:
+        """The first shared migration wave has a coherent closeout record."""
+
+        manifest = cpy_evidence._load_json(cpy_evidence.DEFAULT_MANIFEST)
+        closeout = cpy_evidence.validate_closeout(manifest)
+        self.assertEqual(closeout["state"], "closed")
+
+    def test_unaccepted_mpy_bridge_cannot_be_relabelled(self) -> None:
+        """The closeout cannot silently accept the next MPY protocol slice."""
+
+        manifest = cpy_evidence._load_json(cpy_evidence.DEFAULT_MANIFEST)
+        closeout = cpy_evidence._load_json(cpy_evidence.CLOSEOUT_PATH)
+        closeout["mpy_disposition"]["next_pcdn"]["state"] = "accepted"
+        with self.assertRaises(cpy_evidence.EvidenceError):
+            cpy_evidence._verify_closeout(manifest, closeout)
+
 
 class FirewallTests(unittest.TestCase):
     """Exercise the live graph and a synthetic prohibited edge."""

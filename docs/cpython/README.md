@@ -54,7 +54,7 @@ through ratified phase documents and their acceptance gates.
 |---|---|---|
 | [CPY-00](CPY-00-CONCEPTS.md) | Authority, vocabulary, profiles, invariants, and phase order | Ratified 2026-08-18; three root PCDNs accepted as amended |
 | [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Ratified 2026-08-18; exact baseline retained; runtime qualification remains later-phase evidence |
-| [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; graph/firewall/handoff complete; first `runtime-std` slice authorized |
+| [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; first coordinated wave closed 2026-08-20 with `runtime-std` implemented and later shared work returned to a new-handoff gate |
 | [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; lifecycle/turn/record-class proof and representative host matrix retained; physical BBB qualification open |
 | [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, runtime/backend configuration, transactions, exceptions, callbacks, and typing | Draft; seven binding-policy PCDNs resolved; dependency/implementation evidence open |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
@@ -81,6 +81,12 @@ through ratified phase documents and their acceptance gates.
 - [CPY-CAPACITY-EVIDENCE.schema.json](CPY-CAPACITY-EVIDENCE.schema.json) is the
   authored diagnostic grammar for CPY-03 queue/turn candidates. Its instances
   cannot select normative defaults.
+- [The first coordination closeout](evidence/CPY-COORDINATION-CLOSEOUT-2026-08-20.json)
+  records the rebased and published MPY/CPY implementation frontier, the exact
+  pre/post commit provenance needed by retained historical evidence, and the
+  return to separate family ownership. It closes one migration wave, not the
+  CPY or MPY initiatives. `PCDN-MPY-04-017` remains proposal-only, and every
+  later shared-path change requires a new CPY-02 handoff.
 
 Generated object-index JSON is not edited by hand. After authored CPY and any
 concurrent WLD/MPY documentation settle, regenerate the combined projection

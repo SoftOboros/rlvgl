@@ -1,0 +1,248 @@
+{
+  "schema_version": "CPY-COORDINATION-CLOSEOUT-1",
+  "recorded_on": "2026-08-20",
+  "state": "closed",
+  "scope": "first coordinated MPY/CPY crate-unification and native-runtime wave",
+  "authority": {
+    "handoff_record": "docs/cpython/evidence/CPY-HANDOFF-0cf406b.json",
+    "handoff_source_commit": "0cf406bb22509f1040af6a772d0476a614c7bd9c",
+    "authorized_shared_paths": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "scripts/publish_changed.sh",
+      "runtime-std/"
+    ],
+    "result": "The coordinated CPY migration stayed within the authorized shared paths and added the interpreter-neutral rlvgl-runtime-std crate without moving MPY, WLD, or platform authority."
+  },
+  "implementation_publication": {
+    "rlvgl_remote": "https://github.com/SoftOboros/rlvgl.git",
+    "rlvgl_branch": "v0.2.7",
+    "upstream_wayland_commit": "7c3da6657180d0586d11650fcfbc1dc10a4f4e60",
+    "pre_rebase_frontier": "bf07b0f6925385bf22eb4032574be630a7bdd90f",
+    "published_implementation_frontier": "115edb514e74cb71d83f9a1f90516c14901fbade",
+    "parent_remote": "git@github.com:iraabbott/softoboros.com.git",
+    "parent_branch": "webslinger",
+    "implementation_parent_pin_commit": "a9c58b659e8fc31b2987eb7419fff5e7f881a97c",
+    "implementation_parent_gitlink": "115edb514e74cb71d83f9a1f90516c14901fbade"
+  },
+  "rebase_provenance": {
+    "comparison": "git range-diff 0cf406b..bf07b0f 7c3da66..115edb5",
+    "source_commit_mappings": [
+      {
+        "before": "9281fe7666517b8f7e63c02fea0fa5d6b73c04c4",
+        "after": "6de5008595ffecd012b1508846bfb4c66c1e7e3f",
+        "subject": "feat(api): encode MPY InvokeAction operations"
+      },
+      {
+        "before": "4b226aa70acb082cb316bbe829fa18dbe21e793c",
+        "after": "a912a8de113649e6888ba6deb3a3b8973b9353b1",
+        "subject": "docs(cpy): ratify baseline and crate partition"
+      },
+      {
+        "before": "572b7496ec1b908151a585b5d0bc63d8f389a078",
+        "after": "7d35b54257bbbf2e931c8ec71cdaf1bcdd674583",
+        "subject": "feat(runtime): add native std ownership scaffold"
+      },
+      {
+        "before": "9382b0503703a452ed633f8805627dd25b0d9e69",
+        "after": "3879dddb102fd6e5fbd7dececc6ba5957e8d3fc9",
+        "subject": "feat(runtime): add CPY capacity evidence probe"
+      },
+      {
+        "before": "bdab65e55ec686027c6247300348ac9c1fb39849",
+        "after": "b761fbca9c872cb84c440632a2f07725d5122e96",
+        "subject": "docs(cpy): retain host capacity evidence"
+      },
+      {
+        "before": "c994f163687c6483607f5c3340d885d9c1be210d",
+        "after": "761ee3e04cc6ddb9546268e1e58d3067bbcb4597",
+        "subject": "feat(runtime): add bounded CPY native service"
+      },
+      {
+        "before": "af4a0289cb93bbc38fa8270cc46044a7a18d5273",
+        "after": "68726ae73b67eab59c7812d3c5ed15bada7def2f",
+        "subject": "docs(cpy): retain native service capacity evidence"
+      },
+      {
+        "before": "d207d27046b5e18bd345e952b8461b00965f3261",
+        "after": "2524ce59e2648c862221acdab7593dd6171dcf83",
+        "subject": "docs(cpy): resolve native capacity policy"
+      },
+      {
+        "before": "f5ab2fa0510737dab0bd5f7f840039c1fbf32f66",
+        "after": "55b361802273c09eeafc7c6c352164651dff5753",
+        "subject": "feat(api): encode MPY requested layouts"
+      },
+      {
+        "before": "c7247ec866ba5be9837aad5d152247555ba142cd",
+        "after": "a094e726cd16bc5c225f41de3701f97e031c0bed",
+        "subject": "feat(runtime): reject stale service epochs"
+      },
+      {
+        "before": "79cbc2c3c291c3411d974331c54c9a324655f5ee",
+        "after": "5da8d8f9445d0acbce8472cfa6c4b5e52fca2395",
+        "subject": "test(runtime): prove native close fencing"
+      },
+      {
+        "before": "03bb8210836b34abf21c0d54d490f138c6f03cc6",
+        "after": "5e8c409839fafd2cc0378fd9d012293b3d726e9c",
+        "subject": "feat(core): add MPY local style substrate"
+      },
+      {
+        "before": "9feaaa28f8c2efc12dbb2ce33c035c9264959caf",
+        "after": "aa7c95df6f74ac36b004f77ccaf05896dba38d16",
+        "subject": "feat(runtime): add representative CPY workload"
+      },
+      {
+        "before": "5919fb68df12e2cf9f600eef92e3602937c3e758",
+        "after": "cc8cd53704edbd8114b106970fc052754c59956d",
+        "subject": "docs(cpy): require PyPI and window configuration"
+      },
+      {
+        "before": "e64a976c1e5f23517ae419f7f58ebe7beea92bb6",
+        "after": "858fd2d48f2b77bb91a016c2dc65a0497d0aee55",
+        "subject": "docs(cpy): retain representative host evidence"
+      },
+      {
+        "before": "0e9f5566959bd6101535d0afd21a7ef364115f2b",
+        "after": "a2ac38c32785f680350dc6eeffa2ab4dd7b036e2",
+        "subject": "feat(mpy): complete local style semantics"
+      },
+      {
+        "before": "31adbbf8ed9a3c83206e46bd6586ea30755343b8",
+        "after": "bd489cb178ad09a4e47b30ede589162281570f3e",
+        "subject": "fix(runtime): fence Closed after owner destruction"
+      },
+      {
+        "before": "fd4289f2e00199381bbe7ce8c82d833345123549",
+        "after": "f3338dcb1b06faaad6ded4739807a0bd5c77c7a2",
+        "subject": "feat(runtime): preserve semantic egress classes"
+      }
+    ],
+    "regenerated_index_commit_mappings": [
+      {
+        "before": "97e08adfc4393bf4cd1492a3130c85534f5c89bd",
+        "after": "6659fab6f2bcef41095e7f74e5b70c973626f8b3",
+        "subject": "docs(spec): refresh shared SBC index"
+      },
+      {
+        "before": "7cde5be1c90c0636f644eaa7fd5816bc5c7b20e2",
+        "after": "2b48a7a42b807c57f9041a3fdb448cfd494fca9e",
+        "subject": "docs(spec): refresh CPY baseline index"
+      },
+      {
+        "before": "22dd4dd99e95185c803c114dc4c464c2b89a0c11",
+        "after": "3deefe9ddb6befaf4336bbc2203ae251538b1721",
+        "subject": "docs(spec): refresh CPY capacity index"
+      },
+      {
+        "before": "5901e6267d87913e9c8386008897ee0f871136f9",
+        "after": "d6050135ade5123dc8574af6da196ca0f328e1c3",
+        "subject": "docs(spec): refresh CPY native service index"
+      },
+      {
+        "before": "4fb5e55ee744dd1f2aa5f43ce291a5d0462c16be",
+        "after": "f8635b4a070bb74e678d71ac8fa56e302504dfce",
+        "subject": "docs(spec): refresh CPY and MPY index"
+      },
+      {
+        "before": "64f2a13341f41d4fbada49be4b8a3e244238cf2a",
+        "after": "283030dd455edc9bc4327e27f792d1c1326a02ae",
+        "subject": "docs(spec): refresh CPY service index"
+      },
+      {
+        "before": "8749931931abbd3aa53e97ecf9a95a530439c6bc",
+        "after": "ab53a01258bfa11b748e19c80f33e8d262aa0965",
+        "subject": "docs(spec): refresh CPY and MPY index"
+      },
+      {
+        "before": "6c5f0f37fd7201c67ac37fb51aaa30b3eb70f11c",
+        "after": "3fdcc60ef6bd2b266a5e99f716614b2859f2eabb",
+        "subject": "docs(spec): index CPY host evidence"
+      },
+      {
+        "before": "c3c05b615515d68aeb90d0c214b2044d49d7221a",
+        "after": "f43f22f66e43316eac6efdab9ab85b3c9e7d1254",
+        "subject": "docs(spec): refresh CPY and MPY index"
+      },
+      {
+        "before": "bf07b0f6925385bf22eb4032574be630a7bdd90f",
+        "after": "115edb514e74cb71d83f9a1f90516c14901fbade",
+        "subject": "docs(spec): index CPY semantic egress"
+      }
+    ],
+    "pre_to_post_frontier_tree_delta": [
+      "docs/spec-index/index/_manifest.json",
+      "docs/spec-index/index/wld.json",
+      "docs/wayland/README.md",
+      "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "platform/Cargo.toml",
+      "platform/src/wayland/mod.rs",
+      "platform/tests/wayland_smoke.rs"
+    ],
+    "historical_evidence_policy": "Retained capacity artifacts keep the commit identities actually measured. These mappings preserve rebase provenance and do not relabel or requalify a historical measurement."
+  },
+  "cpy_disposition": {
+    "ratified_phases": [
+      "CPY-00",
+      "CPY-01",
+      "CPY-02"
+    ],
+    "implemented_boundary": "rlvgl-runtime-std provides the interpreter-neutral bounded native service, readiness, lifecycle, representative host workload, and semantic egress projection.",
+    "draft_phases": [
+      "CPY-03",
+      "CPY-04",
+      "CPY-05",
+      "CPY-06",
+      "CPY-07",
+      "CPY-08",
+      "CPY-09"
+    ],
+    "next_evidence_gate": "CPY-03 physical BeagleBone Black representative-workload qualification",
+    "not_implemented": [
+      "rlvgl-cpython PyO3 crate",
+      "Python package and PyPI artifacts",
+      "exported Frame Lease buffer protocol",
+      "embedded-Linux CPython runtime qualification",
+      "host-windowed and asyncio integration",
+      "release budgets and closure"
+    ]
+  },
+  "mpy_disposition": {
+    "ratified_phases": [
+      "MPY-00",
+      "MPY-01",
+      "MPY-02",
+      "MPY-03",
+      "MPY-04",
+      "MPY-05"
+    ],
+    "implementation_boundary": "MPY-03 records satisfied implementation exit; neutral implementation reaches PCDN-MPY-04-016 and substantial MPY-05 Endpoint/Cue substrate.",
+    "last_accepted_pcdn": "PCDN-MPY-04-016",
+    "next_pcdn": {
+      "id": "PCDN-MPY-04-017",
+      "state": "proposal-only",
+      "boundary": "canonical Batch-frame lowering into BatchStageDirection and owned Result publication"
+    },
+    "coverage_summary": {
+      "current": 3,
+      "partial": 2,
+      "without_claims": 10
+    },
+    "later_phase_state": "MPY-06 and MPY-07 are owner-accepted but unratified; MPY-08 and MPY-09 remain Draft."
+  },
+  "verification": {
+    "spec_scanner_tests": "20/20",
+    "suspicion_tests": "7/7",
+    "implementation_frontier_index": "clean at 2,220 objects across 28 families",
+    "open_suspicion_diagnostics": "two existing INV-MPY-9 diagnostics",
+    "rust": [
+      "selected API/core/widgets/platform/runtime all-target tests passed",
+      "strict selected-crate Clippy passed",
+      "cargo fmt --check passed",
+      "git diff --check passed"
+    ],
+    "publication": "Local rlvgl and parent commits matched their GitHub branch tips after push."
+  },
+  "coordination_disposition": "This shared migration wave is closed. Family-owned work may proceed independently; every future change to a shared MPY surface requires a new CPY-02 handoff record and explicit path authority."
+}

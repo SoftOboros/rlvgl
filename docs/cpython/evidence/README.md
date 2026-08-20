@@ -14,6 +14,7 @@ do not satisfy embedded-Linux, physical-board, Python, frame, or release gates.
 |---|---|
 | [`CPY-BASELINE-2026-08-18.json`](CPY-BASELINE-2026-08-18.json) | Exact source, authority, tool, interpreter, rootfs, board, and planned-artifact selection. |
 | [`CPY-HANDOFF-0cf406b.json`](CPY-HANDOFF-0cf406b.json) | MPY owner's acknowledged Safe Point, verified MPY frontier, concurrent-work boundary, and exact paths authorized for the first shared CPY migration wave. |
+| [`CPY-COORDINATION-CLOSEOUT-2026-08-20.json`](CPY-COORDINATION-CLOSEOUT-2026-08-20.json) | Published implementation frontier, rebase provenance, completed shared-wave boundary, remaining CPY/MPY gates, and the requirement for a new handoff before later shared work. |
 | [`_generated/CPY-CARGO-LOCK-0cf406b.lock`](_generated/CPY-CARGO-LOCK-0cf406b.lock) | Detached copy of the resolver snapshot used for the baseline. The workspace intentionally ignores its root `Cargo.lock`; this evidence file preserves the exact selection without changing that policy. |
 | [`_generated/CPY-GRAPH-0cf406b.json`](_generated/CPY-GRAPH-0cf406b.json) | Normalized workspace packages, features, local dependency edges, public-path hashes, and governed publish order. |
 | [`CPY-CAPACITY-HOST-2026-08-18.json`](CPY-CAPACITY-HOST-2026-08-18.json) | CPY-03 diagnostic host matrix: four ingress/egress/turn candidates, three bounded-channel stress scenarios, and five retained iterations per row. It explicitly makes no capacity decision. |
@@ -28,6 +29,28 @@ The immutable source authority is commit
 tracked Cargo manifests at that commit. The detached lock and normalized graph
 are evidence artifacts rather than source authority because the root lockfile
 is intentionally ignored for this library workspace.
+
+## Coordinated wave closeout
+
+The first MPY/CPY migration wave is closed, but neither language initiative is
+complete. Its implemented product is the interpreter-neutral
+`rlvgl-runtime-std` service boundary. The PyO3 adapter, Python package, Frame
+Lease export, embedded and windowed CPython profiles, PyPI artifacts, and
+release evidence remain separately gated CPY phases. On the MPY side,
+`PCDN-MPY-04-017` remains proposal-only and complete Batch-frame ingress/owned
+Result publication is not part of this closeout.
+
+The implementation series was rebased over WLD's published Wayland evidence
+before it was pushed. Retained capacity artifacts continue to name the commit
+identities actually measured. The closeout record maps those identities to
+their published equivalents and identifies combined index commits that were
+regenerated to compose WLD objects. That mapping is provenance only: it does
+not turn a historical host measurement into a new run, physical-board
+qualification, capacity decision, or release budget.
+
+Future family-owned work may proceed independently. A future CPY change to an
+MPY-owned or otherwise shared surface requires a new CPY-02 handoff record; the
+completed first handoff does not confer continuing shared-path authority.
 
 ## Qualification-state rule
 
