@@ -10,7 +10,7 @@ CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md - CPY claim, evidence, budget, documen
 numeric budgets, release version, and evidence retention remain open. Not
 ratified.
 
-**Revision:** 0.2.0
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -128,6 +128,9 @@ visible in its Release Level and public documentation.
 - Claimed window/event-loop platforms and asyncio/synchronous interleaving.
 - Offline install/import for every artifact row, wheel tag audit, dependency
   closure, stub/descriptor fingerprint, and upgrade compatibility.
+- Isolated build of the published `rlvgl` source distribution, TestPyPI
+  upload/install for every public wheel/sdist row, and inspection proving the
+  native rlvgl source manifest matches the closed Baseline/Artifact manifests.
 
 ### 6.6 Hardened security review
 
@@ -192,6 +195,7 @@ A closing Release Level MUST ship:
 - error/callback/shutdown guidance;
 - exact supported/unsupported profile and qualification matrix;
 - packaging/rootfs installation and troubleshooting;
+- PyPI installation/source-build instructions and exact public artifact rows;
 - retained Baseline, Artifact, Evidence, and Closure manifests; and
 - changelog/release notes with no broader claim than the ledger.
 
@@ -214,7 +218,9 @@ other row:
 `CPY-RL-EMBEDDED-DIRECT-1` is the first closure target. Full-host, Hardened,
 and free-threaded levels close only when their own rows pass; they do not block
 that embedded-focused level. A release may carry more than one closed level,
-but public wording and manifests list each separately.
+but public wording and manifests list each separately. Publishing any level as
+the PyPI project `rlvgl` requires the CPY-08 sdist/wheel rows and TestPyPI proof
+to be closed; production upload occurs only after the owner's Closure Record.
 
 ## 9. Phase Invariants
 
@@ -230,6 +236,7 @@ but public wording and manifests list each separately.
 | **INV-CPY-09-8** | Release documentation MUST not claim capabilities, profiles, targets, or security properties absent from the closed claim ledger. | Docs-to-ledger link audit |
 | **INV-CPY-09-9** | Generated and authored spec indexes MUST be clean and deterministic before closure, without overwriting concurrent family ownership. | `make spec-test spec-index-check` and source audit |
 | **INV-CPY-09-10** | Initiative closure MUST retain all manifests/evidence and MUST create a retrospective once every phase is shipped or explicitly closed. | Closure/retrospective review |
+| **INV-CPY-09-11** | A PyPI publication MUST contain only artifacts named by the owner-approved Closure Record and MUST reproduce the exact pinned native rlvgl graph proven by CPY-08. | TestPyPI/production-index manifest and post-upload install audit |
 
 ## 10. Reconciliation Decisions
 
@@ -285,6 +292,9 @@ but public wording and manifests list each separately.
 - [ ] Every claimed host/async/backend/artifact row passes its own gates.
 - [ ] Profile-specific measured budgets pass with reproducible methods.
 - [ ] Documentation and release notes link only to closed claims.
+- [ ] PyPI source/wheel rows pass TestPyPI and are explicitly authorized by the
+      Closure Record before production upload; the release owner controls the
+      normalized production project name.
 - [ ] Authored and generated documentation indexes are clean.
 - [ ] The owner records a CPY Closure Record in §15 and schedules the retrospective.
 
@@ -370,3 +380,30 @@ scenarios, because both hide which authority/profile was actually proven.
 What deliberately did not change: performance thresholds, release version,
 profile set, and retention policy remain open until representative evidence
 exists.
+
+### 0.3.0 — 2026-08-19 — gate PyPI publication through closure evidence
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-09-1, INV-CPY-09-8, INV-CPY-09-11, §6, §8, §9, §12
+
+**Commits:** pending
+
+**Summary:** Adds self-contained sdist, TestPyPI, post-upload installation, and
+owner Closure Record gates for publication under the `rlvgl` PyPI project.
+
+#### Rationale
+
+PyPI is a delivery mechanism, not evidence that a native extension carries the
+correct rlvgl source, ABI, backend features, or claims. Closing the exact public
+artifact rows before upload makes the normal Python install path useful without
+turning index availability into an accidental global conformance statement.
+
+Considered and rejected: publishing before target/import proof, authorizing all
+profiles from one wheel, or treating a successful TestPyPI upload as the owner
+release decision.
+
+What deliberately did not change: version selection, performance budgets,
+retention policy, and the actual production upload remain open/owner-gated.

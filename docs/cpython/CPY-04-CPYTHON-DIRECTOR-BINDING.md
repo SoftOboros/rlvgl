@@ -6,10 +6,10 @@ CPY-04-CPYTHON-DIRECTOR-BINDING.md - PyO3 module, object, conversion, callback, 
 
 **Document ID:** CPY-04-CPYTHON-DIRECTOR-BINDING
 
-**Status:** Draft 2026-08-18. Six policy PCDNs resolved 2026-08-18;
+**Status:** Draft 2026-08-18. Seven policy PCDNs resolved through 2026-08-19;
 implementation and dependency evidence remain open. Not ratified.
 
-**Revision:** 0.2.0
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -86,12 +86,12 @@ Rust crate `rlvgl-cpython`. Public Python code MUST import names from `rlvgl`,
 not `_native`; this permits generated Python conveniences and typing metadata
 without making the extension basename a second API.
 
-The public package MUST provide `Runtime`, `Stage`, `Actor`, `Transaction`,
-`TransactionActor`, `Subscription`, `Request`, and `PollBatch`. The first
-generated convenience set additionally provides `Container`, `Label`,
-`Button`, `Slider`, and `List` for the exact MPY-01 Wave 1 actor rows. Those
-classes are typed `Actor` projections; they do not wrap Rust widget objects or
-replace the Generic Layer.
+The public package MUST provide `Runtime`, `RuntimeConfig`,
+`WaylandWindowConfig`, `Stage`, `Actor`, `Transaction`, `TransactionActor`,
+`Subscription`, `Request`, and `PollBatch`. The first generated convenience set
+additionally provides `Container`, `Label`, `Button`, `Slider`, and `List` for
+the exact MPY-01 Wave 1 actor rows. Those classes are typed `Actor` projections;
+they do not wrap Rust widget objects or replace the Generic Layer.
 
 ```python
 runtime = rlvgl.Runtime(default_timeout=1.0, ...)
@@ -108,6 +108,45 @@ subscription = actor.on("clicked", callback).result()
 batch = runtime.poll(limit=...)
 runtime.close()
 ```
+
+### 5.1 Runtime and compositor configuration
+
+`RuntimeConfig` is an immutable Python value that selects one packaged backend
+profile and carries only that profile's admitted startup values. The binding
+fully validates and copies it into Rust-owned storage before creating the
+Native Runtime Service. Native code retains no borrowed Python string,
+mapping, buffer, or callback from configuration.
+
+The Wayland projection is `WaylandWindowConfig`. Its minimum surface is a
+positive requested logical width and height, UTF-8 title and application id,
+one WLD-owned size policy (`adaptive-window` or `fixed-canvas`), and an explicit
+fullscreen modifier. Backend limit/capacity values required by WLD remain
+explicit `RuntimeConfig` inputs. Python supplies the configuration when
+constructing `Runtime`; it is not a post-start mutation channel:
+
+```python
+runtime = rlvgl.Runtime(
+    config=rlvgl.RuntimeConfig.wayland(
+        rlvgl.WaylandWindowConfig(
+            logical_width=1280,
+            logical_height=720,
+            title="Instrument panel",
+            app_id="com.softoboros.instrument-panel",
+            size_policy="fixed-canvas",
+            fullscreen=False,
+        )
+    ),
+    default_timeout=1.0,
+)
+```
+
+The configuration requests a logical surface area; it does not promise an
+absolute desktop `(x, y)` position, which an ordinary Wayland toplevel does not
+control. The WLD-owned native session creates and owns compositor objects on
+its required thread, processes configure events, and publishes the actual
+configured logical size/profile state. Python neither drives the Wayland event
+loop nor treats its requested size as the final framebuffer size. Unsupported
+backend/profile values fail with stable structured errors before `Running`.
 
 Every wrapper MUST carry its Service Epoch and neutral stable identity. Each
 operation MUST validate the epoch before admission. Wrapper destruction may
@@ -294,6 +333,7 @@ cue order, later callback eligibility, or presentation.
 | **INV-CPY-04-6** | Native threads MUST NOT access the Callback Registry; callbacks MUST run only during a Binding Turn. | Thread-id instrumentation and callback-stall tests |
 | **INV-CPY-04-7** | Callback exceptions MUST be contained and MUST NOT alter native commit, cue ordering, or presentation cadence. | Exception-hook and cadence tests |
 | **INV-CPY-04-8** | Close/finalization MUST release callbacks, handles, and service resources without calling Python from native teardown. | interpreter-finalization stress tests |
+| **INV-CPY-04-9** | Backend configuration MUST be fully copied and validated before native startup; Python MUST NOT own backend objects, event-loop cadence, or compositor placement/final geometry. | Mutation-after-start, thread-id, and configure/reconfigure tests |
 
 ## 10. Reconciliation Decisions
 
@@ -343,6 +383,13 @@ cue order, later callback eligibility, or presentation.
   2026-08-18.** Use the exact §6 hierarchy/mapping, return binding-local
   `CallbackFailure` records, and route the default report through
   `sys.unraisablehook` without unwinding into Rust or altering native work.
+- **PCDN-CPY-04-007 — Runtime/backend configuration — Accepted as amended
+  2026-08-19.** Expose immutable `RuntimeConfig` and `WaylandWindowConfig`
+  values at the package root. Copy and validate them before service startup;
+  let Python request logical size/title/application id/WLD size policy and the
+  fullscreen modifier, while
+  the WLD-owned native session retains event-loop, compositor-object,
+  placement, configure, and actual-geometry authority.
 
 ## 12. Acceptance Checklist
 
@@ -353,6 +400,8 @@ cue order, later callback eligibility, or presentation.
 - [ ] Blocking calls detach Python while the native service remains independent.
 - [ ] Descriptor-generated classes/stubs cannot drift from the Generic Layer.
 - [ ] Module/subinterpreter/finalization state is explicit.
+- [ ] Runtime/backend configuration is copied before startup and Wayland
+      requested-versus-configured geometry is proven without Python ownership.
 - [ ] The owner records ratification in §15.
 
 ## 13. Files Cited
@@ -368,7 +417,7 @@ cue order, later callback eligibility, or presentation.
 
 ## 14. Unblocks
 
-All six policy PCDNs are resolved, but CPY-04 remains Draft. Ratification is
+All seven policy PCDNs are resolved, but CPY-04 remains Draft. Ratification is
 blocked by CPY-03, the consumed MPY phases, generated/generic trace parity,
 thread/finalization tests, and owner acceptance of the completed phase.
 Ratification plus CPY-03's native-only proof would unblock the leaf PyO3
@@ -434,3 +483,34 @@ callbacks, because both introduce semantic drift and timing/finalization risk.
 
 What deliberately did not change: neutral Stage/Actor/batch/cue behavior and
 the MicroPython adapter remain separately owned.
+
+### 0.3.0 — 2026-08-19 — add Python-owned startup configuration
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-04-4, INV-CPY-04-9, PCDN-CPY-04-007, §5, §9, §11,
+§12, §14
+
+**Commits:** pending
+
+**Summary:** Adds immutable Python runtime/backend configuration and the
+Wayland logical-window projection while retaining native compositor ownership.
+
+#### Rationale
+
+A publishable CPython package must let applications select a backend and
+request their initial render/window area without compiling a custom Rust
+launcher. Copy-before-start preserves the interpreter/native boundary. Wayland
+placement and final configure size remain compositor/backend facts, so the API
+does not promise coordinates or let Python drive native cadence.
+
+Considered and rejected: environment-only configuration, retaining a Python
+mapping on the service thread, constructing Wayland objects in Python, treating
+requested dimensions as final frame geometry, or promising absolute toplevel
+placement.
+
+What deliberately did not change: WLD lifecycle/protocol semantics, frame
+lease/export, device presentation, package build mechanics, and backend
+implementation remain owned by their respective phases.

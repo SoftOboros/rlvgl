@@ -9,7 +9,7 @@ CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md - Full-host proof, presenter, event-loo
 **Status:** Draft 2026-08-18. Three policy PCDNs resolved 2026-08-18;
 window topology and asyncio drain capacity remain evidence-gated. Not ratified.
 
-**Revision:** 0.2.0
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -104,6 +104,16 @@ A WLD-backed Linux profile is additive and separately qualified against the
 ratified WLD lifecycle; it does not replace the portable profile or become a
 CPython-owned backend.
 
+Every windowed row consumes CPY-04's immutable copied `RuntimeConfig` before
+native startup. A WLD-backed row additionally consumes
+`WaylandWindowConfig`: Python requests the initial positive logical area,
+title, application id, WLD-owned Adaptive Window/Fixed Canvas size policy, and
+the fullscreen modifier, while WLD owns compositor objects, dispatch, configure
+acknowledgment, placement, and the final logical size. Runtime inspection
+distinguishes requested from configured geometry, and
+later configure/scale changes enter the native record path without waiting for
+Python callbacks.
+
 The process topology MUST be selected per backend/operating system:
 
 - use Extension-Owned Process when the backend can run correctly with the
@@ -179,6 +189,7 @@ MUST NOT replace canonical headless frame evidence.
 | **INV-CPY-07-5** | Synthetic input MUST traverse native input translation and MUST NOT invoke Python callbacks directly. | Input trace equivalence tests |
 | **INV-CPY-07-6** | Canonical frame evidence MUST come from the deterministic frame path; compositor/window screenshots MUST remain separately labeled. | Evidence-manifest audit |
 | **INV-CPY-07-7** | Close MUST unregister readiness/event-loop resources before service/module teardown. | Async close/finalization stress tests |
+| **INV-CPY-07-8** | Windowed startup MUST project copied Python configuration into the selected native presenter and report actual configured geometry without promising compositor-controlled placement. | Requested/configured geometry and thread-ownership integration tests |
 
 ## 10. Reconciliation Decisions
 
@@ -230,6 +241,8 @@ MUST NOT replace canonical headless frame evidence.
 - [ ] Asyncio and `poll()` share one drain path and ordering.
 - [ ] Synthetic input traverses native semantics.
 - [ ] Canonical frames and window screenshots remain distinct evidence classes.
+- [ ] Window configuration proves requested-versus-configured geometry and
+      retains native presenter/event-loop ownership.
 - [ ] Async/window close is safe under interpreter finalization.
 - [ ] The owner records ratification in §15.
 
@@ -311,3 +324,31 @@ using window screenshots as canonical renderer evidence.
 
 What deliberately did not change: backend, neutral runtime, binding, and frame
 semantics remain owned by their respective phases.
+
+### 0.3.0 — 2026-08-19 — configure native windows from Python startup values
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-07-1, INV-CPY-07-4, INV-CPY-07-8, §6, §9, §12
+
+**Commits:** pending
+
+**Summary:** Projects immutable Python window configuration into portable and
+Wayland native presenters while separating requested and configured geometry.
+
+#### Rationale
+
+The same PyPI package must support headless and interactive use without a
+custom Rust executable merely to choose a window area. Startup configuration
+supplies that application policy, while backend event-loop and compositor
+authority remain native and platform-owned.
+
+Considered and rejected: environment variables as the only public surface,
+Python-owned event dispatch, absolute Wayland placement, or using compositor
+screenshots as canonical frames.
+
+What deliberately did not change: the open per-backend topology decision,
+asyncio drain budget, WLD lifecycle, and deterministic Headless Session gates
+remain separate.

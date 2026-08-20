@@ -9,7 +9,7 @@ CPY-06-EMBEDDED-LINUX-RUNTIME.md - Primary embedded-Linux device, presentation, 
 **Status:** Draft 2026-08-18. Six policy PCDNs resolved 2026-08-18;
 rootfs, implementation, and physical-board evidence remain open. Not ratified.
 
-**Revision:** 0.2.0
+**Revision:** 0.3.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -198,6 +198,24 @@ transparency bitfields before `Running`. CPY-05 publication layout does not
 permit assuming that arbitrary fbdev memory already has the canonical Python
 layout.
 
+### 7.2 Compositor-profile startup configuration
+
+An embedded compositor profile consumes CPY-04's copied `RuntimeConfig` and
+`WaylandWindowConfig` before native service startup. Python may select the
+packaged Wayland profile and request a positive logical width/height, title,
+application id, WLD-owned Adaptive Window/Fixed Canvas size policy, and the
+fullscreen modifier. These are application startup values, not device
+privileges and not direct access to a Wayland
+connection, queue, surface, buffer, or file descriptor.
+
+The WLD-owned native session creates all compositor objects and reconciles the
+request with compositor configure events before reporting `Running`. The
+configured logical size, scale, and resulting frame geometry are observed
+facts and may differ from the request. Ordinary Wayland toplevel configuration
+does not expose client-selected absolute screen coordinates; CPY MUST NOT
+invent that promise. Later configure events remain native lifecycle/geometry
+records and cannot depend on Python polling or callbacks for progress.
+
 Startup MUST validate geometry, pixel layout, stride, input capabilities, and
 required permissions before publishing `Running`. Partial startup closes every
 opened resource.
@@ -246,6 +264,7 @@ path even when native acceleration/presentation is used.
 | **INV-CPY-06-6** | Python Frame Leases MUST obey CPY-05 without delaying required native presentation. | Held-lease board cadence test |
 | **INV-CPY-06-7** | Backend-specific lifecycle/input semantics MUST remain owned by the selected platform family and MUST NOT be redefined in the CPython adapter. | Dependency/diff and conformance review |
 | **INV-CPY-06-8** | A physical embedded-Linux claim MUST include boot/import/input/render/present/shutdown and measured resource evidence on the CPY-01 Reference Board. | CPY-09 board evidence bundle |
+| **INV-CPY-06-9** | A compositor profile MUST lower copied Python startup configuration into the native backend before `Running`, then expose actual configured geometry without transferring compositor authority to Python. | Configure/reconfigure trace and thread/fd ownership audit |
 
 ## 10. Reconciliation Decisions
 
@@ -301,6 +320,8 @@ path even when native acceleration/presentation is used.
 - [x] Direct and hardened process/privilege boundaries are explicit.
 - [x] Device Manifest, startup, Device Loss, and shutdown policy is complete.
 - [x] The selected backend remains under its owning authority.
+- [ ] A claimed compositor profile proves requested-versus-configured geometry
+      and native event-loop ownership from Python startup configuration.
 - [ ] Native cadence is independent of Python and held observer leases.
 - [ ] The Reference Board/rootfs and physical evidence procedure are fixed.
 - [x] High-privilege `/dev/mem` behavior cannot be mistaken for a sandbox.
@@ -391,3 +412,32 @@ device mappings.
 
 What deliberately did not change: platform, WLD, LPAR, frame, and neutral
 runtime semantics remain with their owning phases.
+
+### 0.3.0 — 2026-08-19 — project Python configuration into compositor startup
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** semantic
+
+**Touches:** INV-CPY-06-1, INV-CPY-06-7, INV-CPY-06-9, §7, §8, §9, §12
+
+**Commits:** pending
+
+**Summary:** Requires an embedded Wayland profile to consume copied Python
+window configuration before native startup while reporting compositor-selected
+geometry and retaining native event-loop ownership.
+
+#### Rationale
+
+Embedded Linux may run under a compositor rather than direct fbdev. The Python
+application needs to request its logical render/window area, but that request
+cannot become a raw Wayland handle or a false absolute-placement guarantee.
+The CPY configuration projection therefore composes WLD without redefining it.
+
+Considered and rejected: Python-owned Wayland dispatch, post-start mutation of
+borrowed configuration, exposing the connection fd/surface, or treating the
+requested size as the compositor's final configure result.
+
+What deliberately did not change: the BBB fbdev/evdev primary profile, WLD
+implementation authority, device/privilege manifests, and physical evidence
+gates remain unchanged.

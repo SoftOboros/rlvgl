@@ -16,6 +16,13 @@ with embedded Linux as the primary deployment and full-host headless/windowed
 operation as the development and conformance companion. It consumes the
 language-neutral MPY contracts without making CPython their semantic authority.
 
+The public distribution is `rlvgl` and must be publishable to PyPI as truthful
+prebuilt wheels plus a self-contained source distribution that carries/builds
+the pinned native rlvgl graph. Python startup configuration selects packaged
+backends. For Wayland, Python requests logical window area and public metadata;
+the WLD-owned native session retains compositor/event-loop authority and reports
+the actual configured geometry.
+
 The initiative also includes a dedicated crate-topology phase. That phase
 unifies protocol, runtime, rendering, and conformance assets at their neutral
 owners while partitioning CPython, MicroPython, threaded-host, platform, and
@@ -46,12 +53,12 @@ through ratified phase documents and their acceptance gates.
 | [CPY-01](CPY-01-BASELINE-TARGET-PROFILES.md) | Repository baseline, CPython/PyO3 pins, target profiles, and capability matrix | Ratified 2026-08-18; exact baseline retained; runtime qualification remains later-phase evidence |
 | [CPY-02](CPY-02-UNIFY-PARTITION-CRATES.md) | Unify neutral contracts and partition interpreter/runtime/platform crates | Ratified 2026-08-18; graph/firewall/handoff complete; first `runtime-std` slice authorized |
 | [CPY-03](CPY-03-NATIVE-RUNTIME-SERVICE.md) | Native runtime thread, bounded queues, lifecycle, and callback isolation | Draft; v3 Stage/input/Cue/private-frame workload implemented; clean host/BBB qualification open |
-| [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, transactions, exceptions, callbacks, and typing | Draft; six binding-policy PCDNs resolved; dependency/implementation evidence open |
+| [CPY-04](CPY-04-CPYTHON-DIRECTOR-BINDING.md) | PyO3 module, Python objects, runtime/backend configuration, transactions, exceptions, callbacks, and typing | Draft; seven binding-policy PCDNs resolved; dependency/implementation evidence open |
 | [CPY-05](CPY-05-FRAME-LEASE-BUFFER-PROTOCOL.md) | Flattened frames, immutable leases, buffer protocol, damage, and backpressure | Draft; five frame-policy PCDNs resolved; measured slot capacities and proof open |
-| [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |
-| [CPY-07](CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md) | Headless and windowed host profiles, asyncio readiness, and launcher boundary | Draft; three policies resolved; window topology and drain count open |
-| [CPY-08](CPY-08-PACKAGING-CROSS-DEPLOYMENT.md) | Wheels, target-rootfs cross-builds, services, versioning, and artifact manifests | Draft; six packaging policies resolved; build/import/reproducibility proof open |
-| [CPY-09](CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md) | Cross-driver parity, frame/thread/lifetime evidence, budgets, docs, and release closure | Draft; three policies resolved; budgets/version/retention open |
+| [CPY-06](CPY-06-EMBEDDED-LINUX-RUNTIME.md) | Primary fbdev/evdev or admitted native backend, copied Python startup configuration, device lifecycle, and privilege profiles | Draft; six embedded policy PCDNs resolved; rootfs/board/runtime proof open |
+| [CPY-07](CPY-07-HOST-HEADLESS-WINDOWED-ASYNCIO.md) | Headless and configured windowed host profiles, asyncio readiness, and launcher boundary | Draft; three policies resolved; window topology and drain count open |
+| [CPY-08](CPY-08-PACKAGING-CROSS-DEPLOYMENT.md) | PyPI sdist/wheels, target-rootfs cross-builds, services, versioning, and artifact manifests | Draft; six packaging policies resolved; isolated build/import/reproducibility proof open |
+| [CPY-09](CPY-09-CONFORMANCE-PERFORMANCE-RELEASE.md) | Cross-driver parity, frame/thread/lifetime evidence, budgets, PyPI gates, docs, and release closure | Draft; three policies resolved; budgets/version/retention open |
 
 ## Coordination boundaries
 
