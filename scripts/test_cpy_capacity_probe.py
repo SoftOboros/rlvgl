@@ -181,6 +181,24 @@ class ParserTests(unittest.TestCase):
         with self.assertRaises(Exception):
             cpy_capacity_probe._parse_candidate("8:0:4")
 
+    def test_representative_manifest_binds_direct_neutral_sources(self) -> None:
+        """The v3 manifest covers every direct Stage/input/Cue/render component."""
+
+        paths = cpy_capacity_probe.REPRESENTATIVE_SOURCE_PATHS
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertTrue(
+            {
+                "runtime-std/tests/native_service.rs",
+                "core/src/direction.rs",
+                "core/src/endpoint.rs",
+                "core/src/event.rs",
+                "core/src/object.rs",
+                "core/src/subscription.rs",
+                "widgets/src/container.rs",
+                "widgets/src/slider.rs",
+            }.issubset(paths)
+        )
+
 
 class EvidenceTests(unittest.TestCase):
     """Exercise the full matrix and deliberate accounting failures."""
@@ -203,6 +221,101 @@ class EvidenceTests(unittest.TestCase):
             )
         cpy_capacity_probe._validate_schema(bundle)
         cpy_capacity_probe.validate_bundle_value(bundle)
+
+    def test_legacy_probe_cannot_claim_representative_fields(self) -> None:
+        """A v1/v2 label cannot carry fields reserved for the v3 workload."""
+
+        bundle = _bundle()
+        bundle["runs"][0]["probe"]["frame_private"] = True
+        with self.assertRaises(cpy_capacity_probe.EvidenceError):
+            cpy_capacity_probe.validate_bundle_value(bundle)
+
+    def test_representative_probe_version_passes(self) -> None:
+        """The v3 workload proves neutral semantics, cadence, and private rendering."""
+
+        bundle = _bundle()
+        for run in bundle["runs"]:
+            probe = run["probe"]
+            probe["schema_version"] = "CPY-CAPACITY-PROBE-3"
+            probe["workload"] = (
+                "bounded-native-service-with-stage-input-cues-private-rgba-and-os-readiness"
+            )
+            probe["config"]["frame_period_us"] = 16_667
+            workload_requests = probe["accepted_requests"] + (
+                1 if probe["config"]["scenario"] == "cold-burst" else 0
+            )
+            probe.update(
+                {
+                    "workload_requests": workload_requests,
+                    "stage_batches": probe["service_turns"],
+                    "stage_completions": probe["service_turns"],
+                    "native_inputs": workload_requests,
+                    "cue_records": workload_requests,
+                    "frames_rendered": probe["service_turns"],
+                    "cadence_misses": 0,
+                    "final_stage_revision": 10,
+                    "frame_checksum": 1,
+                    "frame_width": 320,
+                    "frame_height": 240,
+                    "frame_stride": 1280,
+                    "frame_format": "RGBA8888",
+                    "frame_private": True,
+                }
+            )
+        for summary in bundle["summaries"]:
+            summary.update(
+                {
+                    "median_frames_rendered": 8,
+                    "median_cadence_misses": 0,
+                    "all_representative_semantics_exact": True,
+                }
+            )
+        cpy_capacity_probe._validate_schema(bundle)
+        cpy_capacity_probe.validate_bundle_value(bundle)
+
+    def test_representative_probe_rejects_missing_cue(self) -> None:
+        """One input without its neutral Cue invalidates representative evidence."""
+
+        bundle = _bundle()
+        for run in bundle["runs"]:
+            probe = run["probe"]
+            probe["schema_version"] = "CPY-CAPACITY-PROBE-3"
+            probe["workload"] = (
+                "bounded-native-service-with-stage-input-cues-private-rgba-and-os-readiness"
+            )
+            probe["config"]["frame_period_us"] = 16_667
+            workload_requests = probe["accepted_requests"] + (
+                1 if probe["config"]["scenario"] == "cold-burst" else 0
+            )
+            probe.update(
+                {
+                    "workload_requests": workload_requests,
+                    "stage_batches": probe["service_turns"],
+                    "stage_completions": probe["service_turns"],
+                    "native_inputs": workload_requests,
+                    "cue_records": workload_requests,
+                    "frames_rendered": probe["service_turns"],
+                    "cadence_misses": 0,
+                    "final_stage_revision": 10,
+                    "frame_checksum": 1,
+                    "frame_width": 320,
+                    "frame_height": 240,
+                    "frame_stride": 1280,
+                    "frame_format": "RGBA8888",
+                    "frame_private": True,
+                }
+            )
+        for summary in bundle["summaries"]:
+            summary.update(
+                {
+                    "median_frames_rendered": 8,
+                    "median_cadence_misses": 0,
+                    "all_representative_semantics_exact": True,
+                }
+            )
+        bundle["runs"][0]["probe"]["cue_records"] -= 1
+        with self.assertRaises(cpy_capacity_probe.EvidenceError):
+            cpy_capacity_probe.validate_bundle_value(bundle)
 
     def test_missing_iteration_is_rejected(self) -> None:
         """A partial candidate/scenario matrix cannot be summarized as evidence."""

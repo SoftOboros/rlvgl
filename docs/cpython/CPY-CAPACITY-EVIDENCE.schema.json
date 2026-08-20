@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://softoboros.com/schemas/rlvgl/cpy-capacity-evidence-1.json",
   "title": "rlvgl CPY Capacity Evidence",
-  "description": "Clean-source diagnostic measurements for CPY-03 bounded queue and per-turn capacity candidates; this schema never selects normative defaults or maxima.",
+  "description": "Clean-source CPY-03 measurements for bounded queue and per-turn candidates, including the representative Stage/input/Cue/private-frame workload; this schema never selects normative defaults or maxima.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -294,6 +294,9 @@
         "sampling_hold_us": {
           "$ref": "#/$defs/positiveInteger"
         },
+        "frame_period_us": {
+          "$ref": "#/$defs/positiveInteger"
+        },
         "scenarios": {
           "const": [
             "cold-burst",
@@ -424,6 +427,9 @@
         },
         "sampling_hold_us": {
           "$ref": "#/$defs/positiveInteger"
+        },
+        "frame_period_us": {
+          "$ref": "#/$defs/positiveInteger"
         }
       }
     },
@@ -460,13 +466,15 @@
         "schema_version": {
           "enum": [
             "CPY-CAPACITY-PROBE-1",
-            "CPY-CAPACITY-PROBE-2"
+            "CPY-CAPACITY-PROBE-2",
+            "CPY-CAPACITY-PROBE-3"
           ]
         },
         "workload": {
           "enum": [
             "bounded-crossbeam-transport-with-empty-endpoint-safe-turn",
-            "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness"
+            "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness",
+            "bounded-native-service-with-stage-input-cues-private-rgba-and-os-readiness"
           ]
         },
         "retained_bytes_scope": {
@@ -535,6 +543,48 @@
         },
         "consumer_checksum": {
           "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "workload_requests": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "stage_batches": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "stage_completions": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "native_inputs": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "cue_records": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "frames_rendered": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "cadence_misses": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "final_stage_revision": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "frame_checksum": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "frame_width": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "frame_height": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "frame_stride": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "frame_format": {
+          "const": "RGBA8888"
+        },
+        "frame_private": {
+          "const": true
         }
       }
     },
@@ -623,6 +673,15 @@
           "const": true
         },
         "all_envelope_bytes_released": {
+          "const": true
+        },
+        "median_frames_rendered": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "median_cadence_misses": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "all_representative_semantics_exact": {
           "const": true
         }
       }

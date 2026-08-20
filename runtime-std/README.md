@@ -76,11 +76,13 @@ assert!(!records.is_empty());
 ## Capacity probe
 
 The `cpy_capacity_probe` example is a diagnostic CPY-03 measurement target. Its
-v2 workload drives the production `NativeService` around an owner-thread
-`Endpoint`, including OS readiness, bounded admission, exact terminal records,
+v3 workload drives the production `NativeService` around an owner-thread
+`Endpoint`: real Stage/Slider mutations and completions, native pointer input
+and Cue drain/acknowledgment, fixed render cadence, a private non-exported
+320×240 RGBA frame, OS readiness, bounded admission, exact terminal records,
 and ordered shutdown. It exercises cold bursts, sustained admission, and a
-stalled egress observer, then emits one JSON result. Candidate values are
-inputs, not runtime defaults:
+stalled egress observer, then emits one JSON result. The private frame is not a
+Frame Lease or Python buffer. Candidate values are inputs, not runtime defaults:
 
 ```bash
 cargo run --release -p rlvgl-runtime-std \
@@ -92,7 +94,8 @@ cargo run --release -p rlvgl-runtime-std \
   --messages 1024 \
   --ingress-payload-bytes 256 \
   --egress-payload-bytes 128 \
-  --observer-stall-us 50000
+  --observer-stall-us 50000 \
+  --frame-period-us 16667
 ```
 
 Use `scripts/cpy_capacity_probe.py` for a reproducible matrix and evidence

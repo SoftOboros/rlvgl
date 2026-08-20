@@ -10,10 +10,10 @@ CPY-03-NATIVE-RUNTIME-SERVICE.md - Native threaded runtime, bounded queue, and l
 service lifecycle, bounded queues, ownership, Unix readiness, and host v1/v2
 diagnostic capacity matrices are complete. Typed restart/stale-epoch
 validation and active-turn close-fence stress evidence are complete.
-Representative native-workload and physical-board qualification evidence
-remains open. Not ratified.
+The representative v3 workload implementation is complete; clean-source host
+and physical-board qualification evidence remains open. Not ratified.
 
-**Revision:** 0.8.0
+**Revision:** 0.9.0
 
 **Author:** Ira Abbott / OpenAI Codex (drafting)
 
@@ -332,6 +332,21 @@ stall. These remain host diagnostics, not budgets or target qualification. The
 empty Safe Turn omits representative Actor/render/frame/input work, and the
 same clean source has not run on the BBB.
 
+The current 0.9.0 implementation upgrades the probe to v3 without relabeling
+the retained v1/v2 matrices. Every native service turn now commits one real
+Stage batch over the built-in Slider actor, drains its exact completion,
+dispatches one pointer input and Cue per workload request, acknowledges the
+opaque Cue drain, and renders the resulting object tree at an explicit fixed
+cadence into a private non-exported 320×240 RGBA buffer. The output records
+Stage, input, Cue, frame, cadence, and checksum accounting, and the evidence
+manifest binds the API/core/widget sources that define those semantics.
+
+This closes the empty-Safe-Turn implementation gap but is not measurement
+evidence by itself. A clean committed v3 matrix must still qualify an explicit
+tuple on the host and physical BeagleBone Black. The private buffer is neither
+a Python export nor a Frame Lease, and the probe does not present it to a
+device.
+
 ## 12. Acceptance Checklist
 
 - [x] Every policy PCDN in §§11.2–11.3 is resolved.
@@ -358,7 +373,7 @@ same clean source has not run on the BBB.
 | `core/src/actor.rs` | Actor registry/runtime ownership |
 | `docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md` | Safe Turn, cues, bounded scheduling |
 | `examples/beaglebone-black/src/main.rs` | Existing Linux input/render/present cadence evidence |
-| `runtime-std/examples/cpy_capacity_probe.rs` | Native transport/capacity measurement executable |
+| `runtime-std/examples/cpy_capacity_probe.rs` | Representative native Stage/input/Cue/private-frame capacity executable |
 | `runtime-std/src/service.rs` | Bounded owner-thread lifecycle, admission, records, close/fault, and metrics |
 | `runtime-std/src/readiness.rs` | Linux `eventfd`, Unix self-pipe, and race-safe coalescing |
 | `runtime-std/tests/native_service.rs` | Ownership, terminal accounting, saturation, close, fault, and restart/stale-epoch evidence |
@@ -380,6 +395,46 @@ binding and CPY-05 frame integration without authorizing device access or
 release defaults.
 
 ## 15. Change Log
+
+### 0.9.0 — 2026-08-19 — replace the empty Safe Turn with representative work
+
+**Author:** Ira Abbott / OpenAI Codex
+
+**Change kind:** implementation
+
+**Touches:** INV-CPY-03-1, INV-CPY-03-2, INV-CPY-03-5, INV-CPY-03-6,
+PCDN-CPY-03-002, §8, §12, §13, §14
+
+**Commits:** pending
+
+**Summary:** Upgrades the production-service capacity probe to schema v3 with
+real neutral Stage mutation/completion, native pointer input and Cue handling,
+explicit frame cadence, and private flattened RGBA rendering.
+
+#### Rationale
+
+The accepted capacity decision requires measurement of the boundary the
+CPython adapter will actually consume, not an empty Endpoint call surrounded
+by synthetic payload copies. The v3 owner therefore retains one built-in
+Container/Slider Stage, mutates it through neutral directions, processes its
+completion and native event Cue, and recursively renders it into a private
+320×240 RGBA buffer before returning service records. All work remains on the
+native owner thread and the service still publishes only language-neutral
+records through bounded queues and readiness.
+
+The Rust semantic negative control suppressed Cue accounting; the focused v3
+test failed from zero records versus four inputs. The Python validator also
+rejects a syntactically valid v3 run with one missing Cue. Restoring exact Cue
+accounting makes both proofs pass.
+
+Considered and rejected: treating payload checksums as representative actor
+work, exporting the render buffer before CPY-05, using device presentation as
+a CPY-03 prerequisite, or overwriting retained v1/v2 evidence.
+
+What deliberately did not change: no capacity becomes normative, no Python or
+PyO3 dependency enters the runtime, no Frame Lease exists, and no fbdev/DRM or
+window presentation is performed. Clean-source host and physical BBB capture
+remain required before CPY-03 qualification.
 
 ### 0.8.0 — 2026-08-19 — prove the native close fence under stress
 

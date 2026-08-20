@@ -17,16 +17,43 @@ use std::{
     time::{Duration, Instant},
 };
 
+use rlvgl_api::protocol::ValueRef;
 use rlvgl_core::{
-    cue::{CUE_FRAME_OVERHEAD_BYTES, CueLimits},
-    endpoint::{Endpoint, EndpointLimits},
-    subscription::{EndpointEpoch, SubscriptionLimits},
+    actor::{
+        ActorIdentity, ConstructorInput, CreateDestination, RegistryLimits, StageId, StageRegistry,
+        TypeDescriptor,
+    },
+    cue::{CUE_FRAME_OVERHEAD_BYTES, CallbackId, CueLimits, DrainBudget, EventId, InputClass},
+    direction::{ActorDirection, OwnedValue, RuntimeFlag, StageDirection},
+    endpoint::{
+        BatchOutcome, Endpoint, EndpointLimits, EndpointNativeInput, NativeInputOutcome,
+        RequestId as EndpointRequestId,
+    },
+    event::Event,
+    object::{DispatchPhase, Disposition},
+    renderer::Renderer,
+    subscription::{
+        EndpointEpoch, PropagationPolicy, SubscribeRequest, SubscriptionFilter, SubscriptionLimits,
+    },
+    widget::{Color, Rect},
 };
 use rlvgl_runtime_std::{
     AdmissionError, NativeService, ServiceConfig, ServiceLifecycle, ServiceRecord,
     spawn_native_service,
 };
+use rlvgl_widgets::{mpy::CATALOG, slider};
 use serde::Serialize;
+
+const FRAME_WIDTH: usize = 320;
+const FRAME_HEIGHT: usize = 240;
+const FRAME_STRIDE: usize = FRAME_WIDTH * 4;
+const STAGE_ID: u32 = 1;
+const SLIDER_BOUNDS: Rect = Rect {
+    x: 16,
+    y: 100,
+    width: 288,
+    height: 40,
+};
 
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -61,6 +88,7 @@ struct ProbeConfig {
     observer_stall_us: u64,
     retry_backoff_us: u64,
     sampling_hold_us: u64,
+    frame_period_us: u64,
 }
 
 impl ProbeConfig {
@@ -75,6 +103,7 @@ impl ProbeConfig {
         let mut observer_stall_us = Some(0);
         let mut retry_backoff_us = Some(50);
         let mut sampling_hold_us = Some(5_000);
+        let mut frame_period_us = None;
         let mut arguments = env::args().skip(1);
 
         while let Some(argument) = arguments.next() {
@@ -99,6 +128,9 @@ impl ProbeConfig {
                 "--observer-stall-us" => observer_stall_us = Some(parse_u64(&argument, &value)?),
                 "--retry-backoff-us" => retry_backoff_us = Some(parse_u64(&argument, &value)?),
                 "--sampling-hold-us" => sampling_hold_us = Some(parse_u64(&argument, &value)?),
+                "--frame-period-us" => {
+                    frame_period_us = Some(parse_positive_u64(&argument, &value)?)
+                }
                 _ => return Err(format!("unknown argument {argument:?}\n{}", usage())),
             }
         }
@@ -116,9 +148,13 @@ impl ProbeConfig {
             observer_stall_us: observer_stall_us.expect("defaulted"),
             retry_backoff_us: retry_backoff_us.expect("defaulted"),
             sampling_hold_us: sampling_hold_us.expect("defaulted"),
+            frame_period_us: frame_period_us.ok_or_else(|| missing("--frame-period-us"))?,
         };
         if !matches!(config.scenario, Scenario::ObserverStall) && config.observer_stall_us != 0 {
             return Err("--observer-stall-us must be zero outside observer-stall".to_owned());
+        }
+        if config.turn_budget > u16::MAX as usize {
+            return Err("--turn-budget exceeds the neutral Stage direction width".to_owned());
         }
         Ok(config)
     }
@@ -129,7 +165,8 @@ fn usage() -> String {
 --scenario <cold-burst|sustained|observer-stall> \
 --ingress-capacity <N> --egress-capacity <N> --turn-budget <N> \
 --messages <N> --ingress-payload-bytes <N> --egress-payload-bytes <N> \
-[--observer-stall-us <N>] [--retry-backoff-us <N>] [--sampling-hold-us <N>]"
+[--observer-stall-us <N>] [--retry-backoff-us <N>] [--sampling-hold-us <N>] \
+--frame-period-us <N>"
         .to_owned()
 }
 
@@ -151,6 +188,14 @@ fn parse_u64(name: &str, value: &str) -> Result<u64, String> {
     value
         .parse::<u64>()
         .map_err(|error| format!("invalid {name} value {value:?}: {error}"))
+}
+
+fn parse_positive_u64(name: &str, value: &str) -> Result<u64, String> {
+    let parsed = parse_u64(name, value)?;
+    if parsed == 0 {
+        return Err(format!("{name} must be positive"));
+    }
+    Ok(parsed)
 }
 
 #[derive(Debug)]
@@ -203,17 +248,283 @@ impl EnvelopeTracker {
     }
 }
 
+#[derive(Debug, Default)]
+struct SemanticTracker {
+    workload_requests: AtomicU64,
+    stage_batches: AtomicU64,
+    stage_completions: AtomicU64,
+    native_inputs: AtomicU64,
+    cue_records: AtomicU64,
+    frames_rendered: AtomicU64,
+    cadence_misses: AtomicU64,
+    final_stage_revision: AtomicU64,
+    frame_checksum: AtomicU64,
+}
+
+struct PrivateRgbaFrame {
+    pixels: Vec<u8>,
+}
+
+impl PrivateRgbaFrame {
+    fn new() -> Self {
+        Self {
+            pixels: vec![0; FRAME_STRIDE * FRAME_HEIGHT],
+        }
+    }
+
+    fn clear(&mut self) {
+        self.pixels.fill(0);
+    }
+
+    fn checksum(&self) -> u64 {
+        self.pixels
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+                (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+            })
+    }
+
+    fn blend_pixel(&mut self, x: i32, y: i32, color: Color) {
+        if x < 0 || y < 0 || x as usize >= FRAME_WIDTH || y as usize >= FRAME_HEIGHT {
+            return;
+        }
+        let index = y as usize * FRAME_STRIDE + x as usize * 4;
+        let alpha = u16::from(color.3);
+        let inverse = 255 - alpha;
+        self.pixels[index] =
+            ((u16::from(color.0) * alpha + u16::from(self.pixels[index]) * inverse) / 255) as u8;
+        self.pixels[index + 1] = ((u16::from(color.1) * alpha
+            + u16::from(self.pixels[index + 1]) * inverse)
+            / 255) as u8;
+        self.pixels[index + 2] = ((u16::from(color.2) * alpha
+            + u16::from(self.pixels[index + 2]) * inverse)
+            / 255) as u8;
+        self.pixels[index + 3] = 0xff;
+    }
+}
+
+impl Renderer for PrivateRgbaFrame {
+    fn fill_rect(&mut self, rect: Rect, color: Color) {
+        let left = rect.x.max(0);
+        let top = rect.y.max(0);
+        let right = rect
+            .x
+            .saturating_add(rect.width)
+            .clamp(0, FRAME_WIDTH as i32);
+        let bottom = rect
+            .y
+            .saturating_add(rect.height)
+            .clamp(0, FRAME_HEIGHT as i32);
+        for y in top..bottom {
+            for x in left..right {
+                self.blend_pixel(x, y, color);
+            }
+        }
+    }
+
+    fn draw_text(&mut self, position: (i32, i32), text: &str, color: Color) {
+        for (index, byte) in text.bytes().enumerate() {
+            if !byte.is_ascii_whitespace() {
+                self.fill_rect(
+                    Rect {
+                        x: position.0 + index as i32 * 6,
+                        y: position.1 - 6,
+                        width: 4,
+                        height: 6,
+                    },
+                    color,
+                );
+            }
+        }
+    }
+}
+
+struct RepresentativeRuntime {
+    endpoint: Endpoint,
+    stage_id: StageId,
+    root_id: rlvgl_core::actor::ObjectId,
+    slider_actor: ActorIdentity,
+    slider_value_property: u32,
+    next_request_id: u32,
+    frame: PrivateRgbaFrame,
+    next_frame_deadline: Instant,
+    frame_period: Duration,
+    tracker: Arc<SemanticTracker>,
+}
+
+impl RepresentativeRuntime {
+    fn wait_for_cadence(&mut self) {
+        let deadline = self.next_frame_deadline;
+        let now = Instant::now();
+        if now < deadline {
+            thread::sleep(deadline.duration_since(now));
+        }
+        let started = Instant::now();
+        let period_nanos = self.frame_period.as_nanos();
+        let missed = if started > deadline {
+            started.duration_since(deadline).as_nanos() / period_nanos
+        } else {
+            0
+        };
+        self.tracker
+            .cadence_misses
+            .fetch_add(u64::try_from(missed).unwrap_or(u64::MAX), Ordering::SeqCst);
+        let advance = u32::try_from(missed.saturating_add(1)).unwrap_or(u32::MAX);
+        self.next_frame_deadline = deadline
+            .checked_add(self.frame_period.saturating_mul(advance))
+            .unwrap_or_else(|| started + self.frame_period);
+    }
+
+    fn render_private_frame(&mut self) -> Result<(), String> {
+        self.frame.clear();
+        let stage = self
+            .endpoint
+            .stage(self.stage_id)
+            .ok_or_else(|| "representative Stage disappeared before render".to_owned())?;
+        stage
+            .node(self.root_id)
+            .map_err(|error| format!("resolve representative render root: {error:?}"))?
+            .draw(&mut self.frame);
+        let checksum = black_box(self.frame.checksum());
+        self.tracker
+            .frame_checksum
+            .fetch_xor(checksum, Ordering::SeqCst);
+        self.tracker.frames_rendered.fetch_add(1, Ordering::SeqCst);
+        self.tracker
+            .final_stage_revision
+            .store(stage.revision().get(), Ordering::SeqCst);
+        Ok(())
+    }
+}
+
 struct StartGate {
     started: SyncSender<()>,
     release: Receiver<()>,
 }
 
 struct ServiceState {
-    endpoint: Endpoint,
+    runtime: RepresentativeRuntime,
     start_gate: Option<StartGate>,
     tracker: Arc<EnvelopeTracker>,
     service_checksum: Arc<AtomicU64>,
     egress_payload_bytes: usize,
+}
+
+fn run_representative_workload(
+    runtime: &mut RepresentativeRuntime,
+    requests: &[ProbeRequest],
+) -> Result<(), String> {
+    runtime.wait_for_cadence();
+    let mut directions = Vec::new();
+    directions
+        .try_reserve_exact(requests.len())
+        .map_err(|_| "reserve representative Stage directions".to_owned())?;
+    for _ in requests {
+        directions.push(StageDirection::MutateActor {
+            object_id: runtime.slider_actor.object_id,
+            directions: vec![ActorDirection::SetProperty {
+                id: runtime.slider_value_property,
+                value: OwnedValue::I32(0),
+            }],
+        });
+    }
+    let endpoint_request = EndpointRequestId::new(runtime.next_request_id)
+        .ok_or_else(|| "representative Endpoint request id exhausted".to_owned())?;
+    runtime.next_request_id = runtime
+        .next_request_id
+        .checked_add(1)
+        .ok_or_else(|| "representative Endpoint request id exhausted".to_owned())?;
+    runtime
+        .endpoint
+        .enqueue_batch(endpoint_request, runtime.stage_id, directions)
+        .map_err(|error| format!("enqueue representative Stage batch: {error:?}"))?;
+    runtime.tracker.stage_batches.fetch_add(1, Ordering::SeqCst);
+    runtime.tracker.workload_requests.fetch_add(
+        u64::try_from(requests.len()).unwrap_or(u64::MAX),
+        Ordering::SeqCst,
+    );
+
+    let summary = runtime
+        .endpoint
+        .run_safe_turn()
+        .map_err(|error| format!("run representative Endpoint Safe Turn: {error:?}"))?;
+    if summary.processed_batches != 1 {
+        return Err(format!(
+            "representative Safe Turn processed {} batches instead of one",
+            summary.processed_batches
+        ));
+    }
+    let completions = runtime
+        .endpoint
+        .drain_completions(2)
+        .map_err(|error| format!("drain representative completion: {error:?}"))?;
+    if completions.len() != 1
+        || completions[0].request_id != endpoint_request
+        || !matches!(completions[0].outcome, BatchOutcome::Committed { .. })
+    {
+        return Err("representative Stage batch did not commit exactly once".to_owned());
+    }
+    runtime
+        .tracker
+        .stage_completions
+        .fetch_add(1, Ordering::SeqCst);
+
+    let mut expected_cues = 0usize;
+    for request in requests {
+        let requested_value = 10 + request.sequence.wrapping_mul(37) % 80;
+        let x = SLIDER_BOUNDS.x
+            + i32::try_from(requested_value * SLIDER_BOUNDS.width as u64 / 100)
+                .expect("slider coordinate fits in i32");
+        let y = SLIDER_BOUNDS.y + SLIDER_BOUNDS.height / 2;
+        match runtime
+            .endpoint
+            .dispatch_native_event(
+                runtime.stage_id,
+                InputClass::new(1).expect("nonzero input class"),
+                EndpointNativeInput::Pointer {
+                    root_id: runtime.root_id,
+                    x,
+                    y,
+                    event: Event::PressRelease { x, y },
+                },
+            )
+            .map_err(|error| format!("dispatch representative native input: {error:?}"))?
+        {
+            NativeInputOutcome::Dispatched {
+                disposition: Disposition::Consumed,
+                cue_count,
+                ..
+            } if cue_count == 1 => expected_cues += cue_count,
+            outcome => {
+                return Err(format!(
+                    "representative native input produced unexpected outcome: {outcome:?}"
+                ));
+            }
+        }
+    }
+    runtime.tracker.native_inputs.fetch_add(
+        u64::try_from(requests.len()).unwrap_or(u64::MAX),
+        Ordering::SeqCst,
+    );
+    let drain = runtime
+        .endpoint
+        .drain_records(DrainBudget::new(expected_cues, usize::MAX))
+        .map_err(|error| format!("drain representative Cue records: {error:?}"))?;
+    let cue_records = drain.records().len();
+    if cue_records != expected_cues {
+        return Err(format!(
+            "representative Cue drain returned {cue_records} records for {expected_cues} inputs"
+        ));
+    }
+    runtime
+        .endpoint
+        .acknowledge_records(drain)
+        .map_err(|error| format!("acknowledge representative Cue records: {error:?}"))?;
+    runtime.tracker.cue_records.fetch_add(
+        u64::try_from(cue_records).unwrap_or(u64::MAX),
+        Ordering::SeqCst,
+    );
+    runtime.render_private_frame()
 }
 
 fn run_service_turn(
@@ -228,11 +539,8 @@ fn run_service_turn(
             .recv()
             .expect("cold-burst priming turn receives release");
     }
-    if let Err(error) = state.endpoint.run_safe_turn() {
-        return requests
-            .into_iter()
-            .map(|_| Err(format!("empty Endpoint Safe Turn failed: {error:?}")))
-            .collect();
+    if let Err(error) = run_representative_workload(&mut state.runtime, &requests) {
+        return requests.into_iter().map(|_| Err(error.clone())).collect();
     }
 
     requests
@@ -470,17 +778,161 @@ struct ProbeResult {
     probe_duration_ns: u64,
     service_checksum: u64,
     consumer_checksum: u64,
+    workload_requests: u64,
+    stage_batches: u64,
+    stage_completions: u64,
+    native_inputs: u64,
+    cue_records: u64,
+    frames_rendered: u64,
+    cadence_misses: u64,
+    final_stage_revision: u64,
+    frame_checksum: u64,
+    frame_width: usize,
+    frame_height: usize,
+    frame_stride: usize,
+    frame_format: &'static str,
+    frame_private: bool,
 }
 
-fn build_endpoint(turn_budget: usize) -> Endpoint {
-    Endpoint::new(
+fn descriptor(name: &str) -> &'static TypeDescriptor {
+    CATALOG
+        .iter()
+        .find(|descriptor| descriptor.stable_name.ends_with(name))
+        .expect("representative actor descriptor")
+}
+
+fn field(actor: &TypeDescriptor, name: &str) -> u32 {
+    actor
+        .constructor_fields
+        .iter()
+        .find(|field| field.name == name)
+        .expect("representative constructor field")
+        .id
+}
+
+fn property(actor: &TypeDescriptor, name: &str) -> u32 {
+    actor
+        .properties
+        .iter()
+        .find(|property| property.name == name)
+        .expect("representative actor property")
+        .id
+}
+
+fn bounds_input(actor: &TypeDescriptor, bounds: Rect) -> ConstructorInput<'static> {
+    ConstructorInput {
+        id: field(actor, "bounds"),
+        value: ValueRef::Rect {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+        },
+    }
+}
+
+fn registry_limits() -> RegistryLimits {
+    RegistryLimits {
+        max_roots: 1,
+        max_actors: 2,
+        max_tree_depth: 2,
+        max_children_per_actor: 1,
+        max_text_bytes: 64,
+        max_resources: 1,
+    }
+}
+
+fn build_representative_runtime(
+    turn_budget: usize,
+    frame_period: Duration,
+    tracker: Arc<SemanticTracker>,
+) -> RepresentativeRuntime {
+    let stage_id = StageId::new(STAGE_ID).expect("nonzero representative Stage id");
+    let mut stage = StageRegistry::new(stage_id, &CATALOG, registry_limits())
+        .expect("construct representative Stage");
+    let container = descriptor("container::Container");
+    let root_id = stage
+        .create(
+            container.type_id,
+            CreateDestination::Root { name: "main" },
+            &[bounds_input(
+                container,
+                Rect {
+                    x: 0,
+                    y: 0,
+                    width: FRAME_WIDTH as i32,
+                    height: FRAME_HEIGHT as i32,
+                },
+            )],
+        )
+        .expect("construct representative root");
+    let slider = descriptor("slider::Slider");
+    let slider_id = stage
+        .create(
+            slider.type_id,
+            CreateDestination::Child { parent: root_id },
+            &[
+                bounds_input(slider, SLIDER_BOUNDS),
+                ConstructorInput {
+                    id: field(slider, "min"),
+                    value: ValueRef::I32(0),
+                },
+                ConstructorInput {
+                    id: field(slider, "max"),
+                    value: ValueRef::I32(100),
+                },
+            ],
+        )
+        .expect("construct representative slider");
+    stage
+        .apply_batch(&[StageDirection::SetFlag {
+            object_id: slider_id,
+            flag: RuntimeFlag::Clickable,
+            enabled: true,
+        }])
+        .expect("make representative slider targetable");
+    let slider_actor = ActorIdentity {
+        object_id: slider_id,
+        type_id: slider.type_id,
+    };
+    let cue_slots = turn_budget
+        .checked_add(2)
+        .expect("representative Cue slots fit usize");
+    let mut endpoint = Endpoint::new(
         EndpointEpoch::new(1).expect("nonzero epoch"),
-        EndpointLimits::new(1, turn_budget, turn_budget, 1)
-            .expect("positive probe endpoint limits"),
+        EndpointLimits::new(1, 1, 1, turn_budget).expect("positive probe endpoint limits"),
         SubscriptionLimits::new(1, 32, 1, 1).expect("valid probe subscription limits"),
-        CueLimits::new(4, 1, 2, 32, CUE_FRAME_OVERHEAD_BYTES + 32).expect("valid probe cue limits"),
+        CueLimits::new(cue_slots, 1, turn_budget, 32, CUE_FRAME_OVERHEAD_BYTES + 32)
+            .expect("valid probe cue limits"),
     )
-    .expect("construct probe Endpoint on its owner thread")
+    .expect("construct probe Endpoint on its owner thread");
+    endpoint
+        .register_stage(stage)
+        .expect("register representative Stage");
+    endpoint
+        .subscribe(SubscribeRequest {
+            stage_id,
+            actor_identity: slider_actor,
+            event_id: EventId::new(slider::MPY_VALUE_CHANGED_EVENT_ID)
+                .expect("nonzero slider event id"),
+            callback_id: CallbackId::new(1).expect("nonzero callback id"),
+            phase: DispatchPhase::Target,
+            filter: SubscriptionFilter::Any,
+            propagation: PropagationPolicy::Observe,
+        })
+        .expect("subscribe representative slider event");
+    RepresentativeRuntime {
+        endpoint,
+        stage_id,
+        root_id,
+        slider_actor,
+        slider_value_property: property(slider, "value"),
+        next_request_id: 1,
+        frame: PrivateRgbaFrame::new(),
+        next_frame_deadline: Instant::now(),
+        frame_period,
+        tracker,
+    }
 }
 
 fn metric_delta(after: u64, before: u64) -> u64 {
@@ -489,6 +941,7 @@ fn metric_delta(after: u64, before: u64) -> u64 {
 
 fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
     let tracker = Arc::new(EnvelopeTracker::default());
+    let semantic_tracker = Arc::new(SemanticTracker::default());
     let service_checksum = Arc::new(AtomicU64::new(0));
     let (start_gate, started_receiver, release_sender) =
         if matches!(config.scenario, Scenario::ColdBurst) {
@@ -506,6 +959,7 @@ fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
             (None, None, None)
         };
     let build_tracker = Arc::clone(&tracker);
+    let build_semantic_tracker = Arc::clone(&semantic_tracker);
     let build_checksum = Arc::clone(&service_checksum);
     let service = spawn_native_service(
         "cpy-capacity-owner",
@@ -516,7 +970,11 @@ fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
         )
         .map_err(|error| format!("capacity configuration: {error}"))?,
         move || ServiceState {
-            endpoint: build_endpoint(config.turn_budget),
+            runtime: build_representative_runtime(
+                config.turn_budget,
+                Duration::from_micros(config.frame_period_us),
+                build_semantic_tracker,
+            ),
             start_gate,
             tracker: build_tracker,
             service_checksum: build_checksum,
@@ -625,9 +1083,9 @@ fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
         Scenario::Sustained | Scenario::ObserverStall => 0,
     };
     Ok(ProbeResult {
-        schema_version: "CPY-CAPACITY-PROBE-2",
-        workload: "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness",
-        retained_bytes_scope: "owned probe request and result structs plus payload capacities; native service/channel/readiness allocation and process overhead excluded",
+        schema_version: "CPY-CAPACITY-PROBE-3",
+        workload: "bounded-native-service-with-stage-input-cues-private-rgba-and-os-readiness",
+        retained_bytes_scope: "owned probe request and result structs plus payload capacities; private RGBA frame, native service/channel/readiness allocation, and process overhead excluded",
         config,
         offered_requests: config.messages,
         accepted_requests: accepted,
@@ -664,6 +1122,20 @@ fn execute(config: ProbeConfig) -> Result<ProbeResult, String> {
         probe_duration_ns,
         service_checksum: service_checksum.load(Ordering::SeqCst),
         consumer_checksum: black_box(consumed.consumer_checksum),
+        workload_requests: semantic_tracker.workload_requests.load(Ordering::SeqCst),
+        stage_batches: semantic_tracker.stage_batches.load(Ordering::SeqCst),
+        stage_completions: semantic_tracker.stage_completions.load(Ordering::SeqCst),
+        native_inputs: semantic_tracker.native_inputs.load(Ordering::SeqCst),
+        cue_records: semantic_tracker.cue_records.load(Ordering::SeqCst),
+        frames_rendered: semantic_tracker.frames_rendered.load(Ordering::SeqCst),
+        cadence_misses: semantic_tracker.cadence_misses.load(Ordering::SeqCst),
+        final_stage_revision: semantic_tracker.final_stage_revision.load(Ordering::SeqCst),
+        frame_checksum: semantic_tracker.frame_checksum.load(Ordering::SeqCst),
+        frame_width: FRAME_WIDTH,
+        frame_height: FRAME_HEIGHT,
+        frame_stride: FRAME_STRIDE,
+        frame_format: "RGBA8888",
+        frame_private: true,
     })
 }
 
@@ -675,6 +1147,45 @@ fn update_max(target: &AtomicUsize, candidate: usize) {
             Ok(_) => return,
             Err(actual) => observed = actual,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn representative_probe_executes_every_neutral_boundary() {
+        let result = execute(ProbeConfig {
+            scenario: Scenario::Sustained,
+            ingress_capacity: 2,
+            egress_capacity: 4,
+            turn_budget: 2,
+            messages: 4,
+            ingress_payload_bytes: 16,
+            egress_payload_bytes: 16,
+            observer_stall_us: 0,
+            retry_backoff_us: 0,
+            sampling_hold_us: 0,
+            frame_period_us: 1,
+        })
+        .expect("execute representative capacity probe");
+
+        assert_eq!(result.accepted_requests, 4);
+        assert_eq!(result.completed_records, 4);
+        assert_eq!(result.workload_requests, 4);
+        assert_eq!(result.native_inputs, 4);
+        assert_eq!(result.cue_records, 4);
+        assert_eq!(result.stage_batches, result.service_turns);
+        assert_eq!(result.stage_completions, result.service_turns);
+        assert_eq!(result.frames_rendered, result.service_turns);
+        assert!(result.final_stage_revision > 0);
+        assert_eq!(
+            (result.frame_width, result.frame_height, result.frame_stride),
+            (320, 240, 1280)
+        );
+        assert_eq!(result.frame_format, "RGBA8888");
+        assert!(result.frame_private);
     }
 }
 

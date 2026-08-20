@@ -21,7 +21,9 @@ from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = REPO_ROOT / "docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json"
-DEFAULT_OUTPUT = REPO_ROOT / "docs/cpython/evidence/CPY-CAPACITY-HOST-2026-08-18.json"
+DEFAULT_OUTPUT = (
+    REPO_ROOT / "docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json"
+)
 GENERATED_DIR = REPO_ROOT / "docs/cpython/evidence/_generated"
 PROBE_SOURCE = "runtime-std/examples/cpy_capacity_probe.rs"
 PROBE_MANIFEST = "runtime-std/Cargo.toml"
@@ -43,6 +45,24 @@ SERVICE_SOURCE_PATHS = (
     PROBE_MANIFEST,
     ORCHESTRATOR_SOURCE,
     "docs/cpython/CPY-CAPACITY-EVIDENCE.schema.json",
+)
+REPRESENTATIVE_SOURCE_PATHS = SERVICE_SOURCE_PATHS + (
+    "runtime-std/tests/native_service.rs",
+    "api/src/protocol.rs",
+    "core/src/actor.rs",
+    "core/src/cue.rs",
+    "core/src/direction.rs",
+    "core/src/draw.rs",
+    "core/src/endpoint.rs",
+    "core/src/event.rs",
+    "core/src/object.rs",
+    "core/src/renderer.rs",
+    "core/src/style_cascade.rs",
+    "core/src/subscription.rs",
+    "core/src/widget.rs",
+    "widgets/src/container.rs",
+    "widgets/src/mpy.rs",
+    "widgets/src/slider.rs",
 )
 
 
@@ -122,7 +142,16 @@ def _source_records(commit: str) -> list[dict[str, str]]:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     ).returncode == 0
-    paths = SERVICE_SOURCE_PATHS if service_source else LEGACY_SOURCE_PATHS
+    if not service_source:
+        paths = LEGACY_SOURCE_PATHS
+    else:
+        probe_source = _git("show", f"{commit}:{PROBE_SOURCE}", text=False)
+        assert isinstance(probe_source, bytes)
+        paths = (
+            REPRESENTATIVE_SOURCE_PATHS
+            if b"CPY-CAPACITY-PROBE-3" in probe_source
+            else SERVICE_SOURCE_PATHS
+        )
     for path in paths:
         data = _git("show", f"{commit}:{path}", text=False)
         assert isinstance(data, bytes)
@@ -251,6 +280,7 @@ def _probe_arguments(
     observer_stall_us: int,
     retry_backoff_us: int,
     sampling_hold_us: int,
+    frame_period_us: int,
 ) -> list[str]:
     """Construct one fully explicit native-probe argument vector."""
 
@@ -277,6 +307,8 @@ def _probe_arguments(
         str(retry_backoff_us),
         "--sampling-hold-us",
         str(sampling_hold_us),
+        "--frame-period-us",
+        str(frame_period_us),
     ]
 
 
@@ -342,41 +374,61 @@ def _summaries(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if run["candidate_id"] == candidate_id
             and run["probe"]["config"]["scenario"] == scenario
         ]
-        summaries.append(
-            {
-                "candidate_id": candidate_id,
-                "scenario": scenario,
-                "samples": len(selected),
-                "median_peak_rss_bytes": _median(
-                    run["peak_rss_bytes"] for run in selected
-                ),
-                "median_probe_duration_ns": _median(
-                    run["probe"]["probe_duration_ns"] for run in selected
-                ),
-                "median_peak_owned_envelope_bytes": _median(
-                    run["probe"]["peak_owned_envelope_bytes"] for run in selected
-                ),
-                "median_service_p95_ns": _median(
-                    run["probe"]["service_latency"]["p95_ns"] for run in selected
-                ),
-                "median_delivery_p95_ns": _median(
-                    run["probe"]["delivery_latency"]["p95_ns"] for run in selected
-                ),
-                "maximum_ingress_full_observations": max(
-                    run["probe"]["ingress_full_observations"] for run in selected
-                ),
-                "maximum_egress_backpressured_records": max(
-                    run["probe"]["egress_backpressured_records"] for run in selected
-                ),
-                "all_sequence_clean": all(
-                    run["probe"]["sequence_errors"] == 0 for run in selected
-                ),
-                "all_envelope_bytes_released": all(
-                    run["probe"]["owned_envelope_bytes_at_end"] == 0
-                    for run in selected
-                ),
-            }
-        )
+        summary = {
+            "candidate_id": candidate_id,
+            "scenario": scenario,
+            "samples": len(selected),
+            "median_peak_rss_bytes": _median(run["peak_rss_bytes"] for run in selected),
+            "median_probe_duration_ns": _median(
+                run["probe"]["probe_duration_ns"] for run in selected
+            ),
+            "median_peak_owned_envelope_bytes": _median(
+                run["probe"]["peak_owned_envelope_bytes"] for run in selected
+            ),
+            "median_service_p95_ns": _median(
+                run["probe"]["service_latency"]["p95_ns"] for run in selected
+            ),
+            "median_delivery_p95_ns": _median(
+                run["probe"]["delivery_latency"]["p95_ns"] for run in selected
+            ),
+            "maximum_ingress_full_observations": max(
+                run["probe"]["ingress_full_observations"] for run in selected
+            ),
+            "maximum_egress_backpressured_records": max(
+                run["probe"]["egress_backpressured_records"] for run in selected
+            ),
+            "all_sequence_clean": all(
+                run["probe"]["sequence_errors"] == 0 for run in selected
+            ),
+            "all_envelope_bytes_released": all(
+                run["probe"]["owned_envelope_bytes_at_end"] == 0 for run in selected
+            ),
+        }
+        if all(
+            run["probe"]["schema_version"] == "CPY-CAPACITY-PROBE-3"
+            for run in selected
+        ):
+            summary.update(
+                {
+                    "median_frames_rendered": _median(
+                        run["probe"]["frames_rendered"] for run in selected
+                    ),
+                    "median_cadence_misses": _median(
+                        run["probe"]["cadence_misses"] for run in selected
+                    ),
+                    "all_representative_semantics_exact": all(
+                        run["probe"]["native_inputs"]
+                        == run["probe"]["cue_records"]
+                        == run["probe"]["workload_requests"]
+                        and run["probe"]["stage_batches"]
+                        == run["probe"]["stage_completions"]
+                        == run["probe"]["frames_rendered"]
+                        == run["probe"]["service_turns"]
+                        for run in selected
+                    ),
+                }
+            )
+        summaries.append(summary)
     return summaries
 
 
@@ -402,14 +454,33 @@ def _validate_probe(probe: dict[str, Any]) -> None:
     """Validate one raw native-probe result semantically."""
 
     version = probe.get("schema_version")
+    representative_fields = {
+        "workload_requests",
+        "stage_batches",
+        "stage_completions",
+        "native_inputs",
+        "cue_records",
+        "frames_rendered",
+        "cadence_misses",
+        "final_stage_revision",
+        "frame_checksum",
+        "frame_width",
+        "frame_height",
+        "frame_stride",
+        "frame_format",
+        "frame_private",
+    }
     expected_workloads = {
         "CPY-CAPACITY-PROBE-1": "bounded-crossbeam-transport-with-empty-endpoint-safe-turn",
         "CPY-CAPACITY-PROBE-2": "bounded-native-service-with-empty-endpoint-safe-turn-and-os-readiness",
+        "CPY-CAPACITY-PROBE-3": "bounded-native-service-with-stage-input-cues-private-rgba-and-os-readiness",
     }
     if version not in expected_workloads:
         raise EvidenceError("unexpected native probe schema")
     if probe.get("workload") != expected_workloads[version]:
         raise EvidenceError("native probe workload does not match its schema version")
+    if version != "CPY-CAPACITY-PROBE-3" and representative_fields & probe.keys():
+        raise EvidenceError("legacy native probe carries representative-only fields")
     config = probe.get("config")
     if not isinstance(config, dict) or config.get("scenario") not in SCENARIOS:
         raise EvidenceError("native probe scenario is invalid")
@@ -434,6 +505,43 @@ def _validate_probe(probe: dict[str, Any]) -> None:
             raise EvidenceError("cold-burst terminal rejection accounting is inconsistent")
     elif accepted != offered or terminal_rejections != 0:
         raise EvidenceError("retrying scenarios must eventually accept every offered request")
+    if version == "CPY-CAPACITY-PROBE-3":
+        frame_period_us = config.get("frame_period_us")
+        if not isinstance(frame_period_us, int) or frame_period_us <= 0:
+            raise EvidenceError("representative probe frame period must be positive")
+        workload_requests = probe.get("workload_requests")
+        expected_requests = accepted + (1 if config["scenario"] == "cold-burst" else 0)
+        if workload_requests != expected_requests:
+            raise EvidenceError("representative workload request accounting is inconsistent")
+        service_turns = probe.get("service_turns")
+        if (
+            probe.get("stage_batches") != service_turns
+            or probe.get("stage_completions") != service_turns
+            or probe.get("frames_rendered") != service_turns
+        ):
+            raise EvidenceError(
+                "every representative service turn must commit and render exactly once"
+            )
+        if (
+            probe.get("native_inputs") != workload_requests
+            or probe.get("cue_records") != workload_requests
+        ):
+            raise EvidenceError(
+                "every representative workload request must dispatch input and publish one cue"
+            )
+        if (
+            probe.get("frame_width") != 320
+            or probe.get("frame_height") != 240
+            or probe.get("frame_stride") != 1280
+            or probe.get("frame_format") != "RGBA8888"
+            or probe.get("frame_private") is not True
+        ):
+            raise EvidenceError("representative private frame contract changed")
+        for name in ("cadence_misses", "final_stage_revision", "frame_checksum"):
+            if not isinstance(probe.get(name), int) or probe[name] < 0:
+                raise EvidenceError(f"representative probe {name} is invalid")
+        if probe["final_stage_revision"] <= 0:
+            raise EvidenceError("representative Stage revision did not advance")
     _validate_distribution(probe.get("service_latency", {}), accepted)
     _validate_distribution(probe.get("delivery_latency", {}), accepted)
 
@@ -470,6 +578,7 @@ def validate_bundle_value(bundle: dict[str, Any]) -> None:
     }
     actual = set()
     rss_sources = set()
+    probe_versions = set()
     for run in runs:
         key = (
             run.get("candidate_id"),
@@ -482,11 +591,14 @@ def validate_bundle_value(bundle: dict[str, Any]) -> None:
         if not isinstance(run.get("peak_rss_bytes"), int) or run["peak_rss_bytes"] <= 0:
             raise EvidenceError("capacity evidence run has no peak RSS")
         rss_sources.add(run.get("rss_source"))
+        probe_versions.add(run.get("probe", {}).get("schema_version"))
         _validate_probe(run.get("probe", {}))
     if actual != expected:
         raise EvidenceError("capacity evidence does not cover the complete candidate matrix")
     if len(rss_sources) != 1 or None in rss_sources:
         raise EvidenceError("capacity evidence mixed or omitted RSS samplers")
+    if len(probe_versions) != 1 or None in probe_versions:
+        raise EvidenceError("capacity evidence mixed or omitted native probe versions")
     summaries = bundle.get("summaries")
     expected_summary_keys = {
         (candidate_id, scenario) for candidate_id in candidate_ids for scenario in SCENARIOS
@@ -504,6 +616,23 @@ def validate_bundle_value(bundle: dict[str, Any]) -> None:
         for summary in summaries
     ):
         raise EvidenceError("capacity evidence summary acceptance flags are incomplete")
+    representative_summary_fields = {
+        "median_frames_rendered",
+        "median_cadence_misses",
+        "all_representative_semantics_exact",
+    }
+    if probe_versions == {"CPY-CAPACITY-PROBE-3"}:
+        if any(
+            not isinstance(summary.get("median_frames_rendered"), int)
+            or summary["median_frames_rendered"] <= 0
+            or not isinstance(summary.get("median_cadence_misses"), int)
+            or summary["median_cadence_misses"] < 0
+            or summary.get("all_representative_semantics_exact") is not True
+            for summary in summaries
+        ):
+            raise EvidenceError("representative evidence summaries are incomplete")
+    elif any(representative_summary_fields & summary.keys() for summary in summaries):
+        raise EvidenceError("legacy evidence carries representative-only summaries")
 
 
 def _validate_schema(bundle: dict[str, Any]) -> None:
@@ -587,6 +716,7 @@ def capture(arguments: argparse.Namespace) -> Path:
                 observer_stall_us=arguments.observer_stall_us,
                 retry_backoff_us=arguments.retry_backoff_us,
                 sampling_hold_us=arguments.sampling_hold_us,
+                frame_period_us=arguments.frame_period_us,
             )
             print(
                 f"warmup {_candidate_id(candidate)} {scenario}",
@@ -670,14 +800,16 @@ def capture(arguments: argparse.Namespace) -> Path:
             "observer_stall_us": arguments.observer_stall_us,
             "retry_backoff_us": arguments.retry_backoff_us,
             "sampling_hold_us": arguments.sampling_hold_us,
+            "frame_period_us": arguments.frame_period_us,
             "scenarios": list(SCENARIOS),
             "candidates": candidate_records,
             "limitations": [
-                "Native-service workload executes an empty neutral Endpoint Safe Turn; it does not measure actor, render, frame, input, Python, or PyO3 work.",
-                "Owned-envelope bytes exclude native service, channel, and readiness allocation; peak RSS separately measures the whole native process.",
+                "Representative native work covers one Slider Stage, mutation/completion, pointer input/Cue, and private RGBA rendering; it is not an application corpus or device presentation path.",
+                "Owned-envelope bytes exclude the private RGBA frame plus native service, channel, and readiness allocation; peak RSS separately measures the whole native process.",
                 "Readiness values count successful producer-side coalesced eventfd or self-pipe notifications, not consumer wakeups.",
                 "Candidate values are evidence inputs and this bundle makes no default, maximum, budget, or ratification decision.",
-                "Host results cannot satisfy the CPY-01 embedded-Linux reference-board requirement.",
+                "Host results cannot satisfy the CPY-01 embedded-Linux reference-board requirement; physical BBB capture remains separate.",
+                "The flattened RGBA frame is private and non-exported; Frame Lease and Python buffer lifetime are deferred to CPY-05.",
             ],
         },
         "runs": runs,
@@ -725,6 +857,7 @@ def _parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--observer-stall-us", type=int, default=50_000)
     capture_parser.add_argument("--retry-backoff-us", type=int, default=50)
     capture_parser.add_argument("--sampling-hold-us", type=int, default=20_000)
+    capture_parser.add_argument("--frame-period-us", type=int, default=16_667)
 
     validate_parser = subparsers.add_parser("validate", help="validate retained evidence")
     validate_parser.add_argument("path", type=Path)
@@ -747,6 +880,7 @@ def main() -> int:
                 "observer_stall_us",
                 "retry_backoff_us",
                 "sampling_hold_us",
+                "frame_period_us",
             ):
                 value = getattr(arguments, name)
                 minimum = 0 if name in {"observer_stall_us", "retry_backoff_us"} else 1
