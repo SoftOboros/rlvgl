@@ -1,5 +1,5 @@
 {
-  "edge_count": 5,
+  "edge_count": 7,
   "edges": [
     {
       "edge_type": "cites",
@@ -32,7 +32,21 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 101,
+      "line": 88,
+      "source": "docs/cpython/README.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 40,
+      "source": "docs/cpython/evidence/README.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 124,
       "source": "docs/cpython/evidence/README.md",
       "target": "PCDN-CPY-03-002"
     }

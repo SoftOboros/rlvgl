@@ -1,5 +1,5 @@
 {
-  "edge_count": 361,
+  "edge_count": 371,
   "edges": [
     {
       "edge_type": "cites",
@@ -368,231 +368,301 @@
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 209,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-1"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 210,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-2"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 211,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-3"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
       "line": 212,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-4"
+      "target": "INV-CPY-02-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 213,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-5"
+      "target": "INV-CPY-02-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 214,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-6"
+      "target": "INV-CPY-02-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 215,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-7"
+      "target": "INV-CPY-02-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 216,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 217,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 218,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 219,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 245,
+      "line": 248,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 245,
+      "line": 248,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 247,
+      "line": 250,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 253,
+      "line": 256,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 259,
+      "line": 262,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 264,
+      "line": 267,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 271,
+      "line": 274,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 276,
+      "line": 279,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 339,
+      "line": 349,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 339,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 339,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "PCDN-CPY-02-006"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 380,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 380,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 380,
+      "line": 349,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 380,
+      "line": 349,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 381,
+      "line": 349,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 381,
+      "line": 350,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 381,
-      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "target": "INV-CPY-02-7"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 381,
+      "line": 350,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "INV-CPY-02-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 382,
+      "line": 350,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 350,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "PCDN-CPY-02-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 378,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 382,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 396,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 396,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 396,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "PCDN-CPY-02-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 437,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 437,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 437,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 437,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 438,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 438,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 438,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 438,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "INV-CPY-02-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 439,
+      "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "target": "PCDN-CPY-02-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 439,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 382,
+      "line": 439,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 382,
+      "line": 439,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 383,
+      "line": 440,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 383,
+      "line": 440,
       "source": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "target": "PCDN-CPY-02-006"
     },
@@ -2531,13 +2601,13 @@
   ],
   "family": "cpy",
   "kind_counts": {
-    "amendment": 40,
+    "amendment": 41,
     "gate": 89,
     "invariant": 88,
-    "rationale": 37,
+    "rationale": 38,
     "term": 78
   },
-  "object_count": 332,
+  "object_count": 334,
   "objects": [
     {
       "attrs": {
@@ -3561,7 +3631,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 75,
+      "line": 78,
       "obj_id": "cpy:term:semantic unification",
       "text": "Moving duplicate interpreter-neutral definitions or scenarios to one existing neutral owner and making all adapters consume them."
     },
@@ -3573,7 +3643,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 76,
+      "line": 79,
       "obj_id": "cpy:term:crate partition",
       "text": "A package boundary justified by target envelope, unsafe/lifecycle authority, dependency direction, publication, or independent consumers."
     },
@@ -3585,7 +3655,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 77,
+      "line": 80,
       "obj_id": "cpy:term:dependency firewall",
       "text": "A machine-checked prohibition on interpreter/platform dependencies entering a neutral or `no_std` crate."
     },
@@ -3597,7 +3667,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 78,
+      "line": 81,
       "obj_id": "cpy:term:host runtime crate",
       "text": "Planned `std` crate owning service threads, bounded channels, readiness, frame slots, and shutdown without Python objects."
     },
@@ -3609,7 +3679,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 79,
+      "line": 82,
       "obj_id": "cpy:term:cpython adapter crate",
       "text": "Planned PyO3 crate exporting the Python module and mapping Python objects to the neutral/host runtime."
     },
@@ -3621,7 +3691,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 80,
+      "line": 83,
       "obj_id": "cpy:term:compatibility re-export",
       "text": "Temporary public path forwarding an existing consumer to a moved neutral item with a documented removal frontier."
     },
@@ -3633,7 +3703,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 81,
+      "line": 84,
       "obj_id": "cpy:term:migration slice",
       "text": "One independently green graph change with before/after public-path and conformance evidence."
     },
@@ -3645,7 +3715,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "term",
-      "line": 82,
+      "line": 85,
       "obj_id": "cpy:term:partition candidate",
       "text": "A proposed crate split that remains rejected until §6 criteria and evidence justify it."
     },
@@ -3663,7 +3733,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 209,
+      "line": 212,
       "obj_id": "INV-CPY-02-1",
       "text": "Every interpreter-neutral semantic object MUST have exactly one crate owner and MUST be consumed rather than copied by adapters."
     },
@@ -3681,7 +3751,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 210,
+      "line": 213,
       "obj_id": "INV-CPY-02-2",
       "text": "Neutral and `no_std` crates MUST reject PyO3, CPython, MicroPython ABI, and operating-system service dependency edges."
     },
@@ -3699,7 +3769,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 211,
+      "line": 214,
       "obj_id": "INV-CPY-02-3",
       "text": "CPython and MicroPython adapters MUST remain separate leaf-oriented crates and MUST share only neutral crates and evidence."
     },
@@ -3717,7 +3787,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 212,
+      "line": 215,
       "obj_id": "INV-CPY-02-4",
       "text": "Each new crate MUST satisfy the §6 admission rule and MUST name its independent consumer or safety boundary."
     },
@@ -3735,7 +3805,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 213,
+      "line": 216,
       "obj_id": "INV-CPY-02-5",
       "text": "Every Migration Slice touching shared MPY surfaces MUST start from the recorded MPY Safe Point or a later coordinated handoff and MUST leave MPY conformance green."
     },
@@ -3753,7 +3823,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 214,
+      "line": 217,
       "obj_id": "INV-CPY-02-6",
       "text": "Platform or WLD code MUST NOT move under CPY authority without the owning-family amendment."
     },
@@ -3772,7 +3842,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 215,
+      "line": 218,
       "obj_id": "INV-CPY-02-7",
       "text": "Compatibility paths MUST have an owner, test, and retirement frontier and MUST NOT become permanent duplicate semantics."
     },
@@ -3790,7 +3860,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "invariant",
-      "line": 216,
+      "line": 219,
       "obj_id": "INV-CPY-02-8",
       "text": "The final graph MUST build each representative feature closure without pulling dependencies from unselected interpreter or platform profiles."
     },
@@ -3802,8 +3872,8 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 299,
-      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:299",
+      "line": 302,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:302",
       "text": "Every PCDN in §11.2 is resolved."
     },
     {
@@ -3814,33 +3884,9 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "gate",
-      "line": 300,
-      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:300",
+      "line": 303,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:303",
       "text": "The current graph, features, public paths, consumers, and publish order"
-    },
-    {
-      "attrs": {
-        "checked": true,
-        "cited_ids": []
-      },
-      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "family": "cpy",
-      "kind": "gate",
-      "line": 302,
-      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:302",
-      "text": "Every proposed new crate satisfies at least two §6 criteria and names an"
-    },
-    {
-      "attrs": {
-        "checked": true,
-        "cited_ids": []
-      },
-      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
-      "family": "cpy",
-      "kind": "gate",
-      "line": 304,
-      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:304",
-      "text": "Prohibited dependency edges are machine-checkable."
     },
     {
       "attrs": {
@@ -3852,7 +3898,7 @@
       "kind": "gate",
       "line": 305,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:305",
-      "text": "The MPY Safe Point/handoff rule permits CPY leadership without editing"
+      "text": "Every proposed new crate satisfies at least two §6 criteria and names an"
     },
     {
       "attrs": {
@@ -3864,7 +3910,7 @@
       "kind": "gate",
       "line": 307,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:307",
-      "text": "WLD and LPAR ownership are preserved explicitly."
+      "text": "Prohibited dependency edges are machine-checkable."
     },
     {
       "attrs": {
@@ -3876,7 +3922,7 @@
       "kind": "gate",
       "line": 308,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:308",
-      "text": "The per-slice no-std, MPY, host, package, and index evidence gate is"
+      "text": "The MPY Safe Point/handoff rule permits CPY leadership without editing"
     },
     {
       "attrs": {
@@ -3888,7 +3934,80 @@
       "kind": "gate",
       "line": 310,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:310",
+      "text": "WLD and LPAR ownership are preserved explicitly."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "family": "cpy",
+      "kind": "gate",
+      "line": 311,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:311",
+      "text": "The per-slice no-std, MPY, host, package, and index evidence gate is"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "family": "cpy",
+      "kind": "gate",
+      "line": 313,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md:gate:313",
       "text": "The owner records ratification in §15."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott / OpenAI Codex",
+        "change_kind": "evidence",
+        "chronological_rank": 5,
+        "commits": [
+          "pending"
+        ],
+        "conformant_change_kind": false,
+        "conformant_status": false,
+        "date": "2026-08-20",
+        "doc_entries_out_of_order": true,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": false,
+        "rev": "0.4.0",
+        "shape": "block",
+        "status": "close the first coordinated migration wave",
+        "summary": "Closes the first shared MPY/CPY migration wave at its rebased,",
+        "touches": [
+          "INV-CPY-02-2",
+          "INV-CPY-02-3",
+          "INV-CPY-02-4",
+          "INV-CPY-02-5"
+        ]
+      },
+      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "family": "cpy",
+      "kind": "amendment",
+      "line": 343,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.4.0",
+      "text": "Closes the first shared MPY/CPY migration wave at its rebased,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CPY-02-2",
+          "INV-CPY-02-3",
+          "INV-CPY-02-4",
+          "INV-CPY-02-5"
+        ]
+      },
+      "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
+      "family": "cpy",
+      "kind": "rationale",
+      "line": 343,
+      "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.4.0-rationale",
+      "text": "The first handoff authorized only the workspace manifest, ignored resolver\nsnapshot, publish-order script, and new `runtime-std/` directory. The completed\nwave stayed inside that boundary while proving the new crate's independent\nnative-service consumer, dependency firewall, bounded ownership/lifecycle,\nrepresentative host workload, and language-neutral semantic records.\n\nThe implementation series was later rebased over the WLD-owned Wayland\nevidence commit before publication. The retained closeout artifact records the\npre/post commit map, distinguishes patch-identical source commits from\nregenerated combined-index commits, and records the seven-file WLD/index tree\ndelta. Historical capacity artifacts retain the commit identities actually\nmeasured; the map preserves provenance without relabeling them as a new run.\n\nThe truthful closure boundary is the coordinated migration wave, not either\nfull language initiative. CPY-03 remains physical-board gated; `rlvgl-cpython`,\nFrame Leases, embedded/host Python integration, PyPI artifacts, and release\nclosure remain future CPY phases. MPY-00 through MPY-05 are ratified, but\ncoverage is not closed and `PCDN-MPY-04-017` remains proposal-only.\n\nConsidered and rejected: declaring CPY or MPY complete from host-only native\nevidence, rewriting immutable measurement commit fields after rebase,\nimplicitly accepting `PCDN-MPY-04-017`, merging interpreter adapters, or\nletting the completed handoff authorize later shared-path edits indefinitely.\n\nWhat deliberately did not change: MPY semantic authority, WLD/platform\nauthority, historical evidence qualification, CPY-03 through CPY-09 phase\nstatus, MPY-06 through MPY-09 phase status, board/PyPI/release claims, and the\nrequirement for a new handoff before future shared migration."
     },
     {
       "attrs": {
@@ -3901,7 +4020,7 @@
         "conformant_change_kind": false,
         "conformant_status": false,
         "date": "2026-08-18",
-        "doc_entries_out_of_order": false,
+        "doc_entries_out_of_order": true,
         "field_provenance": "declared",
         "has_rationale": true,
         "rationale_required": false,
@@ -3921,7 +4040,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 333,
+      "line": 390,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.3.0",
       "text": "Ratifies the target crate graph after capturing the baseline"
     },
@@ -3939,7 +4058,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 333,
+      "line": 390,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.3.0-rationale",
       "text": "The initial `rlvgl-runtime-std` slice satisfies the crate-admission criteria\nand can now be added without touching MPY semantic owners. The recorded\nhandoff proves the shared starting frontier and narrows the first mutation to\nthe workspace manifest, resolver snapshot, publish-order script, and new crate\ndirectory. A synthetic PyO3-to-API negative control proves the firewall is\ncapable of failing rather than merely reporting a green current graph.\n\nWhat deliberately did not change: no API/core/platform/MicroPython code moved,\nno Python dependency entered the graph, and no later migration wave or CPython\nadapter was authorized."
     },
@@ -3954,7 +4073,7 @@
         "conformant_change_kind": true,
         "conformant_status": false,
         "date": "2026-08-18",
-        "doc_entries_out_of_order": false,
+        "doc_entries_out_of_order": true,
         "field_provenance": "declared",
         "has_rationale": false,
         "rationale_required": false,
@@ -3970,7 +4089,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 361,
+      "line": 418,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.2.1",
       "text": "Aligns glossary and section labels with the selected"
     },
@@ -3985,7 +4104,7 @@
         "conformant_change_kind": true,
         "conformant_status": false,
         "date": "2026-08-18",
-        "doc_entries_out_of_order": false,
+        "doc_entries_out_of_order": true,
         "field_provenance": "declared",
         "has_rationale": true,
         "rationale_required": true,
@@ -4003,7 +4122,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 374,
+      "line": 431,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.2.0",
       "text": "Fixes the initial crate graph around `rlvgl-runtime-std` and a"
     },
@@ -4019,7 +4138,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 374,
+      "line": 431,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.2.0-rationale",
       "text": "The dependency audit confirms that the four `rlvgl-api` environment features\nare empty and unused in-repository, while the proposed host service has three\nindependent consumers and a distinct `std`/lifecycle boundary. These facts\nsupport one host-runtime partition without fragmenting frame metadata or the\nexisting platform crate prematurely.\n\nConsidered and rejected: merging interpreter adapters, adding a speculative\n`rlvgl-frame` crate, immediately splitting all Linux code, retaining empty\nmarkers indefinitely, and treating an idle MPY task or clean status snapshot\nas a migration handoff. Each either duplicates authority, multiplies packages\nwithout an independent boundary, or weakens concurrent-work protection.\n\nWhat deliberately did not change: no Cargo manifest, crate, feature, source\npath, MPY artifact, platform backend, or public API moved. CPY-02 remains Draft\nuntil its baseline and acceptance gates close."
     },
@@ -4032,7 +4151,7 @@
         "conformant_change_kind": true,
         "conformant_status": true,
         "date": "2026-08-18",
-        "doc_entries_out_of_order": false,
+        "doc_entries_out_of_order": true,
         "field_provenance": "declared",
         "has_rationale": true,
         "rationale_required": true,
@@ -4045,7 +4164,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "amendment",
-      "line": 409,
+      "line": 466,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.1.0",
       "text": "Defines the neutral-contract unification, interpreter/host partition, target dependency graph, admission criteria, and MPY-safe migration order."
     },
@@ -4056,7 +4175,7 @@
       "doc": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md",
       "family": "cpy",
       "kind": "rationale",
-      "line": 409,
+      "line": 466,
       "obj_id": "docs/cpython/CPY-02-UNIFY-PARTITION-CRATES.md#0.1.0-rationale",
       "text": "CPython needs a `std` runtime and PyO3 leaf, but the reusable semantics are\nalready being formed by MPY in `api` and `core`. Planning those boundaries in\none phase avoids both a parallel Python schema and an undifferentiated adapter\nthat pulls host concerns into embedded builds.\n\nConsidered and rejected: merging MicroPython and CPython adapters, because\ntheir ABI, allocation, scheduling, and exception surfaces differ; and eagerly\nsplitting all Linux/platform code, because size alone is not an ownership\nboundary and WLD/LPAR own adjacent behavior.\n\nWhat deliberately did not change: no crate, feature, source file, MPY artifact,\nor platform backend moved. CPY leads the plan, while actual shared migration\nwaits for a coordinated implementation frontier."
     },
