@@ -17,6 +17,7 @@ use alloc::{
 use core::{
     cell::RefCell,
     fmt,
+    mem::ManuallyDrop,
     num::{NonZeroU8, NonZeroU32, NonZeroUsize},
 };
 use std::{
@@ -404,12 +405,72 @@ struct ConfigureSpec {
     scale: u32,
 }
 
+fn configure_spec_for_token(
+    latest_configure: Option<ConfigureSpec>,
+    token: ConfigureToken,
+) -> Result<ConfigureSpec, WaylandError> {
+    latest_configure
+        .filter(|spec| spec.token == token)
+        .ok_or(WaylandError::StaleConfigure(token))
+}
+
+fn ensure_lifecycle_room(lifecycle: &mut VecDeque<WaylandLifecycleEvent>, capacity: usize) {
+    if lifecycle.len() < capacity {
+        return;
+    }
+    if let Some(index) = lifecycle
+        .iter()
+        .position(|event| matches!(event, WaylandLifecycleEvent::Configure { .. }))
+    {
+        lifecycle.remove(index);
+    }
+}
+
+fn enqueue_configure_lifecycle(
+    lifecycle: &mut VecDeque<WaylandLifecycleEvent>,
+    capacity: usize,
+    event: WaylandLifecycleEvent,
+) {
+    debug_assert!(matches!(event, WaylandLifecycleEvent::Configure { .. }));
+    lifecycle.retain(|event| !matches!(event, WaylandLifecycleEvent::Configure { .. }));
+    ensure_lifecycle_room(lifecycle, capacity);
+    lifecycle.push_back(event);
+}
+
+fn enqueue_terminal_lifecycle(
+    lifecycle: &mut VecDeque<WaylandLifecycleEvent>,
+    capacity: usize,
+    event: WaylandLifecycleEvent,
+) {
+    debug_assert!(matches!(
+        event,
+        WaylandLifecycleEvent::CloseRequested | WaylandLifecycleEvent::ConnectionFailed(_)
+    ));
+    lifecycle.retain(|event| !matches!(event, WaylandLifecycleEvent::Configure { .. }));
+    ensure_lifecycle_room(lifecycle, capacity);
+    lifecycle.push_back(event);
+}
+
+fn flush_connection(connection: &Connection, needs_write: &mut bool) -> Result<(), WaylandError> {
+    match connection.flush() {
+        Ok(()) => {
+            *needs_write = false;
+            Ok(())
+        }
+        Err(ClientWaylandError::Io(error)) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            *needs_write = true;
+            Ok(())
+        }
+        Err(error) => Err(WaylandError::Protocol(error.to_string())),
+    }
+}
+
 /// Owner of one Wayland connection, event queue, toplevel, and display adapter.
 pub struct WaylandSession {
     connection: Connection,
     event_queue: EventQueue<ProtocolState>,
-    protocol: ProtocolState,
-    display: WaylandDisplay,
+    protocol: ManuallyDrop<ProtocolState>,
+    display: ManuallyDrop<WaylandDisplay>,
     prepared_read: Option<ReadEventsGuard>,
     needs_write: bool,
 }
@@ -430,6 +491,13 @@ impl WaylandSession {
         config.validate()?;
         let connection = Connection::connect_to_env()
             .map_err(|error| WaylandError::Connection(error.to_string()))?;
+        Self::connect_with_connection(config, connection)
+    }
+
+    fn connect_with_connection(
+        config: WaylandConfig,
+        connection: Connection,
+    ) -> Result<Self, WaylandError> {
         let (globals, event_queue) = bounded_registry_init(&connection, config.registry_timeout)?;
         let qh = event_queue.handle();
         let compositor = CompositorState::bind(&globals, &qh)
@@ -491,21 +559,14 @@ impl WaylandSession {
         protocol.window.commit();
         let mut protocol = protocol;
         protocol.session_state = WaylandSessionState::AwaitingConfigure;
-        let needs_write = match connection.flush() {
-            Ok(()) => false,
-            Err(ClientWaylandError::Io(error))
-                if error.kind() == std::io::ErrorKind::WouldBlock =>
-            {
-                true
-            }
-            Err(error) => return Err(WaylandError::Protocol(error.to_string())),
-        };
+        let mut needs_write = false;
+        flush_connection(&connection, &mut needs_write)?;
 
         Ok(Self {
             connection,
             event_queue,
-            protocol,
-            display,
+            protocol: ManuallyDrop::new(protocol),
+            display: ManuallyDrop::new(display),
             prepared_read: None,
             needs_write,
         })
@@ -604,11 +665,7 @@ impl WaylandSession {
     /// [`WaylandError::AllocationDeferred`] is retryable after further
     /// dispatch releases retired buffers; it does not consume `token`.
     pub fn accept_configure(&mut self, token: ConfigureToken) -> Result<(), WaylandError> {
-        let spec = self
-            .protocol
-            .latest_configure
-            .filter(|spec| spec.token == token)
-            .ok_or(WaylandError::StaleConfigure(token))?;
+        let spec = configure_spec_for_token(self.protocol.latest_configure, token)?;
         let geometry = Geometry::checked(spec.logical_size, spec.surface_size, spec.scale)?;
         self.protocol
             .presenter
@@ -640,19 +697,7 @@ impl WaylandSession {
     }
 
     fn flush_outbound(&mut self) -> Result<(), WaylandError> {
-        match self.connection.flush() {
-            Ok(()) => {
-                self.needs_write = false;
-                Ok(())
-            }
-            Err(ClientWaylandError::Io(error))
-                if error.kind() == std::io::ErrorKind::WouldBlock =>
-            {
-                self.needs_write = true;
-                Ok(())
-            }
-            Err(error) => Err(WaylandError::Protocol(error.to_string())),
-        }
+        flush_connection(&self.connection, &mut self.needs_write)
     }
 
     fn progress_presenter(&mut self) {
@@ -666,6 +711,24 @@ impl WaylandSession {
         if let Some(error) = error {
             self.protocol.fail(error);
         }
+    }
+}
+
+impl Drop for WaylandSession {
+    fn drop(&mut self) {
+        self.prepared_read.take();
+        // The display and protocol state share the Presenter, and each owns a
+        // Window clone. Drop both owners while the connection is still alive
+        // so SCTK can enqueue its protocol-object destructors, including the
+        // required XDG role-before-surface order, then make a best-effort
+        // final flush.
+        // SAFETY: these fields are ManuallyDrop and are dropped exactly once
+        // here; no field access follows except to the independent connection.
+        unsafe {
+            ManuallyDrop::drop(&mut self.display);
+            ManuallyDrop::drop(&mut self.protocol);
+        }
+        let _ = self.connection.flush();
     }
 }
 
@@ -763,15 +826,16 @@ impl ProtocolState {
             logical_size,
             scale: self.scale,
         });
-        self.lifecycle
-            .retain(|event| !matches!(event, WaylandLifecycleEvent::Configure { .. }));
-        self.ensure_lifecycle_room();
-        self.lifecycle.push_back(WaylandLifecycleEvent::Configure {
-            token,
-            width: surface_size.0,
-            height: surface_size.1,
-            scale: self.scale,
-        });
+        enqueue_configure_lifecycle(
+            &mut self.lifecycle,
+            self.config.limits.lifecycle_capacity.get(),
+            WaylandLifecycleEvent::Configure {
+                token,
+                width: surface_size.0,
+                height: surface_size.1,
+                scale: self.scale,
+            },
+        );
     }
 
     fn request_close(&mut self) {
@@ -784,11 +848,11 @@ impl ProtocolState {
         self.session_state = WaylandSessionState::Closing;
         self.presenter.borrow_mut().stop();
         self.latest_configure = None;
-        self.lifecycle
-            .retain(|event| !matches!(event, WaylandLifecycleEvent::Configure { .. }));
-        self.ensure_lifecycle_room();
-        self.lifecycle
-            .push_back(WaylandLifecycleEvent::CloseRequested);
+        enqueue_terminal_lifecycle(
+            &mut self.lifecycle,
+            self.config.limits.lifecycle_capacity.get(),
+            WaylandLifecycleEvent::CloseRequested,
+        );
     }
 
     fn fail(&mut self, error: WaylandError) {
@@ -798,25 +862,11 @@ impl ProtocolState {
         self.session_state = WaylandSessionState::Failed;
         self.presenter.borrow_mut().stop();
         self.latest_configure = None;
-        self.lifecycle
-            .retain(|event| !matches!(event, WaylandLifecycleEvent::Configure { .. }));
-        self.ensure_lifecycle_room();
-        self.lifecycle
-            .push_back(WaylandLifecycleEvent::ConnectionFailed(error));
-    }
-
-    fn ensure_lifecycle_room(&mut self) {
-        let capacity = self.config.limits.lifecycle_capacity.get();
-        if self.lifecycle.len() < capacity {
-            return;
-        }
-        if let Some(index) = self
-            .lifecycle
-            .iter()
-            .position(|event| matches!(event, WaylandLifecycleEvent::Configure { .. }))
-        {
-            self.lifecycle.remove(index);
-        }
+        enqueue_terminal_lifecycle(
+            &mut self.lifecycle,
+            self.config.limits.lifecycle_capacity.get(),
+            WaylandLifecycleEvent::ConnectionFailed(error),
+        );
     }
 }
 
@@ -959,6 +1009,537 @@ smithay_client_toolkit::delegate_dispatch2!(ProtocolState);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::display::DisplayDriver;
+    use rlvgl_core::widget::{Color, Rect};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use std::{eprintln, format, fs, io::Read, path::Path, vec};
+    use wayland_client::protocol::wl_callback;
+    use wayland_protocols::xdg::shell::server::xdg_wm_base;
+    use wayland_server::{
+        Client, DataInit, Dispatch, Display, DisplayHandle, GlobalDispatch, New,
+        backend::{ClientData, ClientId, DisconnectReason},
+        protocol::wl_compositor,
+    };
+
+    #[derive(Default)]
+    struct FixtureClientData {
+        disconnected: AtomicBool,
+    }
+
+    impl ClientData for FixtureClientData {
+        fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {
+            self.disconnected.store(true, Ordering::Release);
+        }
+    }
+
+    struct FixtureState;
+
+    struct BackpressureState;
+
+    impl wayland_client::Dispatch<wl_callback::WlCallback, ()> for BackpressureState {
+        fn event(
+            _state: &mut Self,
+            _proxy: &wl_callback::WlCallback,
+            _event: wl_callback::Event,
+            _data: &(),
+            _connection: &Connection,
+            _qh: &QueueHandle<Self>,
+        ) {
+        }
+    }
+
+    impl GlobalDispatch<wl_compositor::WlCompositor, ()> for FixtureState {
+        fn bind(
+            _state: &mut Self,
+            _handle: &DisplayHandle,
+            _client: &Client,
+            resource: New<wl_compositor::WlCompositor>,
+            _global_data: &(),
+            data_init: &mut DataInit<'_, Self>,
+        ) {
+            data_init.init(resource, ());
+        }
+    }
+
+    impl Dispatch<wl_compositor::WlCompositor, ()> for FixtureState {
+        fn request(
+            _state: &mut Self,
+            _client: &Client,
+            _resource: &wl_compositor::WlCompositor,
+            request: wl_compositor::Request,
+            _data: &(),
+            _handle: &DisplayHandle,
+            _data_init: &mut DataInit<'_, Self>,
+        ) {
+            panic!("unexpected compositor request in constructor fixture: {request:?}");
+        }
+    }
+
+    impl GlobalDispatch<xdg_wm_base::XdgWmBase, ()> for FixtureState {
+        fn bind(
+            _state: &mut Self,
+            _handle: &DisplayHandle,
+            _client: &Client,
+            resource: New<xdg_wm_base::XdgWmBase>,
+            _global_data: &(),
+            data_init: &mut DataInit<'_, Self>,
+        ) {
+            data_init.init(resource, ());
+        }
+    }
+
+    impl Dispatch<xdg_wm_base::XdgWmBase, ()> for FixtureState {
+        fn request(
+            _state: &mut Self,
+            _client: &Client,
+            _resource: &xdg_wm_base::XdgWmBase,
+            request: xdg_wm_base::Request,
+            _data: &(),
+            _handle: &DisplayHandle,
+            _data_init: &mut DataInit<'_, Self>,
+        ) {
+            panic!("unexpected XDG shell request in constructor fixture: {request:?}");
+        }
+    }
+
+    fn fixture_connection(
+        compositor_version: Option<u32>,
+        advertise_xdg_shell: bool,
+    ) -> (Connection, thread::JoinHandle<()>) {
+        let (client_socket, server_socket) = UnixStream::pair().unwrap();
+        let connection = Connection::from_socket(client_socket).unwrap();
+        let mut display = Display::<FixtureState>::new().unwrap();
+        if let Some(version) = compositor_version {
+            display
+                .handle()
+                .create_global::<FixtureState, wl_compositor::WlCompositor, _>(version, ());
+        }
+        if advertise_xdg_shell {
+            display
+                .handle()
+                .create_global::<FixtureState, xdg_wm_base::XdgWmBase, _>(1, ());
+        }
+        let client_data = Arc::new(FixtureClientData::default());
+        display
+            .handle()
+            .insert_client(server_socket, client_data.clone())
+            .unwrap();
+        let worker = thread::spawn(move || {
+            let mut state = FixtureState;
+            let deadline = std::time::Instant::now() + Duration::from_secs(1);
+            while !client_data.disconnected.load(Ordering::Acquire)
+                && std::time::Instant::now() < deadline
+            {
+                display.dispatch_clients(&mut state).unwrap();
+                display.flush_clients().unwrap();
+                thread::yield_now();
+            }
+            assert!(
+                client_data.disconnected.load(Ordering::Acquire),
+                "fixture client did not disconnect before deadline"
+            );
+        });
+        (connection, worker)
+    }
+
+    fn fixture_config() -> WaylandConfig {
+        let mut config = WaylandConfig::new("fixture", "com.softoboros.rlvgl.fixture", 64, 48)
+            .expect("valid fixture configuration");
+        config.registry_timeout = Duration::from_millis(500);
+        config
+    }
+
+    fn dispatch_live_once(session: &mut WaylandSession) {
+        let interest = session.prepare_io().expect("prepare live Wayland I/O");
+        session
+            .dispatch_ready(WaylandIoReadiness {
+                readable: interest.readable,
+                writable: interest.writable,
+            })
+            .expect("dispatch live Wayland I/O");
+    }
+
+    fn await_live_configure(
+        session: &mut WaylandSession,
+        context: &str,
+    ) -> (ConfigureToken, u32, u32) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            dispatch_live_once(session);
+            match session.poll_lifecycle() {
+                Some(WaylandLifecycleEvent::Configure {
+                    token,
+                    width,
+                    height,
+                    ..
+                }) => return (token, width, height),
+                Some(WaylandLifecycleEvent::ConnectionFailed(error)) => {
+                    panic!("connection failed while waiting for {context}: {error}")
+                }
+                Some(WaylandLifecycleEvent::CloseRequested) => {
+                    panic!("compositor closed the window while waiting for {context}")
+                }
+                None if std::time::Instant::now() >= deadline => {
+                    panic!("timed out waiting for {context}")
+                }
+                None => thread::yield_now(),
+            }
+        }
+    }
+
+    fn present_live_frame(session: &mut WaylandSession, color: Color) {
+        let screen = session.display_mut().screen();
+        let pixels = vec![color; (screen.width * screen.height) as usize];
+        session.display_mut().flush(
+            Rect {
+                x: 0,
+                y: 0,
+                width: screen.width as i32,
+                height: screen.height as i32,
+            },
+            &pixels,
+        );
+        session.display_mut().vsync();
+    }
+
+    #[test]
+    #[ignore = "requires a running Wayland compositor; run explicitly in the live evidence job"]
+    fn live_maximize_reconfigures_and_presents_new_generation() {
+        let mut config = WaylandConfig::new(
+            "rlvgl WLD-01 live resize",
+            "com.softoboros.rlvgl.live-resize",
+            64,
+            48,
+        )
+        .expect("valid live resize configuration");
+        config.registry_timeout = Duration::from_secs(2);
+        let mut session = WaylandSession::connect(config).expect("connect to live compositor");
+
+        let (initial_token, initial_width, initial_height) =
+            await_live_configure(&mut session, "initial configure");
+        session
+            .accept_configure(initial_token)
+            .expect("accept initial configure");
+        let initial_screen = session.display_mut().screen();
+        assert_eq!(
+            (initial_screen.width, initial_screen.height),
+            (initial_width, initial_height)
+        );
+
+        present_live_frame(&mut session, Color(0x25, 0x6f, 0xa1, 0xff));
+        assert_eq!(session.display_mut().stats().submitted_frames, 1);
+        session.protocol.window.set_maximized();
+
+        let (resize_token, resize_width, resize_height) =
+            await_live_configure(&mut session, "maximized configure");
+        assert_ne!(
+            (resize_width, resize_height),
+            (initial_width, initial_height),
+            "maximize did not produce a distinct compositor geometry"
+        );
+        session
+            .accept_configure(resize_token)
+            .expect("accept maximized configure");
+        let resized_screen = session.display_mut().screen();
+        assert_eq!(
+            (resized_screen.width, resized_screen.height),
+            (resize_width, resize_height)
+        );
+        let retired_after_resize = session.display_mut().stats().retired_generations;
+
+        present_live_frame(&mut session, Color(0xa1, 0x52, 0x25, 0xff));
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while session.display_mut().stats().submitted_frames < 2
+            || session.display_mut().stats().frame_callbacks < 1
+            || session.display_mut().stats().retired_generations != 0
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out waiting for resized frame completion and retired release"
+            );
+            dispatch_live_once(&mut session);
+            thread::yield_now();
+        }
+        assert_eq!(session.display_mut().stats().submitted_frames, 2);
+
+        eprintln!(
+            "live resize: {initial_width}x{initial_height} -> {resize_width}x{resize_height}; retired immediately after accept={retired_after_resize}; callbacks={}",
+            session.display_mut().stats().frame_callbacks
+        );
+        assert_eq!(session.state(), WaylandSessionState::Ready);
+    }
+
+    fn wait_for_live_marker(path: &Path, context: &str) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while !path.exists() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out waiting for {context} marker at {}",
+                path.display()
+            );
+            thread::yield_now();
+        }
+    }
+
+    struct CompositorResumeMarker(std::path::PathBuf);
+
+    impl Drop for CompositorResumeMarker {
+        fn drop(&mut self) {
+            let _ = fs::write(&self.0, b"resume");
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an externally controlled Weston compositor; run explicitly in the live evidence job"]
+    fn live_vsync_recovers_from_socket_backpressure() {
+        let control_dir = std::env::var_os("WLD01_BACKPRESSURE_CONTROL_DIR")
+            .map(std::path::PathBuf::from)
+            .expect("WLD01_BACKPRESSURE_CONTROL_DIR must name the controller directory");
+        let ready_path = control_dir.join("client-ready");
+        let stopped_path = control_dir.join("compositor-stopped");
+        let resume_path = control_dir.join("client-resume");
+        let _resume_guard = CompositorResumeMarker(resume_path.clone());
+
+        let mut config = WaylandConfig::new(
+            "rlvgl WLD-01 live backpressure",
+            "com.softoboros.rlvgl.live-backpressure",
+            64,
+            48,
+        )
+        .expect("valid live backpressure configuration");
+        config.registry_timeout = Duration::from_secs(2);
+        let mut session = WaylandSession::connect(config).expect("connect to live compositor");
+        let (token, _, _) = await_live_configure(&mut session, "initial configure");
+        session
+            .accept_configure(token)
+            .expect("accept initial configure");
+
+        fs::write(&ready_path, b"ready").expect("signal that the client is ready");
+        wait_for_live_marker(&stopped_path, "stopped compositor");
+        rustix::net::sockopt::set_socket_send_buffer_size(session.as_fd(), 4 * 1024)
+            .expect("shrink live Wayland socket send buffer");
+
+        let mut saturated = false;
+        for request in 0..100_000 {
+            session
+                .protocol
+                .window
+                .set_title(format!("rlvgl WLD-01 saturated {request}"));
+            match session.connection.flush() {
+                Ok(()) => {}
+                Err(ClientWaylandError::Io(error))
+                    if error.kind() == std::io::ErrorKind::WouldBlock =>
+                {
+                    saturated = true;
+                    break;
+                }
+                Err(error) => panic!("unexpected flush error while saturating socket: {error}"),
+            }
+        }
+        assert!(saturated, "live client socket did not reach WouldBlock");
+
+        let present_started = std::time::Instant::now();
+        present_live_frame(&mut session, Color(0x31, 0x9a, 0x5b, 0xff));
+        assert!(
+            present_started.elapsed() < Duration::from_millis(100),
+            "vsync blocked while the Wayland socket was saturated"
+        );
+        assert_eq!(session.display_mut().stats().submitted_frames, 1);
+        let interest = session.prepare_io().expect("prepare saturated Wayland I/O");
+        assert!(
+            interest.writable,
+            "vsync queued behind WouldBlock must request writable readiness"
+        );
+
+        fs::write(&resume_path, b"resume").expect("resume the controlled compositor");
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while session.display_mut().stats().frame_callbacks < 1 || session.needs_write {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out draining backpressure and completing the queued frame"
+            );
+            dispatch_live_once(&mut session);
+            thread::yield_now();
+        }
+
+        eprintln!(
+            "live backpressure: WouldBlock observed, writable interest set, queued vsync completed"
+        );
+        assert_eq!(session.state(), WaylandSessionState::Ready);
+    }
+
+    #[test]
+    fn constructor_rejects_missing_required_globals() {
+        let (connection, worker) = fixture_connection(None, false);
+        let result = WaylandSession::connect_with_connection(fixture_config(), connection);
+        assert!(matches!(result, Err(WaylandError::Registry(_))));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn constructor_rejects_missing_xdg_shell_global() {
+        let (connection, worker) = fixture_connection(Some(4), false);
+        let result = WaylandSession::connect_with_connection(fixture_config(), connection);
+        assert!(matches!(result, Err(WaylandError::Registry(_))));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn constructor_rejects_missing_shm_global() {
+        let (connection, worker) = fixture_connection(Some(4), true);
+        let result = WaylandSession::connect_with_connection(fixture_config(), connection);
+        assert!(matches!(result, Err(WaylandError::Registry(_))));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn constructor_rejects_old_compositor_version() {
+        let (connection, worker) = fixture_connection(Some(3), false);
+        let result = WaylandSession::connect_with_connection(fixture_config(), connection);
+        assert!(matches!(
+            result,
+            Err(WaylandError::ProtocolVersion {
+                interface: "wl_compositor",
+                required: 4,
+                offered: 3,
+            })
+        ));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn configure_token_selection_rejects_superseded_token() {
+        let superseded = ConfigureToken(41);
+        let current = ConfigureSpec {
+            token: ConfigureToken(42),
+            surface_size: (800, 480),
+            logical_size: (800, 480),
+            scale: 1,
+        };
+
+        assert!(matches!(
+            configure_spec_for_token(Some(current), superseded),
+            Err(WaylandError::StaleConfigure(token)) if token == superseded
+        ));
+        let selected = configure_spec_for_token(Some(current), current.token).unwrap();
+        assert_eq!(selected.token, current.token);
+        assert_eq!(selected.surface_size, current.surface_size);
+        assert_eq!(selected.logical_size, current.logical_size);
+        assert_eq!(selected.scale, current.scale);
+    }
+
+    #[test]
+    fn lifecycle_queue_coalesces_configure_and_preserves_terminal_events() {
+        let mut lifecycle = VecDeque::from([
+            WaylandLifecycleEvent::CloseRequested,
+            WaylandLifecycleEvent::ConnectionFailed(WaylandError::Protocol("first".into())),
+            WaylandLifecycleEvent::Configure {
+                token: ConfigureToken(1),
+                width: 640,
+                height: 360,
+                scale: 1,
+            },
+        ]);
+
+        enqueue_configure_lifecycle(
+            &mut lifecycle,
+            3,
+            WaylandLifecycleEvent::Configure {
+                token: ConfigureToken(2),
+                width: 800,
+                height: 480,
+                scale: 1,
+            },
+        );
+
+        assert_eq!(lifecycle.len(), 3);
+        assert!(matches!(
+            lifecycle.front(),
+            Some(WaylandLifecycleEvent::CloseRequested)
+        ));
+        assert!(matches!(
+            lifecycle.get(1),
+            Some(WaylandLifecycleEvent::ConnectionFailed(_))
+        ));
+        assert!(matches!(
+            lifecycle.back(),
+            Some(WaylandLifecycleEvent::Configure {
+                token: ConfigureToken(2),
+                width: 800,
+                height: 480,
+                scale: 1,
+            })
+        ));
+
+        enqueue_terminal_lifecycle(
+            &mut lifecycle,
+            3,
+            WaylandLifecycleEvent::ConnectionFailed(WaylandError::Protocol("second".into())),
+        );
+        assert_eq!(lifecycle.len(), 3);
+        assert!(
+            !lifecycle
+                .iter()
+                .any(|event| matches!(event, WaylandLifecycleEvent::Configure { .. }))
+        );
+        assert!(matches!(
+            lifecycle.front(),
+            Some(WaylandLifecycleEvent::CloseRequested)
+        ));
+        assert_eq!(
+            lifecycle
+                .iter()
+                .filter(|event| matches!(event, WaylandLifecycleEvent::ConnectionFailed(_)))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn outbound_backpressure_sets_write_interest_and_recovers_after_drain() {
+        let (client_socket, mut server_socket) = UnixStream::pair().unwrap();
+        rustix::net::sockopt::set_socket_send_buffer_size(&client_socket, 4 * 1024).unwrap();
+        server_socket.set_nonblocking(true).unwrap();
+        let connection = Connection::from_socket(client_socket).unwrap();
+        let event_queue = connection.new_event_queue::<BackpressureState>();
+        let qh = event_queue.handle();
+        let display = connection.display();
+
+        let mut saturated = false;
+        for _ in 0..100_000 {
+            let _callback = display.sync(&qh, ());
+            match connection.flush() {
+                Ok(()) => {}
+                Err(ClientWaylandError::Io(error))
+                    if error.kind() == std::io::ErrorKind::WouldBlock =>
+                {
+                    saturated = true;
+                    break;
+                }
+                Err(error) => panic!("unexpected flush error while saturating socket: {error}"),
+            }
+        }
+        assert!(saturated, "fixture did not saturate the client socket");
+
+        let mut needs_write = false;
+        flush_connection(&connection, &mut needs_write).unwrap();
+        assert!(needs_write, "WouldBlock must request writable readiness");
+
+        let mut buffer = [0_u8; 16 * 1024];
+        loop {
+            match server_socket.read(&mut buffer) {
+                Ok(0) => panic!("client socket closed while draining backpressure"),
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(error) => panic!("unexpected socket drain error: {error}"),
+            }
+        }
+        flush_connection(&connection, &mut needs_write).unwrap();
+        assert!(!needs_write, "a successful retry must clear write interest");
+    }
 
     #[test]
     fn registry_bootstrap_returns_at_configured_timeout() {

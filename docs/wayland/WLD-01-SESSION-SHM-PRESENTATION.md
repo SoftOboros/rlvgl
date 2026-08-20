@@ -372,14 +372,15 @@ parent WLD-00 and this phase are ratified. Implementation exit requires:
       `wayland-client` 0.31.15, records Rust 1.86 for the host feature, and
       contains no mandatory calloop dependency.
 - [x] Default and representative embedded/no-std feature checks are unchanged.
-- [ ] Constructor failures cover missing required globals and unsupported
-      formats/versions.
-- [ ] Readiness tests cover pending dispatch, read preparation cancellation,
+- [x] Constructor failures cover each missing required global and an
+      unsupported compositor version. XRGB8888 needs no optional format event
+      because it is guaranteed by `wl_shm` version 1.
+- [x] Readiness tests cover pending dispatch, read preparation cancellation,
       read and write readiness, outbound backpressure, and bounded timeout.
 - [ ] Pure state-machine tests cover initial configure, configure supersession,
       frame-before-release, release-before-frame, all-slots-busy, resize with
       Busy slots, disconnect, and clean teardown.
-- [ ] Configure tests cover zero dimensions, Adaptive adoption at a frame
+- [x] Configure tests cover zero dimensions, Adaptive adoption at a frame
       boundary, Fixed Canvas letterbox geometry, and typed undersized failure.
 - [ ] Integer-scale vectors prove checked buffer dimensions, single conversion
       of logical damage, new-generation retirement, and full invalidation.
@@ -395,10 +396,19 @@ parent WLD-00 and this phase are ratified. Implementation exit requires:
       generations, release-driven allocation progress, and repeated configure.
 - [ ] Backpressure tests prove latest-state coalescing, bounded memory, damage
       overflow promotion, and no blocking wait in `vsync()`.
-- [ ] Configure-token and lifecycle-capacity tests prove stale rejection,
+- [x] Configure-token and lifecycle-capacity tests prove stale rejection,
       latest-configure coalescing, and observable close/terminal failure.
-- [ ] A minimal headless-compositor test maps one window and presents at least
+- [x] A minimal headless-compositor test maps one window and presents at least
       one frame without protocol errors.
+- [x] Live Mutter and Weston tests accept compositor-driven Adaptive resize,
+      present the new generation, and observe release of a Busy retired
+      generation where compositor ordering permits it.
+- [x] A controlled live Weston test drives the configured session socket to
+      `WouldBlock`, proves `vsync()` remains nonblocking and requests writable
+      readiness, then drains and completes the queued frame.
+- [x] Session drop emits and flushes XDG role, XDG surface, and `wl_surface`
+      destructors before connection teardown; two-cycle reconnect traces pass
+      on Mutter and Weston.
 - [ ] Public items satisfy `#![deny(missing_docs)]`; strict Clippy and rustdoc
       gates pass for the new feature.
 
@@ -430,10 +440,10 @@ Evidence recorded on an x86_64 macOS host with Rust 1.96.0:
 `platform/tests/wayland_smoke.rs` is the explicit compositor test. It connects,
 accepts the initial configure, maps a 64×48 XDG window, submits one complete
 frame, and requires a compositor frame callback. It is intentionally ignored
-outside a Linux compositor evidence job. This macOS workspace has no running
-Docker daemon, QEMU user-mode runner, or Weston binary, so the test has not yet
-been executed and the corresponding acceptance box remains open. A Linux
-evidence host should run:
+outside a Linux compositor evidence job. At the time of this initial slice,
+the macOS workspace had no running Docker daemon, QEMU user-mode runner, or
+Weston binary. The later Linux runs in §12.2 supersede that initial limitation.
+A Linux evidence host can run:
 
 ```text
 cargo test -p rlvgl-platform --features wayland \
@@ -441,10 +451,161 @@ cargo test -p rlvgl-platform --features wayland \
   maps_xdg_window_and_observes_frame_callback
 ```
 
-WLD-01 therefore has implementation and deterministic evidence, but is not
-exit-complete. Readiness fault injection, configure/lifecycle supersession,
-live SHM release/resize sequences, the compositor smoke, and clean terminal
-teardown still require Linux runtime evidence before WLD-02 can be unblocked.
+The live compositor evidence and controlled
+constructor/configure/lifecycle/readiness fixtures are recorded in §12.2. They
+now close the initially missing live resize, end-to-end present-backpressure,
+and protocol-teardown gates. WLD-01 is still not exit-complete while the
+broader unchecked acceptance bullets above remain open.
+
+### 12.2 Linux compositor evidence — 2026-08-18 through 2026-08-19
+
+The exact ignored compositor smoke was executed through `ssh docker-vm` on
+Ubuntu 26.04 with Rust 1.88.0 against two independent compositors:
+
+| Compositor | Result |
+|---|---|
+| GNOME Shell 50.1 / Mutter, live `wayland-0` session | Pass: one configure/ack, three bounded SHM buffers, one complete frame submission, `wl_buffer.release`, and `wl_callback.done`. The compiled smoke binary passed 25 of 25 fresh client sessions. |
+| Weston 14.0.2, isolated `headless` backend with Pixman renderer | Pass: the exact smoke mapped a 64×48 XDG window and observed the compositor frame callback. |
+
+Both compositor runs used `WAYLAND_DEBUG=1`. Neither client trace contained a
+protocol error, and the Weston compositor log contained no error or failure.
+The live Mutter trace observed release-before-frame ordering. Linux now passes
+176 `rlvgl-platform` library tests with the `wayland` feature; two additional
+live-only unit witnesses remain ignored in the ordinary library run.
+
+Two additional ignored session tests pass on both compositors, serialized in
+one test process:
+
+- `canceled_prepared_read_remains_nonblocking_and_dispatchable` prepares a
+  socket read, reports no readiness, verifies the call returns within 100 ms,
+  prepares again, then configures and presents a complete frame;
+- `repeated_connect_present_and_drop_keeps_compositor_usable` performs two
+  complete connect/configure/present/drop cycles against the same compositor.
+
+The three-test session suite passes `3/3` on both Mutter and Weston. The client
+traces contain no protocol errors, and the Weston compositor log contains no
+error or failure. `WaylandSession::drop` now cancels any prepared read, drops
+both owners of the session Presenter while the connection is alive, and makes
+a best-effort final flush. The two-cycle traces show
+`xdg_toplevel.destroy`, `xdg_surface.destroy`, and `wl_surface.destroy` before
+each fresh connection. Mutter also released and destroyed every SHM buffer;
+on Weston, SCTK retained the still-attached Busy buffer for release/connection
+teardown while destroying the free slots. Both compositors accepted the second
+client without a protocol error.
+
+A Linux-only controlled server fixture uses `wayland-server` 0.31.14 over a
+private Unix socket. It exercises the production constructor through an
+injected `Connection` while leaving the public environment-based constructor
+unchanged. Four cases pass:
+
+- omission of `wl_compositor`, `xdg_wm_base`, or `wl_shm` returns a typed
+  registry failure before surface construction;
+- `wl_compositor` version 3 returns `ProtocolVersion { required: 4, offered: 3
+  }`.
+
+Pure helpers used by the production path additionally prove that a superseded
+configure token is rejected, the current token remains selectable, configure
+notices coalesce to the latest token, and close/terminal-failure notices remain
+observable at lifecycle capacity. Lowering the production compositor threshold
+from 4 to 3 was run as a negative control: the version test failed. Restoring
+the threshold made it pass.
+
+A second private-socket fixture sets a 4 KiB send buffer and queues valid
+`wl_display.sync` requests while the peer intentionally does not read. It reaches
+`WouldBlock`, proves the production flush helper requests writable readiness,
+drains the peer, and proves a successful retry clears write interest. Forcing
+the `WouldBlock` branch to leave write interest clear makes the test fail;
+restoring it makes the test pass. Together, these fixtures close the
+constructor, readiness, and configure-token/lifecycle-capacity gates.
+
+Two live-only unit witnesses exercise the remaining runtime sequences through
+the private session objects without adding a public maximize or test-control
+API:
+
+- `live_maximize_reconfigures_and_presents_new_generation` presents at 64×48,
+  requests XDG maximize, accepts the new configure, and presents a complete
+  new-size frame. The final Mutter run passed at 1920×1048; it released the first buffer
+  before the configure, so no Retired generation was observable. Weston passed
+  at 800×568; its configure arrived before release, so
+  `retired_generations == 1` after acceptance and returned to zero after the
+  resized commit and release. Both runs observed the pacing callback needed to
+  admit two submissions. Weston also delivered the resized frame callback;
+  Mutter is permitted to throttle that second callback when the surface is not
+  visible, so the witness does not make it an exit condition.
+- `live_vsync_recovers_from_socket_backpressure` pauses only its isolated
+  Weston process after initial configure, reduces the actual client socket
+  send buffer to 4 KiB, and queues valid XDG requests until `WouldBlock`.
+  `vsync()` returns within 100 ms, queues the complete frame, and causes the
+  session to request writable readiness. Resuming Weston drains the socket,
+  clears write interest, and completes the frame callback with the session
+  still Ready.
+
+Linux Rust 1.88.0 also passes `cargo fmt --all -- --check` and the targeted
+rustdoc command from §12.1. Strict production Clippy currently stops on the
+pre-existing `clippy::uninlined_format_args` finding in
+`platform/src/present.rs`; the test-inclusive command also reaches the
+pre-existing `clippy::const_is_empty` finding in `platform/tests/discipline.rs`.
+Allowing exactly those two unrelated lints makes
+`rlvgl-platform --features wayland --lib --tests` pass. The
+public-items/strict-Clippy acceptance box therefore remains open rather than
+treating a focused WLD pass as a workspace-clean result.
+
+Evidence artifacts remain on the evidence host:
+
+- `~/.cache/rlvgl-wld01-evidence/mutter-wayland-debug.log`
+  (`sha256:5598c3f3a45e52c25b944b2bc26b068ebbea87e482bfdc8fd289c4ed205852e8`)
+- `~/.cache/rlvgl-wld01-evidence/weston-headless-client.log`
+  (`sha256:991ca5eafbfa1d574eab031224bd6fcf0d8c5debd9fc6f066ec362f84b87a9ec`)
+- `~/.cache/rlvgl-wld01-evidence/weston-headless.log`
+  (`sha256:df9bc4156c8f5a3578b06c4505cddc0f46ec2dc4397e649862da0efe7019cece`)
+- `~/.cache/rlvgl-wld01-evidence/mutter-session-client.log`
+  (`sha256:80662b0b3c5393133fb024b3e0cfb3fb8ea43f60ce9e4e693bbfe68e18a963b8`)
+- `~/.cache/rlvgl-wld01-evidence/weston-session-client.log`
+  (`sha256:298c546a804e9709d96fc17cb7adb14555536ecd64f2d47262b6e673751fb4a3`)
+- `~/.cache/rlvgl-wld01-evidence/weston-session-headless.log`
+  (`sha256:32b971eaf07c544d15fe8ebc044ce188756c2b396b4bb1d6fbb60398e9ba4b0e`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-fixture-unit.log`
+  (`sha256:4b10ae29e7d4af418ca0638fdef39e33194abd66ec70e0f976b1ad2eb00976de`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-fixture-negative-control.log`
+  (`sha256:58aba482d40b770107789a6f6b52ef118af2b411027c8313d4659e5c3bdaa3fa`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-fixture-positive-control.log`
+  (`sha256:f9769c95875dc9585b742a474299d4a9b528e87d40d1da63ef46f0a81b78c025`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-backpressure-negative-control.log`
+  (`sha256:091dffa688b06694880a43f3cc495dd86404a78327c39cda86e2b9bd18c5cb23`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-backpressure-positive-control.log`
+  (`sha256:ee1a090174d17013ca77c413423cc06dbe0b3f5aff656425b57a7282ca202de4`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-fixture-clippy.log`
+  (`sha256:eec08c08efffc29189f36b67089b7e4b95ffb7526542d85cd91d47c347a89810`)
+- `~/.cache/rlvgl-wld01-evidence/controlled-fixture-format-rustdoc.log`
+  (`sha256:37ef70f8f7d95778184d0ec6364542f39ff3fdf36f88c26e27b5da64075f539c`)
+- `~/.cache/rlvgl-wld01-evidence/mutter-session-client-fixture.log`
+  (`sha256:2e1d9ff4573eb5433419222d52dff464a5e4a66dbab2a39f9ccb8bd0cf8fc2cf`)
+- `~/.cache/rlvgl-wld01-evidence/weston-session-client-fixture.log`
+  (`sha256:8c7c2fd9c4018b18eb6321643a5b818e72037d7ba5da9ad4a1e913b6b7b657af`)
+- `~/.cache/rlvgl-wld01-evidence/weston-fixture-headless.log`
+  (`sha256:497349cd79780aaae4b93ecc17f9ce35cdf4c533e5feec223e329ae5738dea52`)
+- `~/.cache/rlvgl-wld01-evidence/live-resize-mutter.log`
+  (`sha256:a3bf26f36d4e66a5f2ffc6beaa04b6fae1f308e67c490ae8d75c5e093177b4c7`)
+- `~/.cache/rlvgl-wld01-evidence/live-resize-weston-client.log`
+  (`sha256:c7da1cdb4a01e516640f39cd5797fc83034c1458ca9abb275dad14d3e1bad9f0`)
+- `~/.cache/rlvgl-wld01-evidence/live-resize-weston-server.log`
+  (`sha256:dcf47aeb6153fc45d1d173dea27ba236dcc7a78a000d0fe4c3bdf6b0ed5205dc`)
+- `~/.cache/rlvgl-wld01-evidence/live-backpressure-weston-client.log`
+  (`sha256:f98f32267dbe2e6d7e40ab19e6f38017c06d713408839e5500ce492ad472de82`)
+- `~/.cache/rlvgl-wld01-evidence/live-backpressure-weston-server.log`
+  (`sha256:47707392e91b0a75e1eb34e1dfb6543509f5fdc1959e74cef9b90a63a00cf313`)
+- `~/.cache/rlvgl-wld01-evidence/live-teardown-mutter.log`
+  (`sha256:8e71b3c7ccdfa670b5ad83ef62c8e484bf4be2b610881cf0257fee8c175c1a93`)
+- `~/.cache/rlvgl-wld01-evidence/live-teardown-weston-client.log`
+  (`sha256:b7f49ec0cc110f4be55b832f3d692cb9635b4aa50490dd4f20b2c4ef113a3dfd`)
+- `~/.cache/rlvgl-wld01-evidence/live-teardown-weston-server.log`
+  (`sha256:67cc81ea967a00d3e8c9d8c63bb7004e9e7210171125f06e3e6e4972f0e82372`)
+- `~/.cache/rlvgl-wld01-evidence/final-gates.log`
+  (`sha256:132ec3c12db2126c4ec010c950e3a3a119c071baeb2f57a41100f33987614abc`)
+
+This closes the WLD-01 minimal headless-compositor, live resize-generation,
+end-to-end present-backpressure, and explicit protocol-object teardown gates.
+It does not mark the broader unchecked acceptance bullets in §12 complete.
 
 ## 13. Files and Expected Ownership
 
@@ -478,6 +639,78 @@ fractional scaling, presentation-time feedback, multiple windows, popups,
 transparent surfaces, custom decorations, and public frame leases.
 
 ## 15. Change Log
+
+### 0.2.4 — 2026-08-19 — Live resize, backpressure, and protocol teardown
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** implementation and evidence
+
+**Touches:** INV-WLD-1, INV-WLD-2, INV-WLD-3, INV-WLD-4, INV-WLD-5, §7–§12
+
+**Commits:** pending
+
+**Summary:** Adds live-only resize and configured-session backpressure
+witnesses, orders session-owned protocol teardown before the final connection
+flush, and records passing Mutter and Weston traces.
+
+#### Rationale
+
+The earlier deterministic fixture proved write-interest bookkeeping but did
+not call the real presentation path, and the repeated-drop smoke proved only
+that the compositor remained usable. The new evidence drives compositor-sized
+SHM generation replacement, observes a Busy Retired generation on Weston,
+saturates the real configured-session socket before `vsync()`, and records
+XDG role/surface destructors before reconnect. Broader unchecked acceptance
+items remain explicit rather than being inferred from these focused runs.
+
+### 0.2.3 — 2026-08-18 — Controlled constructor, lifecycle, and readiness evidence
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** implementation and evidence
+
+**Touches:** INV-WLD-1, INV-WLD-2, §12
+
+**Commits:** pending
+
+**Summary:** Adds a Linux-only private Wayland server fixture for required
+global and compositor-version failures, plus production-path tests for
+configure-token selection, bounded lifecycle notice behavior, and outbound
+socket backpressure.
+
+#### Rationale
+
+Live compositor success cannot deterministically prove failure behavior. The
+private socket fixture supplies controlled registry contents without changing
+the public constructor, and the queue helpers make the existing lifecycle
+policy directly testable. A deliberate version-check mutation proves the
+version fixture detects a missing guard, while a separate mutation proves the
+backpressure test detects missing writable interest. Live resize generations
+and end-to-end present behavior under saturation remain separate open evidence.
+
+### 0.2.2 — 2026-08-18 — Linux readiness and teardown evidence
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** editorial
+
+**Touches:** INV-WLD-1, INV-WLD-2, §12
+
+**Commits:** pending
+
+**Summary:** Adds compositor session tests for prepared-read cancellation and
+repeated connect/present/drop behavior, executes them against live Mutter and
+headless Weston, and records the protocol traces and remaining evidence limits.
+
+#### Rationale
+
+The first compositor smoke proved one successful frame but not that an external
+poller could report no readiness without stranding the prepared read, nor that
+a dropped session left the compositor usable for a new client. The added tests
+exercise those public-boundary paths on both available compositors without
+claiming the still-missing write-saturation, configure-supersession, or
+protocol-object teardown fixtures.
 
 ### 0.2.1 — 2026-08-18 — Implementation and deterministic evidence
 
