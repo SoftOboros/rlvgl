@@ -286,6 +286,8 @@ def main() -> int:
         root / "examples/stm32h747i-disco/memory.x",
         root / "examples/stm32h747i-disco/memory_cm4.x",
         root / "examples/stm32h747i-disco/src/ipc.rs",
+        root / "examples/stm32h747i-disco/src/main.rs",
+        root / "examples/stm32h747i-disco/src/cm4_main.rs",
         root / "scripts/verify_stm32h747i_disco_pair.py",
     ]
 

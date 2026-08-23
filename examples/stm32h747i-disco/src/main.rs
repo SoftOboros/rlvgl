@@ -1983,7 +1983,7 @@ fn main() -> ! {
         #[allow(clippy::let_unit_value)]
         {
             // Safe to call; function is a no-op in unified builds
-            let _ = bsp_pac::signal_clocks_ready();
+            ipc::signal_clocks_ready();
         }
         unsafe {
             (0x3800_0300u32 as *mut u32).write_volatile(0xA11C_0005u32); // rlvgl-discipline: allow(raw_addr_cast) allow(raw_mmio_cast)
@@ -5106,6 +5106,11 @@ fn main() -> ! {
                 scope_probe::ltdc_active();
                 buffer_ready = false;
                 present_count = present_count.wrapping_add(1);
+                // Legacy paired-image prerequisite: publish the completed
+                // presentation so CM4 can leave its startup wait and prove
+                // both producer/consumer directions. This native-layout event
+                // is diagnostic only and is not an MPY-08 Return Ring frame.
+                let _ = ipc::event_push(ipc::evt_frame_rendered(present_count));
 
                 #[cfg(all(feature = "dma2d", any(target_arch = "arm", target_arch = "aarch64")))]
                 let crawl_running = star_crawl.is_active();
@@ -5253,7 +5258,7 @@ pub extern "C" fn rlvgl_app_main() -> ! {
 
     // ── Signal clocks ready to CM4 ──────────────────────────────────────────
     #[allow(clippy::let_unit_value)]
-    let _ = bsp_pac::signal_clocks_ready();
+    ipc::signal_clocks_ready();
 
     // ── Steal PAC peripherals (clocks/GPIO already configured by C) ─────────
     let dp = unsafe { stm32h7::stm32h747cm7::Peripherals::steal() };

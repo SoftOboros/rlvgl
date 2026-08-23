@@ -13,6 +13,11 @@ FLASH_BASE    := 0x08000000
 OBJCOPY       := rust-objcopy
 PROBE_ID      ?= 0483:3754:004F00273133510837363734
 PROBE_SPEED   ?= 1000
+DISCO_EVIDENCE_DIR      := target/mpy08-evidence
+DISCO_STATIC_EVIDENCE   := $(DISCO_EVIDENCE_DIR)/stm32h747i-disco-pair.json
+DISCO_PHYSICAL_EVIDENCE := $(DISCO_EVIDENCE_DIR)/stm32h747i-disco-physical.json
+DISCO_SETTLE_SECONDS    ?= 5
+DISCO_CAPTURE_TIMEOUT   ?= 10
 
 # Host simulators and tools
 SIM_PACKAGE        := rlvgl-example-sim
@@ -48,7 +53,9 @@ DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 .PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
 	build-disco-freertos flash-disco-freertos release-artifacts \
 	objcopy-disco objcopy-disco-release objcopy-disco-cm4 verify-disco-pair \
+	test-disco-pair-tools \
 	flash-disco flash-disco-cm4 flash-disco-all flash-disco-hex flash-disco-bin \
+	capture-disco-pair \
 	probe-rs-gdb \
 	openocd openocd-dual openocd-erase \
 	gen-stm32h747i-disco-bsp \
@@ -67,6 +74,7 @@ help:
 	@echo "  make build-disco-cm4          # Build CM4 debug + generate .hex"
 	@echo "  make build-disco-all          # Build and verify the paired CM7/CM4 images"
 	@echo "  make verify-disco-pair        # Verify CPU, flash-bank, mailbox, and artifact metadata"
+	@echo "  make test-disco-pair-tools    # Run host tests for physical capture accounting"
 	@echo "  make build-disco-freertos     # Build FreeRTOS preemptive task variant"
 	@echo "  make flash-disco-freertos     # Build + flash FreeRTOS variant"
 	@echo "  make release-artifacts        # Build all platforms (release) into release/"
@@ -89,6 +97,7 @@ help:
 	@echo "  make flash-disco              # Build + flash CM7 via probe-rs (ELF)"
 	@echo "  make flash-disco-cm4          # Build + flash CM4 via probe-rs (ELF)"
 	@echo "  make flash-disco-all          # Build, verify, flash both cores, then reset"
+	@echo "  make capture-disco-pair       # Flash pair + capture physical ring progress"
 	@echo "  make flash-disco-hex          # Flash from .hex"
 	@echo "  make flash-disco-bin          # Flash from .bin (with base address)"
 	@echo "  make probe-rs-gdb             # Flash + launch probe-rs GDB server"
@@ -253,9 +262,13 @@ objcopy-disco-cm4:
 	@ls -lh $(ELF_CM4) $(ELF_CM4).hex
 
 verify-disco-pair: build-disco build-disco-cm4
+	python3 scripts/test_capture_stm32h747i_disco_pair.py
 	python3 scripts/verify_stm32h747i_disco_pair.py \
 	  --cm7 $(ELF_CM7) --cm4 $(ELF_CM4) \
-	  --json-out target/mpy08-evidence/stm32h747i-disco-pair.json
+	  --json-out $(DISCO_STATIC_EVIDENCE)
+
+test-disco-pair-tools:
+	python3 scripts/test_capture_stm32h747i_disco_pair.py
 
 # ── Release artifacts ────────────────────────────────────────────
 #
@@ -317,6 +330,14 @@ flash-disco-all: build-disco-all
 	  --non-interactive --connect-under-reset --verify \
 	  --probe $(PROBE_ID) $(ELF_CM4)
 	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+capture-disco-pair: flash-disco-all
+	python3 scripts/capture_stm32h747i_disco_pair.py \
+	  --chip $(CHIP) --probe $(PROBE_ID) --speed $(PROBE_SPEED) \
+	  --settle-seconds $(DISCO_SETTLE_SECONDS) \
+	  --timeout-seconds $(DISCO_CAPTURE_TIMEOUT) \
+	  --static-evidence $(DISCO_STATIC_EVIDENCE) \
+	  --json-out $(DISCO_PHYSICAL_EVIDENCE)
 
 flash-disco-freertos: build-disco-freertos
 	probe-rs download --chip $(CHIP) \

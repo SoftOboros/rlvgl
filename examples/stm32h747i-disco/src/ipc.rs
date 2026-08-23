@@ -4,7 +4,8 @@
 
 //! Bidirectional cross-core IPC (CM4 ↔ CM7) using ring buffers in D2 SRAM3.
 //!
-//! Two independent queues share the 1KB mailbox region at 0x3004_7000:
+//! Two independent queues and a clock-ready prerequisite flag share the
+//! linker-owned 1 KiB legacy mailbox candidate:
 //! - **CmdQueue** (CM4 → CM7): application commands (navigate, update labels, etc.)
 //! - **EvtQueue** (CM7 → CM4): UI events (touch, button press, frame sync)
 //!
@@ -16,13 +17,31 @@
 //
 // MAILBOX region in D2 SRAM3: 0x3004_7000, 1KB (declared in memory.x / memory_cm4.x)
 //
-// 0x30047000  CmdQueue : head(4) + tail(4) + 16 × 20 = 328 bytes
-// 0x30047200  EvtQueue : head(4) + tail(4) +  8 × 20 = 168 bytes
+// base + 0x000  CmdQueue : head(4) + tail(4) + 16 × 20 = 328 bytes
+// base + 0x1FC  clock-ready prerequisite flag (4 bytes)
+// base + 0x200  EvtQueue : head(4) + tail(4) +  8 × 20 = 168 bytes
 // Total: 496 bytes (well within 1KB)
 
-const MAILBOX_BASE: usize = 0x3004_7000;
-const CMD_QUEUE_ADDR: usize = MAILBOX_BASE;
-const EVT_QUEUE_ADDR: usize = MAILBOX_BASE + 0x200;
+use core::sync::atomic::{AtomicU32, Ordering};
+
+const CMD_QUEUE_OFFSET: usize = 0;
+const CLOCK_READY_OFFSET: usize = 0x1FC;
+const EVT_QUEUE_OFFSET: usize = 0x200;
+
+unsafe extern "C" {
+    static _mailbox_base: u8;
+    static _mailbox_size: u8;
+}
+
+#[inline]
+fn mailbox_base() -> usize {
+    core::ptr::addr_of!(_mailbox_base) as usize
+}
+
+#[inline]
+fn mailbox_size() -> usize {
+    core::ptr::addr_of!(_mailbox_size) as usize
+}
 
 const CMD_CAPACITY: u32 = 16;
 const EVT_CAPACITY: u32 = 8;
@@ -157,17 +176,39 @@ type StaticCmdQueue = &'static mut CmdQueue; // rlvgl-discipline: allow(static_m
 type StaticEvtQueue = &'static mut EvtQueue; // rlvgl-discipline: allow(static_mut)
 
 fn cmd_queue() -> StaticCmdQueue {
-    unsafe { &mut *(CMD_QUEUE_ADDR as *mut CmdQueue) }
+    unsafe { &mut *((mailbox_base() + CMD_QUEUE_OFFSET) as *mut CmdQueue) }
 }
 
 fn evt_queue() -> StaticEvtQueue {
-    unsafe { &mut *(EVT_QUEUE_ADDR as *mut EvtQueue) }
+    unsafe { &mut *((mailbox_base() + EVT_QUEUE_OFFSET) as *mut EvtQueue) }
+}
+
+fn clock_ready() -> &'static AtomicU32 {
+    unsafe { &*((mailbox_base() + CLOCK_READY_OFFSET) as *const AtomicU32) }
 }
 
 // ── Initialisation ──────────────────────────────────────────────────────────
 
-/// Zero both ring buffers.  Called once by CM7 before releasing CM4.
+/// Publish that CM7 has initialized the shared clock prerequisite.
+///
+/// This legacy-demo flag is deliberately separate from both queue indices so
+/// CM7 queue initialization cannot erase a signal that CM4 has not observed.
+/// It is not MPY-08's Boot Epoch or reset-recovery mechanism.
+pub fn signal_clocks_ready() {
+    clock_ready().store(1, Ordering::Release);
+    cortex_m::asm::sev();
+}
+
+/// Wait until CM7 publishes that the shared clock prerequisite is ready.
+pub fn wait_for_clocks() {
+    while clock_ready().load(Ordering::Acquire) == 0 {
+        cortex_m::asm::wfe();
+    }
+}
+
+/// Zero both ring buffers. Called once by CM7 before either queue is used.
 pub fn init() {
+    debug_assert!(mailbox_size() >= EVT_QUEUE_OFFSET + core::mem::size_of::<EvtQueue>());
     let cq = cmd_queue();
     cq.head = 0;
     cq.tail = 0;

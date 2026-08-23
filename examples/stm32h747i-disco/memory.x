@@ -49,6 +49,8 @@ PROVIDE(_axisram_cm7_size  = LENGTH(D1_CM7));
  * auditable in paired-image evidence. */
 _mailbox_base = ORIGIN(MAILBOX);
 _mailbox_size = LENGTH(MAILBOX);
+ASSERT((ORIGIN(MAILBOX) & 31) == 0, "legacy mailbox must be 32-byte aligned");
+ASSERT(LENGTH(MAILBOX) >= 0x2A8, "legacy mailbox is too small for paired queues");
 /* Place `.retained_d3` into D3_CM4 if required */
 PROVIDE(_retained_d3_start = ORIGIN(D3_CM4));
 PROVIDE(_retained_d3_size  = LENGTH(D3_CM4));

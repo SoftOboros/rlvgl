@@ -71,7 +71,7 @@ fn main() -> ! {
         bsp_pac::init_power(&dp);
         #[allow(clippy::let_unit_value)]
         {
-            let _ = bsp_pac::wait_for_clocks();
+            ipc::wait_for_clocks();
         }
 
         ipc::init_cm4();
