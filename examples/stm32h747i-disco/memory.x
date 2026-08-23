@@ -43,9 +43,12 @@ PROVIDE(_sdram_size  = LENGTH(SDRAM));
 /* Place `.axisram_cm7` into D1_CM7 if referenced in a custom linker script */
 PROVIDE(_axisram_cm7_start = ORIGIN(D1_CM7));
 PROVIDE(_axisram_cm7_size  = LENGTH(D1_CM7));
-/* Place `.mailbox` into MAILBOX region if a custom script includes it */
-PROVIDE(_mailbox_base = ORIGIN(MAILBOX));
-PROVIDE(_mailbox_size = LENGTH(MAILBOX));
+/* Export the current legacy-demo mailbox candidate into every linked image.
+ * MPY-08 does not treat this placement as normative until its platform PCDNs
+ * are resolved; these symbols make the existing candidate mechanically
+ * auditable in paired-image evidence. */
+_mailbox_base = ORIGIN(MAILBOX);
+_mailbox_size = LENGTH(MAILBOX);
 /* Place `.retained_d3` into D3_CM4 if required */
 PROVIDE(_retained_d3_start = ORIGIN(D3_CM4));
 PROVIDE(_retained_d3_size  = LENGTH(D3_CM4));
@@ -55,3 +58,19 @@ PROVIDE(_retained_d3_size  = LENGTH(D3_CM4));
  * __edata is the end of .data LMA (= end of flash image).
  * If .data is empty, __sidata == __edata and the total is just .text+.rodata. */
 PROVIDE(_flash_image_end = __sidata + (__edata - __sdata));
+
+/* Preserve reset breadcrumbs and keep the bounded renderer scratch away from
+ * the downward-growing DTCM stack. Both are runtime-owned storage and must not
+ * become loadable flash payloads. */
+SECTIONS
+{
+  .noinit (NOLOAD) : ALIGN(4)
+  {
+    *(.noinit .noinit.*)
+  } > RAM
+
+  .rlvgl_blit_scratch (NOLOAD) : ALIGN(4)
+  {
+    *(.rlvgl_blit_scratch .rlvgl_blit_scratch.*)
+  } > D1_CM7
+} INSERT AFTER .uninit;

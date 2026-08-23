@@ -29,9 +29,10 @@ REGION_ALIAS("REGION_STACK",  RAM);
 /* Place `.axisram_cm4` into D1_CM4 if referenced in a custom linker script */
 PROVIDE(_axisram_cm4_start = ORIGIN(D1_CM4));
 PROVIDE(_axisram_cm4_size  = LENGTH(D1_CM4));
-/* Place `.mailbox` into MAILBOX region if a custom script includes it */
-PROVIDE(_mailbox_base = ORIGIN(MAILBOX));
-PROVIDE(_mailbox_size = LENGTH(MAILBOX));
+/* Export the same legacy-demo mailbox candidate as the CM7 image so paired
+ * link evidence can reject divergent base or extent values. */
+_mailbox_base = ORIGIN(MAILBOX);
+_mailbox_size = LENGTH(MAILBOX);
 /* Place `.retained_d3` into D3_CM4 if required */
 PROVIDE(_retained_d3_start = ORIGIN(D3_CM4));
 PROVIDE(_retained_d3_size  = LENGTH(D3_CM4));

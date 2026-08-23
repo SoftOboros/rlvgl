@@ -4,6 +4,8 @@ PACKAGE       := rlvgl-example-disco
 BIN_CM7       := rlvgl-stm32h747i-disco
 BIN_CM4       := rlvgl-stm32h747i-disco-cm4
 TARGET        := thumbv7em-none-eabihf
+CPU_CM7       := cortex-m7
+CPU_CM4       := cortex-m4
 FEATURES_CM7  := cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
 FEATURES_CM4  := cm4
 CHIP          := STM32H747XIHx
@@ -45,8 +47,8 @@ DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 
 .PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
 	build-disco-freertos flash-disco-freertos release-artifacts \
-	objcopy-disco objcopy-disco-release \
-	flash-disco flash-disco-hex flash-disco-bin \
+	objcopy-disco objcopy-disco-release objcopy-disco-cm4 verify-disco-pair \
+	flash-disco flash-disco-cm4 flash-disco-all flash-disco-hex flash-disco-bin \
 	probe-rs-gdb \
 	openocd openocd-dual openocd-erase \
 	gen-stm32h747i-disco-bsp \
@@ -62,8 +64,9 @@ help:
 	@echo "STM32H747I-DISCO firmware:"
 	@echo "  make build-disco              # Build CM7 debug + generate .hex/.bin"
 	@echo "  make build-disco-release      # Build CM7 release + generate .hex/.bin"
-	@echo "  make build-disco-cm4          # Build CM4 debug"
-	@echo "  make build-disco-all          # Build both cores"
+	@echo "  make build-disco-cm4          # Build CM4 debug + generate .hex"
+	@echo "  make build-disco-all          # Build and verify the paired CM7/CM4 images"
+	@echo "  make verify-disco-pair        # Verify CPU, flash-bank, mailbox, and artifact metadata"
 	@echo "  make build-disco-freertos     # Build FreeRTOS preemptive task variant"
 	@echo "  make flash-disco-freertos     # Build + flash FreeRTOS variant"
 	@echo "  make release-artifacts        # Build all platforms (release) into release/"
@@ -84,6 +87,8 @@ help:
 	@echo ""
 	@echo "Flash & debug:"
 	@echo "  make flash-disco              # Build + flash CM7 via probe-rs (ELF)"
+	@echo "  make flash-disco-cm4          # Build + flash CM4 via probe-rs (ELF)"
+	@echo "  make flash-disco-all          # Build, verify, flash both cores, then reset"
 	@echo "  make flash-disco-hex          # Flash from .hex"
 	@echo "  make flash-disco-bin          # Flash from .bin (with base address)"
 	@echo "  make probe-rs-gdb             # Flash + launch probe-rs GDB server"
@@ -168,23 +173,24 @@ mpy-host-test:
 
 # ── Build ─────────────────────────────────────────────────────────
 build-disco:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM7)" \
 	cargo build --target $(TARGET) \
 	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
 	$(MAKE) objcopy-disco
 
 build-disco-release:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM7)" \
 	cargo build --target $(TARGET) --release \
 	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
 	$(MAKE) objcopy-disco-release
 
 build-disco-cm4:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM4)" \
 	cargo build --target $(TARGET) \
 	  -p $(PACKAGE) --bin $(BIN_CM4) --features $(FEATURES_CM4)
+	$(MAKE) objcopy-disco-cm4
 
-build-disco-all: build-disco build-disco-cm4
+build-disco-all: verify-disco-pair
 
 # FreeRTOS build: preemptive present / render / touch tasks.
 FEATURES_CM7_FREERTOS := cm7,freertos,adapted_cmd,dma2d,splash,desktop
@@ -241,6 +247,16 @@ objcopy-disco-release:
 	@echo "── artifacts ──"
 	@ls -lh $(ELF_CM7_REL) $(ELF_CM7_REL).hex $(ELF_CM7_REL).bin
 
+objcopy-disco-cm4:
+	$(OBJCOPY) -O ihex $(ELF_CM4) $(ELF_CM4).hex
+	@echo "── CM4 artifact ──"
+	@ls -lh $(ELF_CM4) $(ELF_CM4).hex
+
+verify-disco-pair: build-disco build-disco-cm4
+	python3 scripts/verify_stm32h747i_disco_pair.py \
+	  --cm7 $(ELF_CM7) --cm4 $(ELF_CM4) \
+	  --json-out target/mpy08-evidence/stm32h747i-disco-pair.json
+
 # ── Release artifacts ────────────────────────────────────────────
 #
 # Build all platform variants in release mode, rename with platform
@@ -282,6 +298,24 @@ flash-disco: build-disco
 	  --protocol swd --speed $(PROBE_SPEED) \
 	  --non-interactive --connect-under-reset \
 	  --probe $(PROBE_ID) $(ELF_CM7)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+flash-disco-cm4: build-disco-cm4
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM4)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+flash-disco-all: build-disco-all
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM7)
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM4)
 	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
 
 flash-disco-freertos: build-disco-freertos
