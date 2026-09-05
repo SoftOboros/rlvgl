@@ -1,0 +1,30 @@
+# Battery-monitor application crate for the rlvgl simulator and embedded transports.
+[package]
+name = "rlvgl-battery-monitor"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Read-only Renogy Modbus RTU battery-monitor application for rlvgl."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rlvgl-battery-monitor-sim"
+path = "src/main.rs"
+required-features = ["host-serial"]
+
+[features]
+default = ["host-serial"]
+host-serial = [
+    "dep:serialport",
+    "rlvgl-platform/simulator",
+]
+
+[dependencies]
+rlvgl-core = { path = "../../../core", default-features = false }
+rlvgl-widgets = { path = "../../../widgets", default-features = false }
+rlvgl-platform = { path = "../../../platform", default-features = false, optional = true }
+serialport = { version = "4.8.1", optional = true }
+ratatui = { path = "../../../vendor/ratatui/ratatui", default-features = false }
+ratatui-rlvgl = { path = "../../../vendor/ratatui/ratatui-rlvgl", default-features = false }

@@ -505,6 +505,7 @@ members = [
     "devices/rlvgl-device-ptn3460",
     "devices/rlvgl-device-pcm3168a",
     "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
+    "examples/apps/battery-monitor",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
     "examples/beetle-esp32p4",

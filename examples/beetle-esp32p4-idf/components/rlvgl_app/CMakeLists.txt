@@ -9,8 +9,6 @@
 #   - cargo on PATH (rustup)
 #   - rustup target add riscv32imafc-unknown-none-elf   (ilp32f, matches IDF)
 
-idf_component_register(INCLUDE_DIRS "include")
-
 set(RUST_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/rust")
 set(RUST_TARGET  "riscv32imafc-unknown-none-elf")
 set(RUST_PROFILE "release")
@@ -19,12 +17,18 @@ set(RUST_LIB     "${RUST_DIR}/target/${RUST_TARGET}/${RUST_PROFILE}/librlvgl_app
 # Build-time payload selection (SCTD-02 PCDN-02-01): the default `sctd` payload
 # is the interactive SCXML tutorial demo; `idf.py -DRLVGL_PAYLOAD=disco build`
 # restores the original disco-demo widget tree.
-set(RLVGL_PAYLOAD "sctd" CACHE STRING "rlvgl IDF payload: sctd | disco")
+set(RLVGL_PAYLOAD "sctd" CACHE STRING "rlvgl IDF payload: sctd | disco | ccps")
+set(RLVGL_APP_REQUIRES "")
 if(RLVGL_PAYLOAD STREQUAL "disco")
     set(RUST_CARGO_FEATURES --no-default-features --features app_disco)
+elseif(RLVGL_PAYLOAD STREQUAL "ccps")
+    set(RUST_CARGO_FEATURES --no-default-features --features app_ccps)
+    set(RLVGL_APP_REQUIRES ccps_bms)
 else()
     set(RUST_CARGO_FEATURES "")
 endif()
+
+idf_component_register(INCLUDE_DIRS "include" REQUIRES ${RLVGL_APP_REQUIRES})
 
 include(ExternalProject)
 ExternalProject_Add(rlvgl_rust_build

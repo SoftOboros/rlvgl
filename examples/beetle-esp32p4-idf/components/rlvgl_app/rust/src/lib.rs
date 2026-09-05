@@ -27,18 +27,19 @@ extern crate alloc;
 
 #[cfg(not(test))]
 use core::alloc::{GlobalAlloc, Layout};
+use core::cell::RefCell;
 #[cfg(not(test))]
 use core::ffi::c_void;
 #[cfg(not(test))]
 use core::panic::PanicInfo;
-use core::cell::RefCell;
 use core::ptr::addr_of_mut;
 
 use alloc::rc::Rc;
-use rlvgl_core::WidgetNode;
 use rlvgl_core::event::Event;
 use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
+use rlvgl_core::WidgetNode;
+#[cfg(any(feature = "app_sctd", feature = "app_disco"))]
 use rlvgl_platform::Screen;
 
 mod star_crawl;
@@ -49,14 +50,25 @@ use star_crawl::StarCrawl;
 // ---------------------------------------------------------------------------
 //
 // The IDF host loop is payload-agnostic: it drives a uniform `App` that wraps
-// whichever tutorial controller is selected at build time. Default is the SCTD
-// interactive tutorial demo (`app_sctd`); `--features app_disco` restores the
-// original disco-demo widget tree. Exactly one feature is active.
+// whichever controller is selected at build time. Default is the SCTD
+// interactive tutorial demo (`app_sctd`); `app_disco` restores the original
+// disco-demo tree, and `app_ccps` mounts the read-only battery monitor. Exactly
+// one feature is active.
+
+#[cfg(any(
+    all(feature = "app_sctd", feature = "app_disco"),
+    all(feature = "app_sctd", feature = "app_ccps"),
+    all(feature = "app_disco", feature = "app_ccps"),
+))]
+compile_error!("select exactly one rlvgl IDF payload feature");
+
+#[cfg(not(any(feature = "app_sctd", feature = "app_disco", feature = "app_ccps")))]
+compile_error!("select one rlvgl IDF payload feature");
 
 /// SCTD interactive tutorial demo payload.
 #[cfg(feature = "app_sctd")]
 mod app {
-    use super::{Event, RefCell, Rc, Screen, WidgetNode};
+    use super::{Event, Rc, RefCell, Screen, WidgetNode};
     use rlvgl_app_sctd_demo::SctdController;
 
     /// Uniform app wrapper over the SCTD controller.
@@ -74,7 +86,8 @@ mod app {
             self.controller.handle_event(&Event::Tick);
         }
         pub fn dispatch_press(&mut self, x: i32, y: i32) {
-            self.controller.dispatch_event(&Event::PressRelease { x, y });
+            self.controller
+                .dispatch_event(&Event::PressRelease { x, y });
         }
         /// Returns whether a star-crawl effect was requested this frame. SCTD
         /// never requests it, so this is always `false`.
@@ -88,10 +101,204 @@ mod app {
     }
 }
 
+/// CCPS read-only Renogy battery-monitor payload.
+#[cfg(feature = "app_ccps")]
+mod app {
+    use super::{Event, Rc, RefCell, WidgetNode};
+    use rlvgl_battery_monitor::{
+        BatteryMonitorApp, BatteryPoller, BatteryTelemetry, PollResult, DEFAULT_BATTERY_ADDRESSES,
+    };
+    use rlvgl_core::application::Application;
+
+    const STALE_AFTER_MS: u32 = 5_000;
+
+    /// C-compatible copy of the latest CRC-validated snapshot retained by the
+    /// IDF UART task. Raw response frames remain in the C transport cache.
+    #[repr(C)]
+    #[derive(Clone, Copy, Default)]
+    struct CcpsBmsSnapshot {
+        generation: u32,
+        age_ms: u32,
+        remaining_capacity_milliamphours: u32,
+        total_capacity_milliamphours: u32,
+        current_centiamps: i16,
+        cell_temperature_decicelsius: [i16; 3],
+        module_voltage_decivolts: u16,
+        cell_count: u16,
+        cell_voltage_decivolts: [u16; 4],
+        cell_temperature_count: u16,
+        status1: u16,
+        status2: u16,
+        status3: u16,
+        charge_discharge_status: u16,
+        last_error: i32,
+        address: u8,
+        valid: u8,
+        _reserved: [u8; 2],
+    }
+
+    #[cfg(not(test))]
+    unsafe extern "C" {
+        fn ccps_bms_start() -> i32;
+        fn ccps_bms_snapshot(address: u8, snapshot: *mut CcpsBmsSnapshot) -> i32;
+        fn ccps_network_start() -> i32;
+    }
+
+    #[cfg(not(test))]
+    pub fn start_transport() {
+        // SAFETY: starts an idempotent C service and takes no borrowed data.
+        let _ = unsafe { ccps_bms_start() };
+        let _ = unsafe { ccps_network_start() };
+    }
+
+    #[cfg(test)]
+    pub fn start_transport() {}
+
+    struct IdfBatteryPoller {
+        generations: [u32; 3],
+        stale_reported: [bool; 3],
+    }
+
+    impl IdfBatteryPoller {
+        fn new() -> Self {
+            Self {
+                generations: [0; 3],
+                stale_reported: [false; 3],
+            }
+        }
+
+        fn index(address: u8) -> Option<usize> {
+            DEFAULT_BATTERY_ADDRESSES
+                .iter()
+                .position(|candidate| *candidate == address)
+        }
+
+        #[cfg(not(test))]
+        fn read_snapshot(address: u8) -> Option<CcpsBmsSnapshot> {
+            let mut snapshot = CcpsBmsSnapshot::default();
+            // SAFETY: `snapshot` is writable for the call and the C side copies
+            // one cache entry while holding its own critical section.
+            let found = unsafe { ccps_bms_snapshot(address, &mut snapshot) };
+            (found > 0).then_some(snapshot)
+        }
+
+        #[cfg(test)]
+        fn read_snapshot(_address: u8) -> Option<CcpsBmsSnapshot> {
+            None
+        }
+
+        fn error_text(code: i32) -> &'static str {
+            match code {
+                1 => "response timeout",
+                2 => "response shape mismatch",
+                3 => "response CRC mismatch",
+                4 => "UART transaction failed",
+                5 => "gateway role is disabled",
+                _ => "battery poll failed",
+            }
+        }
+    }
+
+    impl BatteryPoller for IdfBatteryPoller {
+        fn poll(&mut self, address: u8) -> PollResult {
+            let Some(index) = Self::index(address) else {
+                return PollResult::Error(alloc::format!(
+                    "address {address:02X} is not configured"
+                ));
+            };
+            let Some(snapshot) = Self::read_snapshot(address) else {
+                return PollResult::Pending;
+            };
+
+            if snapshot.generation == self.generations[index] {
+                if snapshot.valid != 0
+                    && snapshot.age_ms > STALE_AFTER_MS
+                    && !self.stale_reported[index]
+                {
+                    self.stale_reported[index] = true;
+                    return PollResult::Error(alloc::format!(
+                        "telemetry is {} ms old",
+                        snapshot.age_ms
+                    ));
+                }
+                return PollResult::Pending;
+            }
+
+            self.generations[index] = snapshot.generation;
+            self.stale_reported[index] = false;
+            if snapshot.last_error != 0 {
+                return PollResult::Error(alloc::format!(
+                    "{} (last good {} ms ago)",
+                    Self::error_text(snapshot.last_error),
+                    snapshot.age_ms
+                ));
+            }
+            if snapshot.valid == 0 {
+                return PollResult::Pending;
+            }
+
+            PollResult::Telemetry(BatteryTelemetry {
+                address: snapshot.address,
+                cell_count: snapshot.cell_count,
+                cell_voltage_decivolts: snapshot.cell_voltage_decivolts,
+                cell_temperature_count: snapshot.cell_temperature_count,
+                cell_temperature_decicelsius: snapshot.cell_temperature_decicelsius,
+                module_voltage_decivolts: snapshot.module_voltage_decivolts,
+                current_centiamps: snapshot.current_centiamps,
+                remaining_capacity_milliamphours: snapshot.remaining_capacity_milliamphours,
+                total_capacity_milliamphours: snapshot.total_capacity_milliamphours,
+                status1: snapshot.status1,
+                status2: snapshot.status2,
+                status3: snapshot.status3,
+                charge_discharge_status: snapshot.charge_discharge_status,
+            })
+        }
+    }
+
+    /// Uniform wrapper over the portable battery monitor controller.
+    pub struct App {
+        controller: BatteryMonitorApp<IdfBatteryPoller>,
+        root: Rc<RefCell<WidgetNode>>,
+    }
+
+    impl App {
+        pub fn new(width: i32, height: i32) -> Self {
+            let mut controller =
+                BatteryMonitorApp::new(IdfBatteryPoller::new(), DEFAULT_BATTERY_ADDRESSES);
+            let root = Rc::new(RefCell::new(
+                controller.build(width.max(1) as u32, height.max(1) as u32),
+            ));
+            controller.after_event(&root, &Event::Tick);
+            Self { controller, root }
+        }
+        pub fn tick(&mut self) {
+            self.controller.tick(&self.root);
+        }
+        pub fn dispatch_press(&mut self, _x: i32, _y: i32) {}
+        pub fn drain(&mut self) -> bool {
+            false
+        }
+        pub fn root(&self) -> Rc<RefCell<WidgetNode>> {
+            self.root.clone()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::CcpsBmsSnapshot;
+
+        #[test]
+        fn snapshot_layout_matches_c_abi() {
+            assert_eq!(core::mem::size_of::<CcpsBmsSnapshot>(), 56);
+            assert_eq!(core::mem::align_of::<CcpsBmsSnapshot>(), 4);
+        }
+    }
+}
+
 /// Original disco-demo widget-tree payload.
 #[cfg(feature = "app_disco")]
 mod app {
-    use super::{Event, RefCell, Rc, Screen, WidgetNode, rlvgl_host_set_backlight};
+    use super::{rlvgl_host_set_backlight, Event, Rc, RefCell, Screen, WidgetNode};
     use rlvgl_app_disco_demo::{DiscoCapabilities, DiscoCommand, DiscoController, DiscoEffect};
 
     /// Uniform app wrapper over the disco-demo controller.
@@ -120,7 +327,8 @@ mod app {
             self.controller.tick();
         }
         pub fn dispatch_press(&mut self, x: i32, y: i32) {
-            self.controller.dispatch_event(&Event::PressRelease { x, y });
+            self.controller
+                .dispatch_event(&Event::PressRelease { x, y });
         }
         /// Drains the disco command queue; returns whether a star-crawl effect
         /// was requested this frame (disco info wing → BEETLE-IDF-05).
@@ -170,7 +378,7 @@ extern "C" {
     fn rlvgl_host_set_backlight(level: u8);
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "app_disco"))]
 unsafe fn rlvgl_host_set_backlight(_level: u8) {}
 
 /// Global allocator backed by the IDF/newlib heap.
@@ -243,7 +451,11 @@ impl<'a> Rgb888Renderer<'a> {
             return None;
         }
         let i = ((y * self.width + x) as usize) * 3;
-        if i + 2 < self.fb.len() { Some(i) } else { None }
+        if i + 2 < self.fb.len() {
+            Some(i)
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -295,7 +507,7 @@ impl<'a> Renderer for Rgb888Renderer<'a> {
         // functional by shaping with the built-in 6x10 bitmap font and routing
         // through the same shaped path (which lands in `blend_row` below).
         use rlvgl_core::bitmap_font::FONT_6X10;
-        use rlvgl_core::font::{FontMetrics, shape_text_ltr};
+        use rlvgl_core::font::{shape_text_ltr, FontMetrics};
         let baseline = position.1 + FONT_6X10.line_metrics().ascent as i32;
         let shaped = shape_text_ltr(&FONT_6X10, text, (position.0, baseline), 0);
         self.draw_text_shaped(&shaped, (0, 0), color);
@@ -395,6 +607,13 @@ static mut APP: Option<AppState> = None;
 // ---------------------------------------------------------------------------
 // C ABI surface.
 // ---------------------------------------------------------------------------
+
+/// Start payload-owned services before the display path is touched.
+#[no_mangle]
+pub extern "C" fn rlvgl_app_init() {
+    #[cfg(feature = "app_ccps")]
+    app::start_transport();
+}
 
 /// Advance and draw the shared disco-demo UI into a 24-bit RGB framebuffer,
 /// dispatching touch taps as rlvgl input.

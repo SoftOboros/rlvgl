@@ -65,10 +65,10 @@ static esp_ldo_channel_handle_t s_dphy_ldo;
 static i2c_master_bus_handle_t s_i2c_bus;
 static i2c_master_dev_handle_t s_bridge;
 
-static void bridge_write(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_t value)
+static esp_err_t bridge_write(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_t value)
 {
     uint8_t data[] = {reg, value};
-    ESP_ERROR_CHECK(i2c_master_transmit(bridge, data, sizeof(data), 1000));
+    return i2c_master_transmit(bridge, data, sizeof(data), 1000);
 }
 
 static esp_err_t bridge_read(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_t *value)
@@ -77,8 +77,9 @@ static esp_err_t bridge_read(i2c_master_dev_handle_t bridge, uint8_t reg, uint8_
     return i2c_master_transmit_receive(bridge, &reg, 1, value, 1, 1000);
 }
 
-static i2c_master_dev_handle_t bridge_i2c_init(void)
+static esp_err_t bridge_i2c_init(i2c_master_dev_handle_t *bridge_out)
 {
+    *bridge_out = NULL;
     i2c_master_bus_handle_t bus = NULL;
     i2c_master_bus_config_t bus_config = {
         .i2c_port = I2C_NUM_0,
@@ -91,8 +92,18 @@ static i2c_master_dev_handle_t bridge_i2c_init(void)
             .enable_internal_pullup = true,
         },
     };
-    ESP_ERROR_CHECK(i2c_new_master_bus(&bus_config, &bus));
+    esp_err_t err = i2c_new_master_bus(&bus_config, &bus);
+    if (err != ESP_OK) {
+        return err;
+    }
     s_i2c_bus = bus;
+
+    /* A missing DFR0550 is an allowed CCPS operating state. Probe before any
+     * bridge writes so the battery poller can continue without a display. */
+    err = i2c_master_probe(bus, DFR0550_I2C_ADDR, 100);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     i2c_master_dev_handle_t bridge = NULL;
     i2c_device_config_t device_config = {
@@ -101,24 +112,32 @@ static i2c_master_dev_handle_t bridge_i2c_init(void)
         .scl_speed_hz = 100000,
         .scl_wait_us = 0,
     };
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus, &device_config, &bridge));
-    return bridge;
+    err = i2c_master_bus_add_device(bus, &device_config, &bridge);
+    if (err == ESP_OK) {
+        *bridge_out = bridge;
+    }
+    return err;
 }
 
-static void bridge_wake(i2c_master_dev_handle_t bridge)
+static esp_err_t bridge_wake(i2c_master_dev_handle_t bridge)
 {
     ESP_LOGI(TAG, "Wake DFR0550 bridge over IDF I2C");
-    bridge_write(bridge, DFR0550_REG_POWERON, 1);
+    esp_err_t err = bridge_write(bridge, DFR0550_REG_POWERON, 1);
+    if (err != ESP_OK) {
+        return err;
+    }
     vTaskDelay(pdMS_TO_TICKS(20));
 
     for (int tries = 0; tries < 100; tries++) {
         uint8_t portb = 0;
-        esp_err_t err = bridge_read(bridge, DFR0550_REG_PORTB, &portb);
+        err = bridge_read(bridge, DFR0550_REG_PORTB, &portb);
         if (err == ESP_OK && (portb & 0x01) != 0) {
             ESP_LOGI(TAG, "Bridge ready, PORTB=0x%02x", portb);
-            bridge_write(bridge, DFR0550_REG_PORTA, DFR0550_PORTA_KERNEL_DEFAULT);
-            bridge_write(bridge, DFR0550_REG_PWM, 255);
-            return;
+            err = bridge_write(bridge, DFR0550_REG_PORTA, DFR0550_PORTA_KERNEL_DEFAULT);
+            if (err == ESP_OK) {
+                err = bridge_write(bridge, DFR0550_REG_PWM, 255);
+            }
+            return err;
         }
         if (err != ESP_OK) {
             ESP_LOGD(TAG, "Bridge PORTB read not ready yet: %s", esp_err_to_name(err));
@@ -126,12 +145,17 @@ static void bridge_wake(i2c_master_dev_handle_t bridge)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
-    ESP_LOGE(TAG, "DFR0550 bridge never reported ready");
-    abort();
+    return ESP_ERR_TIMEOUT;
 }
 
 static i2c_master_dev_handle_t touch_i2c_init(void)
 {
+    esp_err_t err = i2c_master_probe(s_i2c_bus, FT5X06_I2C_ADDR, 100);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "FT5x06 touch absent; display remains usable without touch");
+        return NULL;
+    }
+
     i2c_master_dev_handle_t touch = NULL;
     i2c_device_config_t device_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
@@ -139,7 +163,11 @@ static i2c_master_dev_handle_t touch_i2c_init(void)
         .scl_speed_hz = 100000,
         .scl_wait_us = 0,
     };
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(s_i2c_bus, &device_config, &touch));
+    err = i2c_master_bus_add_device(s_i2c_bus, &device_config, &touch);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "FT5x06 attach failed: %s", esp_err_to_name(err));
+        return NULL;
+    }
     ESP_LOGI(TAG, "FT5x06 touch attached at I2C 0x%02x", FT5X06_I2C_ADDR);
     return touch;
 }
@@ -150,6 +178,9 @@ static i2c_master_dev_handle_t touch_i2c_init(void)
  */
 static bool touch_read(i2c_master_dev_handle_t touch, int *x, int *y)
 {
+    if (touch == NULL) {
+        return false;
+    }
     uint8_t reg = FT5X06_REG_TD_STATUS;
     uint8_t buf[5] = {0};
     esp_err_t err = i2c_master_transmit_receive(touch, &reg, 1, buf, sizeof(buf), 100);
@@ -191,23 +222,32 @@ void rlvgl_host_set_backlight(uint8_t level)
     }
     uint8_t pwm = (uint8_t)((uint32_t)level * 255u / 100u);
     if (s_bridge != NULL) {
-        bridge_write(s_bridge, DFR0550_REG_PWM, pwm);
-        ESP_LOGI(TAG, "Backlight %u%% -> PWM %u", level, pwm);
+        esp_err_t err = bridge_write(s_bridge, DFR0550_REG_PWM, pwm);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Backlight %u%% -> PWM %u", level, pwm);
+        } else {
+            ESP_LOGW(TAG, "Backlight write failed: %s", esp_err_to_name(err));
+        }
     }
 }
 
-static void dphy_power_on(void)
+static esp_err_t dphy_power_on(void)
 {
     esp_ldo_channel_config_t ldo_config = {
         .chan_id = 3,
         .voltage_mv = 2500,
     };
-    ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &s_dphy_ldo));
+    esp_err_t err = esp_ldo_acquire_channel(&ldo_config, &s_dphy_ldo);
+    if (err != ESP_OK) {
+        return err;
+    }
     ESP_LOGI(TAG, "MIPI DSI PHY powered from LDO_VO3 at 2500 mV");
+    return ESP_OK;
 }
 
-static esp_lcd_panel_handle_t panel_init(void **fb0, void **fb1)
+static esp_err_t panel_init(void **fb0, void **fb1, esp_lcd_panel_handle_t *panel_out)
 {
+    *panel_out = NULL;
     esp_lcd_dsi_bus_handle_t dsi_bus = NULL;
     esp_lcd_dsi_bus_config_t bus_config = {
         .bus_id = 0,
@@ -215,7 +255,10 @@ static esp_lcd_panel_handle_t panel_init(void **fb0, void **fb1)
         .phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT,
         .lane_bit_rate_mbps = DFR0550_DSI_LANE_MBPS,
     };
-    ESP_ERROR_CHECK(esp_lcd_new_dsi_bus(&bus_config, &dsi_bus));
+    esp_err_t err = esp_lcd_new_dsi_bus(&bus_config, &dsi_bus);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     uint32_t phy_status = REG_READ(DSI_HOST_PHY_STATUS_REG);
     ESP_LOGI(TAG, "MIPI_DSI_HOST.phy_status=0x%08" PRIx32, phy_status);
@@ -245,11 +288,21 @@ static esp_lcd_panel_handle_t panel_init(void **fb0, void **fb1)
         },
     };
 
-    ESP_ERROR_CHECK(esp_lcd_new_panel_dpi(dsi_bus, &dpi_config, &dpi_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(dpi_panel));
-    ESP_ERROR_CHECK(esp_lcd_dpi_panel_get_frame_buffer(dpi_panel, 2, fb0, fb1));
+    err = esp_lcd_new_panel_dpi(dsi_bus, &dpi_config, &dpi_panel);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_lcd_panel_init(dpi_panel);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_lcd_dpi_panel_get_frame_buffer(dpi_panel, 2, fb0, fb1);
+    if (err != ESP_OK) {
+        return err;
+    }
     ESP_LOGI(TAG, "DPI framebuffers at %p / %p (%u bytes each)", *fb0, *fb1, DFR0550_FB_BYTES);
-    return dpi_panel;
+    *panel_out = dpi_panel;
+    return ESP_OK;
 }
 
 #if CONFIG_DFR0550_POWER_OFF_AFTER_WAKE
@@ -297,20 +350,36 @@ static void render_rlvgl(void *framebuffer, int touch_x, int touch_y, int touch_
 }
 #endif
 
-void app_main(void)
-{
-    ESP_LOGI(TAG, "ESP-IDF DFR0550 comparison app starting");
+static void display_offline_forever(const char *stage, esp_err_t err) __attribute__((noreturn));
 
-#if CONFIG_DFR0550_NO_TOUCH
-    ESP_LOGW(TAG, "No-touch mode active: I2C, DSI, DPI, framebuffer, and LDO init are skipped");
+static void display_offline_forever(const char *stage, esp_err_t err)
+{
+    ESP_LOGW(TAG, "DISPLAY OFFLINE at %s: %s; application services continue",
+             stage, esp_err_to_name(err));
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+void app_main(void)
+{
+    ESP_LOGI(TAG, "ESP-IDF DFR0550 comparison app starting");
+    rlvgl_app_init();
+
+#if CONFIG_DFR0550_NO_TOUCH
+    display_offline_forever("compile-time no-display diagnostic", ESP_ERR_NOT_SUPPORTED);
 #endif
 
-    i2c_master_dev_handle_t bridge = bridge_i2c_init();
+    i2c_master_dev_handle_t bridge = NULL;
+    esp_err_t err = bridge_i2c_init(&bridge);
+    if (err != ESP_OK) {
+        display_offline_forever("DFR0550 I2C probe", err);
+    }
+    err = bridge_wake(bridge);
+    if (err != ESP_OK) {
+        display_offline_forever("DFR0550 bridge wake", err);
+    }
     s_bridge = bridge; /* expose to the Rust backlight hook (M5) */
-    bridge_wake(bridge);
 
 #if CONFIG_DFR0550_POWER_OFF_AFTER_WAKE
     bridge_power_off(bridge);
@@ -327,10 +396,17 @@ void app_main(void)
     }
 #endif
 
-    dphy_power_on();
+    err = dphy_power_on();
+    if (err != ESP_OK) {
+        display_offline_forever("MIPI DSI PHY power", err);
+    }
 
     void *fb[2] = {NULL, NULL};
-    esp_lcd_panel_handle_t panel = panel_init(&fb[0], &fb[1]);
+    esp_lcd_panel_handle_t panel = NULL;
+    err = panel_init(&fb[0], &fb[1], &panel);
+    if (err != ESP_OK) {
+        display_offline_forever("MIPI DSI/DPI initialization", err);
+    }
 
 #if CONFIG_DFR0550_COLOR_CYCLE
     const uint8_t colors[][3] = {

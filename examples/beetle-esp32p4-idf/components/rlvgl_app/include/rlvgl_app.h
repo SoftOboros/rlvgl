@@ -27,10 +27,17 @@ extern "C" {
  *
  * The caller owns cache coherency: call esp_cache_msync(fb, ..., C2M) after
  * this returns, exactly as the original solid-color fill did. The call does
- * not block and does no hardware access of its own.
+ * not block and does no display hardware access of its own.
  */
 void rlvgl_app_render(uint8_t *fb, int32_t width, int32_t height,
                       int32_t touch_x, int32_t touch_y, int32_t touch_active);
+
+/*
+ * Start any payload-owned background service before display bring-up. This is
+ * a no-op for the tutorial and disco payloads. The CCPS payload uses it to
+ * start the read-only battery poller, which permits headless carrier bring-up.
+ */
+void rlvgl_app_init(void);
 
 #ifdef __cplusplus
 }
