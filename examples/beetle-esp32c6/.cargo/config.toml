@@ -1,0 +1,13 @@
+# Cargo target and runner for the DFR1117 Beetle ESP32-C6.
+[build]
+target = "riscv32imac-unknown-none-elf"
+
+[target.riscv32imac-unknown-none-elf]
+runner = "espflash flash --monitor --flash-size 4mb"
+rustflags = [
+  "-C", "link-arg=-Tlinkall-c6.x",
+  "-C", "link-arg=-Trom-functions.x",
+]
+
+[unstable]
+build-std = ["core", "alloc"]

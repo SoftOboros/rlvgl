@@ -1,0 +1,15 @@
+# Common no-std networking policy and protocol helpers for rlvgl targets.
+[package]
+name = "rlvgl-network"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Portable no-std network configuration, connection policy, and SNTP helpers for rlvgl."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+[dependencies]

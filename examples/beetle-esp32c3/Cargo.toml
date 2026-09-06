@@ -3,14 +3,18 @@ name = "rlvgl-example-beetle-esp32c3"
 version = "0.2.0"
 edition = "2024"
 publish = false
-rust-version = "1.85"
+rust-version = "1.86"
 build = "build.rs"
 
-# Two parallel bring-up paths for the DFRobot Beetle ESP32-C3 (DFR0868),
+# Three parallel bring-up paths for the DFRobot Beetle ESP32-C3 (DFR0868),
 # selected by mutually exclusive feature flags:
 #
 #   --features esp_hal  — the default path, uses esp-hal's high-level I2c,
 #                         Delay, and #[esp_hal::main]. Known-working.
+#
+#   --features esp_hal_network_time — mounts the portable network-time app and
+#                         common network/NVS policy on the esp-hal I2C, Wi-Fi,
+#                         smoltcp, and flash adapters.
 #
 #   --features bsp_pac  — consumes the generated BSP from
 #                         `chipdb/rlvgl-chips-esp/db/boards/beetle_esp32c3.yaml`
@@ -38,6 +42,11 @@ path = "src/esp_hal_main.rs"
 required-features = ["esp_hal"]
 
 [[bin]]
+name = "rlvgl-beetle-esp32c3-network-time"
+path = "src/network_time_main.rs"
+required-features = ["esp_hal_network_time"]
+
+[[bin]]
 name = "rlvgl-beetle-esp32c3-bsp-pac"
 path = "src/bsp_pac_main.rs"
 required-features = ["bsp_pac"]
@@ -48,6 +57,7 @@ default = []
 ## I2C/Delay/entry-point boilerplate and pulls in the rlvgl render stack.
 esp_hal = [
     "dep:esp-hal",
+    "dep:esp-bootloader-esp-idf",
     "dep:esp-backtrace",
     "dep:esp-println",
     "dep:esp-alloc",
@@ -56,6 +66,20 @@ esp_hal = [
     "dep:rlvgl-platform",
     "dep:rlvgl-widgets",
     "rlvgl-platform/ssd1306",
+]
+## Low-rate monochrome network-clock runner. This mounts the portable app and
+## common network/NVS crates on station-mode Wi-Fi, DHCP, and ESP flash. The
+## panel is flushed only when the displayed second changes.
+esp_hal_network_time = [
+    "esp_hal",
+    "dep:embedded-hal-bus",
+    "dep:esp-storage",
+    "dep:esp-wifi",
+    "dep:rlvgl-app-network-time",
+    "dep:rlvgl-device-stts22h",
+    "dep:rlvgl-network",
+    "dep:rlvgl-network-esp-nvs",
+    "dep:smoltcp",
 ]
 ## Generated-BSP + raw-PAC path. Consumes `src/bsp_generated/` produced by
 ## `rlvgl-creator bsp from-yaml --vendor esp --board beetle_esp32c3`.
@@ -79,14 +103,30 @@ bsp_pac = [
 rlvgl-core = { path = "../../core", default-features = false, optional = true }
 rlvgl-platform = { path = "../../platform", default-features = false, optional = true }
 rlvgl-widgets = { path = "../../widgets", default-features = false, optional = true }
+rlvgl-app-network-time = { path = "../apps/network-time", default-features = false, optional = true }
+rlvgl-device-stts22h = { path = "../../devices/rlvgl-device-stts22h", default-features = false, optional = true }
+rlvgl-network = { path = "../../network", default-features = false, optional = true }
+rlvgl-network-esp-nvs = { path = "../../network/esp-nvs", default-features = false, features = ["esp-storage"], optional = true }
 
 ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+smoltcp = { version = "0.12", default-features = false, features = [
+    "medium-ethernet",
+    "proto-dhcpv4",
+    "proto-ipv4",
+    "socket-dhcpv4",
+    "socket-raw",
+    "socket-udp",
+], optional = true }
+embedded-hal-bus = { version = "0.3", default-features = false, optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 esp-hal = { version = "=1.0.0-beta.0", features = ["esp32c3", "unstable"], optional = true }
+esp-bootloader-esp-idf = { version = "=0.1.0", default-features = false, optional = true }
 esp-backtrace = { version = "0.15", features = ["esp32c3", "panic-handler", "println"], optional = true }
 esp-println = { version = "0.13", features = ["esp32c3", "log"], optional = true }
-esp-alloc = { version = "0.6", optional = true }
+esp-alloc = { version = "0.7", optional = true }
+esp-storage = { version = "=0.5.0", default-features = false, features = ["critical-section", "esp32c3", "nor-flash", "storage"], optional = true }
+esp-wifi = { version = "=0.13.0", features = ["esp32c3", "smoltcp", "wifi"], optional = true }
 # bsp_pac-only deps — raw PAC bring-up path.
 esp32c3 = { version = "0.31", features = ["critical-section", "rt"], optional = true }
 esp-riscv-rt = { version = "0.13", optional = true }
@@ -96,4 +136,3 @@ riscv-rt = { version = "0.16", features = ["memory"], optional = true }
 # feature requires but doesn't itself supply.
 riscv = { version = "0.15", features = ["critical-section-single-hart"], optional = true }
 panic-halt = { version = "1", optional = true }
-embedded-hal = { version = "1.0", optional = true }

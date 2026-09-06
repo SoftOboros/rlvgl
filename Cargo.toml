@@ -479,6 +479,11 @@ panic = "abort"
 strip = true
 incremental = false
 
+# The ESP radio scheduler needs speed optimization even when the surrounding
+# low-footprint firmware is optimized for size.
+[profile.release.package.esp-wifi]
+opt-level = 3
+
 [profile.dev]
 opt-level = 2
 debug = true
@@ -499,15 +504,16 @@ rlvgl-core = { path = "core" }
 
 [workspace]
 members = [
-    "core", "platform", "widgets", "ui", "api", "micropython", "runtime-std", "fs-sim", "i18n", "playit",
+    "core", "platform", "widgets", "ui", "api", "network", "network/esp-nvs", "micropython", "runtime-std", "fs-sim", "i18n", "playit",
     "devices/rlvgl-i2c-test-support", "devices/rlvgl-kria-i2c",
     "devices/rlvgl-device-stts22h", "devices/rlvgl-device-veml3235sl",
     "devices/rlvgl-device-ptn3460",
     "devices/rlvgl-device-pcm3168a",
     "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
-    "examples/apps/battery-monitor",
+    "examples/apps/battery-monitor", "examples/apps/network-time",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
+    "examples/beetle-esp32c6",
     "examples/beetle-esp32p4",
     "examples/beaglebone-black",
     "examples/stm32h747i-disco/assets/disco-assets",

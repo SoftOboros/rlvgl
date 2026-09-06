@@ -489,11 +489,17 @@ edits that break compilation surface here first.
 
 ### beetle-esp32c3 feature matrix
 
-`examples/beetle-esp32c3/` has two parallel entry points selected by
-mutually exclusive features:
+`examples/beetle-esp32c3/` has three entry points selected by features:
 
 - `--features esp_hal` → `src/esp_hal_main.rs`, uses esp-hal's high-level
   I2C/Delay/`#[esp_hal::main]`. Known-working rlvgl + SSD1306 path.
+- `--features esp_hal_network_time` → `src/network_time_main.rs`, extends the
+  esp-hal display path with Wi-Fi, DHCP, ESP-IDF-compatible NVS, and SNTP. It
+  mounts `examples/apps/network-time`, consumes the portable `network/` policy
+  and `network/esp-nvs` adapter, and uses the shared STTS22H device driver. The
+  SSD1306 cadence remains one second while the network stack polls more
+  frequently. See `examples/beetle-esp32c3/README.md` for wiring, one-time
+  credential seeding, and the flash command.
 - `--features bsp_pac` → `src/bsp_pac_main.rs`, consumes the generated
   BSP under `src/bsp_generated/` and drives an LED blink via raw PAC. Proves
   the chipdb → generator → compile → boot pipeline. Does **not** currently

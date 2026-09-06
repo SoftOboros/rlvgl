@@ -34,8 +34,11 @@ Package: `rlvgl`
 - [core](./core/README.md) – Widget base trait, layout, event dispatch
 - [widgets](./widgets/README.md) – Rust-native reimplementations of LVGL widgets
 - [platform](./platform/README.md) – Display/input traits and HAL adapters
+- [network](./network/README.md) – Portable network configuration, retry, SNTP, and clock holdover
 - [ui](./ui/README.md) – Higher-level UI components
 - [examples/apps/demo](./examples/apps/demo/README.md) – Packaged demo application crate
+- [examples/apps/network-time](./examples/apps/network-time/README.md) – Portable 128x64 monochrome network-time app
+- [examples/beetle-esp32c6](./examples/beetle-esp32c6/README.md) – DFR1117 ESP32-C6 host for the shared I2C network clock
 - [api](./api/src/lib.rs) – Shared ABI types for bindings and coprocessor integrations
 - [i18n](./i18n/README.md) – Compile-time translations with runtime-selectable locale blobs
 - [chipdb](./chipdb/README.md) – Vendor chip databases used by creator and BSP generation
