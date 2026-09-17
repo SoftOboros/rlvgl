@@ -25,6 +25,10 @@
 
 static const char *TAG = "dfr0550_idf";
 
+/* Optional payload service, called once with the host-owned shared I2C bus.
+ * The callback must return promptly; it must not create a second bus. */
+extern void rlvgl_host_i2c_ready(i2c_master_bus_handle_t bus) __attribute__((weak));
+
 enum {
     DFR0550_H_RES = 800,
     DFR0550_V_RES = 480,
@@ -97,6 +101,9 @@ static esp_err_t bridge_i2c_init(i2c_master_dev_handle_t *bridge_out)
         return err;
     }
     s_i2c_bus = bus;
+    if (rlvgl_host_i2c_ready) {
+        rlvgl_host_i2c_ready(bus);
+    }
 
     /* A missing DFR0550 is an allowed CCPS operating state. Probe before any
      * bridge writes so the battery poller can continue without a display. */

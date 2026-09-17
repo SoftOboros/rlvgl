@@ -25,6 +25,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "diagnostic_i2c")]
+mod diagnostic_i2c;
+
 #[cfg(not(test))]
 use core::alloc::{GlobalAlloc, Layout};
 use core::cell::RefCell;

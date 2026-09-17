@@ -22,6 +22,10 @@ rlvgl-platform = { path = "../../../../../platform", default-features = false }
 rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false, optional = true }
 rlvgl-app-sctd-demo = { path = "../../../../apps/sctd-demo", default-features = false, optional = true }
 rlvgl-battery-monitor = { path = "../../../../apps/battery-monitor", default-features = false, optional = true }
+rlvgl-device-stts22h = { path = "../../../../../devices/rlvgl-device-stts22h", optional = true }
+embedded-hal = { version = "1.0", optional = true }
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+display-interface-i2c = { version = "0.5", optional = true }
 
 [features]
 # Build-time payload selection (SCTD-02 PCDN-02-01). Default = the SCTD
@@ -32,6 +36,7 @@ default = ["app_sctd"]
 app_sctd = ["dep:rlvgl-app-sctd-demo"]
 app_disco = ["dep:rlvgl-app-disco-demo"]
 app_ccps = ["dep:rlvgl-battery-monitor"]
+diagnostic_i2c = ["dep:rlvgl-device-stts22h", "dep:embedded-hal", "dep:ssd1306", "dep:display-interface-i2c", "rlvgl-platform/ssd1306"]
 
 [profile.release]
 opt-level = "s"
