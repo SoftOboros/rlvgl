@@ -32,6 +32,54 @@ extern "C" {
 void rlvgl_app_render(uint8_t *fb, int32_t width, int32_t height,
                       int32_t touch_x, int32_t touch_y, int32_t touch_active);
 
+/*
+ * Prepare one bounded Modbus RTU function-0x03 request. This is an offline
+ * codec operation: it does not configure or access UART or GPIO hardware.
+ * Returns 8 on success, -1 for a refused request, or -2 for a short/null output.
+ */
+int32_t rlvgl_ccps_modbus_prepare_read(uint8_t device_address,
+                                      uint16_t human_register,
+                                      uint16_t pdu_address,
+                                      uint16_t quantity,
+                                      uint8_t *out,
+                                      uintptr_t out_capacity);
+
+/*
+ * Independent last-mile allowlist for an already encoded frame. Returns 1 only
+ * for a CRC-valid, bounded function-0x03 device request; otherwise returns 0.
+ * A future transport must call this immediately before asserting driver enable.
+ */
+int32_t rlvgl_ccps_modbus_wire_frame_is_allowed(const uint8_t *frame,
+                                                uintptr_t frame_len);
+
+/* Candidate evidence record. Raw bytes and decoded words stay together. */
+typedef struct {
+    uint8_t device_address;
+    uint8_t evidence_grade; /* 0 = candidate; no parser can promote it */
+    uint8_t raw_len;
+    uint8_t register_count;
+    uint16_t human_register;
+    uint16_t pdu_address;
+    uint64_t observed_at_ms;
+    uint8_t raw[21];
+    uint16_t registers[8];
+    uint8_t exception_code;
+} rlvgl_ccps_modbus_observation_t;
+
+/*
+ * Parse one exact response into an evidence record. Returns 1 for data, 2 for
+ * a retained exception, or a negative refusal/error code. No hardware access.
+ */
+int32_t rlvgl_ccps_modbus_parse_response(
+    uint8_t device_address, uint16_t human_register, uint16_t pdu_address,
+    uint16_t quantity, const uint8_t *frame, uintptr_t frame_len,
+    uint64_t observed_at_ms, rlvgl_ccps_modbus_observation_t *out);
+
+/* Return 1 only if the observation is not stale under the supplied age bound. */
+int32_t rlvgl_ccps_modbus_observation_is_fresh(
+    const rlvgl_ccps_modbus_observation_t *observation,
+    uint64_t now_ms, uint64_t max_age_ms);
+
 #ifdef __cplusplus
 }
 #endif

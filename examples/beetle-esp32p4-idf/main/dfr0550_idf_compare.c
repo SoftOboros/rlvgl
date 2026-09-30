@@ -301,6 +301,19 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "ESP-IDF DFR0550 comparison app starting");
 
+#if CONFIG_CCPS_MODBUS_OFFLINE_SELF_TEST
+    uint8_t ccps_request[8] = {0};
+    int32_t ccps_len = rlvgl_ccps_modbus_prepare_read(0xf7, 5043, 5043, 1,
+                                                     ccps_request, sizeof(ccps_request));
+    if (ccps_len != (int32_t)sizeof(ccps_request)
+        || rlvgl_ccps_modbus_wire_frame_is_allowed(ccps_request, sizeof(ccps_request)) != 1) {
+        ESP_LOGE(TAG, "CCPS read-only Modbus codec self-test failed");
+        abort();
+    }
+    ESP_LOGI(TAG, "CCPS offline read-only frame prepared; no UART/GPIO access");
+    ESP_LOG_BUFFER_HEX_LEVEL(TAG, ccps_request, sizeof(ccps_request), ESP_LOG_INFO);
+#endif
+
 #if CONFIG_DFR0550_NO_TOUCH
     ESP_LOGW(TAG, "No-touch mode active: I2C, DSI, DPI, framebuffer, and LDO init are skipped");
     for (;;) {

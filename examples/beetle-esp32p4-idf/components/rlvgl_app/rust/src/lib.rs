@@ -41,6 +41,7 @@ use rlvgl_core::renderer::Renderer;
 use rlvgl_core::widget::{Color, Rect};
 use rlvgl_platform::Screen;
 
+mod ccps_modbus;
 mod star_crawl;
 use star_crawl::StarCrawl;
 
