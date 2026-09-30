@@ -113,7 +113,7 @@ espflash flash \
 
 Normal application flashing preserves the NVS partition. An explicit whole
 chip erase removes the stored configuration. If no valid stored record and no
-seed are available, the app parks on `Wi-Fi not set`. Supplying a different
+seed are available, the app scans and tries explicitly open networks. Supplying a different
 seed advances the stored generation and replaces the credentials. An empty
 password is allowed for an open bench network.
 
@@ -127,6 +127,10 @@ synchronized it shows Gregorian UTC and `SYNC age`; if Wi-Fi drops, the clock
 continues from the ESP32-C3 monotonic timer and marks the display `HOLD` while
 requesting reconnection. It resynchronizes hourly and retries a failed refresh
 after one minute.
+
+The shared host also rotates nearby Wi-Fi scan pages and provides bounded,
+nonpersistent open-network fallback. See [shared example support](../common/README.md#wi-fi-discovery-and-open-network-fallback)
+for the scan cadence, display legend, attempt deadlines, and security limits.
 
 ## Verification
 

@@ -60,7 +60,53 @@ building. Normal application flashing preserves NVS; a whole-chip erase does
 not. The screen and sensor update once per displayed second while the ESP
 network stack is serviced at about 100 Hz.
 
+The OLED now rotates clock/temperature with nearby Wi-Fi scan pages. Saved
+credentials remain first choice; if unavailable, the shared host tries only
+explicitly open networks without writing them to NVS. See
+[shared example support](../common/README.md#wi-fi-discovery-and-open-network-fallback)
+for the display legend, retry limits, and captive-portal/security limitations.
+
+For an already provisioned C6, build without including either seed:
+
+```zsh
+unset RLVGL_WIFI_SSID RLVGL_WIFI_PASSWORD
+cargo build --release \
+  --bin rlvgl-beetle-esp32c6-network-time \
+  --features esp_hal_network_time
+```
+
 For an offline image-layout check, `espflash save-image --merge` must place
 descriptor magic bytes `32 54 cd ab` at file offset `0x10020` (application
 offset `0x20`). The linker also rejects builds whose descriptor or executable
 MMU-page placement drifts from that contract.
+
+## Saved-network bench regression: 2026-09-30
+
+The DFR1117 ESP32-C6 revision 0.2 with 4 MB flash, DFR0650 OLED, and STTS22H
+at `0x38` passed two consecutive application flashes of the final image. Both
+build-time credential variables were omitted. The second flash used
+`--no-skip` to force an image rewrite; neither flash erased the NVS partition.
+
+Both final boots reported configuration origin `Stored`, generation `1`, then
+associated with the preexisting WPA2 network on attempt one, acquired a DHCP
+lease, and accepted a stratum-3 SNTP response. Round trips were 41 ms and 42 ms.
+STTS22H probing and low-ODR configuration succeeded. Background scans completed
+without a reported link loss during the observation window.
+
+An earlier run hit a first-error OLED initialization panic following the
+monitor's extra USB reset; a subsequent controlled reset recovered the board.
+The shared host now permits three logged initialization attempts, with 25 ms
+between failures. The two final flash runs completed without an initialization
+failure. This is a bounded mitigation, not exhaustive warm-reset qualification.
+
+Tested C6 ELF SHA-256:
+
+```text
+968dec52cf89865fdd167023ddbafb9f34660346916fe81c46a06558fa4bf2ed
+```
+
+All observed scan results required authentication, so open-network fallback and
+captive-portal behavior were not exercised on hardware. Automatic selection
+rules, credential persistence, and portable rendering passed 18 host tests;
+C3 and C6 release builds and Clippy checks passed. OLED visual confirmation and
+a hardware open-network test remain separate acceptance checks.

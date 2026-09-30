@@ -12,6 +12,8 @@ The crate currently provides:
 - a versioned, checksummed configuration record and a storage trait;
 - load-or-seed behavior that avoids rewriting unchanged credentials;
 - explicit connection states and bounded exponential retry policy;
+- fixed-capacity, BSSID-deduplicated scan results sorted by signal strength,
+  with candidates limited to explicitly open, non-hidden access points;
 - validated SNTP request/response handling; and
 - UTC conversion plus monotonic-clock holdover.
 
@@ -24,3 +26,8 @@ remain platform or product adapters.
 
 The sibling [`rlvgl-network-esp-nvs`](./esp-nvs/README.md) crate supplies the
 reusable NVS-to-store mapping plus optional ESP flash/partition discovery.
+
+Scan results are ephemeral observations, not provisioning records. Unknown
+authentication is never treated as open. Platform adapters must explicitly
+select no authentication when trying an open candidate and keep saved
+credentials separate from these attempts.

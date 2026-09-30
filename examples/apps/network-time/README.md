@@ -5,8 +5,9 @@
 This crate owns the target-independent 128x64 network-clock presentation. It
 implements `rlvgl_core::application::Application` and draws through the rlvgl
 `Renderer` trait. A platform runner updates its small copyable model with
-connection progress, SNTP results, holdover status, and an optional temperature
-sample.
+connection progress, SNTP results, holdover status, an optional temperature
+sample, and three-row Wi-Fi scan pages. SSIDs are truncated and sanitized only
+for display; radio selection uses the complete name and BSSID.
 
 The app does not own I2C, SSD1306, Wi-Fi, DHCP, sockets, flash, or a temperature
 sensor driver. The DFR0868 Beetle ESP32-C3 and DFR1117 Beetle ESP32-C6 mount it

@@ -9,6 +9,7 @@
 #![deny(missing_docs)]
 
 mod config;
+mod scan;
 mod sntp;
 mod state;
 mod time;
@@ -18,6 +19,7 @@ pub use config::{
     NetworkConfigStore, ResolvedNetworkConfig, WIFI_PASSWORD_MAX_LEN, WIFI_SSID_MAX_LEN,
     WifiCredentials, load_or_seed,
 };
+pub use scan::{WifiAccessPoint, WifiScan, WifiSecurity, WifiSsid};
 pub use sntp::{NTP_PACKET_LEN, NetworkTime, NtpError, ntp_request, parse_ntp_response};
 pub use state::{ConnectionState, RetryPolicy};
 pub use time::{HoldoverClock, UtcDateTime, unix_seconds_to_utc};

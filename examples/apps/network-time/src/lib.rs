@@ -20,12 +20,16 @@ use rlvgl_core::{
     renderer::Renderer,
     widget::{Color, Rect, Widget},
 };
-use rlvgl_network::{ConnectionState, unix_seconds_to_utc};
+use rlvgl_network::{
+    ConnectionState, WifiAccessPoint, WifiSecurity, WifiSsid, unix_seconds_to_utc,
+};
 
 /// Preferred width of the initial monochrome clock face.
 pub const TARGET_WIDTH: u32 = 128;
 /// Preferred height of the initial monochrome clock face.
 pub const TARGET_HEIGHT: u32 = 64;
+/// Number of access-point rows that fit on one monochrome scan page.
+pub const NETWORKS_PER_PAGE: usize = 3;
 
 const WHITE: Color = Color(255, 255, 255, 255);
 const BLACK: Color = Color(0, 0, 0, 255);
@@ -52,6 +56,34 @@ pub enum DisplayState {
     StorageFailure,
     /// A supplied provisioning seed failed credential validation.
     ConfigurationFailure,
+    /// The radio is scanning nearby access points.
+    Scanning,
+    /// The radio could not complete a scan; no empty result is being asserted.
+    ScanFailure,
+    /// One page of ephemeral Wi-Fi scan results.
+    Networks {
+        /// Strongest-first access-point rows for this page.
+        entries: [Option<WifiAccessPoint>; NETWORKS_PER_PAGE],
+        /// One-based page number.
+        page: usize,
+        /// Total number of retained-result pages.
+        pages: usize,
+        /// Total access points reported by the radio, before the capacity cap.
+        total: usize,
+        /// SSID of the current usable connection, if any.
+        connected_ssid: Option<WifiSsid>,
+    },
+    /// Progress or failure for a selected saved or ephemeral network.
+    NetworkStatus {
+        /// Complete selected SSID; rendering alone truncates it.
+        ssid: WifiSsid,
+        /// Whether this is a discovered open-network attempt.
+        open: bool,
+        /// Short platform-provided progress or failure description.
+        message: &'static str,
+        /// Seconds elapsed in this stage of the attempt.
+        elapsed_seconds: u32,
+    },
     /// Radio-neutral connection progress.
     Connection {
         /// Current common connection lifecycle state.
@@ -186,6 +218,95 @@ impl Widget for NetworkTimeView {
                     "see serial log",
                 ],
             ),
+            DisplayState::Scanning => draw_lines(
+                renderer,
+                self.bounds,
+                [
+                    "WI-FI NETWORKS",
+                    "scanning...",
+                    "2.4 GHz",
+                    "",
+                    "credentials safe",
+                ],
+            ),
+            DisplayState::ScanFailure => draw_lines(
+                renderer,
+                self.bounds,
+                [
+                    "WI-FI NETWORKS",
+                    "scan failed",
+                    "will retry",
+                    "see serial log",
+                    "credentials safe",
+                ],
+            ),
+            DisplayState::Networks {
+                entries,
+                page,
+                pages,
+                total,
+                connected_ssid,
+            } => {
+                let mut title = String::<22>::new();
+                let _ = write!(title, "WI-FI {page}/{pages} ({total})");
+                let mut rows = [String::<22>::new(), String::new(), String::new()];
+                for (row, access_point) in rows.iter_mut().zip(entries) {
+                    if let Some(ap) = access_point {
+                        let flag = match ap.security {
+                            WifiSecurity::Open => 'O',
+                            WifiSecurity::Protected => 'L',
+                            WifiSecurity::Unknown => '?',
+                        };
+                        let _ = write!(row, "{flag} {:>4} ", ap.rssi);
+                        append_ssid(row, ap.ssid, 21);
+                    }
+                }
+                if entries.iter().all(Option::is_none) {
+                    let _ = rows[0].push_str("no networks found");
+                }
+                let mut footer = String::<22>::new();
+                if let Some(ssid) = connected_ssid {
+                    let _ = footer.push_str("ON ");
+                    append_ssid(&mut footer, ssid, 21);
+                } else {
+                    let _ = footer.push_str("O=open L=locked ?=?");
+                }
+                draw_lines(
+                    renderer,
+                    self.bounds,
+                    [&title, &rows[0], &rows[1], &rows[2], &footer],
+                );
+            }
+            DisplayState::NetworkStatus {
+                ssid,
+                open,
+                message,
+                elapsed_seconds,
+            } => {
+                let mut name = String::<22>::new();
+                append_ssid(&mut name, ssid, 21);
+                let mut elapsed = String::<22>::new();
+                let _ = write!(elapsed, "elapsed {elapsed_seconds}s");
+                draw_lines(
+                    renderer,
+                    self.bounds,
+                    [
+                        if open {
+                            "OPEN NETWORK"
+                        } else {
+                            "SAVED NETWORK"
+                        },
+                        &name,
+                        message,
+                        &elapsed,
+                        if open {
+                            "NVS unchanged"
+                        } else {
+                            "stored credentials"
+                        },
+                    ],
+                );
+            }
             DisplayState::Connection {
                 state,
                 elapsed_seconds,
@@ -222,6 +343,26 @@ impl Widget for NetworkTimeView {
 
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+// The tiny built-in font is ASCII-only. Keep the actual SSID intact for radio
+// selection; replace unsupported/control characters only in its display label.
+fn append_ssid<const N: usize>(line: &mut String<N>, ssid: WifiSsid, columns: usize) {
+    let name = if ssid.as_str().is_empty() {
+        "<hidden>"
+    } else {
+        ssid.as_str()
+    };
+    for character in name.chars() {
+        if line.len() >= columns {
+            break;
+        }
+        let _ = line.push(if character.is_ascii() && !character.is_ascii_control() {
+            character
+        } else {
+            '?'
+        });
     }
 }
 
@@ -376,5 +517,70 @@ mod tests {
         root.draw(&mut capture);
         assert_eq!(capture.text[1].1, "Wi-Fi connect");
         assert_eq!(capture.text[2].1, "attempt 3 / 7s");
+    }
+
+    #[test]
+    fn app_renders_scan_security_rssi_and_bounded_names() {
+        let mut app = NetworkTimeApp::new();
+        let model = app.model();
+        let root = app.build(TARGET_WIDTH, TARGET_HEIGHT);
+        let ap = |ssid, security, rssi| {
+            Some(WifiAccessPoint {
+                ssid: WifiSsid::new(ssid).unwrap(),
+                bssid: [0; 6],
+                channel: 1,
+                rssi,
+                security,
+            })
+        };
+        model.set(DisplayState::Networks {
+            entries: [
+                ap("guest", WifiSecurity::Open, -42),
+                ap(
+                    "012345678901234567890123456789",
+                    WifiSecurity::Protected,
+                    -60,
+                ),
+                ap("café\n", WifiSecurity::Unknown, -80),
+            ],
+            page: 2,
+            pages: 4,
+            total: 30,
+            connected_ssid: None,
+        });
+        let mut capture = Capture::default();
+        root.draw(&mut capture);
+        assert_eq!(capture.text[0].1, "WI-FI 2/4 (30)");
+        assert_eq!(capture.text[1].1, "O  -42 guest");
+        assert_eq!(capture.text[2].1, "L  -60 01234567890123");
+        assert_eq!(capture.text[3].1, "?  -80 caf??");
+        assert!(capture.text.iter().all(|(_, text)| text.len() <= 21));
+    }
+
+    #[test]
+    fn app_shows_empty_scans_and_ephemeral_connection_status() {
+        let mut app = NetworkTimeApp::new();
+        let model = app.model();
+        let root = app.build(TARGET_WIDTH, TARGET_HEIGHT);
+        model.set(DisplayState::Networks {
+            entries: [None; NETWORKS_PER_PAGE],
+            page: 1,
+            pages: 1,
+            total: 0,
+            connected_ssid: None,
+        });
+        let mut capture = Capture::default();
+        root.draw(&mut capture);
+        assert_eq!(capture.text[1].1, "no networks found");
+        model.set(DisplayState::NetworkStatus {
+            ssid: WifiSsid::new("guest").unwrap(),
+            open: true,
+            message: "DHCP timed out",
+            elapsed_seconds: 20,
+        });
+        capture.text.clear();
+        root.draw(&mut capture);
+        assert_eq!(capture.text[0].1, "OPEN NETWORK");
+        assert_eq!(capture.text[4].1, "NVS unchanged");
     }
 }
