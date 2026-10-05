@@ -26,6 +26,9 @@ rlvgl-device-stts22h = { path = "../../../../../devices/rlvgl-device-stts22h", o
 embedded-hal = { version = "1.0", optional = true }
 ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
 display-interface-i2c = { version = "0.5", optional = true }
+# C3-only feature unification for Ratatui and the shared platform atomics.
+portable-atomic = { version = "1", default-features = false, features = ["unsafe-assume-single-core"], optional = true }
+ratatui = { path = "../../../../../vendor/ratatui/ratatui", default-features = false, features = ["portable-atomic"], optional = true }
 
 [features]
 # Build-time payload selection (SCTD-02 PCDN-02-01). Default = the SCTD
@@ -37,6 +40,7 @@ app_sctd = ["dep:rlvgl-app-sctd-demo"]
 app_disco = ["dep:rlvgl-app-disco-demo"]
 app_ccps = ["dep:rlvgl-battery-monitor"]
 diagnostic_i2c = ["dep:rlvgl-device-stts22h", "dep:embedded-hal", "dep:ssd1306", "dep:display-interface-i2c", "rlvgl-platform/ssd1306"]
+idf_c3 = ["dep:portable-atomic", "dep:ratatui"]
 
 [profile.release]
 opt-level = "s"

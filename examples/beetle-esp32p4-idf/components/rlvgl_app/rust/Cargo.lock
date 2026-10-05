@@ -305,6 +305,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bde5057d6143cc94e861d90f591b9303d6716c6b9602309150bd068853c10899"
 dependencies = [
  "hashbrown 0.16.1",
+ "portable-atomic",
+ "portable-atomic-util",
  "thiserror",
 ]
 
@@ -401,6 +403,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
 
 [[package]]
+name = "portable-atomic-util"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10ab3eb7f3becc3a1cbc4f2c6f20267996cfc1a6467a873763411b136a122715"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
 name = "proc-macro-utils"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -485,6 +496,7 @@ dependencies = [
  "instability",
  "itertools 0.15.0",
  "line-clipping",
+ "portable-atomic-util",
  "ratatui-core",
  "strum",
  "unicode-segmentation",
@@ -562,6 +574,8 @@ version = "0.0.0"
 dependencies = [
  "display-interface-i2c",
  "embedded-hal",
+ "portable-atomic",
+ "ratatui",
  "rlvgl-app-disco-demo",
  "rlvgl-app-sctd-demo",
  "rlvgl-battery-monitor",
