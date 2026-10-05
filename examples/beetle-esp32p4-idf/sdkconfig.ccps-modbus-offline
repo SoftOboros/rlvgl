@@ -1,0 +1,3 @@
+# Link and run the structurally read-only CCPS Modbus codec self-test.
+# This option performs no UART, GPIO, or transmit operation.
+CONFIG_CCPS_MODBUS_OFFLINE_SELF_TEST=y

@@ -45,6 +45,7 @@ use rlvgl_core::WidgetNode;
 #[cfg(any(feature = "app_sctd", feature = "app_disco"))]
 use rlvgl_platform::Screen;
 
+mod ccps_modbus;
 mod star_crawl;
 use star_crawl::StarCrawl;
 
