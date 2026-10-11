@@ -8,8 +8,10 @@ MPY-05-CUES-SAFE-SCHEDULING.md - Event descriptors, subscriptions, cue queues, a
 subscriptions, predeclared propagation policy, safe turns, endpoint-owned cue
 queues, observable overflow, and teardown. The endpoint queue, causality
 envelope, bounded drain, reserve, coalescing, and explicit loss/fault substrate
-has focused implementation evidence. Subscription, native-emission, Safe Turn,
-and teardown integration remain open.
+has focused implementation evidence. Neutral subscriptions, native input
+emission, Safe Turn orchestration and exact-once teardown now have bounded
+in-process regression evidence. Complete protocol/binding integration, actual
+VM-safe callable execution and cross-driver conformance remain open.
 
 Parent initiative: [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md). Dependencies:
 MPY-03 actor registry and LPAR-04/05/06 native event semantics.
@@ -109,6 +111,33 @@ stale-subscription error selected by MPY-02 amendment.
 Actor/ancestor deletion and stage teardown remove subscriptions in deterministic
 child-first order and emit Critical teardown notices so MPY-06 can release
 callables at a VM-safe point.
+
+Successful installation of an active subscription or actual removal MUST
+advance the owning Stage Revision exactly once, atomically with the active
+subscription change. Failed requests and matching already-removed outcomes
+within the existing completion window MUST NOT advance either owner's revision.
+Changing another Stage's subscriptions MUST NOT advance this Stage's revision
+or invalidate its snapshot cursor. The subscription registry may retain its
+private revision for existing prepared-work guards; it need not equal Stage
+Revision.
+
+All required identity, capacity and revision preflight MUST complete before
+publishing either the active-record mutation or its Stage revision. Revision
+exhaustion MUST leave both owners unchanged. Subscription cleanup performed
+within an actor deletion or Stage teardown that already advances Stage Revision
+MUST NOT add a second Stage increment for that same mutation. Child-first
+removal, exact-once notices and epoch invalidation remain unchanged.
+
+MPY-04's additive registry-aware native snapshot operation MUST reuse the
+existing neutral `SubscriptionInfo` directly with all nine fields:
+`subscription_id`, `stage_id`, `actor_identity`, `callback_id`, `event_id`,
+`phase`, `filter`, `propagation` and `registration_order`. Only active rows for
+the exact Stage and generation-checked actor identity appear, in registration
+order, without VM pointers or adapter data. MPY-04 §8.2 owns the independent
+caller budget, richer record totals/truncation, compatible Stage-only entry
+points and atomic complete-page preparation. This projection does not create
+or alter a subscription policy or binding contract.
+Snapshot wire encoding remains separately gated.
 
 ## 7. Frozen Decisions — Propagation and Default Policy
 
@@ -394,3 +423,75 @@ What deliberately did not change: the queue does not select raw delivery
 policy for callers, install subscriptions, observe native dispatch, reserve a
 worst-case input emission set, remove Stage-owned pending records, or invoke a
 VM. Those remain the next MPY-05/06 integration slices.
+
+### 0.2.2 — 2026-10-05 — amended
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** editorial
+
+**Touches:** §0, §15
+
+**Commits:** Existing native implementation through `d9c3b6d`; local candidate
+baseline and package overlay recorded in the release receipt.
+
+**Summary:** Reconciles the recorded evidence while preserving normative
+meaning and binding requirements.  The [bounded MPY release receipt](../releases/v0.2.7-mpy-evidence.md)
+records existing descriptor-derived subscriptions, dispatch reservations,
+pre-dispatch native-input admission, acknowledged bounded cue drains, Safe
+Turns and child-first exact-once subscription release during actor/Stage
+teardown. Tests cover saturation before actor mutation, explicit overflow/fault,
+shared sequence order, stale/busy rollback and retained-drain ownership.
+
+The endpoint contains no interpreter adapter. Integer Callback IDs and
+subscription-release cues do not prove actual VM callable retention, execution
+or finalization. Full Stage teardown uses the request completion as its result;
+it does not invent an unregistered separate typed RuntimeNotice. This receipt
+adds no new event policy, flow-control capability or ratification. MPY-06/07
+binding/conformance and MPY-08 physical transport remain separately gated.
+
+### 0.2.3 — 2026-10-06 — amended
+
+**Author:** Ira Abbott; recorded by Codex
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner ratifies one owning-Stage revision increment for successful subscription addition or actual removal, unchanged revisions on failed/idempotent operations and isolation between Stages.
+
+#### Rationale
+
+Active subscriptions become visible in MPY-04 snapshots using existing neutral
+metadata, while the current registry mutation alone does not advance Stage
+Revision. Owner decision 3's October 6 follow-up selects visible subscription
+changes as owning-Stage mutations. This preserves MPY-04's existing single-Stage
+revision cursor and explicit staleness behavior instead of introducing a second
+public revision or endpoint-wide cross-Stage invalidation.
+
+Existing identity, validation, bounded idempotence, child-first teardown and
+exact-once token release remain binding. Atomic preflight must not expose a
+record change without its Stage revision or a revision without its record
+change; cleanup within an already-revisioned actor/Stage mutation must not add
+a second Stage increment. These preserve existing atomic visibility rather
+than select a new teardown protocol. The amendment changes no callback policy,
+wire, budget, API signature, binding claim or coverage status. A new exact
+clean-source handoff still precedes implementation; see the
+[owner decision receipt](../releases/v0.2.7-mpy-owner-decision.md).
+
+### 0.2.4 — 2026-10-10 — amended
+
+**Author:** Ira Abbott; recorded by Codex
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner ratifies direct reuse of all nine neutral subscription fields
+for MPY-04's additive registry-aware native snapshot operation.
+
+#### Rationale
+
+The October 10 disposition selects existing `SubscriptionInfo`, with opaque
+callback tokens and no VM-specific data, rather than introducing a second
+subscription representation. Active rows match the exact Stage and actor
+identity and preserve registration order. MPY-04 owns per-record limits,
+truthful totals/truncation and atomic complete-page preparation. Existing
+Stage-only return shapes remain compatible. Amendment 0.2.3's owning-Stage
+revision and teardown rules remain binding; policy, wire, binding and coverage
+claims are unchanged. Fresh clean-source handoff and acknowledgment still
+precede shared implementation, and Batch/bindings scope remains excluded.

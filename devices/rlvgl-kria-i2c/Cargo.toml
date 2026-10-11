@@ -14,10 +14,10 @@ publish = true
 [dependencies]
 embedded-hal = "1.0"
 embedded-hal-bus = { version = "0.3.0", default-features = false }
-rlvgl-device-pcm3168a = { path = "../rlvgl-device-pcm3168a" }
-rlvgl-device-ptn3460 = { path = "../rlvgl-device-ptn3460" }
-rlvgl-device-stts22h = { path = "../rlvgl-device-stts22h" }
-rlvgl-device-veml3235sl = { path = "../rlvgl-device-veml3235sl" }
+rlvgl-device-pcm3168a = { version = "0.2.5", path = "../rlvgl-device-pcm3168a" }
+rlvgl-device-ptn3460 = { version = "0.2.5", path = "../rlvgl-device-ptn3460" }
+rlvgl-device-stts22h = { version = "0.2.5", path = "../rlvgl-device-stts22h" }
+rlvgl-device-veml3235sl = { version = "0.2.5", path = "../rlvgl-device-veml3235sl" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 linux-embedded-hal = { version = "0.4.1", default-features = false, features = ["i2c"], optional = true }

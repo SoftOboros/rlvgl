@@ -534,9 +534,9 @@ invariant.
     draft-to-landed arc: the crate-local asset-placement correction, a
     worktree/`isolation` dispatch near-miss, the 12×20→14×21 cell-geometry
     divergence, uneven `.notdef` glyph coverage across font-style variants,
-    and forward constraints — most notably that the SCTD demo's hero-popup
-    pixel layout (tuned against the old 12×20 grid) has not yet been
-    re-verified against the new default geometry.
+    and forward constraints. Its §5 records the SCTD hero-popup geometry
+    resolution on 2026-07-18 using opt-in Bitmap6x10 and black-box proof;
+    the earlier geometry mismatch is historical, not reopened work.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

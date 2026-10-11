@@ -1,0 +1,1470 @@
+{
+  "authority": "CRATES-CI-00 \u00a76 / \u00a715 0.1.6; finite v0.2.7 workspace contexts, unexpected source stops",
+  "workspaces": [
+    {
+      "descriptor": "Cargo.toml",
+      "descriptor_sha256": "c2290ac8cbab1af910fe79693728431785d9a256494213c8ad6bbece950fb69b",
+      "members": [
+        {
+          "name": "rlvgl",
+          "manifest": "Cargo.toml",
+          "manifest_sha256": "c2290ac8cbab1af910fe79693728431785d9a256494213c8ad6bbece950fb69b",
+          "targets": [
+            "src/bin/rlvgl_creator/main.rs",
+            "src/lib.rs",
+            "tests/ast_from_c.rs",
+            "tests/bsp_clock_ownership.rs",
+            "tests/bsp_ek_ra6m5_render.rs",
+            "tests/bsp_esp32c3_cli.rs",
+            "tests/bsp_esp32c3_compile.rs",
+            "tests/bsp_esp32c3_render.rs",
+            "tests/bsp_esp32c5_compile.rs",
+            "tests/bsp_esp32c5_render.rs",
+            "tests/bsp_esp32c61_compile.rs",
+            "tests/bsp_esp32c61_render.rs",
+            "tests/bsp_esp32c6_cli.rs",
+            "tests/bsp_esp32c6_compile.rs",
+            "tests/bsp_esp32c6_render.rs",
+            "tests/bsp_esp32h2_compile.rs",
+            "tests/bsp_esp32h2_render.rs",
+            "tests/bsp_esp32p4_cli.rs",
+            "tests/bsp_esp32p4_compile.rs",
+            "tests/bsp_esp32p4_render.rs",
+            "tests/bsp_esp_matrix_smoke.rs",
+            "tests/bsp_hal_pac_parse.rs",
+            "tests/bsp_microchip_compile.rs",
+            "tests/bsp_microchip_render.rs",
+            "tests/bsp_nordic.rs",
+            "tests/bsp_nrf52840_render.rs",
+            "tests/bsp_nxp.rs",
+            "tests/bsp_nxp_render.rs",
+            "tests/bsp_renesas.rs",
+            "tests/bsp_reserved_pins.rs",
+            "tests/bsp_roundtrip.rs",
+            "tests/bsp_rp2040.rs",
+            "tests/bsp_rp2040_render.rs",
+            "tests/bsp_silabs_slstk3701a_compile.rs",
+            "tests/bsp_silabs_slstk3701a_render.rs",
+            "tests/bsp_ti_cc1352r_compile.rs",
+            "tests/bsp_ti_cc1352r_render.rs",
+            "tests/chipdb_embed.rs",
+            "tests/chipdb_vendors.rs",
+            "tests/creator_app_bsp_gen.rs",
+            "tests/creator_app_emit.rs",
+            "tests/creator_app_feature_graph.rs",
+            "tests/creator_app_i18n.rs",
+            "tests/creator_app_inspect.rs",
+            "tests/creator_app_new.rs",
+            "tests/creator_app_parallel.rs",
+            "tests/creator_app_round_trip_disco_sm.rs",
+            "tests/creator_app_schema.rs",
+            "tests/creator_app_sm_vendored.rs",
+            "tests/creator_app_theme.rs",
+            "tests/creator_app_validate.rs",
+            "tests/creator_board_import.rs",
+            "tests/creator_gen_lib.rs",
+            "tests/creator_image_convert.rs",
+            "tests/creator_new.rs",
+            "tests/creator_qt_emit_bound_text_compile.rs",
+            "tests/creator_qt_emit_centered_compile.rs",
+            "tests/creator_qt_emit_clickable_compile.rs",
+            "tests/creator_qt_emit_compile.rs",
+            "tests/creator_qt_emit_corners_compile.rs",
+            "tests/creator_qt_emit_counter_compile.rs",
+            "tests/creator_qt_emit_edges_compile.rs",
+            "tests/creator_qt_emit_mousearea_compile.rs",
+            "tests/creator_qt_emit_nested_compile.rs",
+            "tests/creator_qt_emit_rlvgl_compile.rs",
+            "tests/creator_qt_emit_stopwatch_compile.rs",
+            "tests/creator_qt_ingest.rs",
+            "tests/creator_qt_strict_mode.rs",
+            "tests/creator_run.rs",
+            "tests/creator_svelte_check.rs",
+            "tests/creator_ui_kittest.rs",
+            "tests/creator_ui_menu_groups.rs",
+            "tests/creator_ui_run_preset.rs",
+            "tests/creator_ui_wizard.rs",
+            "tests/esp_ir_roundtrip.rs",
+            "tests/nrf_ir_roundtrip.rs",
+            "tests/nxp_ir_roundtrip.rs",
+            "tests/publish_changed_matrix.rs",
+            "tests/renesas_ir_roundtrip.rs",
+            "tests/rp_ir_roundtrip.rs",
+            "tests/tools_build_vendor.rs",
+            "tests/tools_bump_vendor_versions.rs",
+            "tests/tools_gen_pins.rs",
+            "tests/tools_st_extract_af.rs",
+            "tests/tools_st_ioc_board.rs",
+            "tests/tools_stm32_xml_scraper.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "README.md",
+              "sha256": "009a30632167019925ca7c38889eac1d9301ebf3f40ddc4e3885aa66ee8bda2a"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-api",
+          "manifest": "api/Cargo.toml",
+          "manifest_sha256": "82d7daf461ea35b53d801b4da41cca532f826434eca65fc62b9e6872b7e139de",
+          "targets": [
+            "api/src/lib.rs",
+            "api/tests/mpy_v1_golden.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-audio-meters-core",
+          "manifest": "audio-meters-core/Cargo.toml",
+          "manifest_sha256": "75d73b0d77c27348d09cb6922ddefef036ae10cb6438932145ddc7313e440183",
+          "targets": [
+            "audio-meters-core/src/lib.rs",
+            "audio-meters-core/tests/parity.rs",
+            "audio-meters-core/tests/scales.rs",
+            "audio-meters-core/tests/skins.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "audio-meters-core/README.md",
+              "sha256": "c38ad00cb7baa444b1c0b9d046ce67abbd5f0211d96cbf2339676580aed02b2c"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-esp",
+          "manifest": "chipdb/rlvgl-chips-esp/Cargo.toml",
+          "manifest_sha256": "0780680ef692a10b2a61411194ac188de4938f1a7d00ef80063bf21553b1596d",
+          "targets": [
+            "chipdb/rlvgl-chips-esp/build.rs",
+            "chipdb/rlvgl-chips-esp/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-esp/README.md",
+              "sha256": "ea61873c619cc9246da7733e1b0c62261eefafd9b99102a8601d397dd482e602"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-microchip",
+          "manifest": "chipdb/rlvgl-chips-microchip/Cargo.toml",
+          "manifest_sha256": "bb81dbe31cc991035356b725034c89a5ebba5ae634d254841d20c00c91c5b3dd",
+          "targets": [
+            "chipdb/rlvgl-chips-microchip/build.rs",
+            "chipdb/rlvgl-chips-microchip/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-microchip/README.md",
+              "sha256": "6547018dd7e3ba7981b3d5aad6e298e1e567a9950a36f7f8a51369f67c316c6f"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-nrf",
+          "manifest": "chipdb/rlvgl-chips-nrf/Cargo.toml",
+          "manifest_sha256": "645a111588a6ae058004118ddb60538154bb52dc6a411897fcb3d2100862b599",
+          "targets": [
+            "chipdb/rlvgl-chips-nrf/build.rs",
+            "chipdb/rlvgl-chips-nrf/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-nrf/README.md",
+              "sha256": "934b63ce9243c5356df495847135cfb1d9e7cb28228453d6ebcb6828a337b4f4"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-nxp",
+          "manifest": "chipdb/rlvgl-chips-nxp/Cargo.toml",
+          "manifest_sha256": "ae53feab7ae71a3b85ef3f5aeffeb066d0bfa47affadeb6dc7ef32e08231b75a",
+          "targets": [
+            "chipdb/rlvgl-chips-nxp/build.rs",
+            "chipdb/rlvgl-chips-nxp/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-nxp/README.md",
+              "sha256": "baf3ac9c81c6a38f650d9db5c8629d754ac697117d05fb3638a34f6ff1330720"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-renesas",
+          "manifest": "chipdb/rlvgl-chips-renesas/Cargo.toml",
+          "manifest_sha256": "9ec781640c61a286daaef850132617f8954023bcb39cd8fe252577bd03f6ac65",
+          "targets": [
+            "chipdb/rlvgl-chips-renesas/build.rs",
+            "chipdb/rlvgl-chips-renesas/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-renesas/README.md",
+              "sha256": "a0b84a611b131c9a9b5002141c5c135c7552af386cce15122e1aab234ecc102c"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-rp2040",
+          "manifest": "chipdb/rlvgl-chips-rp2040/Cargo.toml",
+          "manifest_sha256": "ddeb21e284177397c61fba59b31cbb0320e08255f287868f9e5f4c717b9b7eed",
+          "targets": [
+            "chipdb/rlvgl-chips-rp2040/build.rs",
+            "chipdb/rlvgl-chips-rp2040/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-rp2040/README.md",
+              "sha256": "0caa5e275558f1fc798c52169c11c7832167db81a438cd48bf4b10ba915bedcb"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-silabs",
+          "manifest": "chipdb/rlvgl-chips-silabs/Cargo.toml",
+          "manifest_sha256": "e30e3a44a4d6a47d55b941192b57c954c94d94c6a2e57a37e5caa2c52c66fd63",
+          "targets": [
+            "chipdb/rlvgl-chips-silabs/build.rs",
+            "chipdb/rlvgl-chips-silabs/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-silabs/README.md",
+              "sha256": "311fbc43b1df358cc0f13f3204a3f2870a36d1fea717e98bc62dd24227bed458"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-stm",
+          "manifest": "chipdb/rlvgl-chips-stm/Cargo.toml",
+          "manifest_sha256": "41ce21de0af2c6e3d1c1db88a2953bdac0f05ced14f73d3f61cc797d3453b9fe",
+          "targets": [
+            "chipdb/rlvgl-chips-stm/build.rs",
+            "chipdb/rlvgl-chips-stm/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-stm/README.md",
+              "sha256": "97313ba9b041dddc61dbb4a6ed3e4686f36b0d1ef21c16486d1adbeb9a6ecd7b"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-chips-ti",
+          "manifest": "chipdb/rlvgl-chips-ti/Cargo.toml",
+          "manifest_sha256": "ab61361c72cefaf27b9c8b90da985f792afea12337f9e556ffb933550b01b368",
+          "targets": [
+            "chipdb/rlvgl-chips-ti/build.rs",
+            "chipdb/rlvgl-chips-ti/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chipdb/rlvgl-chips-ti/README.md",
+              "sha256": "774fa5e46c354c17e213f79e383113738f618fd64087d21c5759b22b26f43d17"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-bsps-stm",
+          "manifest": "chips/stm/bsps/Cargo.toml",
+          "manifest_sha256": "0c81e45e101d1880a875153cab83a042d66cd7f645ca7c49d8144dc3cb8bf0ce",
+          "targets": [
+            "chips/stm/bsps/build.rs",
+            "chips/stm/bsps/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "chips/stm/bsps/README.md",
+              "sha256": "2afe84740e920656447af0b8df5838098999a40a944f3afc8e3f9f8c151b1dbb"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-core",
+          "manifest": "core/Cargo.toml",
+          "manifest_sha256": "2b282023a36431d1c23309bac9ba15efecee4ac8124e40d728138840ec118e50",
+          "targets": [
+            "core/src/lib.rs",
+            "core/tests/anim_slide.rs",
+            "core/tests/animation.rs",
+            "core/tests/clip_renderer.rs",
+            "core/tests/cmd.rs",
+            "core/tests/font_metrics.rs",
+            "core/tests/font_registry.rs",
+            "core/tests/image_blit.rs",
+            "core/tests/image_descriptor.rs",
+            "core/tests/lpar16_asset_cache.rs",
+            "core/tests/lpar16_conformance.rs",
+            "core/tests/lpar16_layout_geometry.rs",
+            "core/tests/lpar16_scroll_throw.rs",
+            "core/tests/lpar16_timer_anim.rs",
+            "core/tests/mask.rs",
+            "core/tests/mpy_actor_preflight.rs",
+            "core/tests/mpy_atomic_create.rs",
+            "core/tests/mpy_cue_queue.rs",
+            "core/tests/mpy_native_endpoint.rs",
+            "core/tests/mpy_safe_turn.rs",
+            "core/tests/mpy_snapshot_subscriptions.rs",
+            "core/tests/mpy_style_directions.rs",
+            "core/tests/mpy_style_storage.rs",
+            "core/tests/mpy_subscriptions.rs",
+            "core/tests/raster.rs",
+            "core/tests/renderer_dirty.rs",
+            "core/tests/style_builder.rs",
+            "core/tests/theme.rs",
+            "core/tests/widget_node.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "core/README.md",
+              "sha256": "2a4b54d15f309e9c3a69761a994a45bde3154605961f281538816e35e4fc3f2a"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-device-pcm3168a",
+          "manifest": "devices/rlvgl-device-pcm3168a/Cargo.toml",
+          "manifest_sha256": "983ecbd0ed6ba687ae872780fee822af70a5bdda57808b371fd0c4ca5e2165a7",
+          "targets": [
+            "devices/rlvgl-device-pcm3168a/src/lib.rs",
+            "devices/rlvgl-device-pcm3168a/tests/driver.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-device-ptn3460",
+          "manifest": "devices/rlvgl-device-ptn3460/Cargo.toml",
+          "manifest_sha256": "3a40fdf525c4c027ab973786afb14990b87a7675e257be20ee545bee68eba35e",
+          "targets": [
+            "devices/rlvgl-device-ptn3460/src/lib.rs",
+            "devices/rlvgl-device-ptn3460/tests/driver.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-device-stts22h",
+          "manifest": "devices/rlvgl-device-stts22h/Cargo.toml",
+          "manifest_sha256": "6cb6123fa113b870f3f733356187cbf07ac8154a14f3eccb8f93e188229a1cda",
+          "targets": [
+            "devices/rlvgl-device-stts22h/src/lib.rs",
+            "devices/rlvgl-device-stts22h/tests/driver.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-device-veml3235sl",
+          "manifest": "devices/rlvgl-device-veml3235sl/Cargo.toml",
+          "manifest_sha256": "1e34e6c7dc156b26d68850907add46c95a758ef31b15e5eeabefb0e25929439d",
+          "targets": [
+            "devices/rlvgl-device-veml3235sl/src/lib.rs",
+            "devices/rlvgl-device-veml3235sl/tests/driver.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-i2c-test-support",
+          "manifest": "devices/rlvgl-i2c-test-support/Cargo.toml",
+          "manifest_sha256": "c94ae568130f6d3ae4f4b208113aa254842878ab9b72d07f706ea9396a528eb2",
+          "targets": [
+            "devices/rlvgl-i2c-test-support/src/lib.rs",
+            "devices/rlvgl-i2c-test-support/tests/strict_recorder.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-kria-i2c",
+          "manifest": "devices/rlvgl-kria-i2c/Cargo.toml",
+          "manifest_sha256": "447e1caa451f1005e854a265fe1cb023c6f674f302ab8bf7fd0a38dc71354cf5",
+          "targets": [
+            "devices/rlvgl-kria-i2c/src/lib.rs",
+            "devices/rlvgl-kria-i2c/tests/integration.rs",
+            "devices/rlvgl-kria-i2c/tests/shared_bus.rs",
+            "devices/rlvgl-kria-i2c/tests/topology.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-battery-monitor",
+          "manifest": "examples/apps/battery-monitor/Cargo.toml",
+          "manifest_sha256": "c0eb4cad6b5007afde6af88b4727701668a2f07700a47fc962e61dee46df267d",
+          "targets": [
+            "examples/apps/battery-monitor/src/lib.rs",
+            "examples/apps/battery-monitor/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/apps/battery-monitor/README.md",
+              "sha256": "8c6b5b9f00f3a2d0e19f67e90ef6bba8f15a113d3c9d9d84ddd79a209e148040"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-app-demo",
+          "manifest": "examples/apps/demo/Cargo.toml",
+          "manifest_sha256": "6845affe15244e3a10c861b402f22dd7debdf4262926296117b363cbe7b3825d",
+          "targets": [
+            "examples/apps/demo/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/apps/demo/README.md",
+              "sha256": "8dfb9b7c7d969aa621d0f3f35b33396f0290a7d20ccaf3a1857f031611fa7c28"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-app-disco-demo",
+          "manifest": "examples/apps/disco-demo/Cargo.toml",
+          "manifest_sha256": "db4ae967a43f97492c70094fe8d0631b2af5cad28d3ee0bba594880a62089ddb",
+          "targets": [
+            "examples/apps/disco-demo/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/apps/disco-demo/README.md",
+              "sha256": "edd49355899e78cb33b3d73c191155706d22f6b5962a232b9ad44c3478f83e8b"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-app-network-time",
+          "manifest": "examples/apps/network-time/Cargo.toml",
+          "manifest_sha256": "6477c4bcef0f4b8ab66c0fa9eff2dbb52793a4f5c46d7374d1c17076d4813673",
+          "targets": [
+            "examples/apps/network-time/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/apps/network-time/README.md",
+              "sha256": "9061280973292a555109b39c00507a77c5816b40c691f5b7e43fed532cfd1adb"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-app-sctd-demo",
+          "manifest": "examples/apps/sctd-demo/Cargo.toml",
+          "manifest_sha256": "a51eb3096cd6f42ab7b380721ddd1099fbf4897f9841c0c09ea822c6c422c782",
+          "targets": [
+            "examples/apps/sctd-demo/src/lib.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "dining-philosophers-interactive",
+          "manifest": "examples/apps/sctd-demo/machines/dining-philosophers-interactive/Cargo.toml",
+          "manifest_sha256": "8069183977a7beae3eb57c539fd1f20acaa33a242ba7e3dd325a4218c0282fae",
+          "targets": [
+            "examples/apps/sctd-demo/machines/dining-philosophers-interactive/src/lib.rs",
+            "examples/apps/sctd-demo/machines/dining-philosophers-interactive/tests/dbg.rs",
+            "examples/apps/sctd-demo/machines/dining-philosophers-interactive/tests/interactive_behavior.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "media-player",
+          "manifest": "examples/apps/sctd-demo/machines/media-player/Cargo.toml",
+          "manifest_sha256": "a841e2763dc28343fd609f2b03b7788e3f7deb20afc4bf417e4b830943e72e82",
+          "targets": [
+            "examples/apps/sctd-demo/machines/media-player/src/lib.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-example-bbb",
+          "manifest": "examples/beaglebone-black/Cargo.toml",
+          "manifest_sha256": "57cb55ba70d8cd1374c08286c061f2c383fb802f4c6906818ebbaa270b4e4a2f",
+          "targets": [
+            "examples/beaglebone-black/build.rs",
+            "examples/beaglebone-black/src/bare_metal.rs",
+            "examples/beaglebone-black/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/beaglebone-black/README.md",
+              "sha256": "dd82f5ce554841d7c69eb98bbd2da9ccfa8450ecd4330c7d3929cdb74b03f412"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-example-beetle-esp32c3",
+          "manifest": "examples/beetle-esp32c3/Cargo.toml",
+          "manifest_sha256": "8535fc3181737f9ff1dcda59f1a6c77d8fb6d77f5772313541fb67095dd3c85e",
+          "targets": [
+            "examples/beetle-esp32c3/build.rs",
+            "examples/beetle-esp32c3/src/bsp_pac_main.rs",
+            "examples/beetle-esp32c3/src/esp_hal_main.rs",
+            "examples/beetle-esp32c3/src/network_time_main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/beetle-esp32c3/README.md",
+              "sha256": "b94ca350195b2bca364526de09d7f7ebd0a0d81973f53d2fc5f41010f6edfe09"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-example-beetle-esp32c6",
+          "manifest": "examples/beetle-esp32c6/Cargo.toml",
+          "manifest_sha256": "ace3747a9688e2c3a4e9e897a09aada08efb389d6509af1cf3097f4f76bb7ba7",
+          "targets": [
+            "examples/beetle-esp32c6/build.rs",
+            "examples/beetle-esp32c6/src/network_time_main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/beetle-esp32c6/README.md",
+              "sha256": "4ab0b88093c5b4478e3e82ee262fcbbfc7dcc6baef027d3b464d64c31fd27573"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-example-beetle-esp32p4",
+          "manifest": "examples/beetle-esp32p4/Cargo.toml",
+          "manifest_sha256": "72a6c0558486c9c55bd64adc40e2c7980c7d2dbca363897aeef1143f75e8f017",
+          "targets": [
+            "examples/beetle-esp32p4/build.rs",
+            "examples/beetle-esp32p4/src/bin/blink_all.rs",
+            "examples/beetle-esp32p4/src/bsp_pac_main.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-example-disco-sim",
+          "manifest": "examples/disco-sim/Cargo.toml",
+          "manifest_sha256": "90f5dcdfd4d038efde94d28b2997b9f0ab636815c4b3e120d6f0b90ebeab9cf6",
+          "targets": [
+            "examples/disco-sim/src/main.rs",
+            "examples/disco-sim/src/sctd_main.rs",
+            "examples/disco-sim/tests/playit_automation.rs",
+            "examples/disco-sim/tests/typed_dma2d_host.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/disco-sim/README.md",
+              "sha256": "d07a8dc882aae6c497c349d2627224adcc287792b4395024ee546cc1ee2edc7a"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-example-sim",
+          "manifest": "examples/sim/Cargo.toml",
+          "manifest_sha256": "fd3c5f9c042a5c9f86f289bd2a31bf7793bd806832e7628d31c5ca5d19554a09",
+          "targets": [
+            "examples/sim/src/main.rs",
+            "examples/sim/tests/demo.rs",
+            "examples/sim/tests/headless.rs",
+            "examples/sim/tests/text.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/sim/README.md",
+              "sha256": "35cb0fe65961b12e4ecbe116e4f5bbb39c2377bbf28376cbdb500952d46af1c7"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-example-disco",
+          "manifest": "examples/stm32h747i-disco/Cargo.toml",
+          "manifest_sha256": "bb3ebc5aac0eb7a26e8a4f74da4e8ac723b9af31da714d817846ea527d665ab6",
+          "targets": [
+            "examples/stm32h747i-disco/build.rs",
+            "examples/stm32h747i-disco/src/cm4_main.rs",
+            "examples/stm32h747i-disco/src/lib.rs",
+            "examples/stm32h747i-disco/src/main.rs",
+            "examples/stm32h747i-disco/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/stm32h747i-disco/README.md",
+              "sha256": "8dd50f2cb9eaa6263625dd26215b88c6f9c8450196eac192d810efd028b50c6f"
+            }
+          ]
+        },
+        {
+          "name": "disco-assets",
+          "manifest": "examples/stm32h747i-disco/assets/disco-assets/Cargo.toml",
+          "manifest_sha256": "48239ddbb1a3079e0dc165b4f622850abb38293984e1ceee29d5c1222b2a5e4a",
+          "targets": [
+            "examples/stm32h747i-disco/assets/disco-assets/build.rs",
+            "examples/stm32h747i-disco/assets/disco-assets/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "examples/stm32h747i-disco/assets/disco-assets/README.md",
+              "sha256": "892df25c409ebadf06c0bba411c6b52a75986ed5ba98464534ff1a6f4550ca8c"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-fs-sim",
+          "manifest": "fs-sim/Cargo.toml",
+          "manifest_sha256": "b043c4d35633a2ac84bc263006c6cfb79ca0ebf3e7678133e4c33aa7c59edc95",
+          "targets": [
+            "fs-sim/src/bin/fatcat.rs",
+            "fs-sim/src/bin/mkfatimg.rs",
+            "fs-sim/src/lib.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-i18n",
+          "manifest": "i18n/Cargo.toml",
+          "manifest_sha256": "0bbe466c342afbaa5c102048b11869e37c8d75855500e02d4acf20fc37fca886",
+          "targets": [
+            "i18n/build.rs",
+            "i18n/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "i18n/README.md",
+              "sha256": "b1d5b4438f27b58e328a8b1e04edd19ffd12c1f065f02094943372f5966e53f0"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-micropython",
+          "manifest": "micropython/Cargo.toml",
+          "manifest_sha256": "90394d56e8f9e27ad6030673f2f96ba010d64adae34c578c5e21b36047ad7f35",
+          "targets": [
+            "micropython/src/lib.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-network",
+          "manifest": "network/Cargo.toml",
+          "manifest_sha256": "0d30f028b7ccbfa472a26bf84c40d7bdff67b6b35a0900e41e85979ca7460142",
+          "targets": [
+            "network/src/lib.rs",
+            "network/tests/config_failure_boundaries.rs",
+            "network/tests/scan_refresh_boundaries.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "network/README.md",
+              "sha256": "4bd36fd7f7f815da2aeceda00c5a927f4d519fff89513c8132d5c264e11f2acd"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-network-esp-nvs",
+          "manifest": "network/esp-nvs/Cargo.toml",
+          "manifest_sha256": "ee62afddf3fab5da003372afb85e5cb20f8e41a76b1be69f8e0416c54629ca5a",
+          "targets": [
+            "network/esp-nvs/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "network/esp-nvs/README.md",
+              "sha256": "1efc0b7e7591e1fb77f6dcb2aae9c9eb88c489e3bf3090d50234654b0d53ddcc"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-platform",
+          "manifest": "platform/Cargo.toml",
+          "manifest_sha256": "7b5c37a82260ff750541ada6398985a86111b67982f8a2cad55ce3574cd03ef2",
+          "targets": [
+            "platform/examples/leak.rs",
+            "platform/src/lib.rs",
+            "platform/tests/addr.rs",
+            "platform/tests/blend_row_override.rs",
+            "platform/tests/blitter_command_sink.rs",
+            "platform/tests/discipline.rs",
+            "platform/tests/discipline_compile.rs",
+            "platform/tests/font_rotated_glyph.rs",
+            "platform/tests/input_device.rs",
+            "platform/tests/isr_channel.rs",
+            "platform/tests/leak_detection.rs",
+            "platform/tests/simulator_window.rs",
+            "platform/tests/size_regression.rs",
+            "platform/tests/wayland_model_vectors.rs",
+            "platform/tests/wayland_smoke.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "platform/README.md",
+              "sha256": "43de0078bbf2f37751df06cbe83fe12737c662b2b6fbdf5c1f8c945d64759a50"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-playit",
+          "manifest": "playit/Cargo.toml",
+          "manifest_sha256": "d68658d661443f545fbf4421611b2f6d9b904071ef816c6090d9c324b67b41f6",
+          "targets": [
+            "playit/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "playit/README.md",
+              "sha256": "0c30eaae5046455e2f83183cb8b743419770f3c5a5a25e8dfca7ed18ab4effea"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-decomp",
+          "manifest": "rlvgl-decomp/Cargo.toml",
+          "manifest_sha256": "41ed30a06e10602dc2512e6872e404bee97ccbae80f6cfa00a58c6ed6eb70269",
+          "targets": [
+            "rlvgl-decomp/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "rlvgl-decomp/README.md",
+              "sha256": "fd965b4e381a06899cee6d991e8ae5722bf43e88725dc074219a9e90a02b4397"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-runtime-std",
+          "manifest": "runtime-std/Cargo.toml",
+          "manifest_sha256": "a1dba0603f764af250fd1e2c7840e41fed5666d409d75893be885d4763f2b406",
+          "targets": [
+            "runtime-std/examples/cpy_capacity_probe.rs",
+            "runtime-std/src/lib.rs",
+            "runtime-std/tests/headless_owner.rs",
+            "runtime-std/tests/native_service.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "runtime-std/README.md",
+              "sha256": "1c1aaae565158b534e8c54587ad7c04ff040f673d509c3c2dc338eb628ba255b"
+            }
+          ]
+        },
+        {
+          "name": "stopwatch_gen",
+          "manifest": "tests/fixtures/qt/stopwatch_gen/Cargo.toml",
+          "manifest_sha256": "72862eabe8b77bbbd91f1837a91fa4b4f384de3735e79bea6c1a915425aa5681",
+          "targets": [
+            "tests/fixtures/qt/stopwatch_gen/src/lib.rs"
+          ],
+          "shared_files": []
+        },
+        {
+          "name": "rlvgl-ui",
+          "manifest": "ui/Cargo.toml",
+          "manifest_sha256": "552b13f8b542ec1cf46abe86891e7c31631bcfc470eb940ce067376303f8fb24",
+          "targets": [
+            "ui/examples/demo.rs",
+            "ui/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "ui/README.md",
+              "sha256": "6692d0201354feb43307e79c53aad767f20e8d1403fae929e5339d579ad80da8"
+            }
+          ]
+        },
+        {
+          "name": "rlvgl-widgets",
+          "manifest": "widgets/Cargo.toml",
+          "manifest_sha256": "e90d1cf024333b4e25ed8ace714ee7126efa506640781a418aa270db7a5fbfab",
+          "targets": [
+            "widgets/examples/audio_meters_console.rs",
+            "widgets/src/lib.rs",
+            "widgets/tests/audio_meters_integration.rs",
+            "widgets/tests/button_event.rs",
+            "widgets/tests/checkbox_event.rs",
+            "widgets/tests/clock.rs",
+            "widgets/tests/event_fuzz.rs",
+            "widgets/tests/font_aa_conformance.rs",
+            "widgets/tests/font_arc_label_coverage.rs",
+            "widgets/tests/golden_button.rs",
+            "widgets/tests/golden_checkbox.rs",
+            "widgets/tests/golden_container.rs",
+            "widgets/tests/golden_image.rs",
+            "widgets/tests/golden_label.rs",
+            "widgets/tests/golden_list.rs",
+            "widgets/tests/golden_progress.rs",
+            "widgets/tests/golden_slider.rs",
+            "widgets/tests/layout_stress.rs",
+            "widgets/tests/list_draw_selected.rs",
+            "widgets/tests/list_event.rs",
+            "widgets/tests/lpar16_arc_label_geometry.rs",
+            "widgets/tests/lpar16_canvas_anim.rs",
+            "widgets/tests/lpar16_lpar11_goldens.rs",
+            "widgets/tests/lpar16_lpar12_goldens.rs",
+            "widgets/tests/lpar16_lpar13_goldens.rs",
+            "widgets/tests/lpar16_lpar14_goldens.rs",
+            "widgets/tests/meter_presets_match_json.rs",
+            "widgets/tests/mpy_actor_ops_compile.rs",
+            "widgets/tests/mpy_stage_directions.rs",
+            "widgets/tests/mpy_stage_registry.rs",
+            "widgets/tests/progress_edge.rs",
+            "widgets/tests/radio_event.rs",
+            "widgets/tests/scroll_view.rs",
+            "widgets/tests/slider_event.rs",
+            "widgets/tests/slider_zero_range.rs",
+            "widgets/tests/switch_event.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "widgets/README.md",
+              "sha256": "712d3cff76c49cdd470e68c37bc62e59d8310b492e91241c62122adfc6f823b0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "descriptor": "vendor/ratatui/Cargo.toml",
+      "descriptor_sha256": "a5cfc1ccdf94d14df401ddbb005dc42f93b9fa2f79aa55b43399c7c3ad327c14",
+      "members": [
+        {
+          "name": "advanced-widget-impl",
+          "manifest": "vendor/ratatui/examples/apps/advanced-widget-impl/Cargo.toml",
+          "manifest_sha256": "0132b0773095946c104993679d39f9d254284d6f90e1b2dce3532b4db434671a",
+          "targets": [
+            "vendor/ratatui/examples/apps/advanced-widget-impl/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/advanced-widget-impl/README.md",
+              "sha256": "9264bfa9311af3a1e0b2c048321f8455f9f196c721a4c11a374589ca624005f9"
+            }
+          ]
+        },
+        {
+          "name": "async-github",
+          "manifest": "vendor/ratatui/examples/apps/async-github/Cargo.toml",
+          "manifest_sha256": "2bec866ac6524a3cba00691f6b814005dd61c7177bce5d49645bfb2aababe16b",
+          "targets": [
+            "vendor/ratatui/examples/apps/async-github/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/README.md",
+              "sha256": "80428444721189970a09ed14c0de055dd1a6f42bd4a5a49b6bb9fea762982a90"
+            }
+          ]
+        },
+        {
+          "name": "calendar-explorer",
+          "manifest": "vendor/ratatui/examples/apps/calendar-explorer/Cargo.toml",
+          "manifest_sha256": "29adc094cf57b359f008b9a8ecf6db15f78aa102b2beff3d106841ae747bb057",
+          "targets": [
+            "vendor/ratatui/examples/apps/calendar-explorer/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/calendar-explorer/README.md",
+              "sha256": "aece17b2c198692e4232b1096d1ce90ce00863f24871db45b95f0527d8e8206f"
+            }
+          ]
+        },
+        {
+          "name": "canvas",
+          "manifest": "vendor/ratatui/examples/apps/canvas/Cargo.toml",
+          "manifest_sha256": "6144378438f5626fcce970af0438359faf9df5e08b28ab303ed2ea4f5e157c4b",
+          "targets": [
+            "vendor/ratatui/examples/apps/canvas/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/canvas/README.md",
+              "sha256": "3b27dea07e29b180061b16c696755b856e7ed9f976a76d259368919aaf72e26a"
+            }
+          ]
+        },
+        {
+          "name": "chart",
+          "manifest": "vendor/ratatui/examples/apps/chart/Cargo.toml",
+          "manifest_sha256": "af1fbaf029cf24697a5def526a9a38fdf23a896a535a55030600fed607b2c7ce",
+          "targets": [
+            "vendor/ratatui/examples/apps/chart/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/chart/README.md",
+              "sha256": "2b98578cff580c977a37e8d33d3bfac84607220edc57424bff0ebaf040fd888c"
+            }
+          ]
+        },
+        {
+          "name": "color-explorer",
+          "manifest": "vendor/ratatui/examples/apps/color-explorer/Cargo.toml",
+          "manifest_sha256": "e108ef1d5a989c99ae6098ea7211286e0c690d49a33d75bd17e1e873114396ab",
+          "targets": [
+            "vendor/ratatui/examples/apps/color-explorer/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/color-explorer/README.md",
+              "sha256": "8e5b4777e33bb8756ee679475f67d53b2d38f27fd91a3beb348f38d83f1a53f3"
+            }
+          ]
+        },
+        {
+          "name": "colors-rgb",
+          "manifest": "vendor/ratatui/examples/apps/colors-rgb/Cargo.toml",
+          "manifest_sha256": "e6eeb7d93bd1d55e6f9fe6bb577133da3f7d0628d4b28ab070ad3ba4ac494439",
+          "targets": [
+            "vendor/ratatui/examples/apps/colors-rgb/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/colors-rgb/README.md",
+              "sha256": "7624249ff2fdad1889722258cd00f192f858b397a6986465a7066f43b30b9ba8"
+            }
+          ]
+        },
+        {
+          "name": "constraint-explorer",
+          "manifest": "vendor/ratatui/examples/apps/constraint-explorer/Cargo.toml",
+          "manifest_sha256": "f16377286aab1e2ac2b09bd5108488342a33e38777efc0568205bc267f3df952",
+          "targets": [
+            "vendor/ratatui/examples/apps/constraint-explorer/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/constraint-explorer/README.md",
+              "sha256": "a8e1eae6070526d8d21ab5ffb45a2c64f91e0453d85573fa3b6d239370e7d20a"
+            }
+          ]
+        },
+        {
+          "name": "constraints",
+          "manifest": "vendor/ratatui/examples/apps/constraints/Cargo.toml",
+          "manifest_sha256": "4e54c30b62c94e612d9cb76d0c4a1c6788448ad571095480f20c74d7eab350f2",
+          "targets": [
+            "vendor/ratatui/examples/apps/constraints/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/constraints/README.md",
+              "sha256": "2c63fde3ee40577fc0ce8c5ac745ac5ef0d0ed5c876fe1449fcc8353b6153709"
+            }
+          ]
+        },
+        {
+          "name": "custom-widget",
+          "manifest": "vendor/ratatui/examples/apps/custom-widget/Cargo.toml",
+          "manifest_sha256": "c124c9575916ac709fd1ae4eae9f547e1c53cbd8a8c0022af7d2aa63f68c81a6",
+          "targets": [
+            "vendor/ratatui/examples/apps/custom-widget/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/custom-widget/README.md",
+              "sha256": "b112148a4c71f23e7f35941785d24be097642c67b79c010c968772952c623a68"
+            }
+          ]
+        },
+        {
+          "name": "demo",
+          "manifest": "vendor/ratatui/examples/apps/demo/Cargo.toml",
+          "manifest_sha256": "23f6276701ac39d52d7ff09d5f3be10d7b37f47f185bba8b396840615f27842b",
+          "targets": [
+            "vendor/ratatui/examples/apps/demo/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/demo/README.md",
+              "sha256": "abc67703669671bdc4c753b6fa230e9528d9eb62b5a30f4f682c3dd24070786e"
+            }
+          ]
+        },
+        {
+          "name": "demo2",
+          "manifest": "vendor/ratatui/examples/apps/demo2/Cargo.toml",
+          "manifest_sha256": "a5bb54549affae8e759b5235f0f253f02c390eada1e9bf5f0b3e37f78f26d8ef",
+          "targets": [
+            "vendor/ratatui/examples/apps/demo2/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/demo2/README.md",
+              "sha256": "167cce4fd88d45f475a21bf556391c80c8985378e02e983eb6f8f8b8b5b97424"
+            }
+          ]
+        },
+        {
+          "name": "flex",
+          "manifest": "vendor/ratatui/examples/apps/flex/Cargo.toml",
+          "manifest_sha256": "761813aa593a10fb729e6101ea83562b7ba34b2eeae2c4b6e229834105ed3f35",
+          "targets": [
+            "vendor/ratatui/examples/apps/flex/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/flex/README.md",
+              "sha256": "4171b63de834f8605b281997330dc7103763e1a6a9120b0e979771c6b6a698bd"
+            }
+          ]
+        },
+        {
+          "name": "gauge",
+          "manifest": "vendor/ratatui/examples/apps/gauge/Cargo.toml",
+          "manifest_sha256": "97402a358f85f4b1a5452c7cff4a172b4ef8ad19333073aab2c05af83bee174f",
+          "targets": [
+            "vendor/ratatui/examples/apps/gauge/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/gauge/README.md",
+              "sha256": "c05f8dea0dedacec455613fec4b8c6421d476db9c579a0647dac6f5112cb180d"
+            }
+          ]
+        },
+        {
+          "name": "hello-world",
+          "manifest": "vendor/ratatui/examples/apps/hello-world/Cargo.toml",
+          "manifest_sha256": "e31bae7fcaeaa1e7a52256f995897d3b997d69b7339385685336a685762257d9",
+          "targets": [
+            "vendor/ratatui/examples/apps/hello-world/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/hello-world/README.md",
+              "sha256": "e9754756e44c6bc2aacb85596ef0a2e096f391bef2a16b7c528f9f85b57e786a"
+            }
+          ]
+        },
+        {
+          "name": "hyperlink",
+          "manifest": "vendor/ratatui/examples/apps/hyperlink/Cargo.toml",
+          "manifest_sha256": "085933b4057d11ad2b7a01271c0dd7dac49de5b74cd780dfc71b87a1034837c2",
+          "targets": [
+            "vendor/ratatui/examples/apps/hyperlink/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/hyperlink/README.md",
+              "sha256": "5663184aa16c7001f7f3a8a9551812389f95fe0e69314b40f93fea2f252591a4"
+            }
+          ]
+        },
+        {
+          "name": "inline",
+          "manifest": "vendor/ratatui/examples/apps/inline/Cargo.toml",
+          "manifest_sha256": "70d019f277e49ccdd774302901c6cb367aaadbb4c359fd81c342fd0112417328",
+          "targets": [
+            "vendor/ratatui/examples/apps/inline/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/inline/README.md",
+              "sha256": "b2fb90afb62825d26fa3225a704d34487a51a03ea13772510fbfff9ca8115563"
+            }
+          ]
+        },
+        {
+          "name": "input-form",
+          "manifest": "vendor/ratatui/examples/apps/input-form/Cargo.toml",
+          "manifest_sha256": "a8984edcdf1ae2a2b2b00d9d6f024e43cb0c3e5e26183fea8aa931c11e1a962b",
+          "targets": [
+            "vendor/ratatui/examples/apps/input-form/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/input-form/README.md",
+              "sha256": "19230290da63888552511d13d6ef4b2bafa99ef54764e7e88c5387a42ddcc696"
+            }
+          ]
+        },
+        {
+          "name": "minimal",
+          "manifest": "vendor/ratatui/examples/apps/minimal/Cargo.toml",
+          "manifest_sha256": "e143961505ae7bbb616c8ee232e0ccd82c1376b7f574e21a779cff0bd72b2344",
+          "targets": [
+            "vendor/ratatui/examples/apps/minimal/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/minimal/README.md",
+              "sha256": "2bbd46df491329dedc29c92b720648353afe8a2c3aac218af42396e47ea9670c"
+            }
+          ]
+        },
+        {
+          "name": "modifiers",
+          "manifest": "vendor/ratatui/examples/apps/modifiers/Cargo.toml",
+          "manifest_sha256": "65a952bf0ad19f2d5085ac5ed85ffa02381e2dae5b5936790a60eb85bc3bd75e",
+          "targets": [
+            "vendor/ratatui/examples/apps/modifiers/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/modifiers/README.md",
+              "sha256": "e4edcb47792a2d87bfa88c6c476f05ae1872fbb9d5a60da8ea79de768a8feddd"
+            }
+          ]
+        },
+        {
+          "name": "mouse-drawing",
+          "manifest": "vendor/ratatui/examples/apps/mouse-drawing/Cargo.toml",
+          "manifest_sha256": "1f61a82cff66de3e4322898c4312552a2271d39deacbcfb3c29bef7ffc69587d",
+          "targets": [
+            "vendor/ratatui/examples/apps/mouse-drawing/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/mouse-drawing/README.md",
+              "sha256": "6c773ad773774af35404860b381232b9aacc6e76be9c6753a1dc4fadfd183e03"
+            }
+          ]
+        },
+        {
+          "name": "panic",
+          "manifest": "vendor/ratatui/examples/apps/panic/Cargo.toml",
+          "manifest_sha256": "9d338014d1c7d4467c4e2728ee170ab328651ac779f593479a7b2a8f125abec1",
+          "targets": [
+            "vendor/ratatui/examples/apps/panic/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/panic/README.md",
+              "sha256": "1f10ca12cb6c0c5ccfb8728b81e95340c05267d0102ac9365d261fdefcab4dc3"
+            }
+          ]
+        },
+        {
+          "name": "popup",
+          "manifest": "vendor/ratatui/examples/apps/popup/Cargo.toml",
+          "manifest_sha256": "37cc06c0dc428e962a143014c788e100a1e8db3b02f6c4b57515414b8c97d1fa",
+          "targets": [
+            "vendor/ratatui/examples/apps/popup/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/popup/README.md",
+              "sha256": "249266f3e28ef625362b55548775b92bd72c1d5e327600054fecd0d14bceead5"
+            }
+          ]
+        },
+        {
+          "name": "release-header",
+          "manifest": "vendor/ratatui/examples/apps/release-header/Cargo.toml",
+          "manifest_sha256": "6d490733f1b8217f86ef07e125e4f00f6096f9406ed4426d5046a80e2e264413",
+          "targets": [
+            "vendor/ratatui/examples/apps/release-header/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/release-header/README.md",
+              "sha256": "f5716345b83c63da74fde0edaf0b7ad3ef610a67b3bd1e2850a0bd09601b2c08"
+            }
+          ]
+        },
+        {
+          "name": "scrollbar",
+          "manifest": "vendor/ratatui/examples/apps/scrollbar/Cargo.toml",
+          "manifest_sha256": "a03beb92b811f8ba07e7b9abd5b5c2d0398af1a566a2dec113b6da89c4241a2e",
+          "targets": [
+            "vendor/ratatui/examples/apps/scrollbar/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/scrollbar/README.md",
+              "sha256": "7185c4fbbc8591153d2c572801ec9261639fdb4b4bf722114ef043fa7233eb63"
+            }
+          ]
+        },
+        {
+          "name": "table",
+          "manifest": "vendor/ratatui/examples/apps/table/Cargo.toml",
+          "manifest_sha256": "10507274ce3daea6323f2eaeaaf1664232baa3943ace56ec7ebf967417d5c3c9",
+          "targets": [
+            "vendor/ratatui/examples/apps/table/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/table/README.md",
+              "sha256": "15620402ced090515ede2e18d6f9135c3a205b6edb02a255ce7cac78741cabbd"
+            }
+          ]
+        },
+        {
+          "name": "todo-list",
+          "manifest": "vendor/ratatui/examples/apps/todo-list/Cargo.toml",
+          "manifest_sha256": "de8f7d6286dad8a7ec1027a6663dec3ac1168bc8788d47d2331309913321360f",
+          "targets": [
+            "vendor/ratatui/examples/apps/todo-list/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/todo-list/README.md",
+              "sha256": "28c4ec91cb69811ea262357b4f60f5786df0ed49d7ba84b633a82ccaea95ea3c"
+            }
+          ]
+        },
+        {
+          "name": "tracing",
+          "manifest": "vendor/ratatui/examples/apps/tracing/Cargo.toml",
+          "manifest_sha256": "06b8153b6ce8861ae4e28b20d7dad98d348b6627addebb9248a1e3635af96455",
+          "targets": [
+            "vendor/ratatui/examples/apps/tracing/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/tracing/README.md",
+              "sha256": "beabd204442214da28f916b7aba9ed2e89e31864130bdd30465df7bc0ed3c359"
+            }
+          ]
+        },
+        {
+          "name": "user-input",
+          "manifest": "vendor/ratatui/examples/apps/user-input/Cargo.toml",
+          "manifest_sha256": "20e492f651e45f44260c43d25434da43681822545f079239dc2a0bc76dd60511",
+          "targets": [
+            "vendor/ratatui/examples/apps/user-input/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/user-input/README.md",
+              "sha256": "37b4d529f0d87018449d15430dc8f4e6472693f89d611b8a521b6582c0d3de80"
+            }
+          ]
+        },
+        {
+          "name": "volatility-surface",
+          "manifest": "vendor/ratatui/examples/apps/volatility-surface/Cargo.toml",
+          "manifest_sha256": "bd67888fcc8c20c5253e5445d95fc4d053640263573c17ade20c78fa97bd731b",
+          "targets": [
+            "vendor/ratatui/examples/apps/volatility-surface/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/volatility-surface/README.md",
+              "sha256": "0c70075ad003585566d7286a4fcfe47386fefc1ab9c18d742eb0cfe805c00df9"
+            }
+          ]
+        },
+        {
+          "name": "weather",
+          "manifest": "vendor/ratatui/examples/apps/weather/Cargo.toml",
+          "manifest_sha256": "df1dd398ed3cde9da29816445a941808e024657c2c53a9bdb215502976e26800",
+          "targets": [
+            "vendor/ratatui/examples/apps/weather/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/weather/README.md",
+              "sha256": "94127281c1887f54dd684bd83ece9345cb8833c22fbcf10503d9d31816148292"
+            }
+          ]
+        },
+        {
+          "name": "widget-ref-container",
+          "manifest": "vendor/ratatui/examples/apps/widget-ref-container/Cargo.toml",
+          "manifest_sha256": "52ab5bf1c7208a88e6ee3990fcd6e65265e1661cbf5fadc4a5477241990973a3",
+          "targets": [
+            "vendor/ratatui/examples/apps/widget-ref-container/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/apps/widget-ref-container/README.md",
+              "sha256": "10044978f3ae52344a850325c2da3d286db1b916ad920efc3c9d52a0c4b489b5"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-state-examples",
+          "manifest": "vendor/ratatui/examples/concepts/state/Cargo.toml",
+          "manifest_sha256": "1c036eedbc11fcd1fdc61cd5e79163d7007fd5f9f0537125cbc6a3160fb80fd7",
+          "targets": [
+            "vendor/ratatui/examples/concepts/state/src/bin/component-trait.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/immutable-consuming.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/immutable-function.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/immutable-shared-ref.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/mutable-function.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/mutable-widget.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/nested-mutable-widget.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/nested-stateful-widget.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/refcell.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/stateful-widget.rs",
+            "vendor/ratatui/examples/concepts/state/src/bin/widget-with-mutable-ref.rs",
+            "vendor/ratatui/examples/concepts/state/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/examples/concepts/state/README.md",
+              "sha256": "59a5ad341f0cddd0fc98600d88c21de19c9a37cb0aeba7ef4a6c5726f92d4070"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-core",
+          "manifest": "vendor/ratatui/ratatui-core/Cargo.toml",
+          "manifest_sha256": "688e2c6b8d197a1da9bef752d46b365194d81880349b249864ec151b54789938",
+          "targets": [
+            "vendor/ratatui/ratatui-core/src/lib.rs",
+            "vendor/ratatui/ratatui-core/tests/rect.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-core/README.md",
+              "sha256": "a621e33efc51a893ccb0177bfb9b1fc3ad2be34d1bf97e41a659831e5acb86c6"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-crossterm",
+          "manifest": "vendor/ratatui/ratatui-crossterm/Cargo.toml",
+          "manifest_sha256": "db3edc85769e753e6a6e3fe0e30c428d24ec601aaa4be525240a13b93423d167",
+          "targets": [
+            "vendor/ratatui/ratatui-crossterm/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-crossterm/README.md",
+              "sha256": "8528f51a8593b5302f229bc121d49ba21f205f30ac79d271ba5731548f70790c"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-macros",
+          "manifest": "vendor/ratatui/ratatui-macros/Cargo.toml",
+          "manifest_sha256": "cf93cbb59a3370d927d9ab02176899eff95f15b2cb9aa68d6daee2b4888eb265",
+          "targets": [
+            "vendor/ratatui/ratatui-macros/src/lib.rs",
+            "vendor/ratatui/ratatui-macros/tests/macros.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-macros/README.md",
+              "sha256": "fad7ce545e4b8de98706b58196a86db34acc5f104226cadd23ed64bb03fedd66"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-rlvgl",
+          "manifest": "vendor/ratatui/ratatui-rlvgl/Cargo.toml",
+          "manifest_sha256": "034f2d888d2bb202ec3af8e907b75d40d55fa9678ba6317dc37620d226155b5f",
+          "targets": [
+            "vendor/ratatui/ratatui-rlvgl/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-rlvgl/README.md",
+              "sha256": "8f41b5050a0b9c4deafb3feaafca6517a8ad438fc345447c358b3968a6f05a7f"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-termina",
+          "manifest": "vendor/ratatui/ratatui-termina/Cargo.toml",
+          "manifest_sha256": "b353dcc0f4941f18b10d6628fe4dbf0ee02bad46b5d13f5ea062576b485b2e9c",
+          "targets": [
+            "vendor/ratatui/ratatui-termina/examples/termina.rs",
+            "vendor/ratatui/ratatui-termina/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-termina/README.md",
+              "sha256": "a13fe964cc209e9f5e77a138343cd3979328d42c6d48d88ecbd41c910f511378"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-termion",
+          "manifest": "vendor/ratatui/ratatui-termion/Cargo.toml",
+          "manifest_sha256": "659111ba82ac8f95f96be14b5b5615be9e2a515ebbe3f323f6bb28a0a56049e5",
+          "targets": [
+            "vendor/ratatui/ratatui-termion/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-termion/README.md",
+              "sha256": "d257dbfc03b7d2e9c08596195498d87845348cf800fd4cc85bd9df3173260827"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-termwiz",
+          "manifest": "vendor/ratatui/ratatui-termwiz/Cargo.toml",
+          "manifest_sha256": "9e832dff33f4073004b47cd28b163249d3b4244209c924fe1d1c9c53686e4ffa",
+          "targets": [
+            "vendor/ratatui/ratatui-termwiz/src/lib.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-termwiz/README.md",
+              "sha256": "9c14b9a466e3510137055950ea24122e324ca4892e25712c7040078861037462"
+            }
+          ]
+        },
+        {
+          "name": "ratatui-widgets",
+          "manifest": "vendor/ratatui/ratatui-widgets/Cargo.toml",
+          "manifest_sha256": "c264ae30338c5f09f5792942571c44b68e8d6aee4d981b031ddf86011f8f6119",
+          "targets": [
+            "vendor/ratatui/ratatui-widgets/examples/barchart-grouped.rs",
+            "vendor/ratatui/ratatui-widgets/examples/barchart.rs",
+            "vendor/ratatui/ratatui-widgets/examples/block.rs",
+            "vendor/ratatui/ratatui-widgets/examples/calendar.rs",
+            "vendor/ratatui/ratatui-widgets/examples/canvas.rs",
+            "vendor/ratatui/ratatui-widgets/examples/chart.rs",
+            "vendor/ratatui/ratatui-widgets/examples/collapsed-borders.rs",
+            "vendor/ratatui/ratatui-widgets/examples/gauge.rs",
+            "vendor/ratatui/ratatui-widgets/examples/line-gauge.rs",
+            "vendor/ratatui/ratatui-widgets/examples/list.rs",
+            "vendor/ratatui/ratatui-widgets/examples/logo.rs",
+            "vendor/ratatui/ratatui-widgets/examples/paragraph.rs",
+            "vendor/ratatui/ratatui-widgets/examples/scrollbar.rs",
+            "vendor/ratatui/ratatui-widgets/examples/shadow.rs",
+            "vendor/ratatui/ratatui-widgets/examples/sparkline.rs",
+            "vendor/ratatui/ratatui-widgets/examples/table.rs",
+            "vendor/ratatui/ratatui-widgets/examples/tabs.rs",
+            "vendor/ratatui/ratatui-widgets/src/lib.rs",
+            "vendor/ratatui/ratatui-widgets/tests/auto_traits.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/ratatui-widgets/README.md",
+              "sha256": "88d0024d5eecf692d0988ab8978bdb23a47fbf2274096bcb36b1cb9edb000965"
+            }
+          ]
+        },
+        {
+          "name": "ratatui",
+          "manifest": "vendor/ratatui/ratatui/Cargo.toml",
+          "manifest_sha256": "7616d3a4247e688f31270519f9efd479661e35c82e9e91b49b344f2c50d938e8",
+          "targets": [
+            "vendor/ratatui/ratatui/benches/main.rs",
+            "vendor/ratatui/ratatui/src/lib.rs",
+            "vendor/ratatui/ratatui/tests/backend_termion.rs",
+            "vendor/ratatui/ratatui/tests/state_serde.rs",
+            "vendor/ratatui/ratatui/tests/stateful_widget_ref_dyn.rs",
+            "vendor/ratatui/ratatui/tests/stylize.rs",
+            "vendor/ratatui/ratatui/tests/terminal.rs",
+            "vendor/ratatui/ratatui/tests/widgets_barchart.rs",
+            "vendor/ratatui/ratatui/tests/widgets_block.rs",
+            "vendor/ratatui/ratatui/tests/widgets_calendar.rs",
+            "vendor/ratatui/ratatui/tests/widgets_canvas.rs",
+            "vendor/ratatui/ratatui/tests/widgets_chart.rs",
+            "vendor/ratatui/ratatui/tests/widgets_gauge.rs",
+            "vendor/ratatui/ratatui/tests/widgets_list.rs",
+            "vendor/ratatui/ratatui/tests/widgets_paragraph.rs",
+            "vendor/ratatui/ratatui/tests/widgets_table.rs",
+            "vendor/ratatui/ratatui/tests/widgets_tabs.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/README.md",
+              "sha256": "80428444721189970a09ed14c0de055dd1a6f42bd4a5a49b6bb9fea762982a90"
+            }
+          ]
+        },
+        {
+          "name": "xtask",
+          "manifest": "vendor/ratatui/xtask/Cargo.toml",
+          "manifest_sha256": "9540864ac10ffa83c56c8d5f2829b3ba5566aca387c8148dda7d6907d6958f54",
+          "targets": [
+            "vendor/ratatui/xtask/src/main.rs"
+          ],
+          "shared_files": [
+            {
+              "path": "vendor/ratatui/xtask/README.md",
+              "sha256": "7ab7aa612db8ea5d4108821d5550d23c2dcef7a64684f332bd7db680f666346d"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

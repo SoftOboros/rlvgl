@@ -1,124 +1,257 @@
 {
-  "edge_count": 22,
+  "edge_count": 46,
   "edges": [
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 193,
+      "line": 237,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 206,
+      "line": 250,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 259,
+      "line": 303,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 260,
+      "line": 304,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 262,
+      "line": 306,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 265,
+      "line": 309,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C4"
     },
     {
       "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 267,
-      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C5"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 269,
-      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C6"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 272,
-      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C7"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 308,
-      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C7"
-    },
-    {
-      "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 311,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
-      "edge_type": "cites",
+      "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 372,
+      "line": 313,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 316,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 373,
+      "line": 352,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C4"
+      "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 399,
-      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
-      "target": "INV-C4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 399,
+      "line": 355,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 409,
+      "line": 416,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 410,
+      "line": 417,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 443,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 443,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 453,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 454,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 561,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 561,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 561,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 579,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 579,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 597,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 597,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 618,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 618,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 618,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 655,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 655,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 655,
+      "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 62,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 62,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 62,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "target": "INV-C6"
     },
     {
       "edge_type": "cites",
@@ -144,6 +277,41 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 21,
+      "source": "docs/crates-ci/ERRATA.md",
+      "target": "EOQ-002-ERRATA-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 22,
+      "source": "docs/crates-ci/ERRATA.md",
+      "target": "EOQ-001-ERRATA-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 104,
+      "source": "docs/crates-ci/ERRATA.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 104,
+      "source": "docs/crates-ci/ERRATA.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 126,
+      "source": "docs/crates-ci/ERRATA.md",
+      "target": "EOQ-002-ERRATA-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 35,
       "source": "docs/crates-ci/README.md",
       "target": "INV-C2"
@@ -151,17 +319,20 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 57,
+      "line": 61,
       "source": "docs/crates-ci/README.md",
       "target": "INV-C1"
     }
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 17,
-    "invariant": 7
+    "amendment": 30,
+    "errata": 2,
+    "gate": 13,
+    "invariant": 7,
+    "rationale": 13
   },
-  "object_count": 24,
+  "object_count": 65,
   "objects": [
     {
       "attrs": {
@@ -175,7 +346,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 259,
+      "line": 303,
       "obj_id": "INV-C1",
       "text": "— No release tag without Gate P green on the same ref."
     },
@@ -191,7 +362,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 260,
+      "line": 304,
       "obj_id": "INV-C2",
       "text": "— Consumer Projects contain zero `path`/`[patch]` routes into"
     },
@@ -207,7 +378,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 262,
+      "line": 306,
       "obj_id": "INV-C3",
       "text": "— Playit verb set is frozen vocabulary (Standards Action per"
     },
@@ -223,7 +394,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 265,
+      "line": 309,
       "obj_id": "INV-C4",
       "text": "— Snapshot comparisons always carry an explicit threshold;"
     },
@@ -239,7 +410,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 267,
+      "line": 311,
       "obj_id": "INV-C5",
       "text": "— No CI job for this initiative requires a display server or"
     },
@@ -255,7 +426,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 269,
+      "line": 313,
       "obj_id": "INV-C6",
       "text": "— `cargo package` artifacts consumed by Gate P are built from"
     },
@@ -271,7 +442,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 272,
+      "line": 316,
       "obj_id": "INV-C7",
       "text": "— Layer W's stdout handshake string `PLAYIT_READY tcp://…` is"
     },
@@ -297,8 +468,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 348,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@348",
+      "line": 392,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@392",
       "text": "**2026-06-10** — Initial draft (CRATES-CI-00). Gate topology (§5),"
     },
     {
@@ -323,8 +494,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 354,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@354",
+      "line": 398,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@398",
       "text": "**2026-06-10** — **RATIFIED** by owner. CLAUDE.md applicability list and"
     },
     {
@@ -349,8 +520,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 357,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@357",
+      "line": 401,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@401",
       "text": "**2026-06-10** — §6 amended during CRATES-CI-01 validation (per §6.4):"
     },
     {
@@ -375,8 +546,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 369,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@369",
+      "line": 413,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@413",
       "text": "**2026-06-10** — CRATES-CI-02 landed: `consumers/user-sim/` (custom"
     },
     {
@@ -401,8 +572,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 391,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@391",
+      "line": 435,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@435",
       "text": "**2026-06-10** — CRATES-CI-03 landed: Layer K via"
     },
     {
@@ -427,8 +598,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 403,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@403",
+      "line": 447,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@447",
       "text": "**2026-06-10** — CRATES-CI-04 landed: Layer W. New root-crate feature"
     },
     {
@@ -453,8 +624,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 423,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@423",
+      "line": 467,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@467",
       "text": "**2026-06-10** — CRATES-CI-05 landed: Gate R."
     },
     {
@@ -479,8 +650,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 433,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@433",
+      "line": 477,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@477",
       "text": "**2026-06-10** — CRATES-CI-01a: two Gate P blind spots closed after"
     },
     {
@@ -505,8 +676,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 448,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@448",
+      "line": 492,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@492",
       "text": "**2026-06-10** — CRATES-CI-01a amendment: the two asset-bearing"
     },
     {
@@ -531,8 +702,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 459,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@459",
+      "line": 503,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@503",
       "text": "**2026-06-10** — CRATES-CI-06: initiative retrospective drafted at"
     },
     {
@@ -557,8 +728,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 465,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@465",
+      "line": 509,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@509",
       "text": "**2026-06-10** — Post-close amendment (owner request): pre-publish"
     },
     {
@@ -583,8 +754,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 478,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@478",
+      "line": 522,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@522",
       "text": "**2026-07-12** — SCTD-04 release amendment: Gate P and the publish chain"
     },
     {
@@ -609,8 +780,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 485,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@485",
+      "line": 529,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@529",
       "text": "**2026-07-12** — SCTD-04 Gate P validation amendment: packaging the bridge"
     },
     {
@@ -635,8 +806,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 493,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@493",
+      "line": 537,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@537",
       "text": "**2026-07-12** — Gate P host-target amendment: the creator-cli and user-sim"
     },
     {
@@ -661,8 +832,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 498,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@498",
+      "line": 542,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@542",
       "text": "**2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now"
     },
     {
@@ -687,9 +858,744 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 503,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-13@503",
+      "line": 547,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-13@547",
       "text": "**2026-07-13** — Trusted Publishing amendment (owner direction): the 403 on"
+    },
+    {
+      "attrs": {
+        "author": "Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 17,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-05",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Records ERRATA-001 and proposes CRATES-CI-01b isolated packaging; §6 remains unchanged pending exact mechanism disposition.",
+        "touches": [
+          "§6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 557,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.0",
+      "text": "Records ERRATA-001 and proposes CRATES-CI-01b isolated packaging; §6 remains unchanged pending exact mechanism disposition."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 557,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.0-rationale",
+      "text": "The core/bridge deferral hides an unpublished predecessor needed by later\npackages, while restoring it in the live root produces duplicate source\nidentities. [The drafted correction](CRATES-CI-01B-STAGING-ISOLATION.md)\nspecifies archive/manifest equivalence, predecessor negative controls and\ncomplete consumer proof. [ERRATA-001](ERRATA.md) remains pending ratification.\nConsidered and rejected: reducing dependency minima, live-source fallback,\nor counting a partial run as Gate P. The effective mechanism, clean-source\nrule, metadata/drift checks, release gate and owner decision remain unchanged."
+    },
+    {
+      "attrs": {
+        "author": "Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 18,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-05",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.1",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Records ERRATA-002 and proposes frozen-source, same-ref Gate P for continuation; effective workflow and §5 remain unchanged.",
+        "touches": [
+          "§5",
+          "INV-C1",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 575,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.1",
+      "text": "Records ERRATA-002 and proposes frozen-source, same-ref Gate P for continuation; effective workflow and §5 remain unchanged."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "INV-C1",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 575,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.1-rationale",
+      "text": "The continuation resolves a release tag but executes its publisher against the\nworkflow revision without a Gate P dependency. The\n[concrete review packet](../releases/v0.2.7-continuation-wave3.md) separates helper\nmaintenance from package-source qualification and retains all consumers/OIDC\nrequirements. [ERRATA-002](ERRATA.md) awaits owning disposition. A static/local\nfixture pass does not replace full Gate P or provider execution. Updating only\nthe helper while packaging unqualified later crate sources was rejected as a\nsolution to the owner's one-candidate requirement."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 19,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.2",
+        "shape": "block",
+        "status": "ratified",
+        "summary": "Owner accepts frozen-source same-ref Gate P for continuation and removes its timed publishing trigger.",
+        "touches": [
+          "§5",
+          "INV-C1",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 593,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.2",
+      "text": "Owner accepts frozen-source same-ref Gate P for continuation and removes its timed publishing trigger."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "INV-C1",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 593,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.2-rationale",
+      "text": "The owner agreed to decision 1 and directed that timed publishing runs are no\nlonger needed. This ratifies the source/gate correction proposed in 0.1.1,\nadds manual-only continuation, and preserves separate helper identity. The\npublisher has no local five-crate cutoff; this amendment does not assume removal\nof registry-side rate limits. Existing HTTP 429 diagnostics and indexing waits\nremain. Gate R's existing daily verification schedule remains independent, and its\npost-publish trigger follows successful primary and continuation runs.\n[The decision receipt](../releases/v0.2.7-continuation-decision.md) records the\nimplementation and bounded checks. ERRATA-002's owner question is settled;\nprovider execution and full Gate P remain verification gates. ERRATA-001 and\nits staging-mechanism decision are unchanged."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 20,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.3",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Owner accepts detached-packaging direction with original manifests and Cargo-owned normalization; exact lock mechanism awaits equivalence and final ratification.",
+        "touches": [
+          "§6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 614,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.3",
+      "text": "Owner accepts detached-packaging direction with original manifests and Cargo-owned normalization; exact lock mechanism awaits equivalence and final ratification."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 614,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.3-rationale",
+      "text": "Decision 2 was accepted with its stated remaining lock-resolution condition.\n[CRATES-CI-01b](CRATES-CI-01B-STAGING-ISOLATION.md) records those accepted\nconstraints. [The follow-up receipt](../releases/v0.2.7-staging-decision.md)\nrecords the bounded experiment. No dependency minimum, live-source fallback,\narchive member or failed lock comparison is waived. Effective §6 remains\nunchanged until the detailed mechanism is ready for final ratification."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 21,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.4",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner makes bounded real source graph admission effective before detached packaging; extracted-only verification, predecessor routing and all release gates remain required.",
+        "touches": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 630,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.4",
+      "text": "Owner makes bounded real source graph admission effective before detached packaging; extracted-only verification, predecessor routing and all release gates remain required."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 630,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.4-rationale",
+      "text": "The owner accepted recommendations 1–6 on 2026-10-10 and authorized parallel\nimplementation. This adopts the exact admission boundary proposed in\n[the October 7 mechanism packet](../releases/v0.2.7-staging-mechanism.md) for\n[ERRATA-001](ERRATA.md). The historical core trial separated Cargo's loading of\nreal path-only dev dependencies from its normalized package graph; its all-member\ncomparison and missing extracted-API control are recorded in\n[the historical receipt](../releases/v0.2.7-packaging-wave4.md). Those transcript-\nrecovered observations are historical evidence, not fresh qualification of the\nrestored candidate or recovered raw archives.\n\nConsidered and rejected: suppressing extracted core/bridge entries, replacing\nreal dependency manifests, lowering version minima, removing a source lock to\nmake a trial succeed, and allowing consumer paths into the source admission\ngraph. Each hides the original resolution or distribution defect. Cargo retains\nownership of inventory, normalization, archive generation and external input-\ngraph lock updates. Original manifests and checkout locks remain preserved.\nThis changes §6's deferral mechanism, not INV-C1, INV-C2 or INV-C6, the release\nset/order, selective versions, asset preparation, metadata/content-drift checks,\nclean-source refusal, the three consumers, provider CI or publication authority.\nImplementation is authorized against this ratified concepts amendment. The\n[01B execution plan](CRATES-CI-01B-STAGING-ISOLATION.md) remains Draft with its\nremaining acceptance gates open; this entry is not its ratification or Gate P."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 22,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.5",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner authorizes the enumerated real root and nested Ratatui descriptor/member contexts solely for Cargo archive preparation, preserving extracted predecessors and admission-free verification/consumers.",
+        "touches": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 662,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.5",
+      "text": "Owner authorizes the enumerated real root and nested Ratatui descriptor/member contexts solely for Cargo archive preparation, preserving extracted predecessors and admission-free verification/consumers."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 662,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.5-rationale",
+      "text": "The owner accepted both latest recommendations on October 10 local time after the bounded\nexecution stopped on Ratatui's inherited descriptor. The exact frontier and two\ndispositions are recorded in [that receipt](../releases/v0.2.7-staging-20261010.md).\nThis amendment is recorded before governing implementation. Root and nested\nRatatui are the only additional workspace contexts authorized: their actual\ndescriptor bytes and finite actual member/target contexts must be enumerated\nbefore preparation. Cargo, rather than fabricated ancestors or flattened\ninheritance, interprets those inputs and generates normalized archives. Any\nunexpected workspace or additional source requirement stops for a new owning\ndecision; this is not recursive workspace admission.\n\nConsidered and rejected: continuing the previous fail-closed diagnostic as if\nfull staging passed, omitting bridge/root from the publishable set, inventing an\nancestor, rewriting inherited values, bypassing a predecessor through original\nsource or registry, and assigning the outer AA Git identity to nested ED source.\nThe selected disposition preserves real manifests, payload inventories/targets,\nactual nested Git provenance including dirty overlays, and every checkout lock's\nbytes or absence. Source admission is solely for archive preparation, must become\nunavailable before normalized verification and consumers, and does not waive\nclean-source, asset, metadata/drift, full-set, three-consumer or Linux CI gates.\nThe 01B plan remains Draft. A frozen hashed uncommitted candidate permits local\ndiagnostics; it is not a clean release ref or authorization to create a source\ncommit before the remaining CLAUDE prepublish gates pass."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 23,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.6",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner admits only the already approved BSP clock-ownership regression target into the finite root archive-preparation context.",
+        "touches": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 695,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.6",
+      "text": "Owner admits only the already approved BSP clock-ownership regression target into the finite root archive-preparation context."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 695,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.6-rationale",
+      "text": "The owner accepted the one-target staging recommendation on October 11 local\ntime after the unchanged workspace guard refused the new Cargo-discovered\nintegration test. This amendment is recorded before governing implementation.\nOnly `tests/bsp_clock_ownership.rs` in the root `rlvgl` member is additionally\nadmitted, with SHA256\n`02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.\nIt supplies the separately approved BSP null-owner regression coverage.\nThe actual root and nested Ratatui descriptor bytes, original manifest/shared\nfile fingerprints, and 47/43 member sets remain unchanged. Governing finite\ncontext implementation SHALL enumerate only this additional target. Every\nother unexpected descriptor, member, target or source requirement remains an\nowning-decision stop.\n\nConsidered and rejected: removing or hiding the approved regression test,\nautomatically admitting future Cargo-discovered targets, or disabling the\nunchanged fail-closed target guard. Those bypass the finite admission boundary.\nOriginal Cargo inventories and normalization, progressive extracted\npredecessors, withdrawal of admission inputs before normalized verification\nand all consumers, genuine nested Git/overlay provenance, checkout lock bytes\nor absence, clean release-ref, metadata/drift, normal asset preparation,\nfull ordered publish set, all three consumers and Linux same-ref/provider\ngates remain required. Root/core allocation remains 0.2.7; this amendment does\nnot ratify the Draft 01B execution plan or establish Gate P/publication readiness."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 68,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:68",
+      "text": "Owner accepts the exact §6 bounded mechanism (CRATES-CI-00 §15 0.1.4, 2026-10-10); phase execution gates below remain open."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 69,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:69",
+      "text": "Inventory equals Cargo's normal package file set, including generated assets."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 70,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:70",
+      "text": "Normalized manifests/dependencies equal Cargo's packaged manifests."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 71,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:71",
+      "text": "An unpublished missing predecessor fails at the affected package."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 72,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:72",
+      "text": "The same package succeeds with its extracted predecessor available."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 73,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:73",
+      "text": "Normalized package verification and all final consumers have no source admission or live sibling route; graph admission follows effective §6."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 74,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:74",
+      "text": "No live/extracted package identity collision remains with core 0.2.7 and bridge 0.1.1."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 75,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:75",
+      "text": "Clean-source refusal, metadata failure and existing-version content drift remain enforced."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 76,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:76",
+      "text": "Nested Cargo.lock restoration and checkout preservation pass on success and failure."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 77,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:77",
+      "text": "Enumerated descriptor/member/target contexts preserve exact bytes, nested Git provenance and checkout-lock hashes/absence; unlisted context fails closed."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 78,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:78",
+      "text": "Full publishable-set staging passes with normal asset preparation."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 79,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:79",
+      "text": "Library, creator CLI and user-sim consumers pass against extracted packages."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "gate",
+      "line": 80,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md:gate:80",
+      "text": "Linux CI proof and effective source identity are attached before release tagging."
+    },
+    {
+      "attrs": {
+        "author": "Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-05",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Proposes detached packaging against progressive extracted dependencies to replace the core/bridge deferral.",
+        "touches": [
+          "CRATES-CI-00 §6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 92,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.0",
+      "text": "Proposes detached packaging against progressive extracted dependencies to replace the core/bridge deferral."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "CRATES-CI-00 §6",
+          "INV-C1",
+          "INV-C2",
+          "INV-C6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 92,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.0-rationale",
+      "text": "The recorded deferral removes an unpublished dependency needed by later\npackages. Restoring it in the live root exposes duplicate source identities.\nConsidered and rejected: lowering the declared dependency minimum, falling\nback to live workspace patches, or treating a partial packaging run as Gate P.\nThose hide the published-content failure instead of proving its correction.\nGate requirements, source preservation, metadata/drift checks and publication\nauthority deliberately remain unchanged."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording owner direction",
+        "change_kind": "semantic",
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.1",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Owner accepts original manifests, Cargo-owned normalization and extracted-only dependencies; resolve lock equivalence before final mechanism ratification.",
+        "touches": [
+          "§5",
+          "§12",
+          "CRATES-CI-00 §6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 109,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.1",
+      "text": "Owner accepts original manifests, Cargo-owned normalization and extracted-only dependencies; resolve lock equivalence before final mechanism ratification."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "§12",
+          "CRATES-CI-00 §6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 109,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.1-rationale",
+      "text": "The owner accepted decision 2's recommendation, which explicitly preserves\nthese constraints and resolves the core lock case before final ratification.\nThis records acceptance of the direction without treating an unresolved input\nmechanism as implemented authority. The\n[follow-up receipt](../releases/v0.2.7-staging-decision.md) retains the bounded\nlock experiment and its exact result. The whole-workspace lock currently forces\nan absent path-only widgets dependency; a successful fresh-lock subset does not\nprove retained-source lock equivalence. Acceptance boxes remain open and the\ngoverned stager remains unchanged."
+    },
+    {
+      "attrs": {
+        "author": "Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-07",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.2",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Proposes real dev-graph admission before Cargo normalization while retaining extracted-only package verification and consumer resolution.",
+        "touches": [
+          "§5",
+          "§12",
+          "§14",
+          "CRATES-CI-00 §6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 128,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.2",
+      "text": "Proposes real dev-graph admission before Cargo normalization while retaining extracted-only package verification and consumer resolution."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "§12",
+          "§14",
+          "CRATES-CI-00 §6"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 128,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.2-rationale",
+      "text": "The retained-lock core trial now packages successfully with its unchanged\nmanifest after Cargo can load the actual path-only dev-dependency graph. Every\nmember of its 84-member archive, including original/normalized manifests, lock\nand VCS metadata, equals the retained actual package. Extracted-core metadata\nthen resolves only extracted core/API plus registry packages. This distinguishes\nsource graph loading from the normalized package graph instead of deleting a\nlock, fabricating a sibling manifest or weakening a declared version.\n\nThe proposed exception and its guards are in the\n[mechanism packet](../releases/v0.2.7-staging-mechanism.md). The current draft's\nblanket extracted-only sibling-alias clause would exclude this real dev-graph\ninput; owner ratification must explicitly dispose of that difference. The\nproposal is not effective authority. Existing acceptance boxes, governing\nstager, source/asset/drift guards, complete-set packaging and consumer gates\nremain unchanged."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.3",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Aligns this Draft execution plan with the effective owner-accepted CRATES-CI-00 §6 admission amendment; full execution/consumer/CI acceptance remains open.",
+        "touches": [
+          "§5",
+          "§12",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 153,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.3",
+      "text": "Aligns this Draft execution plan with the effective owner-accepted CRATES-CI-00 §6 admission amendment; full execution/consumer/CI acceptance remains open."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "§12",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 153,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.3-rationale",
+      "text": "CRATES-CI-00 §15 0.1.4 amends the already ratified owning concepts after the\nowner's acceptance. It supplies governing implementation authority for the\nbounded admission exception. This Draft plan records that authority without\nmisusing `ratified` (which closes the document's gates under SBC Addendum D §3)\nor `amended` (which changes an already ratified document). Its acceptance items\nremain a plan for fresh proof. Considered and rejected: calling the entire phase\nratified on historical one-package diagnostics, or marking unresolved release\ngates complete. No invariant, release set, consumer, clean-source rule, asset\npreparation or registry requirement changes. Stop on a new discrepancy or PCDN;\nowner acceptance does not authorize recursively broadening the boundary."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.4",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Plans the effective concepts 0.1.5 real descriptor/member preparation exception and fresh current-MPY diagnostics; execution, consumers and clean Linux CI gates remain open.",
+        "touches": [
+          "§5",
+          "§12",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 173,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.4",
+      "text": "Plans the effective concepts 0.1.5 real descriptor/member preparation exception and fresh current-MPY diagnostics; execution, consumers and clean Linux CI gates remain open."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "§12",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 173,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.4-rationale",
+      "text": "The owner accepted the bounded additional descriptor disposition after the\nRatatui stop. CRATES-CI-00 §15 0.1.5 amends the ratified owning concepts before\ncode. This plan enumerates both real workspace contexts and requires fresh\npositive, refusal, nested-provenance and checkout-lock controls on an immutable\ncompleted-MPY source snapshot. Prior mixed archives cannot supply that identity.\nConsidered and rejected: ratifying this entire execution phase on the accepted\ndesign, reusing mixed artifacts, or quietly loading another workspace/context.\nThe plan remains Draft; unchanged full staging and three-consumer proof is\ndistinct from source tests, local dirty diagnostics and clean Linux CI Gate P."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.5",
+        "shape": "block",
+        "status": "drafted",
+        "summary": "Aligns this Draft plan with the effective concepts 0.1.6 one-target admission amendment; full execution and release proof remain open.",
+        "touches": [
+          "§5",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 192,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.5",
+      "text": "Aligns this Draft plan with the effective concepts 0.1.6 one-target admission amendment; full execution and release proof remain open."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5",
+          "§14"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 192,
+      "obj_id": "docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md#0.1.5-rationale",
+      "text": "The owner accepted exactly the existing BSP clock-ownership regression target\nfor root archive preparation. CRATES-CI-00 §15 0.1.6 records the amendment\nbefore governing implementation. This plan retains the unchanged member sets,\nreal descriptor bytes, target fingerprints and all existing acceptance gates.\nConsidered and rejected: inferring general target admission, hiding the test,\nor ratifying the execution plan from that acceptance. All other unexpected\ncontexts remain an owning-decision stop; Linux, clean-ref, full-set staging,\nthree extracted consumers and publication proof remain separate."
     },
     {
       "attrs": {
@@ -716,6 +1622,24 @@
       "line": 313,
       "obj_id": "docs/crates-ci/CRATES-CI-RETROSPECTIVE.md#2026-06-10@313",
       "text": "**2026-06-10** — Retrospective drafted at initiative completion"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/crates-ci/ERRATA.md",
+      "family": "crates-ci",
+      "kind": "errata",
+      "line": 31,
+      "obj_id": "crates-ci:ERRATA-001",
+      "text": "Core and bridge deferral breaks unpublished core resolution"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/crates-ci/ERRATA.md",
+      "family": "crates-ci",
+      "kind": "errata",
+      "line": 100,
+      "obj_id": "crates-ci:ERRATA-002",
+      "text": "Continuation source is not frozen to its selected release"
     }
   ],
   "schema_version": 2

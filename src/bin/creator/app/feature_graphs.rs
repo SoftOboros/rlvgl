@@ -252,7 +252,7 @@ static BBB_LINUX: ProngTemplate = ProngTemplate {
 // §6.7 "duplicate by copy", each manifest's emit is single-intent.
 //
 // Reference [features].esp_hal expansion:
-//   ["dep:esp-hal", "dep:esp-backtrace", "dep:esp-println",
+//   ["dep:esp-hal", "dep:esp-bootloader-esp-idf", "dep:esp-backtrace", "dep:esp-println",
 //    "dep:esp-alloc", "dep:ssd1306", "dep:rlvgl-core",
 //    "dep:rlvgl-platform", "dep:rlvgl-widgets", "rlvgl-platform/ssd1306"]
 //
@@ -301,6 +301,13 @@ static BEETLE_ESP_HAL: ProngTemplate = ProngTemplate {
                 optional: true,
             },
             Dep {
+                name: "esp-bootloader-esp-idf",
+                source: DepSource::Version("=0.1.0"),
+                default_features: false,
+                features: &[],
+                optional: true,
+            },
+            Dep {
                 name: "esp-backtrace",
                 source: DepSource::Version("0.15"),
                 default_features: true,
@@ -328,6 +335,7 @@ static BEETLE_ESP_HAL: ProngTemplate = ProngTemplate {
         "esp_hal",
         &[
             "dep:esp-hal",
+            "dep:esp-bootloader-esp-idf",
             "dep:esp-backtrace",
             "dep:esp-println",
             "dep:esp-alloc",

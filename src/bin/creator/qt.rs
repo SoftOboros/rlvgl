@@ -533,7 +533,7 @@ pub fn render_externals(
     out.push_str("pub struct ScreenExternals;\n\n");
     out.push_str("impl ScreenExternals {\n    pub fn new() -> Self {\n        Self\n    }\n}\n\n");
     out.push_str("impl Default for ScreenExternals {\n    fn default() -> Self {\n        Self::new()\n    }\n}\n\n");
-    out.push_str(&format!("impl Externals for ScreenExternals {{\n"));
+    out.push_str("impl Externals for ScreenExternals {\n");
     let mut first = true;
     for script in &sm.scripts {
         if !first {
@@ -621,10 +621,10 @@ pub fn walk_theme_module(item: &UiItem) -> Option<TokenSet> {
                 }
             }
             "string" => {
-                if let Some(s) = parse_string_literal(default) {
-                    if let Some(key) = prop.name.strip_prefix("font_") {
-                        ts.fonts.insert(key.to_string(), s);
-                    }
+                if let Some(s) = parse_string_literal(default)
+                    && let Some(key) = prop.name.strip_prefix("font_")
+                {
+                    ts.fonts.insert(key.to_string(), s);
                 }
             }
             _ => {}
@@ -6345,10 +6345,10 @@ fn parse_dispatch_call(stmt: &str) -> Option<DispatchEvent> {
     // §5 explicitly excludes expression-form arguments.
     let qml = if let Some(s) = inner.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
         s
-    } else if let Some(s) = inner.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
-        s
     } else {
-        return None;
+        inner
+            .strip_prefix('\'')
+            .and_then(|s| s.strip_suffix('\''))?
     };
     if qml.is_empty() {
         return None;
@@ -7530,14 +7530,15 @@ impl<'a> Parser<'a> {
                     brace -= 1;
                 }
                 b';' if paren == 0 && bracket == 0 && brace == 0 => break,
-                b'\n' if paren == 0 && bracket == 0 && brace == 0 => {
+                b'\n'
+                    if paren == 0 && bracket == 0 && brace == 0
                     // A newline ends the binding unless the expression is
                     // syntactically incomplete (QML/JS line continuation).
-                    if !self.expr_newline_continues(last_sig, last_sig2) {
-                        break;
-                    }
-                    // Continuation: fall through to consume the newline.
+                    && !self.expr_newline_continues(last_sig, last_sig2) =>
+                {
+                    break;
                 }
+                // Continuation: fall through to consume the newline.
                 _ => {}
             }
             if !matches!(b, b' ' | b'\t' | b'\n' | b'\r') {

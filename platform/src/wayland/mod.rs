@@ -9,6 +9,9 @@ mod display;
 mod model;
 mod shm;
 
+#[cfg(test)]
+mod acceptance_tests;
+
 use alloc::{
     collections::VecDeque,
     rc::Rc,

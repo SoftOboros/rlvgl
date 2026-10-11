@@ -14,6 +14,16 @@ v3 native workload and clean-source host matrix are complete; physical BBB
 qualification remains open. CPY-03
 through CPY-09 remain Draft and separately evidence-gated.
 
+The retained representative host captures include both
+[2026-08-19](evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json) and
+[2026-08-23](evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-23.json), at their
+original source pins. Both remain diagnostic host evidence with
+`physical_board: false`; neither qualifies the BBB or selects capacities.
+The informative [v0.2.7 readiness receipt](evidence/CPY-V027-READINESS.md)
+records their verification and the candidate boundary. The
+[BBB capture plan](evidence/CPY-BBB-CAPTURE-PLAN.md) prepares the next evidence
+step without recording a hardware run or changing phase status.
+
 CPY specifies a full CPython binding over rlvgl's Stage-and-Actors runtime,
 with embedded Linux as the primary deployment and full-host headless/windowed
 operation as the development and conformance companion. It consumes the

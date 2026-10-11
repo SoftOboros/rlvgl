@@ -184,7 +184,15 @@ impl MpyActor for Button {
 
     fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
         match id {
-            MPY_TEXT_PROPERTY => Ok(OwnedValue::Text(String::from(self.text()))),
+            MPY_TEXT_PROPERTY => {
+                let mut text = String::new();
+                text.try_reserve_exact(self.text().len())
+                    .map_err(|_| RegistryError::Capacity {
+                        kind: rlvgl_core::actor::CapacityKind::SnapshotValues,
+                    })?;
+                text.push_str(self.text());
+                Ok(OwnedValue::Text(text))
+            }
             _ => Err(RegistryError::UnknownProperty { property_id: id }),
         }
     }

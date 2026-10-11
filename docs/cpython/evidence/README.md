@@ -23,6 +23,10 @@ do not satisfy embedded-Linux, physical-board, Python, frame, or release gates.
 | [`_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-c994f163.lock) | Detached resolver snapshot for the v2 service probe, including production Crossbeam Channel and Rustix dependencies. |
 | [`CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json`](CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json) | CPY-03 v3 diagnostic host matrix over representative Stage/input/Cue/private-frame work. It completes the host half of the paired host/physical-board evidence gate without selecting a capacity. |
 | [`_generated/CPY-CAPACITY-CARGO-LOCK-87499319.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-87499319.lock) | Detached resolver snapshot for the v3 representative host matrix from clean combined source `87499319`. |
+| [`CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-23.json`](CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-23.json) | Later v3 diagnostic host matrix at source `2bb9a911`: 60 retained runs and 12 summaries. `physical_board: false`; no BBB qualification or capacity decision. |
+| [`_generated/CPY-CAPACITY-CARGO-LOCK-2bb9a911.lock`](_generated/CPY-CAPACITY-CARGO-LOCK-2bb9a911.lock) | Detached resolver snapshot for the later representative host matrix. |
+| [`CPY-V027-READINESS.md`](CPY-V027-READINESS.md) | Informative v0.2.7 evidence-verification receipt, current-source drift, and remaining gates. |
+| [`CPY-BBB-CAPTURE-PLAN.md`](CPY-BBB-CAPTURE-PLAN.md) | Informative prerequisites and commands for a later paired physical-board capture; not execution evidence. |
 
 The immutable source authority is commit
 `0cf406bb22509f1040af6a772d0476a614c7bd9c`. The baseline hashes all 53
@@ -151,8 +155,17 @@ python3 scripts/cpy_capacity_probe.py validate \
   docs/cpython/evidence/CPY-CAPACITY-SERVICE-HOST-2026-08-18.json
 python3 scripts/cpy_capacity_probe.py validate \
   docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-19.json
+python3 scripts/cpy_capacity_probe.py validate \
+  docs/cpython/evidence/CPY-CAPACITY-REPRESENTATIVE-HOST-2026-08-23.json
 python3 scripts/test_cpy_capacity_probe.py
 ```
+
+The later August 23 capture retains source commit `2bb9a9116b3899355cb026ff1f1f30e383455a65`.
+It has the same host-only qualification boundary and keeps its own source and
+lock hashes. Its hardware label mentions pairing with BBB qualification, but
+the measured environment is macOS and `physical_board` is false. A hardware
+label cannot substitute for a retained physical-board capture. The existing
+CPY-03 phase gate remains open.
 
 Capture a new clean-source host matrix under a new evidence name:
 

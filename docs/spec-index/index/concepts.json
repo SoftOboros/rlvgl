@@ -1,5 +1,5 @@
 {
-  "edge_count": 10,
+  "edge_count": 12,
   "edges": [
     {
       "edge_type": "cites",
@@ -67,6 +67,20 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
+      "line": 7,
+      "source": "docs/concepts/KI2C-ERRATA.md",
+      "target": "SBC-INV-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 7,
+      "source": "docs/concepts/KI2C-ERRATA.md",
+      "target": "SBC-INV-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
       "line": 227,
       "source": "docs/concepts/README.md",
       "target": "INV-SCTD02-1"
@@ -74,9 +88,10 @@
   ],
   "family": "concepts",
   "kind_counts": {
-    "amendment": 5
+    "amendment": 5,
+    "errata": 2
   },
-  "object_count": 5,
+  "object_count": 7,
   "objects": [
     {
       "attrs": {
@@ -131,6 +146,15 @@
       "text": "**2026-05-03 — Renamed `DCB-POST-MORTEM.md` →"
     },
     {
+      "attrs": {},
+      "doc": "docs/concepts/ERRATA.md",
+      "family": "concepts",
+      "kind": "errata",
+      "line": 61,
+      "obj_id": "concepts:ERRATA-001",
+      "text": "Infallible text readback aborts snapshot preparation"
+    },
+    {
       "attrs": {
         "author": null,
         "change_kind": null,
@@ -181,6 +205,15 @@
       "line": 312,
       "obj_id": "docs/concepts/FONT-RETROSPECTIVE.md#2026-06-15@312",
       "text": "**2026-06-15 (FONT-05 reopen — discharges the §5 Coupled carry-forward / FC2).**"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/concepts/KI2C-ERRATA.md",
+      "family": "concepts",
+      "kind": "errata",
+      "line": 45,
+      "obj_id": "concepts:ERRATA-001",
+      "text": "Read-only smoke requires temperature configuration"
     },
     {
       "attrs": {

@@ -20,8 +20,9 @@
 //!
 //! [`DcaCache`] abstracts the SCB primitives so host tests can run the
 //! typestate round-trip without a real Cortex-M present. On target,
-//! [`cortex_m::peripheral::SCB`] is the concrete implementer; the
-//! `DcaCache` impl is the **only** site in `rlvgl-platform` that may
+//! `cortex_m::peripheral::SCB` is the concrete implementer with the `cortex-m`
+//! feature enabled; the `DcaCache` impl is the **only** site in
+//! `rlvgl-platform` that may
 //! call `clean_dcache_by_*` / `invalidate_dcache_by_*` on the SCB
 //! (DCB-00 §9 INV-D8: scanner rule `raw_dcache` whitelists this module).
 //!
@@ -69,7 +70,7 @@ pub enum Write {}
 /// Cache-controller abstraction.
 ///
 /// On target, the `cortex-m` feature provides an implementation for
-/// [`cortex_m::peripheral::SCB`] (the only site in `rlvgl-platform`
+/// `cortex_m::peripheral::SCB` (the only site in `rlvgl-platform`
 /// allowed to call the raw SCB cache APIs — DCB-00 §9 INV-D8).
 ///
 /// On host, [`NullCache`] is a no-op implementer suitable for typestate

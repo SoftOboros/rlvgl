@@ -17,7 +17,9 @@ use crate::{
         DrainBudget, DrainedEndpointRecords, EndpointRecord, InputClass, InputSequence,
         NativeCueAdmission, NativeEventSequence,
     },
-    direction::{StageDirection, StageRevision},
+    direction::{
+        SnapshotError, SnapshotToken, StageDirection, StageRevision, SubscriptionSnapshotPage,
+    },
     event::Event,
     object::{DispatchInput, Disposition, ObjectDispatchError, ObjectEvent},
     subscription::{
@@ -277,6 +279,8 @@ pub struct SafeTurnSummary {
 /// Endpoint construction, admission, drain, or terminal failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EndpointError {
+    /// Snapshot preparation or cursor validation failed.
+    Snapshot(SnapshotError),
     /// Endpoint capacities are zero, inconsistent, or exceed wire widths.
     InvalidLimits,
     /// A bounded allocation failed before externally visible state changed.
@@ -528,6 +532,76 @@ impl Endpoint {
             .find(|stage| stage.stage_id() == stage_id)
     }
 
+    /// Begin a snapshot against an endpoint-owned Stage.
+    pub fn snapshot_begin(&mut self, stage_id: StageId) -> Result<SnapshotToken, EndpointError> {
+        self.ensure_not_faulted()?;
+        if self.pending_teardown_stages.contains(&stage_id) {
+            return Err(EndpointError::StageTeardownPending);
+        }
+        let index = self
+            .stage_index(stage_id)
+            .ok_or(EndpointError::StageNotFound)?;
+        self.stages[index]
+            .snapshot_begin()
+            .map_err(EndpointError::Snapshot)
+    }
+
+    /// Read a complete native actor/subscription page before advancing its cursor.
+    ///
+    /// Text, style and subscription bounds are independent. Zero subscriptions
+    /// returns truthful counts; zero records is invalid. Stage-only snapshot
+    /// methods and their return types remain unchanged.
+    pub fn snapshot_read(
+        &mut self,
+        stage_id: StageId,
+        token: SnapshotToken,
+        max_records: usize,
+        max_text_bytes_per_record: usize,
+        max_style_values_per_record: usize,
+        max_subscriptions_per_record: usize,
+    ) -> Result<SubscriptionSnapshotPage, EndpointError> {
+        self.ensure_not_faulted()?;
+        if self.pending_teardown_stages.contains(&stage_id) {
+            return Err(EndpointError::StageTeardownPending);
+        }
+        let index = self
+            .stage_index(stage_id)
+            .ok_or(EndpointError::StageNotFound)?;
+        let subscriptions = &self.subscriptions;
+        let page = self.stages[index]
+            .snapshot_read_projected(
+                token,
+                max_records,
+                max_text_bytes_per_record,
+                max_style_values_per_record,
+                |actor| {
+                    subscriptions.snapshot_record(stage_id, actor, max_subscriptions_per_record)
+                },
+            )
+            .map_err(EndpointError::Snapshot)?;
+        Ok(SubscriptionSnapshotPage {
+            revision: page.revision,
+            sequence: page.sequence,
+            records: page.records,
+            ended: page.ended,
+        })
+    }
+
+    /// Release a live endpoint-owned snapshot cursor.
+    pub fn snapshot_end(
+        &mut self,
+        stage_id: StageId,
+        token: SnapshotToken,
+    ) -> Result<(), EndpointError> {
+        self.ensure_not_faulted()?;
+        let index = self
+            .stage_index(stage_id)
+            .ok_or(EndpointError::StageNotFound)?;
+        self.stages[index]
+            .snapshot_end(token)
+            .map_err(EndpointError::Snapshot)
+    }
+
     /// Install one validated subscription against an endpoint-owned Stage.
     pub fn subscribe(
         &mut self,
@@ -541,7 +615,26 @@ impl Endpoint {
             .stage_index(request.stage_id)
             .ok_or(EndpointError::StageNotFound)?;
         self.subscriptions
-            .subscribe(&self.stages[index], request)
+            .subscribe(&mut self.stages[index], request)
+            .map_err(EndpointError::Subscription)
+    }
+
+    /// Remove an exact subscription and return its existing callback-release report.
+    pub fn unsubscribe(
+        &mut self,
+        stage_id: StageId,
+        actor_identity: ActorIdentity,
+        subscription_id: crate::cue::SubscriptionId,
+    ) -> Result<crate::subscription::UnsubscribeOutcome, EndpointError> {
+        self.ensure_not_faulted()?;
+        if self.pending_teardown_stages.contains(&stage_id) {
+            return Err(EndpointError::StageTeardownPending);
+        }
+        let index = self
+            .stage_index(stage_id)
+            .ok_or(EndpointError::StageNotFound)?;
+        self.subscriptions
+            .unsubscribe(&mut self.stages[index], actor_identity, subscription_id)
             .map_err(EndpointError::Subscription)
     }
 

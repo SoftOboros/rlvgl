@@ -18,6 +18,7 @@ See crate overviews for:
 
 ## Release & Project
 - [CHANGELOG.md](./CHANGELOG.md) — Version history (current: v0.2.5).
+- [v0.2.7 family wave three](./releases/v0.2.7-family-wave3.md) — candidate source/package progress and remaining owning decisions.
 - [v0.2.5 release notes](./releases/v0.2.5.md) — Current release notes.
 - [v0.1.9 release notes](./releases/v0.1.9.md) — Archived v0.1.9 release notes.
 - [Pre-v0.2 roadmap](./releases/roadmap-pre-v0.2.md) — Archived high-level project roadmap and work streams.
@@ -40,15 +41,15 @@ See crate overviews for:
 - [BACKEND-ARCHITECTURE.md](./rendering/BACKEND-ARCHITECTURE.md) — Pluggable blitter backends (CPU, DMA2D, wgpu).
 - [ALPHA-BLENDING.md](./rendering/ALPHA-BLENDING.md) — Alpha-blending and layered widget rendering.
 - [Ratatui on rlvgl](./ratatui-tutorial/README.md) — Retained cell backend, rlvgl-hosted pane, hybrid composition, and bare-metal proof.
-- [WLD native Wayland backend initiative](./wayland/README.md) — Draft v0.2.7 SBC family for XDG-shell lifecycle, SHM presentation, seat input, and compositor evidence; no implementation is authorized while its PCDNs remain open.
+- [WLD native Wayland backend initiative](./wayland/README.md) — WLD-00/01 are ratified with deterministic and compositor evidence; remaining WLD-01 acceptance and Draft WLD-02 input/release work are separately gated.
 - [IMAGE-COMPRESSION-FORMAT.md](./assets/IMAGE-COMPRESSION-FORMAT.md) — Palette + RLE codec for embedded assets.
 - [PLUGIN-ECOSYSTEM.md](./PLUGIN-ECOSYSTEM.md) — Media plugins: PNG, JPEG, GIF, Lottie, QR, fonts.
 
 ## UI Framework
 - [UI-COMPONENT-ARCHITECTURE.md](./UI-COMPONENT-ARCHITECTURE.md) — Theme, components, Chakra-inspired widgets.
 - [SVELTE-DESIGN-TOKEN-ALIGNMENT.md](./SVELTE-DESIGN-TOKEN-ALIGNMENT.md) — Svelte design tokens and component IR.
-- [MPY stage-and-actors initiative](./concepts/MPY-00-CONCEPTS.md) — Ratified runtime concepts plus MPY-01 introspection and MPY-02 protocol phases; MPY-03 through MPY-09 remain separately gated drafts listed in the [concepts index](./concepts/README.md).
-- [CPY embedded-Linux and host CPython initiative](./cpython/README.md) — Draft CPY-00 through CPY-09 family covering the PyO3 Director binding, native runtime service, flattened Frame Leases, embedded-Linux-first deployment, full-host companionship, and explicit crate unification/partition; no implementation is authorized while its phases remain unratified.
+- [MPY stage-and-actors initiative](./concepts/MPY-00-CONCEPTS.md) — MPY-01 through MPY-05 are ratified with bounded native proof; MPY-04-017, interpreter, cross-driver and board/release closure remain separately gated in the [concepts index](./concepts/README.md).
+- [CPY embedded-Linux and host CPython initiative](./cpython/README.md) — CPY-00 through CPY-02 are ratified and the native-only handoff is retained; CPY-03 through CPY-09 stay Draft pending physical/runtime, binding, Frame Lease, deployment and release proof.
 
 ## Hardware Targets
 - [STM32H747I-DISCO hardware notes](../examples/stm32h747i-disco/HARDWARE.md) — Board reference (display, touch, pinout).

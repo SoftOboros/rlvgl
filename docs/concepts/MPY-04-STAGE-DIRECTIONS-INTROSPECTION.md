@@ -8,8 +8,9 @@ MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md - Tree, property, action, layout, and s
 metadata, local-style, requested-layout, computed-geometry, atomic-commit, and
 snapshot semantics. The in-process direction, revision, tree, requested-layout,
 geometry, invalidation, bounded sparse local-style projection, and snapshot
-substrate has focused implementation evidence. Subscription metadata in
-snapshots and the complete cross-driver conformance gate remain open. The common Batch mutation-
+substrate has focused implementation evidence, refreshed by the bounded
+2026-10-05 native regression receipt. Subscription metadata in snapshots and
+the complete cross-driver conformance gate remain open. The common Batch mutation-
 target envelope and exact Delete payload have allocation-free codecs and golden
 protocol evidence. The exact Reorder and Reparent payloads have the same proof,
 including all four Reparent reference pairs. PromoteRoot now has an exact
@@ -1253,6 +1254,70 @@ advance traversal. Successful bounded reads do advance even when the style
 prefix is empty, because `total_style_values` and `styles_truncated` make that
 omission explicit.
 
+Subscription metadata uses the existing neutral `SubscriptionInfo` surface
+owned by MPY-05; it MUST NOT contain Python callable pointers. A successful
+subscription addition or actual removal MUST advance the owning Stage Revision
+exactly once, atomically with the active metadata change. Failed operations and
+matching already-removed outcomes within MPY-05's completion window MUST NOT
+advance it. Subscription changes in another Stage MUST NOT invalidate this
+Stage's cursor. The next read after an owning-Stage change follows the existing
+`SnapshotStale` and cursor-release rule.
+
+A complete subscription-bearing page MUST prepare all retained actor and
+subscription data before committing traversal position, page sequence or
+successful end-of-cursor release. Any allocation failure MUST leave position
+and sequence unchanged so the same page may retry; decorating an already
+committed actor page does not satisfy this requirement. Multiple reservations
+are permitted before the single cursor commit boundary. Existing explicit
+staleness, teardown and Endpoint Epoch replacement still release the cursor.
+
+Atomic mutation/revision preparation MUST fail before either visible owner
+changes if the required Stage or subscription-registry revision cannot advance.
+Subscription cleanup inside an already-revisioned actor deletion or Stage
+teardown MUST NOT introduce another Stage increment for that same mutation.
+This preserves existing complete-Batch revision and exact-once teardown rules.
+Amendment 0.15.3 freezes the native subscription caller budget, richer record
+projection and additive registry-aware Endpoint operation below. Snapshot wire
+encoding remains separately gated.
+
+#### Native subscription-bearing projection
+
+The additive registry-aware Endpoint snapshot operation MUST return richer
+actor records containing the existing actor projection plus `subscriptions`,
+`total_subscriptions` and `subscriptions_truncated`. Existing Stage-only
+snapshot entry points and their return shapes MUST be preserved. Stage-only
+reads MUST NOT claim subscription totals they cannot observe. No wire format,
+interpreter representation or negotiated capability is selected by this native
+operation.
+
+Each subscription row MUST reuse the existing neutral `SubscriptionInfo` with
+all nine fields: `subscription_id`, `stage_id`, `actor_identity`, `callback_id`,
+`event_id`, `phase`, `filter`, `propagation` and `registration_order`. Callback
+identity is an opaque integer token; callable pointers, callable lookup, VM
+state and adapter data MUST NOT enter this projection. Only active rows for the
+exact Stage and generation-checked actor identity are included. Actor traversal
+retains root order/pre-order; rows within an actor retain registration order.
+Removed rows and tombstones MUST NOT appear.
+
+The caller supplies `max_subscriptions_per_record`, independently of the text
+and style limits. The operation MUST count every matching active row before
+retaining its bounded leading prefix. Retained storage is bounded by that
+limit and registry capacity. `total_subscriptions` is the complete matching
+count, and `subscriptions_truncated` is true exactly when the retained prefix
+is shorter than that count; a truncated subscription prefix also sets the
+aggregate actor record `truncated` flag. A zero subscription limit is valid:
+nonempty matches return no rows, their truthful total and truncation true;
+empty matches return total zero and truncation false. `max_records == 0`
+remains invalid.
+
+All retained actor and subscription data for the complete page MUST be prepared
+successfully before traversal position or page sequence is committed. Any
+preparation/allocation failure leaves that cursor at the same page for retry;
+no returned page may combine Stage Revisions. This does not require one
+allocation. The existing SnapshotBusy, SnapshotStale, end and teardown rules
+remain binding. Subscription additions and actual removals use the owning
+Stage Revision rule recorded by amendment 0.15.2.
+
 ## 9. Frozen Decisions — Invariants
 
 | Invariant | Normative statement | Verification surface |
@@ -1858,3 +1923,89 @@ Projecting only durable MPY-local sparse state makes snapshots deterministic
 and rebuild-oriented while excluding native/theme/transition implementation
 details. Explicit total and truncation fields make a zero budget truthful, and
 delaying cursor advancement until allocation succeeds preserves retry safety.
+
+### 0.15.1 — 2026-10-05 — amended
+
+**Author:** OpenAI Codex with owner direction
+
+**Change kind:** editorial
+
+**Touches:** §0, §15
+
+**Commits:** Local candidate based on `aa94329ff9b26e8afeb9e0e37f824a1ae17bea6b`;
+package overlay and nested pins recorded in the release receipt.
+
+**Summary:** Reconciles the recorded evidence while preserving normative
+meaning and binding requirements.  The [bounded MPY release receipt](../releases/v0.2.7-mpy-evidence.md)
+refreshes existing five-actor, atomic direction, local-style, requested-layout
+and computed-geometry evidence. The coverage ledger now records partial
+`in-process` claims for previously unclaimed implemented surfaces. Baseline
+row definitions, existing Current claims and all other target profiles are
+unchanged.
+
+Complete canonical Batch-frame lowering and owned Result publication stop at
+proposal-only `PCDN-MPY-04-017`. Subscription-bearing snapshots, result-bearing
+actions, actual interpreter operations and the MPY-07 cross-driver corpus are
+not closed by these Rust tests. Historical CPY closeout artifacts retain their
+original measurement and coverage summaries.
+
+### 0.15.2 — 2026-10-06 — amended
+
+**Author:** Ira Abbott; recorded by Codex
+**Change kind:** semantic
+**Touches:** INV-MPY-04-5, §8.2
+**Summary:** Owner ratifies neutral subscription snapshot metadata reuse, atomic complete-page preparation and owning-Stage revision advancement for actual subscription changes.
+
+#### Rationale
+
+Subscription metadata is already required by §8.2, but the current subscription
+registry advances a private revision while the Stage cursor freezes only Stage
+Revision. Owner decision 3 and its October 6 follow-up select the existing
+neutral `SubscriptionInfo` surface and require successful addition or actual
+removal to advance the owning Stage Revision once. Failed or repeated matching
+removals leave it unchanged, and another Stage's subscription change does not
+invalidate this Stage's snapshot. A dual-revision cursor was considered but
+not selected: the current endpoint-wide registry revision would couple
+unrelated Stages and require an additional staleness contract.
+
+Preparing all retained actor and subscription data before cursor advancement
+preserves the existing allocation-failure retry guarantee; it does not require
+one allocation. Atomic revision/mutation preflight and no double Stage increment
+for subscription cleanup are implications of existing atomic visibility and
+complete-Batch revision rules. Exact caller budget, added record fields,
+Endpoint API signature and wire representation remain proposals, not ratified
+by this amendment. No implementation or coverage closure is claimed. The
+[owner decision receipt](../releases/v0.2.7-mpy-owner-decision.md) retains the
+required new clean-source handoff and remaining API disposition.
+
+### 0.15.3 — 2026-10-10 — amended
+
+**Author:** Ira Abbott; recorded by Codex
+**Change kind:** semantic
+**Touches:** INV-MPY-04-5, §8.2
+**Summary:** Owner ratifies the concrete native subscription snapshot projection,
+independent caller budget and additive registry-aware Endpoint operation while
+preserving existing Stage-only return shapes and complete-page retry safety.
+
+#### Rationale
+
+The October 10 owner disposition accepts the remaining representation, bounds
+and API choices presented after amendment 0.15.2. Richer actor records reuse the
+existing nine-field neutral `SubscriptionInfo` directly, add truthful total and
+truncation fields and retain the current actor traversal. A separate caller
+subscription limit permits count-only inspection without borrowing text/style
+capacity. Registry-aware Endpoint access supplies the observations needed for
+truthful counts; existing Stage-only entry points and return shapes remain
+compatible and do not claim unobserved subscription totals.
+
+All retained actor and subscription data for a complete page must be prepared
+before committing traversal position or sequence. Failed preparation leaves
+the cursor retryable at that same page, without requiring one allocation.
+Actual additions/removals still advance only the owning Stage Revision once;
+failed/idempotent operations and cleanup within an already-revisioned mutation
+retain amendment 0.15.2's rules.
+
+The new clean-source handoff, exact path acknowledgment and fresh gates still
+precede shared implementation. No wire, Batch lowering, Result publication,
+interpreter binding, cross-driver coverage or phase closure is adopted here;
+`PCDN-MPY-04-017` remains proposal-only.

@@ -1,5 +1,5 @@
 {
-  "edge_count": 7,
+  "edge_count": 20,
   "edges": [
     {
       "edge_type": "cites",
@@ -32,21 +32,112 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 88,
+      "line": 98,
       "source": "docs/cpython/README.md",
       "target": "PCDN-MPY-04-017"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 40,
+      "line": 51,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 64,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 65,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-07-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 66,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-07-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 67,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-09-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 68,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-09-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 69,
+      "source": "docs/cpython/evidence/CPY-NEXT-SLICE.md",
+      "target": "PCDN-CPY-09-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 93,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-07-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-07-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 97,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-09-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 97,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-09-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 97,
+      "source": "docs/cpython/evidence/CPY-V027-READINESS.md",
+      "target": "PCDN-CPY-09-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 44,
       "source": "docs/cpython/evidence/README.md",
       "target": "PCDN-MPY-04-017"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 124,
+      "line": 128,
       "source": "docs/cpython/evidence/README.md",
       "target": "PCDN-CPY-03-002"
     }

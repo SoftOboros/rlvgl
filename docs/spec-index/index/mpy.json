@@ -1,5 +1,5 @@
 {
-  "edge_count": 590,
+  "edge_count": 594,
   "edges": [
     {
       "edge_type": "defines",
@@ -1887,1141 +1887,1169 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 885,
+      "line": 886,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-014"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 958,
+      "line": 959,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 960,
+      "line": 961,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 962,
+      "line": 963,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 964,
+      "line": 965,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 966,
+      "line": 967,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 969,
+      "line": 970,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-015"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 972,
+      "line": 973,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-016"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 980,
+      "line": 981,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-015"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1055,
+      "line": 1056,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-016"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1260,
+      "line": 1325,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1261,
+      "line": 1326,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1262,
+      "line": 1327,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1263,
+      "line": 1328,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1264,
+      "line": 1329,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1265,
+      "line": 1330,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-6"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1266,
+      "line": 1331,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-6"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1267,
+      "line": 1332,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-7"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 1268,
+      "line": 1333,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1292,
+      "line": 1357,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1294,
+      "line": 1359,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1296,
+      "line": 1361,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1300,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1305,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-005"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1310,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-006"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1315,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-007"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1321,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-008"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1328,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-009"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1334,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-010"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1342,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-011"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1350,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-012"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1358,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-013"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 1365,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-014"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1369,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-015"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1376,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-016"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1385,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1386,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1387,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1388,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1389,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1390,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1391,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1391,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1391,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1391,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1391,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-016"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1429,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1457,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1457,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1466,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "PCDN-MPY-04-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1491,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1518,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1518,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1518,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1544,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1544,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1544,
+      "line": 1370,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-005"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1571,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1571,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1571,
+      "line": 1375,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-006"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1597,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1597,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1597,
+      "line": 1380,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-007"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1623,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1623,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1623,
+      "line": 1386,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-008"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1649,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1649,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1649,
+      "line": 1393,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-009"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1675,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1675,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1675,
+      "line": 1399,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-010"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1704,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1704,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1704,
+      "line": 1407,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-011"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1731,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1731,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1731,
+      "line": 1415,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-012"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1758,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1758,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1758,
+      "line": 1423,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-013"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1784,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-STYLE-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1784,
+      "line": 1430,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-014"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1785,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-STYLE-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1813,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1813,
+      "line": 1434,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-015"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1814,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-STYLE-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1814,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-STYLE-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1841,
-      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
-      "target": "INV-MPY-04-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 1841,
+      "line": 1441,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "PCDN-MPY-04-016"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1842,
+      "line": 1450,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1451,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1452,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1453,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1454,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1455,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1456,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1456,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1456,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1456,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1456,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-016"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1494,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1522,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1522,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1531,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1556,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1583,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1583,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1583,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1609,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1609,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1609,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1636,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1636,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1636,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-006"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1662,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1662,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1662,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-007"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1688,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1688,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1688,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-008"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1714,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1714,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1714,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-009"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1740,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1740,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1740,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-010"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1769,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1769,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1769,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-011"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1796,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1796,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1796,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-012"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1823,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1823,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1823,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-013"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1849,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 1842,
+      "line": 1849,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-014"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1850,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-STYLE-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1878,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1878,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-015"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1879,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-STYLE-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1879,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-STYLE-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1906,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1906,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-016"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1907,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-STYLE-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1907,
       "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "target": "INV-MPY-04-STYLE-8"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 145,
+      "line": 1947,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1956,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1985,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "INV-MPY-04-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 2011,
+      "source": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 174,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-004"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 236,
+      "line": 265,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 237,
+      "line": 266,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-2"
     },
     {
       "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 238,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 239,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 240,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
-    },
-    {
-      "edge_type": "defines",
-      "kind_provenance": "inferred",
-      "line": 241,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 264,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-001"
-    },
-    {
-      "edge_type": "cites",
       "kind_provenance": "inferred",
       "line": 267,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-002"
+      "target": "INV-MPY-05-3"
     },
     {
-      "edge_type": "cites",
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 268,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 269,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "defines",
       "kind_provenance": "inferred",
       "line": 270,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 276,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 277,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 277,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 278,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 279,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 280,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 281,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 282,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 282,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 282,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 282,
+      "line": 293,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 282,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 315,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 342,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-05-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "INV-MPY-8"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-004"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
-      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
-      "target": "PCDN-MPY-05-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 351,
+      "line": 296,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 351,
+      "line": 299,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-05-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
+      "line": 305,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 306,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 306,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "PCDN-MPY-004"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 377,
+      "line": 307,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 377,
+      "line": 308,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 309,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 310,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 311,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 344,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 371,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-05-003"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 387,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "PCDN-MPY-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 406,
+      "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "target": "INV-MPY-05-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 406,
       "source": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "target": "INV-MPY-05-5"
     },
@@ -4134,14 +4162,14 @@
   ],
   "family": "mpy",
   "kind_counts": {
-    "amendment": 50,
+    "amendment": 56,
     "gate": 82,
     "invariant": 73,
     "nongoal": 43,
-    "rationale": 41,
+    "rationale": 45,
     "term": 80
   },
-  "object_count": 369,
+  "object_count": 379,
   "objects": [
     {
       "attrs": {
@@ -6905,7 +6933,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 68,
+      "line": 69,
       "obj_id": "mpy:term:mutation effect",
       "text": "Descriptor bitset declaring whether a property/action may affect draw, layout, tree, focus, asset state, or snapshot revision."
     },
@@ -6917,7 +6945,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 69,
+      "line": 70,
       "obj_id": "mpy:term:layout direction",
       "text": "Neutral value representation of LPAR-10 container configuration and item hints authored by the director."
     },
@@ -6929,7 +6957,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 70,
+      "line": 71,
       "obj_id": "mpy:term:geometry result",
       "text": "Read-only computed bounds and optional measurement/layout diagnostics for one actor."
     },
@@ -6941,7 +6969,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 71,
+      "line": 72,
       "obj_id": "mpy:term:stage revision",
       "text": "Monotonic counter advanced once for each committed visible stage mutation."
     },
@@ -6953,7 +6981,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "term",
-      "line": 72,
+      "line": 73,
       "obj_id": "mpy:term:consistent snapshot",
       "text": "Snapshot page set tied to one Stage Revision, with explicit restart if the revision becomes unavailable."
     },
@@ -6969,7 +6997,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 958,
+      "line": 959,
       "obj_id": "INV-MPY-04-STYLE-1",
       "text": "property IDs, names, types, domains, constraints,"
     },
@@ -6985,7 +7013,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 960,
+      "line": 961,
       "obj_id": "INV-MPY-04-STYLE-2",
       "text": "MPY set/remove uses exact selector equality, including"
     },
@@ -7001,7 +7029,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 962,
+      "line": 963,
       "obj_id": "INV-MPY-04-STYLE-3",
       "text": "one property mutation cannot alter an unrelated MPY"
     },
@@ -7017,7 +7045,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 964,
+      "line": 965,
       "obj_id": "INV-MPY-04-STYLE-4",
       "text": "explicit zero and removal resolve identically across"
     },
@@ -7033,7 +7061,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 966,
+      "line": 967,
       "obj_id": "INV-MPY-04-STYLE-5",
       "text": "invalid, capacity-rejected, or stale work publishes no"
     },
@@ -7051,7 +7079,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1260,
+      "line": 1325,
       "obj_id": "INV-MPY-04-1",
       "text": "Every property/action command MUST validate descriptor ID, applicability, value schema, access, and capacity before native mutation."
     },
@@ -7069,7 +7097,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1261,
+      "line": 1326,
       "obj_id": "INV-MPY-04-2",
       "text": "Requested layout MUST be writable and separately readable while computed geometry MUST remain read-only."
     },
@@ -7087,7 +7115,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1262,
+      "line": 1327,
       "obj_id": "INV-MPY-04-3",
       "text": "One accepted mutation batch MUST advance Stage Revision once and MUST expose no intermediate tree, property, or geometry state."
     },
@@ -7105,7 +7133,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1263,
+      "line": 1328,
       "obj_id": "INV-MPY-04-4",
       "text": "Mutation Effects and actual geometry changes MUST produce deterministic invalidation covering old and new visual extents."
     },
@@ -7123,7 +7151,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1264,
+      "line": 1329,
       "obj_id": "INV-MPY-04-5",
       "text": "A snapshot MUST be deterministic at one Stage Revision and MUST explicitly fail or mark truncation rather than mix revisions or omit data silently."
     },
@@ -7141,7 +7169,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1265,
+      "line": 1330,
       "obj_id": "INV-MPY-04-6",
       "text": "Tree commands MUST preserve one-parent/root ownership, cycle rejection, child policy, and unaffected actor identities."
     },
@@ -7159,7 +7187,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1266,
+      "line": 1331,
       "obj_id": "INV-MPY-04-STYLE-6",
       "text": "SetLocalStyle MUST have one canonical set/remove spelling, prepare all grouped storage before publication, and produce no operation result."
     },
@@ -7177,7 +7205,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1267,
+      "line": 1332,
       "obj_id": "INV-MPY-04-STYLE-7",
       "text": "Style discovery MUST expose bounded borrowed registries/applicability without expanding a selector/property Cartesian product."
     },
@@ -7195,7 +7223,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 1268,
+      "line": 1333,
       "obj_id": "INV-MPY-04-STYLE-8",
       "text": "Snapshot style projection MUST contain only sparse MPY-local values in selector/property order and MUST report bounded-prefix truncation explicitly."
     },
@@ -7204,7 +7232,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 1284,
+      "line": 1349,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:1",
       "text": "No callback delivery. MPY-04 records subscriptions in snapshots only"
     },
@@ -7213,7 +7241,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 1286,
+      "line": 1351,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:2",
       "text": "No arbitrary theme authoring. Local actor style is in scope; theme graph"
     },
@@ -7222,7 +7250,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 1288,
+      "line": 1353,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:3",
       "text": "No snapshot restore. Rebuilds use validated create/mutation batches."
     },
@@ -7231,7 +7259,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 1289,
+      "line": 1354,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:nongoal:4",
       "text": "No writable computed geometry. Absolute positioning, if supported, is a"
     },
@@ -7245,8 +7273,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1385,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1385",
+      "line": 1450,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1450",
       "text": "`INV-MPY-04-1` generic property/action validation is accepted."
     },
     {
@@ -7259,8 +7287,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1386,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1386",
+      "line": 1451,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1451",
       "text": "`INV-MPY-04-2` freezes requested layout versus computed geometry."
     },
     {
@@ -7273,8 +7301,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1387,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1387",
+      "line": 1452,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1452",
       "text": "`INV-MPY-04-3` Stage Revision and atomic visibility are accepted."
     },
     {
@@ -7287,8 +7315,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1388,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1388",
+      "line": 1453,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1453",
       "text": "`INV-MPY-04-4` invalidation ownership is accepted."
     },
     {
@@ -7301,8 +7329,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1389,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1389",
+      "line": 1454,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1454",
       "text": "`INV-MPY-04-5` snapshot ordering, paging, and truncation are accepted."
     },
     {
@@ -7315,8 +7343,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1390,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1390",
+      "line": 1455,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1455",
       "text": "`INV-MPY-04-6` tree-command integrity is accepted."
     },
     {
@@ -7331,8 +7359,8 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 1391,
-      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1391",
+      "line": 1456,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md:gate:1456",
       "text": "PCDN-MPY-04-001 through PCDN-MPY-04-016 are resolved without weakening `INV-MPY-4`, `INV-MPY-6`, or `INV-MPY-8`."
     },
     {
@@ -7370,7 +7398,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1423,
+      "line": 1488,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.0",
       "text": "Drafts generic tree/property/action/style/state/layout directions,"
     },
@@ -7392,7 +7420,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1423,
+      "line": 1488,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.0-rationale",
       "text": "MicroPython can set the stage only if all durable UI intent lowers to generic\nvalidated commands while actors and rlvgl retain measurement, layout, native\nbehavior, and computed state. A revisioned snapshot gives bindings and tests one\nauthoritative view without transferring runtime ownership."
     },
@@ -7424,7 +7452,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1444,
+      "line": 1509,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.1.1",
       "text": "Records the completed MPY-03 production registry, actor-local"
     },
@@ -7466,7 +7494,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1460,
+      "line": 1525,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.0",
       "text": "Ratifies the MPY-04 command, transaction, layout, geometry, and"
     },
@@ -7491,7 +7519,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1460,
+      "line": 1525,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.0-rationale",
       "text": "The accepted boundary preserves rlvgl ownership of runtime states, native\nscroll/focus machinery, style selectors, computed geometry, and invalidation.\nIt still gives the director complete durable intent through descriptor-checked\ncommands and deterministic snapshots. Implementation and conformance evidence\nremain required before MPY-04 coverage becomes Current or MPY-06 consumes the\nsurface."
     },
@@ -7528,7 +7556,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1485,
+      "line": 1550,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.2.1",
       "text": "Records the descriptor-driven Stage direction, transaction,"
     },
@@ -7563,7 +7591,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1512,
+      "line": 1577,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.3.0",
       "text": "Freezes one allocation-free contextual object-reference prefix for"
     },
@@ -7581,7 +7609,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1512,
+      "line": 1577,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.3.0-rationale",
       "text": "All MPY-04 mutations need identical stable-or-same-Batch targeting. Defining\nthat prefix once prevents ten subtly different reference decoders while\nkeeping property, action, flag, layout, tree, delete, and style schema authority\nwith their own PCDNs. Returning the untouched remainder also lets those later\ncodecs remain zero-copy and apply their negotiated limits with full semantic\ncontext."
     },
@@ -7616,7 +7644,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1538,
+      "line": 1603,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.4.0",
       "text": "Freezes Delete as a zero-flag Batch-only operation whose complete"
     },
@@ -7634,7 +7662,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1538,
+      "line": 1603,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.4.0-rationale",
       "text": "Delete needs no options in MPY v1; accepting an opaque remainder would create\nunused extension bytes and weaken canonical validation. Outputless completion\nkeeps the response proportional while the shared Batch revision reports the\ncommitted state. Rejecting same-Batch-created members avoids ambiguous\ncreate/delete identity and lifecycle accounting, while delete-then-Create slot\nreuse preserves bounded capacity without ever reviving an old `ObjectId`."
     },
@@ -7669,7 +7697,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1565,
+      "line": 1630,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.5.0",
       "text": "Freezes Reorder as the common contextual target followed by one"
     },
@@ -7687,7 +7715,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1565,
+      "line": 1630,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.5.0-rationale",
       "text": "Defining the index after conceptual removal eliminates forward/backward move\nambiguity and maps directly to the prepared shadow-tree operation. Reorder\nchanges only order, so preserving the current parent or root name prevents it\nfrom becoming a second reparent/promote path. Outputless success and one common\nBatch revision report the committed state without redundant per-operation\nvalues, including for a valid same-position no-op."
     },
@@ -7722,7 +7750,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1591,
+      "line": 1656,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.6.0",
       "text": "Freezes Reparent as target reference, new-parent reference, and"
     },
@@ -7740,7 +7768,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1591,
+      "line": 1656,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.6.0-rationale",
       "text": "Resolving target before destination makes failures deterministic, while\ndetach-first indexing gives same-parent and cross-parent moves one definition.\nDropping a root's name and budget on detach preserves a single child identity\nmodel and makes bounded text accounting reversible. Fixed positional fields\nneed no negotiated payload limit; the outer Batch frame remains the authority\nwhen eight large stable-reference operations do not fit 256 bytes."
     },
@@ -7775,7 +7803,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1617,
+      "line": 1682,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.7.0",
       "text": "Freezes PromoteRoot as a contextual target followed by one"
     },
@@ -7793,7 +7821,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1617,
+      "line": 1682,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.7.0-rationale",
       "text": "Detaching before indexing gives child promotion and existing-root move/rename\none deterministic ordering rule. Preserving an empty UTF-8 name in the codec\nkeeps structure separate from Stage name policy, while the negotiated decoder\nenforces the per-name byte limit before Endpoint dispatch. Outputless success\nuses the common Batch revision without redundant identity data; independent\ntext, item-count, and complete-frame bounds remain explicit."
     },
@@ -7829,7 +7857,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1643,
+      "line": 1708,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.8.0",
       "text": "Freezes SetFlag as a contextual target followed by one stable"
     },
@@ -7848,7 +7876,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1643,
+      "line": 1708,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.8.0-rationale",
       "text": "Stable semantic flag IDs prevent exposure of raw native bit positions while\npreserving the runtime-owned Hidden, Enabled, Clickable, and Focusable paths.\nCanonical Boolean bytes remove alternate encodings, and descriptor-gating the\ncontrol flags prevents unsupported actors from accepting inert metadata.\nOutputless success and one Batch revision report the synchronized flag/state\ncommit without redundant result values, including for a valid no-op."
     },
@@ -7884,7 +7912,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1669,
+      "line": 1734,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.9.0",
       "text": "Freezes SetProperties as a contextual target followed by one"
     },
@@ -7903,7 +7931,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1669,
+      "line": 1734,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.9.0-rationale",
       "text": "A canonical increasing field list gives collective property writes one\ndeterministic two-phase validation and error order while retaining MPY-02 typed\nvalues. Completing schema/access/type/scalar validation before contextual\nObject resolution ensures semantic errors outrank reference availability,\nwhile requiring descriptor-proven Object context prevents BatchObject from\nbecoming an untyped escape. Aggregate Stage capacity remains operation-\nattributed because no one field owns the total. Outputless success uses the\ncommon Batch revision, and independent item, value-payload, and frame limits\nkeep minimum-profile behavior explicit."
     },
@@ -7939,7 +7967,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1698,
+      "line": 1763,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.10.0",
       "text": "Freezes ResetProperties as a contextual target followed by one"
     },
@@ -7958,7 +7986,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1698,
+      "line": 1763,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.10.0-rationale",
       "text": "Raw property IDs avoid encoding placeholder values while retaining canonical\nordering and deterministic descriptor-error attribution. Restoring exact\ndeclared defaults, including durable absence with canonical `None` readback,\nkeeps reset distinct from writing inferred zeros or permitting values outside a\ndescriptor's set schema. Complete validation before commit preserves collective\natomicity; outputless success uses the common Batch revision, while the item\nand outer frame limits keep minimum-profile behavior explicit."
     },
@@ -7994,7 +8022,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1725,
+      "line": 1790,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.11.0",
       "text": "Freezes InvokeAction as a contextual target, nonzero raw action ID,"
     },
@@ -8013,7 +8041,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1725,
+      "line": 1790,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.11.0-rationale",
       "text": "Reusing the canonical ValueList preserves typed zero-copy arguments and one\nnegotiated payload policy. Completing descriptor, transaction, and\nargument-schema validation before contextual Object resolution gives action\nfailures a deterministic order without treating BatchObject as an untyped\nescape. This slice admits only Transactional descriptors with empty results, so\noutputless success can use the common Batch revision while BatchForbidden,\nresult-bearing, and deferred contracts remain explicit later gates."
     },
@@ -8049,7 +8077,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1752,
+      "line": 1817,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.12.0",
       "text": "Freezes SetRequestedLayout as a contextual target plus one Bytes"
     },
@@ -8068,7 +8096,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1752,
+      "line": 1817,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.12.0-rationale",
       "text": "An opcode-owned Bytes body keeps the MPY value registry closed while making the\ncomplete requested-layout replacement language-neutral and byte-echoable.\nSeparating structural domains from descriptor semantics preserves signed layout\nintent and restricts Range to the accepted invalid combinations. Exact body\nsizing before publication makes result capacity atomic, while independent body,\ncolumn-track, row-track, and outer-frame limits retain the conservative profile."
     },
@@ -8099,7 +8127,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1778,
+      "line": 1843,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.13.0",
       "text": "Freezes twenty stable global style-property rows, exact named and"
     },
@@ -8113,7 +8141,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1778,
+      "line": 1843,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.13.0-rationale",
       "text": "Separating descriptor/storage proof from opcode design prevents the future\nwire from choosing semantics the native cascade cannot uphold. Exact selector\nidentity makes DEFAULT mask zero usable without turning it into a removal\nwildcard, while sparse per-property storage preserves unrelated native and MPY\nstate. Completing allocation and conversion before an infallible vector swap\nmakes the prerequisite composable with the existing Stage Safe Turn without\nclaiming that opcode, Stage, Endpoint, result, snapshot, or binding integration\nalready exists."
     },
@@ -8144,7 +8172,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1807,
+      "line": 1872,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.14.0",
       "text": "Freezes SetLocalStyle as a contextual target, exact part/state/"
     },
@@ -8158,7 +8186,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1807,
+      "line": 1872,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.14.0-rationale",
       "text": "An absent trailing value gives removal one byte-minimal canonical spelling\nwithout extending the closed ValueTag registry or confusing explicit numeric\nzero with absence. Grouping every actor's submitted style operations into one\nprepared replacement preserves deterministic last-write-wins semantics and\nlets the Stage guard validate private storage freshness before any direction\nbecomes visible. Outputless success uses the common Batch revision while\nproperty effects retain deterministic invalidation."
     },
@@ -8189,7 +8217,7 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 1835,
+      "line": 1900,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.0",
       "text": "Adds borrowed global named-part, state, and property registries;"
     },
@@ -8203,9 +8231,126 @@
       "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 1835,
+      "line": 1900,
       "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.0-rationale",
       "text": "Borrowing compact descriptor rows gives bindings enough information to plan\nbounded storage without materializing every possible selector/property pair.\nProjecting only durable MPY-local sparse state makes snapshots deterministic\nand rebuild-oriented while excluding native/theme/transition implementation\ndetails. Explicit total and truncation fields make a zero budget truthful, and\ndelaying cursor advancement until allocation succeeds preserves retry safety."
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "editorial",
+        "chronological_rank": 18,
+        "commits": [
+          "Local candidate based on `aa94329ff9b26e8afeb9e0e37f824a1ae17bea6b`;"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-05",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.15.1",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Reconciles the recorded evidence while preserving normative",
+        "touches": [
+          "§0",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 1927,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.1",
+      "text": "Reconciles the recorded evidence while preserving normative"
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott; recorded by Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 19,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.15.2",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner ratifies neutral subscription snapshot metadata reuse, atomic complete-page preparation and owning-Stage revision advancement for actual subscription changes.",
+        "touches": [
+          "INV-MPY-04-5",
+          "§8.2"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 1952,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.2",
+      "text": "Owner ratifies neutral subscription snapshot metadata reuse, atomic complete-page preparation and owning-Stage revision advancement for actual subscription changes."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-04-5",
+          "§8.2"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 1952,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.2-rationale",
+      "text": "Subscription metadata is already required by §8.2, but the current subscription\nregistry advances a private revision while the Stage cursor freezes only Stage\nRevision. Owner decision 3 and its October 6 follow-up select the existing\nneutral `SubscriptionInfo` surface and require successful addition or actual\nremoval to advance the owning Stage Revision once. Failed or repeated matching\nremovals leave it unchanged, and another Stage's subscription change does not\ninvalidate this Stage's snapshot. A dual-revision cursor was considered but\nnot selected: the current endpoint-wide registry revision would couple\nunrelated Stages and require an additional staleness contract.\n\nPreparing all retained actor and subscription data before cursor advancement\npreserves the existing allocation-failure retry guarantee; it does not require\none allocation. Atomic revision/mutation preflight and no double Stage increment\nfor subscription cleanup are implications of existing atomic visibility and\ncomplete-Batch revision rules. Exact caller budget, added record fields,\nEndpoint API signature and wire representation remain proposals, not ratified\nby this amendment. No implementation or coverage closure is claimed. The\n[owner decision receipt](../releases/v0.2.7-mpy-owner-decision.md) retains the\nrequired new clean-source handoff and remaining API disposition."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott; recorded by Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 20,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.15.3",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner ratifies the concrete native subscription snapshot projection,",
+        "touches": [
+          "INV-MPY-04-5",
+          "§8.2"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 1981,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.3",
+      "text": "Owner ratifies the concrete native subscription snapshot projection,"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-MPY-04-5",
+          "§8.2"
+        ]
+      },
+      "doc": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 1981,
+      "obj_id": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md#0.15.3-rationale",
+      "text": "The October 10 owner disposition accepts the remaining representation, bounds\nand API choices presented after amendment 0.15.2. Richer actor records reuse the\nexisting nine-field neutral `SubscriptionInfo` directly, add truthful total and\ntruncation fields and retain the current actor traversal. A separate caller\nsubscription limit permits count-only inspection without borrowing text/style\ncapacity. Registry-aware Endpoint access supplies the observations needed for\ntruthful counts; existing Stage-only entry points and return shapes remain\ncompatible and do not claim unobserved subscription totals.\n\nAll retained actor and subscription data for a complete page must be prepared\nbefore committing traversal position or sequence. Failed preparation leaves\nthe cursor retryable at that same page, without requiring one allocation.\nActual additions/removals still advance only the owning Stage Revision once;\nfailed/idempotent operations and cleanup within an already-revisioned mutation\nretain amendment 0.15.2's rules.\n\nThe new clean-source handoff, exact path acknowledgment and fresh gates still\nprecede shared implementation. No wire, Batch lowering, Result publication,\ninterpreter binding, cross-driver coverage or phase closure is adopted here;\n`PCDN-MPY-04-017` remains proposal-only."
     },
     {
       "attrs": {
@@ -8215,7 +8360,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 54,
+      "line": 56,
       "obj_id": "mpy:term:runtime event",
       "text": "Native event processed synchronously by rlvgl through its existing object/widget semantics."
     },
@@ -8227,7 +8372,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 55,
+      "line": 57,
       "obj_id": "mpy:term:cue record",
       "text": "Immutable typed notification derived from a completed Runtime Event and addressed to one subscription/callback token."
     },
@@ -8239,7 +8384,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 56,
+      "line": 58,
       "obj_id": "mpy:term:subscription policy",
       "text": "Predeclared phase/filter/propagation/delivery/coalescing configuration enforced natively before the Python callback runs."
     },
@@ -8251,7 +8396,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 57,
+      "line": 59,
       "obj_id": "mpy:term:critical cue",
       "text": "Cue that cannot be coalesced or silently lost, including lifecycle, subscription teardown, and overflow/recovery notices."
     },
@@ -8263,7 +8408,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 58,
+      "line": 60,
       "obj_id": "mpy:term:coalescible cue",
       "text": "Descriptor-authorized high-rate cue for which multiple pending records may be replaced by one record carrying explicit coalescing metadata."
     },
@@ -8275,7 +8420,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 59,
+      "line": 61,
       "obj_id": "mpy:term:cue drain",
       "text": "VM-side retrieval of an ordered bounded set of queued cues; invocation belongs to MPY-06."
     },
@@ -8287,7 +8432,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "term",
-      "line": 60,
+      "line": 62,
       "obj_id": "mpy:term:safe turn",
       "text": "Runtime boundary at which validated commands may mutate the stage outside active native dispatch."
     },
@@ -8305,7 +8450,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 236,
+      "line": 265,
       "obj_id": "INV-MPY-05-1",
       "text": "Native event routing MUST complete without invoking Python, and each Python callback MUST run only after its immutable cue is dequeued in a VM-safe context."
     },
@@ -8324,7 +8469,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 237,
+      "line": 266,
       "obj_id": "INV-MPY-05-2",
       "text": "Callback return values MUST NOT retroactively change native propagation; any consume/stop policy MUST be validated and installed before the Runtime Event."
     },
@@ -8342,7 +8487,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 238,
+      "line": 267,
       "obj_id": "INV-MPY-05-3",
       "text": "Cue ordering MUST be deterministic by native phase, emission, subscription registration, and monotonic CueSequence."
     },
@@ -8360,7 +8505,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 239,
+      "line": 268,
       "obj_id": "INV-MPY-05-4",
       "text": "Structural/property commands requested by a callback MUST NOT apply until the callback returns and the next Safe Turn admits them."
     },
@@ -8378,7 +8523,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 240,
+      "line": 269,
       "obj_id": "INV-MPY-05-5",
       "text": "Coalescing or loss MUST follow descriptor policy and MUST be observable through sequence/merge/loss metadata; silent cue loss is forbidden."
     },
@@ -8396,7 +8541,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "invariant",
-      "line": 241,
+      "line": 270,
       "obj_id": "INV-MPY-05-6",
       "text": "Actor or Stage teardown MUST remove subscriptions and release callback tokens exactly once without calling the VM from teardown context."
     },
@@ -8405,7 +8550,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 256,
+      "line": 285,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:1",
       "text": "No VM invocation. MPY-05 produces cues; MPY-06 invokes callables."
     },
@@ -8414,7 +8559,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 257,
+      "line": 286,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:2",
       "text": "No Python-defined native handlers. Python cannot execute inside"
     },
@@ -8423,7 +8568,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 259,
+      "line": 288,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:3",
       "text": "No universal prevent-default. Initial descriptors do not promise a hook"
     },
@@ -8432,7 +8577,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "nongoal",
-      "line": 261,
+      "line": 290,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:nongoal:4",
       "text": "No silent best-effort queue. Footprint limits may cause explicit loss or"
     },
@@ -8446,8 +8591,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 276,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:276",
+      "line": 305,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:305",
       "text": "`INV-MPY-05-1` queued VM-safe callback boundary is accepted."
     },
     {
@@ -8460,8 +8605,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 277,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:277",
+      "line": 306,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:306",
       "text": "`INV-MPY-05-2` predeclared propagation policy resolves PCDN-MPY-004 direction."
     },
     {
@@ -8474,8 +8619,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 278,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:278",
+      "line": 307,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:307",
       "text": "`INV-MPY-05-3` phase/subscription/sequence ordering is accepted."
     },
     {
@@ -8488,8 +8633,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 279,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:279",
+      "line": 308,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:308",
       "text": "`INV-MPY-05-4` callback mutation deferral is accepted."
     },
     {
@@ -8502,8 +8647,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 280,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:280",
+      "line": 309,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:309",
       "text": "`INV-MPY-05-5` queue classes and explicit overflow/coalescing are accepted."
     },
     {
@@ -8516,8 +8661,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 281,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:281",
+      "line": 310,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:310",
       "text": "`INV-MPY-05-6` subscription/token teardown is accepted."
     },
     {
@@ -8532,8 +8677,8 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "gate",
-      "line": 282,
-      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:282",
+      "line": 311,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md:gate:311",
       "text": "PCDN-MPY-05-001 through PCDN-MPY-05-003 are resolved without weakening `INV-MPY-5`, `INV-MPY-6`, or `INV-MPY-8`."
     },
     {
@@ -8572,7 +8717,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 309,
+      "line": 338,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.0",
       "text": "Drafts event descriptors, tokenized subscriptions, predeclared"
     },
@@ -8595,7 +8740,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 309,
+      "line": 338,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.0-rationale",
       "text": "MicroPython callbacks must orchestrate later UI behavior without entering the\nnative real-time path. Tokenized immutable cues preserve event semantics across\nsame-core and dual-core deployments while explicit queue classes make embedded\ncapacity failures observable and testable."
     },
@@ -8627,7 +8772,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 330,
+      "line": 359,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.1.1",
       "text": "Records the completed MPY-03 production registry, actor lifecycle,"
     },
@@ -8673,7 +8818,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 345,
+      "line": 374,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.0",
       "text": "Ratifies descriptor-declared consumable events, endpoint-owned"
     },
@@ -8702,7 +8847,7 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "rationale",
-      "line": 345,
+      "line": 374,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.0-rationale",
       "text": "The accepted policy preserves native synchronous event semantics and keeps\nPython invocation outside dispatch and interrupt contexts. Endpoint-wide\ncapacity makes Critical Reserve and overflow accounting coherent across\nStages, while pre-dispatch rejection guarantees that an unreported actor\nmutation cannot occur when a required non-coalescible cue lacks capacity.\nImplementation and conformance evidence remain required before MPY-05 coverage\nbecomes Current or MPY-06 consumes the cue surface."
     },
@@ -8736,9 +8881,122 @@
       "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
       "family": "mpy",
       "kind": "amendment",
-      "line": 371,
+      "line": 400,
       "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.1",
       "text": "Records the bounded endpoint-owned Cue queue, canonical causality"
+    },
+    {
+      "attrs": {
+        "author": "OpenAI Codex with owner direction",
+        "change_kind": "editorial",
+        "chronological_rank": 5,
+        "commits": [
+          "Existing native implementation through `d9c3b6d`; local candidate"
+        ],
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-05",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": false,
+        "rev": "0.2.2",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Reconciles the recorded evidence while preserving normative",
+        "touches": [
+          "§0",
+          "§15"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 427,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.2",
+      "text": "Reconciles the recorded evidence while preserving normative"
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott; recorded by Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.3",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner ratifies one owning-Stage revision increment for successful subscription addition or actual removal, unchanged revisions on failed/idempotent operations and isolation between Stages.",
+        "touches": [
+          "§6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 453,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.3",
+      "text": "Owner ratifies one owning-Stage revision increment for successful subscription addition or actual removal, unchanged revisions on failed/idempotent operations and isolation between Stages."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 453,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.3-rationale",
+      "text": "Active subscriptions become visible in MPY-04 snapshots using existing neutral\nmetadata, while the current registry mutation alone does not advance Stage\nRevision. Owner decision 3's October 6 follow-up selects visible subscription\nchanges as owning-Stage mutations. This preserves MPY-04's existing single-Stage\nrevision cursor and explicit staleness behavior instead of introducing a second\npublic revision or endpoint-wide cross-Stage invalidation.\n\nExisting identity, validation, bounded idempotence, child-first teardown and\nexact-once token release remain binding. Atomic preflight must not expose a\nrecord change without its Stage revision or a revision without its record\nchange; cleanup within an already-revisioned actor/Stage mutation must not add\na second Stage increment. These preserve existing atomic visibility rather\nthan select a new teardown protocol. The amendment changes no callback policy,\nwire, budget, API signature, binding claim or coverage status. A new exact\nclean-source handoff still precedes implementation; see the\n[owner decision receipt](../releases/v0.2.7-mpy-owner-decision.md)."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott; recorded by Codex",
+        "change_kind": "semantic",
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-10",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.2.4",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner ratifies direct reuse of all nine neutral subscription fields",
+        "touches": [
+          "§6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "amendment",
+      "line": 479,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.4",
+      "text": "Owner ratifies direct reuse of all nine neutral subscription fields"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§6"
+        ]
+      },
+      "doc": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+      "family": "mpy",
+      "kind": "rationale",
+      "line": 479,
+      "obj_id": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md#0.2.4-rationale",
+      "text": "The October 10 disposition selects existing `SubscriptionInfo`, with opaque\ncallback tokens and no VM-specific data, rather than introducing a second\nsubscription representation. Active rows match the exact Stage and actor\nidentity and preserve registration order. MPY-04 owns per-record limits,\ntruthful totals/truncation and atomic complete-page preparation. Existing\nStage-only return shapes remain compatible. Amendment 0.2.3's owning-Stage\nrevision and teardown rules remain binding; policy, wire, binding and coverage\nclaims are unchanged. Fresh clean-source handoff and acknowledgment still\nprecede shared implementation, and Batch/bindings scope remains excluded."
     },
     {
       "attrs": {

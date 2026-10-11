@@ -148,10 +148,10 @@ pub fn render_esp_pac(ir: &EspIr, out_dir: &Path) -> Result<Vec<std::path::PathB
 fn peripherals_used(ir: &EspIr) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for pin in &ir.pins {
-        if let Some(p) = pin.peripheral.as_deref() {
-            if !out.iter().any(|s| s == p) {
-                out.push(p.to_string());
-            }
+        if let Some(p) = pin.peripheral.as_deref()
+            && !out.iter().any(|s| s == p)
+        {
+            out.push(p.to_string());
         }
     }
     out
@@ -288,10 +288,10 @@ fn pick_route_for_signal(
         if !direction_compatible(direction, sig.direction) {
             continue;
         }
-        if sig.iomux_pin == Some(gpio) {
-            if let Some(slot) = sig.iomux_fn {
-                return PinRouteKind::Direct { fn_slot: slot };
-            }
+        if sig.iomux_pin == Some(gpio)
+            && let Some(slot) = sig.iomux_fn
+        {
+            return PinRouteKind::Direct { fn_slot: slot };
         }
     }
     // Matrix route: if we have a role hint, try to match it first so that
@@ -302,10 +302,10 @@ fn pick_route_for_signal(
             if !direction_compatible(direction, sig.direction) {
                 continue;
             }
-            if sig.role.eq_ignore_ascii_case(hint) {
-                if let Some(id) = sig.gpio_matrix_id {
-                    return PinRouteKind::Matrix { signal_id: id };
-                }
+            if sig.role.eq_ignore_ascii_case(hint)
+                && let Some(id) = sig.gpio_matrix_id
+            {
+                return PinRouteKind::Matrix { signal_id: id };
             }
         }
     }

@@ -1,12 +1,12 @@
-//! LPAR-03 display presenter: resolves a [`PresentPlan`] into
+//! LPAR-03 display presenter: resolves a [`rlvgl_core::invalidation::PresentPlan`] into
 //! [`DisplayDriver::flush`] calls (LPAR-03 §9).
 //!
 //! # API summary
 //!
-//! - [`present_plan`] — execute a [`PresentPlan`] against a [`DisplayDriver`],
+//! - [`crate::present::present_plan`] — execute a [`rlvgl_core::invalidation::PresentPlan`] against a [`DisplayDriver`],
 //!   extracting sub-rect pixel slices from a full logical-screen frame buffer.
-//! - [`ingest_blit_planner`] — bridge a [`BlitPlanner`]'s backend-observed
-//!   write regions into an [`InvalidationList`], promoting to full frame on
+//! - [`crate::present::ingest_blit_planner`] — bridge a [`BlitPlanner`]'s backend-observed
+//!   write regions into an [`rlvgl_core::invalidation::InvalidationList`], promoting to full frame on
 //!   overflow (LPAR-03 §7 "Backend draw planner").
 //!
 //! Both items are pure safe Rust; no `unsafe` is needed.
@@ -29,7 +29,7 @@ use crate::display::DisplayDriver;
 /// - [`PresentPlan::None`] — no flush, no vsync (LPAR-03 §5.3).
 /// - [`PresentPlan::FullFrame`] — one flush of the full logical screen rect
 ///   followed by one [`DisplayDriver::vsync`] call.
-/// - [`PresentPlan::Rects(rs)`] — one flush per rect in order; each rect's
+/// - [`PresentPlan::Rects(rs)`](PresentPlan::Rects) — one flush per rect in order; each rect's
 ///   pixel data is extracted from `frame` into a temporary `Vec` and passed
 ///   to `flush`. Rects are expected to be screen-clipped by the planner. If
 ///   a rect extends outside `frame` bounds (e.g. due to mismatched screen
@@ -118,7 +118,7 @@ pub fn present_plan(
 /// Ingest a [`BlitPlanner`]'s backend-observed write regions into an
 /// [`InvalidationList`] (LPAR-03 §7, "Backend draw planner").
 ///
-/// Each rect stored in `planner` is converted from [`blit::Rect`]
+/// Each rect stored in `planner` is converted from [`crate::blit::Rect`]
 /// (unsigned width/height) to [`Rect`] (signed) and pushed into `list`.
 /// If `planner.overflowed()` is `true`, the list is immediately promoted to
 /// a full-frame plan via [`InvalidationList::mark_full_frame`] — dropped

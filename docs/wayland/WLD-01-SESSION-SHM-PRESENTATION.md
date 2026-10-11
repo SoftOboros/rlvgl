@@ -607,6 +607,20 @@ This closes the WLD-01 minimal headless-compositor, live resize-generation,
 end-to-end present-backpressure, and explicit protocol-object teardown gates.
 It does not mark the broader unchecked acceptance bullets in §12 complete.
 
+### 12.3 v0.2.7 candidate acceptance reconciliation — 2026-10-05
+
+The release-candidate reconciliation is recorded in
+[`v0.2.7-wld-evidence.md`](../releases/v0.2.7-wld-evidence.md). It maps every
+unchecked §12 group to existing production-path tests, five supplemental
+host-independent model vectors, and the remaining Linux/session proof. The
+supplemental tests include the production model directly; they do not simulate
+SHM ownership or replace compositor evidence. Historical results in §12.1 and
+§12.2 are retained with their original scope and dates.
+
+This informative reconciliation changes no acceptance requirement, invariant,
+ratification state, or WLD-02 implementation authorization. The unchecked
+groups remain unchecked until their complete clauses are evidenced.
+
 ## 13. Files and Expected Ownership
 
 Expected implementation locus:

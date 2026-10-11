@@ -582,6 +582,39 @@ pub struct SnapshotPage {
     pub ended: bool,
 }
 
+/// Native actor snapshot extended with endpoint-owned neutral subscriptions.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SubscriptionSnapshotRecord {
+    /// Existing actor projection, including the aggregate truncation flag.
+    pub actor: SnapshotRecord,
+    /// Bounded active metadata in registration order.
+    pub subscriptions: Vec<crate::subscription::SubscriptionInfo>,
+    /// Complete matching active count before bounding.
+    pub total_subscriptions: usize,
+    /// Whether the retained rows are a strict prefix of all matching rows.
+    pub subscriptions_truncated: bool,
+}
+
+/// One complete registry-aware native snapshot page.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SubscriptionSnapshotPage {
+    /// Revision frozen at cursor begin.
+    pub revision: StageRevision,
+    /// Zero-based page sequence.
+    pub sequence: u32,
+    /// Bounded actor and subscription records.
+    pub records: Vec<SubscriptionSnapshotRecord>,
+    /// Whether traversal completed and released the cursor.
+    pub ended: bool,
+}
+
+pub(crate) struct ProjectedSnapshotPage<T> {
+    pub(crate) revision: StageRevision,
+    pub(crate) sequence: u32,
+    pub(crate) records: Vec<T>,
+    pub(crate) ended: bool,
+}
+
 /// Explicit snapshot cursor failure.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotError {

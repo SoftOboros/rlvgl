@@ -19,9 +19,9 @@ pub use rlvgl_api::protocol::{ErrorClass, ValueRef, ValueTag};
 use crate::{
     direction::{
         ActorDirection, BatchCreateDestination, BatchObjectReference, BatchStageDirection,
-        GeometryResult, GeometryRole, OwnedValue, RequestedLayout, RuntimeFlag, SnapshotError,
-        SnapshotPage, SnapshotProperty, SnapshotRecord, SnapshotStyleValue, SnapshotToken,
-        StageDirection, StageRevision,
+        GeometryResult, GeometryRole, OwnedValue, ProjectedSnapshotPage, RequestedLayout,
+        RuntimeFlag, SnapshotError, SnapshotPage, SnapshotProperty, SnapshotRecord,
+        SnapshotStyleValue, SnapshotToken, StageDirection, StageRevision,
     },
     layout::{
         Dimension, EngineConfig, FlexAlign, FlexFlow, GridAlign, GridTrack, LayoutRole, LayoutState,
@@ -5063,6 +5063,30 @@ impl StageRegistry {
         max_text_bytes_per_record: usize,
         max_style_values_per_record: usize,
     ) -> Result<SnapshotPage, SnapshotError> {
+        let page = self.snapshot_read_projected(
+            token,
+            max_records,
+            max_text_bytes_per_record,
+            max_style_values_per_record,
+            Ok,
+        )?;
+        Ok(SnapshotPage {
+            revision: page.revision,
+            sequence: page.sequence,
+            records: page.records,
+            ended: page.ended,
+        })
+    }
+
+    /// Prepare every projected record before the one cursor commit boundary.
+    pub(crate) fn snapshot_read_projected<T>(
+        &mut self,
+        token: SnapshotToken,
+        max_records: usize,
+        max_text_bytes_per_record: usize,
+        max_style_values_per_record: usize,
+        mut project: impl FnMut(SnapshotRecord) -> Result<T, RegistryError>,
+    ) -> Result<ProjectedSnapshotPage<T>, SnapshotError> {
         if max_records == 0 {
             return Err(SnapshotError::InvalidLimit);
         }
@@ -5101,17 +5125,17 @@ impl StageRegistry {
                 })
             })?;
         for object_id in &traversal[cursor.position..end] {
-            records.push(
-                self.snapshot_record(
+            let actor = self
+                .snapshot_record(
                     *object_id,
                     max_text_bytes_per_record,
                     max_style_values_per_record,
                 )
-                .map_err(SnapshotError::Registry)?,
-            );
+                .map_err(SnapshotError::Registry)?;
+            records.push(project(actor).map_err(SnapshotError::Registry)?);
         }
         let ended = end == traversal.len();
-        let page = SnapshotPage {
+        let page = ProjectedSnapshotPage {
             revision: cursor.revision,
             sequence: cursor.sequence,
             records,
@@ -5289,6 +5313,15 @@ impl StageRegistry {
         } else {
             Err(RegistryError::StageClosed)
         }
+    }
+
+    pub(crate) fn prepare_subscription_revision(&self) -> Result<StageRevision, RegistryError> {
+        self.ensure_active()?;
+        self.next_revision()
+    }
+
+    pub(crate) fn commit_subscription_revision(&mut self, revision: StageRevision) {
+        self.revision = revision;
     }
 
     fn next_revision(&self) -> Result<StageRevision, RegistryError> {
@@ -6923,6 +6956,83 @@ mod prepared_geometry_tests {
                 }],
             )
             .unwrap()
+    }
+
+    #[test]
+    fn subscription_stage_revision_exhaustion_leaves_both_registries_unchanged() {
+        use crate::{
+            cue::{CallbackId, EventId},
+            subscription::{
+                EndpointEpoch, PropagationPolicy, SubscribeRequest, SubscriptionError,
+                SubscriptionFilter, SubscriptionLimits, SubscriptionRegistry,
+            },
+        };
+        static CATALOG: [TypeDescriptor; 1] = [TypeDescriptor {
+            events: &[EventDescriptor {
+                id: 1,
+                name: "clicked",
+                payload: &[],
+                max_payload_bytes: 0,
+                native_event: NativeEventKind::Clicked,
+                phases: EventPhaseSet::TARGET,
+                filters: EventFilterSet::ANY,
+                requires_widget_invocation: false,
+                requires_native_consumed: false,
+                allow_consume_at_target: false,
+                allow_stop_after_phase: false,
+                native_effects: MutationEffects::NONE,
+                delivery: EventDelivery::Ordered,
+                coalescing_key: None,
+            }],
+            ..TEST_DESCRIPTOR
+        }];
+        let mut stage =
+            StageRegistry::new(StageId::new(1).unwrap(), &CATALOG, registry().limits).unwrap();
+        let object_id = create_container(&mut stage);
+        let actor_identity = ActorIdentity {
+            object_id,
+            type_id: TEST_TYPE,
+        };
+        let mut subscriptions = SubscriptionRegistry::new(
+            EndpointEpoch::new(1).unwrap(),
+            SubscriptionLimits::new(2, 32, 2, 2).unwrap(),
+        )
+        .unwrap();
+        let mut request = SubscribeRequest {
+            stage_id: stage.stage_id(),
+            actor_identity,
+            event_id: EventId::new(1).unwrap(),
+            callback_id: CallbackId::new(1).unwrap(),
+            phase: DispatchPhase::Target,
+            filter: SubscriptionFilter::Any,
+            propagation: PropagationPolicy::Observe,
+        };
+        let first = subscriptions.subscribe(&mut stage, request).unwrap();
+        let mut prepared = subscriptions
+            .prepare_teardown_stage_child_first(stage.stage_id(), &[object_id])
+            .unwrap();
+        stage.revision = StageRevision::new(u64::MAX);
+        request.callback_id = CallbackId::new(2).unwrap();
+        assert_eq!(
+            subscriptions.subscribe(&mut stage, request),
+            Err(SubscriptionError::Registry(RegistryError::Internal))
+        );
+        assert_eq!(
+            subscriptions.unsubscribe(&mut stage, actor_identity, first),
+            Err(SubscriptionError::Registry(RegistryError::Internal))
+        );
+        assert_eq!(stage.revision().get(), u64::MAX);
+        assert_eq!(subscriptions.len(), 1);
+        assert_eq!(
+            subscriptions
+                .subscriptions()
+                .next()
+                .unwrap()
+                .subscription_id,
+            first
+        );
+        // The unchanged preparation still passes its private registry revision guard.
+        subscriptions.commit_teardown(&mut prepared).unwrap();
     }
 
     #[test]

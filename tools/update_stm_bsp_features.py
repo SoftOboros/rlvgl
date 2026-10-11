@@ -25,19 +25,24 @@ def collect_features() -> list[str]:
     for file in SRC_DIR.rglob("*.rs"):
         text = file.read_text(encoding="utf-8")
         for feat in FEATURE_RE.findall(text):
-            features.add(feat)
+            if feat.startswith("stm32-"):
+                features.add(feat)
     return sorted(features)
 
 def update_cargo_toml(features: list[str]) -> None:
     """Rewrite the `[features]` table with the supplied STM32 entries."""
     data = tomllib.loads(TOML_PATH.read_text(encoding="utf-8"))
     feats = data.setdefault("features", {})
+    existing_stm = {
+        key: value for key, value in feats.items() if key.startswith("stm32-")
+    }
     # Remove existing stm32-* keys
     for key in list(feats.keys()):
         if key.startswith("stm32-"):
             feats.pop(key)
     for feat in features:
-        feats[feat] = []
+        if feat.startswith("stm32-"):
+            feats[feat] = existing_stm.get(feat, [])
     TOML_PATH.write_text(tomli_w.dumps(data), encoding="utf-8")
 
 def main() -> None:

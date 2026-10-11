@@ -117,8 +117,8 @@ One owner per concept; Consumer Projects cite these, never restate them.
 ## §5 Frozen decision — gate topology (Standards Action)
 
 1. Two gates, **both** required for a conforming release: Gate P blocks the
-   tag; Gate R verifies registry truth after publish and on a 3×-daily
-   schedule (mirroring `publish-continue.yml` cadence).
+   tag; Gate R verifies registry truth after publish and on
+   the established daily verification schedule. Publishing has no timed trigger.
 2. Gate P consumes the full ordered publish list (`ordered_crates` in
    `scripts/publish_changed.sh`; 26 crates as of the 2026-07-12 SCTD-04
    amendment) — packaging
@@ -130,8 +130,19 @@ One owner per concept; Consumer Projects cite these, never restate them.
    immediately after `rlvgl-core`, its sole rlvgl dependency.
 3. Consumer Projects MUST NOT use `path` dependencies or `[patch]` entries
    pointing into the workspace. Violation = nonconforming run.
-4. The publish workflow (`publish.yml`) MUST require Gate P green on the
-   release ref before `scripts/publish_changed.sh` executes.
+4. Both publishing workflows (`publish.yml` and `publish-continue.yml`) MUST
+   require Gate P green on the exact frozen release commit before the publisher
+   executes. Continuation is manual-only: resolve the latest release tag and
+   previous tag to immutable commit SHAs, then use the same release SHA for
+   packaging/consumers and publication. Publication MUST depend on successful
+   Gate P, verify exact HEAD and a clean source checkout before authentication,
+   and retain all three existing packaged consumers. A newer maintenance helper
+   MAY be preserved from the workflow revision only when its identity is recorded
+   separately and it executes against the frozen release sources. Changes to crate
+   sources require a newly qualified candidate. The continuation workflow MUST
+   NOT have a scheduled publishing trigger; registry throttling requires explicit
+   operator retry after the reported reset time. Gate R's daily registry-truth
+   verification remains independent of publication.
 5. Crates.io publication MUST authenticate through Trusted Publishing, not a
    repository-stored long-lived registry token. Every publishing job MUST use
    the GitHub `release` Environment, grant only `contents: read` and
@@ -154,33 +165,66 @@ cannot be resolved through it, while third-party deps would all need
 vendoring. `[patch.crates-io]` injects candidates that do not exist
 upstream — the standard pre-publish mechanism.)*
 
-1. Gate P runs `cargo package --no-verify -p <crate>` in publish order
-   (`scripts/crates_ci_stage.sh`), **progressively**: each packaged
-   archive is extracted to `$STAGE_DIR/staged/<name>-<version>/` and
-   appended to `$STAGE_DIR/patch-config.toml` (a `[patch.crates-io]`
-   table) BEFORE the next crate packages, with the partial table fed to
-   cargo via `--config`. This is required — `cargo package` re-resolves
-   the sanitized manifest, and unpublished sibling versions are
-   unresolvable until injected (publish time solves the same problem by
-   actually publishing in order). Side effect: a publish-order topology
-   error fails Gate P at the same crate that would have failed
-   `cargo publish` (P-ORDER caught pre-tag). Consumer Projects consume
-   the finished table as their `.cargo/config.toml`; third-party
-   dependencies continue to resolve from crates.io.
-   The excluded `ratatui-rlvgl` submodule crate uses the equivalent
-   `cargo package --manifest-path vendor/ratatui/ratatui-rlvgl/Cargo.toml`;
-   its version and archive location are discovered from that manifest's
-   workspace rather than the rlvgl root workspace. Its staged consumer patch
-   entry is appended after all root-workspace packages complete. The bridge is
-   first packaged against extracted `rlvgl-core`; Gate P then defers both
-   extracted patch entries while later root packages run because the live root
-   already consumes the bridge from the submodule path and patches its own
-   core. Exposing both live and extracted paths creates an ambiguous duplicate
-   `rlvgl-core` source in Cargo's lockfile. No later publish crate depends on
-   `ratatui-rlvgl`, and consumer gates receive both extracted entries after the
-   package loop, so the deferral does not weaken publish-order or packaged-core
-   verification. Gate P restores the submodule `Cargo.lock` after packaging so
-   validation leaves the pinned gitlink clean.
+1. Gate P packages in publish order (`scripts/crates_ci_stage.sh`), using
+   workspace-detached temporary inputs that preserve each original manifest
+   and every actual Cargo-selected payload byte. Cargo owns inventory,
+   normalization and archive generation. Each archive is immediately extracted
+   to `$STAGE_DIR/staged/<name>-<version>/` and its entry is appended to the
+   progressive `$STAGE_DIR/patch-config.toml` BEFORE the next package runs.
+   Every previously packaged dependency, including core and the excluded
+   Ratatui bridge, MUST resolve through its extracted package; no deferral,
+   source fallback, fabricated manifest, dependency-minimum change, or manual
+   archive/lock editing is permitted. Missing extracted predecessors fail.
+
+   Cargo MAY load a separately recorded source graph-admission input for genuine
+   path-only dev dependencies removed by Cargo normalization and their necessary
+   real path closure. Every admitted file MUST come from its actual package's
+   Cargo source inventory at the same frozen candidate, including original
+   manifests and actual targets. Missing inventory files fail. An actual graph
+   back-edge MAY point to the current package's input; previously packaged
+   predecessors MUST still route to extracted archives. This permission only
+   admits Cargo's pre-normalization graph; it does not admit source paths into
+   normalized package verification or final consumers.
+
+   Solely for Cargo archive preparation, the real RLVGL `Cargo.toml` workspace
+   and nested `vendor/ratatui/Cargo.toml` workspace MAY additionally supply their
+   actual ancestor descriptors and finite member context. Before execution,
+   enumerate and fingerprint their original descriptor/member manifests,
+   Cargo-selected payload inventories, actual targets and any inherited real
+   shared readme/license paths. Preserve those bytes; Cargo owns interpretation
+   of inherited values, inventory, normalization and generated members. The
+   current bounded context is the root's 47 metadata members and Ratatui's 43
+   metadata members, recorded by exact manifest path in
+   `scripts/crates_ci_workspace_contexts.json`. Under §15 0.1.6, the root
+   `rlvgl` member additionally admits only the integration-test target
+   `tests/bsp_clock_ownership.rs`, fingerprinted by SHA256
+   `02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.
+   Other workspace descriptors, new members/targets or additional source
+   requirements MUST stop for an owning decision rather than recursively
+   broadening admission. Previously
+   packaged predecessors MUST still resolve through their extracted archives.
+   Keep actual nested Git identity and dirty-overlay provenance; the outer
+   repository identity MUST NOT replace nested Ratatui provenance. Checkout
+   lock preservation includes retaining absence when no source lock exists.
+   All additional admission inputs MUST become unavailable before normalized
+   package verification and final consumers.
+
+   The extracted package's resolved metadata MUST contain local paths only for
+   itself and its extracted staged predecessors; other packages MUST have registry
+   sources. Any source admission/original-checkout route in that graph fails.
+   Verification MUST still resolve after admission inputs become unavailable.
+   Preserve and compare the source inventory and original manifest, record
+   Cargo's normalized manifest, packaged lock and VCS provenance, and retain
+   complete generated-member accounting separately from payload equality.
+   Temporary input-graph locks may be changed only by Cargo. Checkout locks,
+   including nested locks, MUST remain unchanged on success and failure.
+
+   The excluded `ratatui-rlvgl` is discovered by its actual submodule manifest
+   and packaged at its dependency-ordered position against extracted core. Both
+   extracted entries remain available throughout later packaging. The completed
+   patch table points only into extracted archives and is consumed by all
+   existing Consumer Projects. An unpublished predecessor/topology error remains
+   a P-ORDER/P-RESOLVE failure; a subset diagnostic is not full Gate P.
    After installing the completed patch table, every Gate P Consumer Project
    MUST discard any `Cargo.lock` embedded by `cargo package` and resolve a fresh
    lock before building. Otherwise Cargo can retain an older registry version
@@ -509,3 +553,174 @@ upstream — the standard pre-publish mechanism.)*
   cannot configure a Trusted Publisher before a crate exists. The same change
   quotes the workflow-supplied base revision so an empty/manual `*` value
   cannot expand to a repository filename.
+
+### 0.1.0 — 2026-10-05 — drafted
+
+**Author:** Codex
+**Change kind:** semantic
+**Touches:** §6, INV-C1, INV-C2, INV-C6
+**Summary:** Records ERRATA-001 and proposes CRATES-CI-01b isolated packaging; §6 remains unchanged pending exact mechanism disposition.
+
+#### Rationale
+
+The core/bridge deferral hides an unpublished predecessor needed by later
+packages, while restoring it in the live root produces duplicate source
+identities. [The drafted correction](CRATES-CI-01B-STAGING-ISOLATION.md)
+specifies archive/manifest equivalence, predecessor negative controls and
+complete consumer proof. [ERRATA-001](ERRATA.md) remains pending ratification.
+Considered and rejected: reducing dependency minima, live-source fallback,
+or counting a partial run as Gate P. The effective mechanism, clean-source
+rule, metadata/drift checks, release gate and owner decision remain unchanged.
+
+### 0.1.1 — 2026-10-05 — drafted
+
+**Author:** Codex
+**Change kind:** semantic
+**Touches:** §5, INV-C1, INV-C6
+**Summary:** Records ERRATA-002 and proposes frozen-source, same-ref Gate P for continuation; effective workflow and §5 remain unchanged.
+
+#### Rationale
+
+The continuation resolves a release tag but executes its publisher against the
+workflow revision without a Gate P dependency. The
+[concrete review packet](../releases/v0.2.7-continuation-wave3.md) separates helper
+maintenance from package-source qualification and retains all consumers/OIDC
+requirements. [ERRATA-002](ERRATA.md) awaits owning disposition. A static/local
+fixture pass does not replace full Gate P or provider execution. Updating only
+the helper while packaging unqualified later crate sources was rejected as a
+solution to the owner's one-candidate requirement.
+
+### 0.1.2 — 2026-10-06 — ratified
+
+**Author:** Codex, recording owner direction
+**Change kind:** semantic
+**Touches:** §5, INV-C1, INV-C6
+**Summary:** Owner accepts frozen-source same-ref Gate P for continuation and removes its timed publishing trigger.
+
+#### Rationale
+
+The owner agreed to decision 1 and directed that timed publishing runs are no
+longer needed. This ratifies the source/gate correction proposed in 0.1.1,
+adds manual-only continuation, and preserves separate helper identity. The
+publisher has no local five-crate cutoff; this amendment does not assume removal
+of registry-side rate limits. Existing HTTP 429 diagnostics and indexing waits
+remain. Gate R's existing daily verification schedule remains independent, and its
+post-publish trigger follows successful primary and continuation runs.
+[The decision receipt](../releases/v0.2.7-continuation-decision.md) records the
+implementation and bounded checks. ERRATA-002's owner question is settled;
+provider execution and full Gate P remain verification gates. ERRATA-001 and
+its staging-mechanism decision are unchanged.
+
+### 0.1.3 — 2026-10-06 — drafted
+
+**Author:** Codex, recording owner direction
+**Change kind:** semantic
+**Touches:** §6, INV-C1, INV-C2, INV-C6
+**Summary:** Owner accepts detached-packaging direction with original manifests and Cargo-owned normalization; exact lock mechanism awaits equivalence and final ratification.
+
+#### Rationale
+
+Decision 2 was accepted with its stated remaining lock-resolution condition.
+[CRATES-CI-01b](CRATES-CI-01B-STAGING-ISOLATION.md) records those accepted
+constraints. [The follow-up receipt](../releases/v0.2.7-staging-decision.md)
+records the bounded experiment. No dependency minimum, live-source fallback,
+archive member or failed lock comparison is waived. Effective §6 remains
+unchanged until the detailed mechanism is ready for final ratification.
+
+### 0.1.4 — 2026-10-10 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner makes bounded real source graph admission effective before detached packaging; extracted-only verification, predecessor routing and all release gates remain required.
+
+#### Rationale
+
+The owner accepted recommendations 1–6 on 2026-10-10 and authorized parallel
+implementation. This adopts the exact admission boundary proposed in
+[the October 7 mechanism packet](../releases/v0.2.7-staging-mechanism.md) for
+[ERRATA-001](ERRATA.md). The historical core trial separated Cargo's loading of
+real path-only dev dependencies from its normalized package graph; its all-member
+comparison and missing extracted-API control are recorded in
+[the historical receipt](../releases/v0.2.7-packaging-wave4.md). Those transcript-
+recovered observations are historical evidence, not fresh qualification of the
+restored candidate or recovered raw archives.
+
+Considered and rejected: suppressing extracted core/bridge entries, replacing
+real dependency manifests, lowering version minima, removing a source lock to
+make a trial succeed, and allowing consumer paths into the source admission
+graph. Each hides the original resolution or distribution defect. Cargo retains
+ownership of inventory, normalization, archive generation and external input-
+graph lock updates. Original manifests and checkout locks remain preserved.
+This changes §6's deferral mechanism, not INV-C1, INV-C2 or INV-C6, the release
+set/order, selective versions, asset preparation, metadata/content-drift checks,
+clean-source refusal, the three consumers, provider CI or publication authority.
+Implementation is authorized against this ratified concepts amendment. The
+[01B execution plan](CRATES-CI-01B-STAGING-ISOLATION.md) remains Draft with its
+remaining acceptance gates open; this entry is not its ratification or Gate P.
+
+### 0.1.5 — 2026-10-10 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner authorizes the enumerated real root and nested Ratatui descriptor/member contexts solely for Cargo archive preparation, preserving extracted predecessors and admission-free verification/consumers.
+
+#### Rationale
+
+The owner accepted both latest recommendations on October 10 local time after the bounded
+execution stopped on Ratatui's inherited descriptor. The exact frontier and two
+dispositions are recorded in [that receipt](../releases/v0.2.7-staging-20261010.md).
+This amendment is recorded before governing implementation. Root and nested
+Ratatui are the only additional workspace contexts authorized: their actual
+descriptor bytes and finite actual member/target contexts must be enumerated
+before preparation. Cargo, rather than fabricated ancestors or flattened
+inheritance, interprets those inputs and generates normalized archives. Any
+unexpected workspace or additional source requirement stops for a new owning
+decision; this is not recursive workspace admission.
+
+Considered and rejected: continuing the previous fail-closed diagnostic as if
+full staging passed, omitting bridge/root from the publishable set, inventing an
+ancestor, rewriting inherited values, bypassing a predecessor through original
+source or registry, and assigning the outer AA Git identity to nested ED source.
+The selected disposition preserves real manifests, payload inventories/targets,
+actual nested Git provenance including dirty overlays, and every checkout lock's
+bytes or absence. Source admission is solely for archive preparation, must become
+unavailable before normalized verification and consumers, and does not waive
+clean-source, asset, metadata/drift, full-set, three-consumer or Linux CI gates.
+The 01B plan remains Draft. A frozen hashed uncommitted candidate permits local
+diagnostics; it is not a clean release ref or authorization to create a source
+commit before the remaining CLAUDE prepublish gates pass.
+
+### 0.1.6 — 2026-10-11 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner admits only the already approved BSP clock-ownership regression target into the finite root archive-preparation context.
+
+#### Rationale
+
+The owner accepted the one-target staging recommendation on October 11 local
+time after the unchanged workspace guard refused the new Cargo-discovered
+integration test. This amendment is recorded before governing implementation.
+Only `tests/bsp_clock_ownership.rs` in the root `rlvgl` member is additionally
+admitted, with SHA256
+`02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.
+It supplies the separately approved BSP null-owner regression coverage.
+The actual root and nested Ratatui descriptor bytes, original manifest/shared
+file fingerprints, and 47/43 member sets remain unchanged. Governing finite
+context implementation SHALL enumerate only this additional target. Every
+other unexpected descriptor, member, target or source requirement remains an
+owning-decision stop.
+
+Considered and rejected: removing or hiding the approved regression test,
+automatically admitting future Cargo-discovered targets, or disabling the
+unchanged fail-closed target guard. Those bypass the finite admission boundary.
+Original Cargo inventories and normalization, progressive extracted
+predecessors, withdrawal of admission inputs before normalized verification
+and all consumers, genuine nested Git/overlay provenance, checkout lock bytes
+or absence, clean release-ref, metadata/drift, normal asset preparation,
+full ordered publish set, all three consumers and Linux same-ref/provider
+gates remain required. Root/core allocation remains 0.2.7; this amendment does
+not ratify the Draft 01B execution plan or establish Gate P/publication readiness.

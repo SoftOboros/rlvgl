@@ -25,6 +25,7 @@ not redefine identifier grammar or canonicalization.
 | CHIPS-MICROCHIP | Ira Abbott | `chipdb/rlvgl-chips-microchip/` | `chipdb/rlvgl-chips-microchip/` |
 | CHIPS-SILABS | Ira Abbott | `chipdb/rlvgl-chips-silabs/` | `chipdb/rlvgl-chips-silabs/` |
 | CHIPS-TI | Ira Abbott | `chipdb/rlvgl-chips-ti/` | `chipdb/rlvgl-chips-ti/` |
+| CREATOR | Ira Abbott | `docs/bsp/CREATOR-00-CONCEPTS.md` | `docs/bsp/` and `docs/creator/`; current authority scope limited to accepted clock-source contract |
 | CPY | Ira Abbott | `docs/cpython/CPY-00-CONCEPTS.md` | `docs/cpython/` |
 | CRATES-CI | Ira Abbott | `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` | `docs/crates-ci/` |
 | DCB | Ira Abbott | `docs/concepts/DCB-00-CONCEPTS.md` | `docs/concepts/` |
@@ -43,6 +44,15 @@ not redefine identifier grammar or canonicalization.
 | WLD | Ira Abbott | `docs/wayland/WLD-00-CONCEPTS.md` | `docs/wayland/` |
 
 ## Historical Identifier Aliases
+
+CRATES-CI's [family errata log](../crates-ci/ERRATA.md) was activated on
+2026-10-05 under its existing prefix and owner. No prefix allocation or ownership
+changed; the corresponding status is recorded in SBC-COMPATIBILITY.md.
+
+KI2C’s [family errata log](../concepts/KI2C-ERRATA.md) was activated on
+2026-10-06 under its existing prefix and owner. KI2C-07 completed its §15
+legacy bridge for the owner-ratified identity-only smoke scope. No prefix or
+ownership changed.
 
 These retained identifiers resolve to the named family above; they are not
 available for a new family or a new meaning.

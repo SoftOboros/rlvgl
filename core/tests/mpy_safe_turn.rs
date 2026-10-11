@@ -286,7 +286,6 @@ fn deletion_releases_callbacks_in_child_first_registration_order_and_blocks_turn
     let first_actor = create_button(&mut owned_stage, root, "First");
     let second_actor = create_button(&mut owned_stage, root, "Second");
     let stage_id = owned_stage.stage_id();
-    let committed_revision = StageRevision::new(owned_stage.revision().get() + 1);
     let mut endpoint = endpoint_with_limits(endpoint_limits());
     endpoint.register_stage(owned_stage).unwrap();
     for (actor, callback) in [(first_actor, 10), (first_actor, 11), (second_actor, 12)] {
@@ -295,6 +294,8 @@ fn deletion_releases_callbacks_in_child_first_registration_order_and_blocks_turn
             .unwrap();
     }
 
+    let committed_revision =
+        StageRevision::new(endpoint.stage(stage_id).unwrap().revision().get() + 1);
     endpoint
         .enqueue_batch(
             RequestId::new(1).unwrap(),
@@ -512,7 +513,6 @@ fn exact_release_capacity_rejects_delete_before_stage_mutation() {
     let root = create_root(&mut owned_stage);
     let actor = create_button(&mut owned_stage, root, "Button");
     let stage_id = owned_stage.stage_id();
-    let starting_revision = owned_stage.revision();
     let mut endpoint = Endpoint::new(
         EndpointEpoch::new(2).unwrap(),
         endpoint_limits(),
@@ -526,6 +526,7 @@ fn exact_release_capacity_rejects_delete_before_stage_mutation() {
             .subscribe(subscribe_request(stage_id, actor, callback))
             .unwrap();
     }
+    let starting_revision = endpoint.stage(stage_id).unwrap().revision();
     endpoint
         .enqueue_batch(
             RequestId::new(1).unwrap(),
@@ -665,7 +666,6 @@ fn full_stage_teardown_releases_child_first_and_ack_gates_stage_capacity() {
     let first_actor = create_button(&mut owned_stage, root, "First");
     let second_actor = create_button(&mut owned_stage, root, "Second");
     let stage_id = owned_stage.stage_id();
-    let final_revision = StageRevision::new(owned_stage.revision().get() + 1);
     let limits = EndpointLimits::new(1, 8, 8, 16).unwrap();
     let mut endpoint = endpoint_with_limits(limits);
     endpoint.register_stage(owned_stage).unwrap();
@@ -674,6 +674,7 @@ fn full_stage_teardown_releases_child_first_and_ack_gates_stage_capacity() {
             .subscribe(subscribe_request(stage_id, actor, callback))
             .unwrap();
     }
+    let final_revision = StageRevision::new(endpoint.stage(stage_id).unwrap().revision().get() + 1);
     endpoint
         .enqueue_stage_teardown(RequestId::new(1).unwrap(), stage_id)
         .unwrap();
@@ -797,7 +798,6 @@ fn stage_teardown_capacity_rejection_is_exact_and_retryable() {
     let mut first_stage = stage(1);
     let first_root = create_root(&mut first_stage);
     let first_actor = create_button(&mut first_stage, first_root, "First");
-    let first_revision = first_stage.revision();
     let mut second_stage = stage(2);
     let second_root = create_root(&mut second_stage);
     let second_actor = create_button(&mut second_stage, second_root, "Second");
@@ -819,6 +819,7 @@ fn stage_teardown_capacity_rejection_is_exact_and_retryable() {
             .subscribe(subscribe_request(second_stage_id, second_actor, callback))
             .unwrap();
     }
+    let first_revision = endpoint.stage(StageId::new(1).unwrap()).unwrap().revision();
     endpoint
         .enqueue_batch(
             RequestId::new(1).unwrap(),

@@ -4,63 +4,63 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 239,
+      "line": 240,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 248,
+      "line": 249,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 361,
+      "line": 362,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 361,
+      "line": 362,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 387,
+      "line": 388,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 394,
+      "line": 400,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 394,
+      "line": 400,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 395,
+      "line": 401,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 396,
+      "line": 402,
       "source": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "target": "INV-SCTD02-1"
     },
@@ -298,7 +298,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 101,
+      "line": 102,
       "obj_id": "sctd:term:firebeetle-2-p4 target",
       "text": "The DFRobot DFR1237 kit (DFR1172 ESP32-P4 module) + DFR0550-V2 800×480 DSI panel, driven by the `examples/beetle-esp32p4-idf` ESP-IDF app."
     },
@@ -310,7 +310,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 102,
+      "line": 103,
       "obj_id": "sctd:term:idf payload",
       "text": "The `no_std` Rust staticlib called by the C host each refill via `rlvgl_app_render`. Owns pixel composition + input dispatch; owns no hardware. As defined in `examples/beetle-esp32p4-idf/components/rlvgl_app/rust/src/lib.rs:299`; SCTD-02 adapts it to mount the SCTD controller."
     },
@@ -322,7 +322,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 103,
+      "line": 104,
       "obj_id": "sctd:term:interactive dining philosophers",
       "text": "A new admitted Tutorial Machine (SCTD-00 §5) with external lifecycle inputs, generated through the iState M1P6 path. Provenance to the SCTD-01 faithful DP; the faithful DP is not modified."
     },
@@ -334,7 +334,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 104,
+      "line": 105,
       "obj_id": "sctd:term:lifecycle event",
       "text": "A host-injected SCXML external event consumed by the Interactive DP machine: `PHILOSOPHER_ARRIVE`, `PHILOSOPHER_DEPART`, `DEADLOCK_BREAK`, `SIMULATION_RESET`."
     },
@@ -346,7 +346,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 105,
+      "line": 106,
       "obj_id": "sctd:term:pending depart",
       "text": "A datamodel boolean on a seated philosopher: set true by `PHILOSOPHER_DEPART` received while not in `Thinking`; the seated philosopher completes its eat→release→think cycle, then a state-scoped transition in `Thinking` honours the depart."
     },
@@ -358,7 +358,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 106,
+      "line": 107,
       "obj_id": "sctd:term:host simulation control",
       "text": "A control that acts on the harness, not the machine: pause/resume (suspend the logical tick) and speed (scale logical-ms per refill). It never injects an SCXML event."
     },
@@ -370,7 +370,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 107,
+      "line": 108,
       "obj_id": "sctd:term:logical tick cadence",
       "text": "The mapping from refill iterations (~30 Hz) to machine logical-time advance, chosen so state transitions are human-watchable. Decoupled from refill rate."
     },
@@ -382,7 +382,7 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "term",
-      "line": 108,
+      "line": 109,
       "obj_id": "sctd:term:compose-then-flip",
       "text": "The invariant that the panel flip (`esp_lcd_panel_draw_bitmap`) occurs only after the payload fully composes the frame into the off-screen buffer."
     },
@@ -394,8 +394,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 344,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:344",
+      "line": 345,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:345",
       "text": "The owner accepts the SCTD-02 scope, the interactive-machine"
     },
     {
@@ -406,8 +406,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 346,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:346",
+      "line": 347,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:347",
       "text": "PCDN-02-01 (payload selection), PCDN-02-02 (seating/arrival), and"
     },
     {
@@ -418,8 +418,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 348,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:348",
+      "line": 349,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:349",
       "text": "The SCTD-00 §5/§7 amendment entries are accepted and recorded in"
     },
     {
@@ -430,8 +430,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 350,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:350",
+      "line": 351,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:351",
       "text": "This document's §15 receives a dated ratification entry."
     },
     {
@@ -442,8 +442,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 354,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:354",
+      "line": 355,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:355",
       "text": "An Interactive Dining Philosophers Tutorial Machine exists, is"
     },
     {
@@ -454,8 +454,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 356,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:356",
+      "line": 357,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:357",
       "text": "The Tutorial Demo App exposes the on-screen lifecycle controls +"
     },
     {
@@ -466,8 +466,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 358,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:358",
+      "line": 359,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:359",
       "text": "The FireBeetle-2-P4 ESP-IDF app mounts the SCTD payload without"
     },
     {
@@ -481,8 +481,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 361,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:361",
+      "line": 362,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:362",
       "text": "INV-SCTD02-1 (compose-then-flip) and INV-SCTD02-2 (decoupled tick)"
     },
     {
@@ -493,8 +493,8 @@
       "doc": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md",
       "family": "sctd",
       "kind": "gate",
-      "line": 363,
-      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:363",
+      "line": 364,
+      "obj_id": "docs/concepts/SCTD-02-FIREBEETLE-P4-INTERACTIVE.md:gate:364",
       "text": "On-board flash + verify (§7.7) confirms the interactive demo on the"
     },
     {

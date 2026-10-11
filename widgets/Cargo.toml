@@ -14,8 +14,8 @@ categories = ["embedded", "gui", "no-std", "graphics"]
 publish = true
 
 [dependencies]
-rlvgl-core = { version = "0.2.6", path = "../core", default-features = false }
-rlvgl-platform = { version = "0.2.4", path = "../platform", default-features = false }
+rlvgl-core = { version = "0.2.7", path = "../core", default-features = false }
+rlvgl-platform = { version = "0.2.6", path = "../platform", default-features = false }
 rlvgl-audio-meters-core = { version = "0.2.0", path = "../audio-meters-core", default-features = false }
 libm = { version = "0.2", default-features = false }
 

@@ -543,196 +543,175 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 649,
+      "line": 663,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 649,
+      "line": 663,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 649,
+      "line": 663,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 649,
+      "line": 663,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 649,
+      "line": 663,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 673,
+      "line": 687,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 673,
+      "line": 687,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 698,
+      "line": 712,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 698,
+      "line": 712,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 721,
+      "line": 735,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-001"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 746,
+      "line": 760,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 763,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-003"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 769,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-2"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 769,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-6"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 769,
+      "line": 777,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-003"
     },
@@ -741,110 +720,131 @@
       "kind_provenance": "inferred",
       "line": 783,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 789,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 789,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 789,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 789,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-002"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 804,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 810,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 830,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-1"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 830,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 830,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-3"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 830,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-4"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 830,
-      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "INV-WLD-5"
-    },
-    {
-      "edge_type": "cites",
-      "kind_provenance": "inferred",
-      "line": 830,
+      "line": 783,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "INV-WLD-6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 830,
+      "line": 783,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
-      "target": "PCDN-WLD-001"
+      "target": "PCDN-WLD-003"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 830,
+      "line": 797,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-002"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 830,
+      "line": 803,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 803,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 803,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 803,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 818,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 824,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "INV-WLD-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
+      "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
+      "target": "PCDN-WLD-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 844,
       "source": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "target": "PCDN-WLD-003"
     },
@@ -1880,7 +1880,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 692,
+      "line": 706,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.2",
       "text": "Adds compositor session tests for prepared-read cancellation and"
     },
@@ -1895,7 +1895,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 692,
+      "line": 706,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.2-rationale",
       "text": "The first compositor smoke proved one successful frame but not that an external\npoller could report no readiness without stranding the prepared read, nor that\na dropped session left the compositor usable for a new client. The added tests\nexercise those public-boundary paths on both available compositors without\nclaiming the still-missing write-saturation, configure-supersession, or\nprotocol-object teardown fixtures."
     },
@@ -1931,7 +1931,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 715,
+      "line": 729,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.1",
       "text": "Implements the first WLD-01 platform slice and records its"
     },
@@ -1950,7 +1950,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 715,
+      "line": 729,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.1-rationale",
       "text": "SCTK's public global-binding helpers require its synchronous registry\ninitializer, so WLD isolates that roundtrip behind a timeout and socket\ncancellation while keeping initial configure dispatch caller-driven. The\nhost-independent model lets geometry, XRGB conversion, damage, pacing, slot\nbounds, and resize-budget behavior execute on the development host without\nclaiming the still-open Linux compositor evidence."
     },
@@ -1989,7 +1989,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 740,
+      "line": 754,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.0",
       "text": "Ratifies the session and SHM presentation definition with a"
     },
@@ -2011,7 +2011,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 740,
+      "line": 754,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.2.0-rationale",
       "text": "Disabling SCTK defaults prevents calloop and keyboard dependencies from\nbecoming accidental WLD-01 requirements. Configure tokens and one\nsession-owned readiness operation close lifecycle and protocol-ordering races,\nwhile explicit limits and protocol versions turn the accepted boundedness and\ndamage policies into implementable gates.\n\n### 0.1.3 — 2026-08-18 — Consumed PCDN-WLD-003 resolution\n\n**Author:** Ira Abbott\n\n**Change kind:** semantic\n\n**Touches:** INV-WLD-2, INV-WLD-6, PCDN-WLD-003, §3, §6, §7, §11, §12\n\n**Commits:** pending\n\n**Summary:** Freezes Adaptive Window as the default, deterministic Fixed\nCanvas letterboxing and undersized failure, fullscreen as a modifier, positive\ninteger scaling, generation retirement, and compositor-owned rotation.\n\n\nThe phase now distinguishes logical canvas size, configured surface size, and\nbuffer size. That distinction prevents implicit crop/scale behavior, avoids\ndouble-scaling input, and preserves SHM ownership when geometry changes.\n\n### 0.1.2 — 2026-08-18 — Consumed PCDN-WLD-002 resolution\n\n**Author:** Ira Abbott\n\n**Change kind:** semantic\n\n**Touches:** INV-WLD-3, INV-WLD-4, INV-WLD-5, PCDN-WLD-002, §9, §10, §12\n\n**Commits:** pending\n\n**Summary:** Freezes an exact two-or-three-slot SHM policy with three as the\ndefault, forbids pressure-driven slot growth, and adds checked steady-state and\nresize-generation byte-budget gates.\n\n\nRelease-tracked slots and the private Shadow Frame make two slots sufficient\nfor correctness and three preferable for the reference profile. Explicit\nslot and byte bounds prevent compositor delay and repeated resize from turning\nthat preference into unbounded memory growth.\n\n### 0.1.1 — 2026-08-18 — Consumed PCDN-WLD-001 resolution\n\n**Author:** Ira Abbott\n\n**Change kind:** editorial\n\n**Touches:** PCDN-WLD-001, §0, §12\n\n**Commits:** pending\n\n**Summary:** Records that WLD-01 consumes the accepted client substrate and\nevent-loop boundary while remaining blocked on the two unresolved\npresentation decisions.\n\n\nThe parent decision is now resolved, so the phase status must distinguish the\naccepted event-loop boundary from the presentation decisions that still block\nratification and implementation."
     },
@@ -2050,7 +2050,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "amendment",
-      "line": 824,
+      "line": 838,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.1.0",
       "text": "Proposes the v0.2.7 Wayland session, composable dispatch boundary,"
     },
@@ -2072,7 +2072,7 @@
       "doc": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md",
       "family": "wld",
       "kind": "rationale",
-      "line": 824,
+      "line": 838,
       "obj_id": "docs/wayland/WLD-01-SESSION-SHM-PRESENTATION.md#0.1.0-rationale",
       "text": "The existing display trait supplies a useful compatibility boundary but cannot\nown Wayland callbacks and lifecycle alone. A session plus a complete private\nframe closes protocol ownership and rotating-buffer correctness without\nchanging public display or Python APIs during concurrent MPY/CPython work."
     },

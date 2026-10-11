@@ -34,9 +34,12 @@ legacy document cannot be used as a shortcut around that gate.
 | Agent-facing authority pointer | `CLAUDE.md` “Current SBC authority and rlvgl adoption” |
 | Family prefix allocation | [PREFIX-REGISTRY.md](PREFIX-REGISTRY.md) |
 | Deterministic local projection | [README.md](README.md), `make spec-index`, and `make spec-index-check` |
+| CREATOR family errata | [`docs/bsp/ERRATA.md`](../bsp/ERRATA.md) |
 | CPY family errata | [`docs/cpython/ERRATA.md`](../cpython/ERRATA.md) |
 | MPY family errata | [`docs/concepts/ERRATA.md`](../concepts/ERRATA.md) |
+| KI2C family errata | [`docs/concepts/KI2C-ERRATA.md`](../concepts/KI2C-ERRATA.md) |
 | WLD family errata | [`docs/wayland/ERRATA.md`](../wayland/ERRATA.md) |
+| CRATES-CI family errata | [`docs/crates-ci/ERRATA.md`](../crates-ci/ERRATA.md) |
 | Existing family errata | `docs/beetle-esp32p4/ERRATA.md` and `docs/disco-test-and-debug/ERRATA.md` |
 
 Before a family without a current errata log receives its next behavior change
@@ -53,17 +56,18 @@ an empty or absent historical log is not evidence that no prior issue existed.
 | BBB | `docs/beaglebone-black/README.md` and `05-zephyr-prong.md` | Current-shape phase material; the bare-metal bring-up guide is an as-built narrative, not a phase gate. |
 | BEETLE | `docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md` | Current-shape and existing family errata log. |
 | BEETLE-IDF | `docs/beetle-esp32p4-idf/BEETLE-IDF-00-CONCEPTS.md` | Current-shape phase material; create family errata before the next material amendment. |
-| CPY | `docs/cpython/CPY-00-CONCEPTS.md` | Current-shape family with local errata. CPY-00 is ratified; CPY leads CPython/PyO3 and crate unification/partition planning. CPY-01 through CPY-09 remain separately gated Draft phases. |
-| CRATES-CI | `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` | Current-shape family; create family errata before the next material amendment. |
+| CREATOR | `docs/bsp/CREATOR-00-CONCEPTS.md` | Current-SBC errata/concepts activated 2026-10-11 for accepted clock-source admission only; all other Creator/BSP narratives remain legacy and no broader conformance is ratified. |
+| CPY | `docs/cpython/CPY-00-CONCEPTS.md` | Current-shape family with local errata. CPY-00 through CPY-02 are ratified; CPY leads CPython/PyO3 and crate unification/partition planning. CPY-03 through CPY-09 remain separately gated Draft phases. |
+| CRATES-CI | `docs/crates-ci/CRATES-CI-00-CONCEPTS.md` | Current-shape family with local errata activated 2026-10-05. CRATES-CI-01b is a drafted mechanism correction; its defect/decision and proof remain open. |
 | DCB | `docs/concepts/DCB-00-CONCEPTS.md` | Canonical root remains authoritative; `DCB-*-A` files are resolved historical analyses and MUST NOT authorize behavior. |
 | DPR | `docs/concepts/DPR-00-CONCEPTS.md` | Draft; no behavior implementation is authorized by this adoption map. |
 | FONT / INPUT / REND / WID | Their respective `docs/concepts/*-00-CONCEPTS.md` roots | Current-shape family documents; create a family errata log before the next material amendment. |
-| KI2C | `docs/concepts/KI2C-00-CONCEPTS.md` | KI2C-07 is hardware-blocked. Its physical conformance work remains evidence-gated and must receive a current §15 bridge before resuming behavior work. |
+| KI2C | `docs/concepts/KI2C-00-CONCEPTS.md` | KI2C family errata activated 2026-10-06. KI2C-07 received its current §15 scope bridge for owner-ratified identity-only RLVGL smoke with existing reporting. Physical conformance remains hardware-blocked; temperature-dependent CCPS work has separate validation gates. |
 | LPAR | `docs/concepts/LPAR-00-CONCEPTS.md` | Later phases are current-shape; the three legacy change-log bridges below remain explicit migration work. |
-| MPY | `docs/concepts/MPY-00-CONCEPTS.md` | MPY-01 and MPY-02 are ratified with their phase PCDNs resolved; golden protocol vectors remain required before MPY-03, and MPY-03 through MPY-09 remain separately gated Draft phases. |
+| MPY | `docs/concepts/MPY-00-CONCEPTS.md` | MPY-01 through MPY-05 are ratified. Native substrate evidence is separate from complete wire/interpreter/board conformance; MPY-04-017 remains proposal-only. Owner decisions 2026-10-06 accept neutral subscription metadata, atomic full-page preparation and owning-Stage revision advancement for actual subscription changes; implementation and fresh handoff remain open. MPY-06/07 are owner-accepted but unratified; MPY-08/09 remain Draft. |
 | QT | `docs/qt-support/00-concepts.md` | Current-shape family; create family errata before the next material amendment. |
 | RATATUI / SCTD | Their respective `docs/concepts/*-00-CONCEPTS.md` roots | Current-shape family documents; create a family errata log before the next material amendment. |
-| WLD | `docs/wayland/WLD-00-CONCEPTS.md` | Current-shape Draft family with local errata; PCDN-WLD-001 and PCDN-WLD-002 are resolved, three PCDNs remain open, and no implementation is authorized. |
+| WLD | `docs/wayland/WLD-00-CONCEPTS.md` | Current-shape family with local errata; WLD-00/01 are ratified and all five root PCDNs are resolved. WLD-01 acceptance evidence remains incomplete; WLD-02 stays Draft pending its prerequisites and ratification. |
 | CHIPS-* / DISCO-* | Their canonical `chipdb/` and `docs/disco-*/` roots | Existing local documentation remains a legacy baseline until each family activates its current-SBC errata and amendment workflow. |
 
 ## Explicit Legacy Bridges
@@ -80,7 +84,7 @@ evidence.
 | `docs/concepts/LPAR-01-BASELINE.md` | §13 | Legacy structure; no current behavior change is opened here. |
 | `docs/concepts/LPAR-02-OBJECT-SUBSTRATE.md` | §14 | Legacy structure; no current behavior change is opened here. |
 | `docs/concepts/LPAR-10-LAYOUT.md` | §14 | Legacy structure; no current behavior change is opened here. |
-| `docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md` | §12 | Hardware-blocked; bridge before physical conformance resumes. |
+| `docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md` | §12 | Current §15 bridge completed 2026-10-06; historical §12 preserved. Physical conformance remains evidence-gated. |
 
 The following documents are deliberately excluded from the phase-gate
 inventory: `docs/releases/roadmap-pre-v0.2.md`, the BeagleBone bare-metal
@@ -115,10 +119,11 @@ new behavior change.
   Draft pending phase ratification, and WLD-02 remains Draft and blocked by
   WLD-01. Release parity still requires the complete compositor, isolation,
   resource, documentation, versioning, and changelog evidence.
-- **KI2C-07:** Physical-board facts and read-only probe evidence are missing;
-  hardware-blocked is not a conformance result.
-- **Legacy bridges:** The four documents above require their §15 bridge before
-  their next material amendment. This is a documentation migration, not a
+- **KI2C-07:** Physical-board facts and read-only identity/health probe evidence
+  are missing; hardware-blocked is not a conformance result. Temperature validation
+  blocks only the specific CCPS dependencies requiring it, not generic RLVGL release.
+- **Legacy bridges:** The three LPAR documents above still require their §15 bridge before
+  their next material amendment; KI2C-07 completed its bridge on 2026-10-06. This is a documentation migration, not a
   license to change their frozen behavior.
 
 ## Maintenance Rule

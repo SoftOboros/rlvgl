@@ -186,10 +186,10 @@ fn slider_value(endpoint: &Endpoint, actor: ActorIdentity) -> i32 {
 #[test]
 fn native_pointer_dispatch_publishes_one_revision_and_one_cue() {
     let (stage, root_id, actor) = stage_with_slider();
-    let starting_revision = stage.revision();
     let mut endpoint = endpoint(standard_cue_limits());
     endpoint.register_stage(stage).unwrap();
     subscribe_slider(&mut endpoint, actor, 1);
+    let starting_revision = endpoint.stage(StageId::new(1).unwrap()).unwrap().revision();
 
     let first = endpoint
         .dispatch_native_event(
@@ -401,7 +401,6 @@ fn native_input_continues_while_a_vm_drain_is_outstanding() {
 #[test]
 fn subscription_workspace_saturation_reports_input_loss_before_mutation() {
     let (stage, root_id, actor) = stage_with_slider();
-    let starting_revision = stage.revision();
     let mut endpoint = Endpoint::new(
         EndpointEpoch::new(1).unwrap(),
         EndpointLimits::new(2, 4, 4, 8).unwrap(),
@@ -412,6 +411,7 @@ fn subscription_workspace_saturation_reports_input_loss_before_mutation() {
     endpoint.register_stage(stage).unwrap();
     subscribe_slider(&mut endpoint, actor, 1);
     subscribe_slider(&mut endpoint, actor, 2);
+    let starting_revision = endpoint.stage(StageId::new(1).unwrap()).unwrap().revision();
 
     assert_eq!(
         endpoint
@@ -450,12 +450,12 @@ fn subscription_workspace_saturation_reports_input_loss_before_mutation() {
 #[test]
 fn route_busy_reports_input_loss_and_preserves_the_native_sequence() {
     let (stage, root_id, actor) = stage_with_slider();
-    let starting_revision = stage.revision();
     let widget = stage.node(actor.object_id).unwrap().widget().clone();
     let retained_borrow = widget.borrow_mut();
     let mut endpoint = endpoint(standard_cue_limits());
     endpoint.register_stage(stage).unwrap();
     subscribe_slider(&mut endpoint, actor, 1);
+    let starting_revision = endpoint.stage(StageId::new(1).unwrap()).unwrap().revision();
 
     assert_eq!(
         endpoint
@@ -502,10 +502,10 @@ fn route_busy_reports_input_loss_and_preserves_the_native_sequence() {
 #[test]
 fn permanent_cue_contract_failure_faults_the_endpoint_before_mutation() {
     let (stage, root_id, actor) = stage_with_slider();
-    let starting_revision = stage.revision();
     let mut endpoint = endpoint(CueLimits::new(8, 2, 4, 1, CUE_FRAME_OVERHEAD_BYTES + 1).unwrap());
     endpoint.register_stage(stage).unwrap();
     subscribe_slider(&mut endpoint, actor, 1);
+    let starting_revision = endpoint.stage(StageId::new(1).unwrap()).unwrap().revision();
 
     let error = endpoint
         .dispatch_native_event(

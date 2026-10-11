@@ -3,10 +3,11 @@
   "edges": [],
   "family": "ki2c",
   "kind_counts": {
-    "amendment": 18,
-    "gate": 70
+    "amendment": 19,
+    "gate": 70,
+    "rationale": 1
   },
-  "object_count": 88,
+  "object_count": 90,
   "objects": [
     {
       "attrs": {
@@ -1312,9 +1313,58 @@
       "doc": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md",
       "family": "ki2c",
       "kind": "amendment",
-      "line": 184,
-      "obj_id": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md#2026-07-15@184",
+      "line": 208,
+      "obj_id": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md#2026-07-15@208",
       "text": "**2026-07-15 — Blocked handoff created.** Recorded the cumulative software"
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott; recorded by Codex",
+        "change_kind": "scope",
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-06",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner accepts strict read-only identity/typed-health reporting for RLVGL, retaining temperature and prototype wiring qualification only for affected CCPS dependencies and physical claims.",
+        "touches": [
+          "§0",
+          "§1",
+          "§6",
+          "§8",
+          "§11"
+        ]
+      },
+      "doc": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md",
+      "family": "ki2c",
+      "kind": "amendment",
+      "line": 219,
+      "obj_id": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md#0.1.0",
+      "text": "Owner accepts strict read-only identity/typed-health reporting for RLVGL, retaining temperature and prototype wiring qualification only for affected CCPS dependencies and physical claims."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§0",
+          "§1",
+          "§6",
+          "§8",
+          "§11"
+        ]
+      },
+      "doc": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md",
+      "family": "ki2c",
+      "kind": "rationale",
+      "line": 219,
+      "obj_id": "docs/concepts/KI2C-07-HARDWARE-CONFORMANCE.md#0.1.0-rationale",
+      "text": "The former STTS22H smoke requirement combined a configuration-dependent\ntemperature read with a prohibition on configuration writes. Owner decision 4\nselects identity-only probing and reporting as they stand. Adding writes or an\nobserved-configuration adoption API would expand the accepted operation and\ndriver contracts, so neither is selected. Identity or typed-health success\ndoes not establish temperature accuracy, electrical readiness or board\nqualification; all physical prerequisites and existing reporting remain.\n\nOwner decision 6 confirms that CCPS prototype wiring divergences are deliberate\nease-of-build adaptations with matching firmware/hardware, including ESP32\nrouting revisions. They are not generic RLVGL release blockers. Future firmware\nrevisions may retire old rigs; this amendment does not choose a pin map,\nqualify any current rig or authorize hardware changes. Affected CCPS functions\nretain their actual temperature/wiring validation dependencies. See\nKI2C ERRATA-001 and the [owner decision receipt](../releases/v0.2.7-embedded-owner-decision.md)."
     }
   ],
   "schema_version": 2

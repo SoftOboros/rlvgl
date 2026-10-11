@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "ratatui-rlvgl"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ratatui-core",
  "rlvgl-core",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "rlvgl-core"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "rlvgl-api",
 ]
@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "rlvgl-platform"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bitflags",
  "display-interface",

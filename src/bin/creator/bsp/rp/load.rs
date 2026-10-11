@@ -140,10 +140,10 @@ fn validate_pins(chip: &RpChip, board: &RpBoard) -> Result<()> {
         }
 
         // Label uniqueness.
-        if let Some(label) = &pin.label {
-            if !labels_seen.insert(label.clone()) {
-                bail!("duplicate label '{}'", label);
-            }
+        if let Some(label) = &pin.label
+            && !labels_seen.insert(label.clone())
+        {
+            bail!("duplicate label '{}'", label);
         }
     }
 

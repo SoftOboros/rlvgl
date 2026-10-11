@@ -565,6 +565,12 @@ Owner ratification unblocks the following ordered execution phases:
 
 ## §16 Execution record
 
+The 2026-10-05 release-candidate software regression and remaining acceptance
+boundaries are recorded in
+[`v0.2.7-demo-evidence.md`](../releases/v0.2.7-demo-evidence.md). This informative
+receipt preserves the dated bench observations below; it does not close the
+ten-minute hardware soak, independent bridge-package, or publication gates.
+
 - 2026-07-12 — Implemented `ratatui-rlvgl` on the Ratatui contribution branch
   and pinned its committed gitlink. Independent host tests, strict clippy, and
   `thumbv7em-none-eabihf` `no_std` compilation pass.

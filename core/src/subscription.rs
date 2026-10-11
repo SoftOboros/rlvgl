@@ -819,6 +819,43 @@ impl SubscriptionRegistry {
             .filter(move |info| info.stage_id == stage_id)
     }
 
+    /// Prepare one bounded native snapshot extension without VM data.
+    pub(crate) fn snapshot_record(
+        &self,
+        stage_id: StageId,
+        mut actor: crate::direction::SnapshotRecord,
+        max_subscriptions: usize,
+    ) -> Result<crate::direction::SubscriptionSnapshotRecord, RegistryError> {
+        let identity = ActorIdentity {
+            object_id: actor.object_id,
+            type_id: actor.type_id,
+        };
+        let total_subscriptions = self
+            .subscriptions_for_stage(stage_id)
+            .filter(|info| info.actor_identity == identity)
+            .count();
+        let retained = total_subscriptions.min(max_subscriptions);
+        let mut subscriptions = Vec::new();
+        subscriptions
+            .try_reserve_exact(retained)
+            .map_err(|_| RegistryError::Capacity {
+                kind: crate::actor::CapacityKind::SnapshotValues,
+            })?;
+        subscriptions.extend(
+            self.subscriptions_for_stage(stage_id)
+                .filter(|info| info.actor_identity == identity)
+                .take(retained),
+        );
+        let subscriptions_truncated = retained < total_subscriptions;
+        actor.truncated |= subscriptions_truncated;
+        Ok(crate::direction::SubscriptionSnapshotRecord {
+            actor,
+            subscriptions,
+            total_subscriptions,
+            subscriptions_truncated,
+        })
+    }
+
     /// Reserve one complete descriptor-first native traversal.
     ///
     /// The route was already resolved against one explicit Stage root (or
@@ -1144,7 +1181,7 @@ impl SubscriptionRegistry {
     /// Validate and install one descriptor-qualified subscription.
     pub fn subscribe(
         &mut self,
-        stage: &StageRegistry,
+        stage: &mut StageRegistry,
         request: SubscribeRequest,
     ) -> Result<SubscriptionId, SubscriptionError> {
         if request.stage_id != stage.stage_id() {
@@ -1183,6 +1220,7 @@ impl SubscriptionRegistry {
             return Err(SubscriptionError::IdentifierExhausted);
         }
         let revision = self.next_revision()?;
+        let stage_revision = stage.prepare_subscription_revision()?;
         self.records.push(SubscriptionRecord {
             subscription_id,
             stage_id: request.stage_id,
@@ -1198,6 +1236,7 @@ impl SubscriptionRegistry {
         self.next_subscription_id = self.next_subscription_id.checked_add(1).unwrap_or(0);
         self.next_registration_order = self.next_registration_order.checked_add(1).unwrap_or(0);
         self.revision = revision;
+        stage.commit_subscription_revision(stage_revision);
         Ok(subscription_id)
     }
 
@@ -1460,10 +1499,11 @@ impl SubscriptionRegistry {
     /// Remove one exact subscription with bounded idempotent-close detection.
     pub fn unsubscribe(
         &mut self,
-        stage_id: StageId,
+        stage: &mut StageRegistry,
         actor_identity: ActorIdentity,
         subscription_id: SubscriptionId,
     ) -> Result<UnsubscribeOutcome, SubscriptionError> {
+        let stage_id = stage.stage_id();
         let Some(index) = self.records.iter().position(|record| {
             record.subscription_id == subscription_id
                 && record.stage_id == stage_id
@@ -1480,6 +1520,7 @@ impl SubscriptionRegistry {
             };
         };
         let revision = self.next_revision()?;
+        let stage_revision = stage.prepare_subscription_revision()?;
         let record = self.records.remove(index);
         let report = self.report(&record);
         self.push_tombstone(Tombstone {
@@ -1488,6 +1529,7 @@ impl SubscriptionRegistry {
             subscription_id,
         });
         self.revision = revision;
+        stage.commit_subscription_revision(stage_revision);
         Ok(UnsubscribeOutcome::Removed(report))
     }
 

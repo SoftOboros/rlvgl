@@ -106,7 +106,7 @@ pub mod nt35510;
 pub mod pdm_filter;
 #[cfg(feature = "simulator")]
 pub mod pixels_renderer;
-/// LPAR-03 display presenter: resolves a [`PresentPlan`] into flush calls.
+/// LPAR-03 display presenter: resolves a [`rlvgl_core::invalidation::PresentPlan`] into flush calls.
 pub mod present;
 #[cfg(all(
     feature = "stm32h747i_disco",

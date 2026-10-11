@@ -7,6 +7,18 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## v0.2.7 (candidate)
+
+Consolidates the existing v0.2.7 source with the read-only CCPS Modbus handoff,
+C3 diagnostic Rust bridge, and pinned Ratatui portable atomics. Includes the
+native MPY/CPY runtime substrate, Wayland presentation work, C3/C6 network-time
+examples, and new I2C device crates. Both `rlvgl` and `rlvgl-core` target
+`0.2.7`; other package versions advance selectively;
+family release/conformance closure remains governed by each initiative.
+See [candidate scope and package versions](releases/v0.2.7.md) and
+[validation status](releases/v0.2.7-validation.md). Latest bounded work is
+recorded in [family wave three](releases/v0.2.7-family-wave3.md).
+
 ## v0.2.5
 
 Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.5.md).

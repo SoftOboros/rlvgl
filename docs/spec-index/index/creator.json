@@ -1,0 +1,225 @@
+{
+  "edge_count": 9,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 48,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 54,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 68,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 94,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 115,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 115,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 115,
+      "source": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "target": "INV-CREATOR-3"
+    }
+  ],
+  "family": "creator",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 8,
+    "rationale": 1
+  },
+  "object_count": 10,
+  "objects": [
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 87,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:87",
+      "text": "Owner accepted the narrow source-key/agreement/absence rules before code on 2026-10-11."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 88,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:88",
+      "text": "§0, §3/§4, §10 and §15 assign authority, preserve adjacent behavior and delimit scope."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 89,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:89",
+      "text": "Optional HSE remains unknown; no wider family/physical conformance is ratified."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 90,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:90",
+      "text": "Family errata is activated from the pinned SBC template; the diagnosed failure is retained."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-CREATOR-1"
+        ]
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 94,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:94",
+      "text": "Existing admitted tests cover §5/INV-CREATOR-1 primary/virtual/equal/conflicting/unsupported/absent cases and external/non-owner paths, with meaningful negative controls."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-CREATOR-2"
+        ]
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 95,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:95",
+      "text": "Existing tests cover §6/INV-CREATOR-2 unknown and numeric diagnostic rendering."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-CREATOR-3"
+        ]
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 96,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:96",
+      "text": "Source/locks/ownership preservation proves §9/INV-CREATOR-3."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "gate",
+      "line": 97,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md:gate:97",
+      "text": "Rebuilt Creator, single unchanged H747 IOC and exact CM7 profile retain actual results and generation delta; compilation is separate from hardware readiness."
+    },
+    {
+      "attrs": {
+        "author": "Ira Abbott (ratifier); OpenAI Codex (recording)",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "ratified",
+        "summary": "Records owner-accepted explicit source-key admission, normalized agreement and unresolved-source diagnostics for emitted owned H7 PLL initialization; preserves unknown optional HSE.",
+        "touches": [
+          "INV-CREATOR-1",
+          "INV-CREATOR-2",
+          "INV-CREATOR-3"
+        ]
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "amendment",
+      "line": 111,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md#0.1.0",
+      "text": "Records owner-accepted explicit source-key admission, normalized agreement and unresolved-source diagnostics for emitted owned H7 PLL initialization; preserves unknown optional HSE."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "INV-CREATOR-1",
+          "INV-CREATOR-2",
+          "INV-CREATOR-3"
+        ]
+      },
+      "doc": "docs/bsp/CREATOR-00-CONCEPTS.md",
+      "family": "creator",
+      "kind": "rationale",
+      "line": 111,
+      "obj_id": "docs/bsp/CREATOR-00-CONCEPTS.md#0.1.0-rationale",
+      "text": "The actual IOC carries HSE intent in the virtual source key, while the primary-only parser yields a nullable value and generated HSI fallback. Silent priority on conflicting keys, accepting arbitrary tokens, and importing the board's 25 MHz runtime assumption were considered and rejected: they would hide disagreement or fabricate input intent. The existing accepted clock-owner correction remains unchanged. The scope ratifies only this narrow contract, not legacy Creator/BSP narratives, register encodings, reserved frequency overrides, other phases or hardware. ERRATA-001 remains diagnosed until a resolving commit and actual verification are recorded."
+    }
+  ],
+  "schema_version": 2
+}

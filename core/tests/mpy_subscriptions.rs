@@ -376,15 +376,16 @@ fn proof_descriptor_matrix_and_payload_adapters_are_canonical() {
 #[test]
 fn reservation_completion_preserves_registration_order_and_semantic_gate() {
     let mut stage = stage();
+    let stage_id_for_subscription = stage.stage_id();
     let actor = create_button(&mut stage);
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(1).unwrap(), subscription_limits(4, 4))
             .unwrap();
     let first = subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 button::MPY_CLICKED_EVENT_ID,
                 10,
@@ -394,9 +395,9 @@ fn reservation_completion_preserves_registration_order_and_semantic_gate() {
         .unwrap();
     let second = subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 button::MPY_CLICKED_EVENT_ID,
                 11,
@@ -452,15 +453,16 @@ fn reservation_completion_preserves_registration_order_and_semantic_gate() {
 #[test]
 fn actual_transition_controls_revision_cue_and_predeclared_consume() {
     let mut stage = stage();
+    let stage_id_for_subscription = stage.stage_id();
     let actor = create_slider(&mut stage);
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(2).unwrap(), subscription_limits(2, 2))
             .unwrap();
     subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 slider::MPY_VALUE_CHANGED_EVENT_ID,
                 20,
@@ -560,33 +562,33 @@ fn invalid_policy_filter_identity_callback_and_capacity_are_rejected() {
     );
     invalid.phase = DispatchPhase::Bubble;
     assert_eq!(
-        subscriptions.subscribe(&stage, invalid),
+        subscriptions.subscribe(&mut stage, invalid),
         Err(SubscriptionError::InvalidPhase)
     );
     invalid.phase = DispatchPhase::Target;
     invalid.propagation = PropagationPolicy::PreventDefault;
     assert_eq!(
-        subscriptions.subscribe(&stage, invalid),
+        subscriptions.subscribe(&mut stage, invalid),
         Err(SubscriptionError::UnsupportedPolicy)
     );
     invalid.propagation = PropagationPolicy::Observe;
     invalid.filter = SubscriptionFilter::PointerRegion(Rect { width: 0, ..BOUNDS });
     assert_eq!(
-        subscriptions.subscribe(&stage, invalid),
+        subscriptions.subscribe(&mut stage, invalid),
         Err(SubscriptionError::InvalidFilter)
     );
     invalid.filter = SubscriptionFilter::Any;
-    subscriptions.subscribe(&stage, invalid).unwrap();
+    subscriptions.subscribe(&mut stage, invalid).unwrap();
     invalid.callback_id = CallbackId::new(1).unwrap();
     assert_eq!(
-        subscriptions.subscribe(&stage, invalid),
+        subscriptions.subscribe(&mut stage, invalid),
         Err(SubscriptionError::DuplicateCallback)
     );
     invalid.callback_id = CallbackId::new(2).unwrap();
-    subscriptions.subscribe(&stage, invalid).unwrap();
+    subscriptions.subscribe(&mut stage, invalid).unwrap();
     invalid.callback_id = CallbackId::new(3).unwrap();
     assert_eq!(
-        subscriptions.subscribe(&stage, invalid),
+        subscriptions.subscribe(&mut stage, invalid),
         Err(SubscriptionError::Capacity)
     );
 
@@ -612,6 +614,7 @@ fn invalid_policy_filter_identity_callback_and_capacity_are_rejected() {
 #[test]
 fn insufficient_preflight_and_stale_workspace_fail_before_cue_loss() {
     let mut stage = stage();
+    let stage_id_for_subscription = stage.stage_id();
     let actor = create_button(&mut stage);
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(5).unwrap(), subscription_limits(3, 1))
@@ -619,9 +622,9 @@ fn insufficient_preflight_and_stale_workspace_fail_before_cue_loss() {
     for callback in [1, 2] {
         subscriptions
             .subscribe(
-                &stage,
+                &mut stage,
                 request(
-                    stage.stage_id(),
+                    stage_id_for_subscription,
                     actor,
                     button::MPY_CLICKED_EVENT_ID,
                     callback,
@@ -649,9 +652,9 @@ fn insufficient_preflight_and_stale_workspace_fail_before_cue_loss() {
             .unwrap();
     subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 button::MPY_CLICKED_EVENT_ID,
                 3,
@@ -662,9 +665,9 @@ fn insufficient_preflight_and_stale_workspace_fail_before_cue_loss() {
     let mut workspace = reserve(&subscriptions, &mut stage, actor, &event, 2);
     subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 button::MPY_CLICKED_EVENT_ID,
                 4,
@@ -734,6 +737,7 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
         object_id: child,
         type_id: button::MPY_TYPE_ID,
     };
+    let stage_id_for_subscription = stage.stage_id();
     let mut subscriptions = SubscriptionRegistry::new(
         EndpointEpoch::new(7).unwrap(),
         SubscriptionLimits::new(4, 32, 1, 4).unwrap(),
@@ -741,9 +745,9 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
     .unwrap();
     let parent_subscription = subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 parent_identity,
                 PARENT_EVENT_ID,
                 1,
@@ -753,9 +757,9 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
         .unwrap();
     let child_subscription = subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 child_identity,
                 button::MPY_CLICKED_EVENT_ID,
                 2,
@@ -799,12 +803,12 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
     assert_eq!(deallocations, 1);
     assert_eq!(
         subscriptions
-            .unsubscribe(stage.stage_id(), parent_identity, parent_subscription)
+            .unsubscribe(&mut stage, parent_identity, parent_subscription)
             .unwrap(),
         UnsubscribeOutcome::AlreadyRemoved
     );
     assert_eq!(
-        subscriptions.unsubscribe(stage.stage_id(), child_identity, child_subscription),
+        subscriptions.unsubscribe(&mut stage, child_identity, child_subscription),
         Err(SubscriptionError::StaleSubscription)
     );
 }
@@ -812,15 +816,16 @@ fn teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded() {
 #[test]
 fn prepared_teardown_drop_rolls_back_and_revision_changes_make_it_stale() {
     let mut stage = stage();
+    let stage_id_for_subscription = stage.stage_id();
     let actor = create_button(&mut stage);
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(11).unwrap(), subscription_limits(3, 3))
             .unwrap();
     let first = subscriptions
         .subscribe(
-            &stage,
+            &mut stage,
             request(
-                stage.stage_id(),
+                stage_id_for_subscription,
                 actor,
                 button::MPY_CLICKED_EVENT_ID,
                 1,
@@ -842,9 +847,7 @@ fn prepared_teardown_drop_rolls_back_and_revision_changes_make_it_stale() {
         .prepare_teardown_stage_child_first(stage.stage_id(), &[actor.object_id])
         .unwrap();
     assert!(matches!(
-        subscriptions
-            .unsubscribe(stage.stage_id(), actor, first)
-            .unwrap(),
+        subscriptions.unsubscribe(&mut stage, actor, first).unwrap(),
         UnsubscribeOutcome::Removed(_)
     ));
     let (committed, allocations, deallocations) =
@@ -1045,6 +1048,7 @@ fn descriptor_order_precedes_per_descriptor_registration_order() {
         object_id,
         type_id: ORDERED_ACTOR_TYPE,
     };
+    let stage_id_for_subscription = stage.stage_id();
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(10).unwrap(), subscription_limits(4, 4))
             .unwrap();
@@ -1055,9 +1059,9 @@ fn descriptor_order_precedes_per_descriptor_registration_order() {
     ] {
         subscriptions
             .subscribe(
-                &stage,
+                &mut stage,
                 request(
-                    stage.stage_id(),
+                    stage_id_for_subscription,
                     actor,
                     event_id,
                     callback,
@@ -1121,6 +1125,7 @@ fn dispatch_wide_workspace_is_allocation_free_and_preserves_descriptor_fanout_or
         object_id,
         type_id: ORDERED_ACTOR_TYPE,
     };
+    let stage_id_for_subscription = stage.stage_id();
     let mut subscriptions =
         SubscriptionRegistry::new(EndpointEpoch::new(11).unwrap(), subscription_limits(4, 4))
             .unwrap();
@@ -1131,9 +1136,9 @@ fn dispatch_wide_workspace_is_allocation_free_and_preserves_descriptor_fanout_or
     ] {
         subscriptions
             .subscribe(
-                &stage,
+                &mut stage,
                 request(
-                    stage.stage_id(),
+                    stage_id_for_subscription,
                     actor,
                     event_id,
                     callback,

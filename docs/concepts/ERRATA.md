@@ -39,7 +39,7 @@ family-local errata log alongside its phase documents.
 
 | Id | Title | Status | Phase | First seen |
 |---|---|---|---|---|
-| *(none)* | — | — | — | — |
+| ERRATA-001 | Infallible text readback aborts snapshot preparation | 🟡 diagnosed | MPY-04 §8.2; MPY-05 §6 | 2026-10-10 |
 
 ---
 
@@ -55,3 +55,36 @@ family-local errata log alongside its phase documents.
 5. Keep entries permanently. On resolution, record the resolving commit and
    verification evidence, change the status to 🟢, and remove its Open
    Questions row.
+
+---
+
+## ERRATA-001 — Infallible text readback aborts snapshot preparation
+
+**Status:** 🟡 diagnosed
+
+**First seen:** 2026-10-10
+
+**Phase:** MPY-04 §8.2 complete-page allocation guarantee; MPY-05 §6 native projection
+
+**Classification:** implementation defect; no requirement deviation or new PCDN
+
+**Evidence:** The nonempty Button snapshot allocation-failure sweep aborted on
+an 11-byte allocation (`SIGABRT`) in `MpyActor::property`. Both Button and Label
+used `String::from(self.text())` for property readback, which cannot return the
+existing `RegistryError` on allocation failure. The original failure remains
+preserved in the external recovery evidence at
+`recovery/mpy/implementation-snapshot.log`.
+
+**Prescription:** In those two property-readback arms only, reserve an empty
+String with `try_reserve_exact`, map allocation failure to the existing
+`RegistryError::Capacity { kind: SnapshotValues }`, then copy with `push_str`.
+Keep actor direction preparation, constructors and invocation paths unchanged.
+Retry the original nonempty complete-page sweep and independently inject Label
+readback failure; demonstrate that the cursor position/sequence/end ownership
+and Stage/subscription revisions do not change on returned preparation failure.
+If another external infallible allocation appears, stop the affected proof and
+record its exact boundary instead of extending the correction recursively.
+
+**Resolution:** Candidate correction and verification pending. No resolving
+commit is recorded; this entry remains diagnosed until the fix lands with its
+verification evidence.
