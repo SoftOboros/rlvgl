@@ -1,85 +1,124 @@
-# Continues crates.io publishing from the current workflow revision by diffing
-# against the previous release tag.
+# CRATES-CI-00 §5 / §15 0.1.2: manually resume the frozen tagged candidate
+# only after same-commit Gate P. Helper maintenance identity is separate.
 name: Publish Continue
-
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '15 4,12,20 * * *'
-
+'on':
+  workflow_dispatch: null
 concurrency:
   group: publish-continue
   cancel-in-progress: false
-
 jobs:
+  resolve-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_sha: ${{ steps.tags.outputs.tag_sha }}
+      base_sha: ${{ steps.tags.outputs.base_sha }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Resolve frozen release source
+      id: tags
+      shell: bash
+      run: |
+        mapfile -t tags < <(git tag -l 'v*' --sort=-version:refname)
+        if [[ ${#tags[@]} -lt 2 ]]; then
+          echo "Need at least two release tags to continue publishing." >&2
+          exit 1
+        fi
+
+        head_tag="${tags[0]}"
+        base_tag="${tags[1]}"
+        workflow_sha="$(git rev-parse HEAD)"
+        tag_sha="$(git rev-parse "$head_tag^{commit}")"
+        base_sha="$(git rev-parse "$base_tag^{commit}")"
+
+        echo "head_tag=$head_tag" >> "$GITHUB_OUTPUT"
+        echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
+        echo "workflow_sha=$workflow_sha" >> "$GITHUB_OUTPUT"
+        echo "tag_sha=$tag_sha" >> "$GITHUB_OUTPUT"
+        echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+
+        echo "Publish continue diff:"
+        echo "  workflow head: $workflow_sha"
+        echo "  latest tag:    $head_tag ($tag_sha)"
+        echo "  previous tag:  $base_tag ($base_sha)"
+    permissions:
+      contents: read
+  gate-p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.resolve-release.outputs.tag_sha }}
+        fetch-depth: 0
+        submodules: recursive
+    - name: Prepare build environment
+      run: bash scripts/setup-ci-env.sh
+    - name: Stage publishable crates
+      run: bash scripts/crates_ci_stage.sh
+    - name: Lib consumer smoke (Gate P)
+      run: bash consumers/lib-smoke/gate_p.sh
+    - name: Creator CLI smoke (Gate P)
+      run: bash consumers/creator-cli/smoke.sh
+    - name: User sim consumer (Gate P)
+      run: bash consumers/user-sim/gate_p.sh
+    needs: resolve-release
+    permissions:
+      contents: read
   publish:
     runs-on: ubuntu-latest
     environment: release
     permissions:
       contents: read
       id-token: write
-
     steps:
-      - name: Checkout repository history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
+    - name: Checkout repository history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - name: Preserve publish helper from workflow revision
+      id: helper
+      shell: bash
+      run: |
+        helper_sha="$(git rev-parse HEAD)"
+        cp scripts/publish_changed.sh /tmp/publish_changed.sh
+        chmod +x /tmp/publish_changed.sh
 
-      - name: Resolve release baseline
-        id: tags
-        shell: bash
-        run: |
-          mapfile -t tags < <(git tag -l 'v*' --sort=-version:refname)
-          if [[ ${#tags[@]} -lt 2 ]]; then
-            echo "Need at least two release tags to continue publishing." >&2
-            exit 1
-          fi
-
-          head_tag="${tags[0]}"
-          base_tag="${tags[1]}"
-          workflow_sha="$(git rev-parse HEAD)"
-          tag_sha="$(git rev-parse "$head_tag")"
-          base_sha="$(git rev-parse "$base_tag")"
-
-          echo "head_tag=$head_tag" >> "$GITHUB_OUTPUT"
-          echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
-          echo "workflow_sha=$workflow_sha" >> "$GITHUB_OUTPUT"
-          echo "tag_sha=$tag_sha" >> "$GITHUB_OUTPUT"
-          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
-
-          echo "Publish continue diff:"
-          echo "  workflow head: $workflow_sha"
-          echo "  latest tag:    $head_tag ($tag_sha)"
-          echo "  previous tag:  $base_tag ($base_sha)"
-
-      - name: Preserve publish helper from workflow revision
-        id: helper
-        shell: bash
-        run: |
-          helper_sha="$(git rev-parse HEAD)"
-          cp scripts/publish_changed.sh /tmp/publish_changed.sh
-          chmod +x /tmp/publish_changed.sh
-
-          echo "helper_sha=$helper_sha" >> "$GITHUB_OUTPUT"
-          echo "Preserved publish helper from workflow revision: $helper_sha"
-
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Authenticate with crates.io
-        id: crates_io_auth
-        uses: rust-lang/crates-io-auth-action@v1
-
-      - name: Publish remaining crates from latest release diff
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
-        run: /tmp/publish_changed.sh "${{ steps.tags.outputs.base_sha }}"
+        echo "helper_sha=$helper_sha" >> "$GITHUB_OUTPUT"
+        echo "Preserved publish helper from workflow revision: $helper_sha"
+    - name: Checkout frozen release source
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ needs.resolve-release.outputs.tag_sha }}
+        fetch-depth: 0
+        submodules: recursive
+    - name: Verify frozen release source
+      shell: bash
+      env:
+        EXPECTED_RELEASE_SHA: ${{ needs.resolve-release.outputs.tag_sha }}
+      run: |
+        test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
+        test -z "$(git status --porcelain)"
+    - name: Install stable toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+    - name: Authenticate with crates.io
+      id: crates_io_auth
+      uses: rust-lang/crates-io-auth-action@v1
+    - name: Publish remaining crates from latest release diff
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
+      run: /tmp/publish_changed.sh "${{ needs.resolve-release.outputs.base_sha }}"
+    needs:
+    - resolve-release
+    - gate-p
