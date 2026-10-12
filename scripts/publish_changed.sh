@@ -24,6 +24,11 @@ ordered_crates=(
   rlvgl-chips-ti
   rlvgl-chips-rp2040
   rlvgl-bsps-stm
+  rlvgl-device-pcm3168a
+  rlvgl-device-ptn3460
+  rlvgl-device-stts22h
+  rlvgl-device-veml3235sl
+  rlvgl-kria-i2c
   disco-assets
   rlvgl-api
   rlvgl-core
@@ -243,6 +248,11 @@ done
 if path_changed '^chips/stm/bsps/'; then
   append_unique "rlvgl-bsps-stm"
 fi
+for crate in rlvgl-device-pcm3168a rlvgl-device-ptn3460 rlvgl-device-stts22h rlvgl-device-veml3235sl rlvgl-kria-i2c; do
+  if path_changed "^devices/${crate}/"; then
+    append_unique "$crate"
+  fi
+done
 if path_changed '^examples/stm32h747i-disco/assets/disco-assets/'; then
   append_unique "disco-assets"
 fi

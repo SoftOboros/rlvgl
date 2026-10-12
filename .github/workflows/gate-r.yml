@@ -24,14 +24,13 @@
 name: crates-ci (Gate R)
 
 on:
-  # (a) After every successful run of publish.yml (name: "Publish") —
+  # (a) After every successful primary or continuation publication —
   # registry truth is checked as soon as a publish completes.
   workflow_run:
-    workflows: ["Publish"]
+    workflows: ["Publish", "Publish Continue"]
     types:
       - completed
-  # (b) Daily, offset from publish-continue.yml's '15 4,12,20 * * *' so
-  # the scheduled runs don't stampede the same infrastructure.
+  # (b) Daily registry-truth verification; continuation publication is manual-only.
   schedule:
     - cron: '30 16 * * *'
   # (c) On demand.

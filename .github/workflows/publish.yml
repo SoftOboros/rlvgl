@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           submodules: recursive
       - name: Prepare build environment
         run: bash scripts/setup-ci-env.sh
@@ -81,6 +83,14 @@ jobs:
             fi
             printf 'base=%s\n' "$base" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify frozen release source
+        shell: bash
+        env:
+          EXPECTED_RELEASE_SHA: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
+          test -z "$(git status --porcelain)"
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
