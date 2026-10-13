@@ -1128,3 +1128,78 @@ PR/squash guards remain required. New release/tag identity, publication/Gate R
 and parent adoption remain separately admitted decisions after their gates.
 No admin bypass, force update, retagging, failure relabeling or hardware readiness
 claim is granted. Stop for any new PCDN.
+
+### 0.1.13 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-13
+**Change kind:** semantic
+**Touches:** §5 one governing documentation adoption and later qualification profile
+**Summary:** Admit the exact retained hosted diagnostic spelling failures for
+one five-document PR; admit two dated qualification inputs only in the later
+coherent source PR. All source and release gates remain required.
+
+#### Rationale and bounded documentation disposition
+
+The owner accepted PCDN-13 after PR223's hosted CI run 38425309332 failed its
+workspace test step: 11 of 14 compile-fail cases passed. Its setup script
+updated nightly from Rust 1.91 to 1.101.0-nightly `e9bbadf68` (2026-10-12).
+Only `dca_dbuf_use_after_lend`, `dca_ltdc_use_after_stop` and
+`dca_use_after_lend` differed. Each retained E0382, identical moved values,
+move/borrow positions and receiver ownership prohibition; only the explanatory
+note added `rlvgl_platform::hwcore::dca::` to its type name. Retain the actual
+11/14 failed result and complete diagnostic evidence as OPEN. Do not bless,
+normalize, filter or relabel the failed snapshots as passing.
+
+For the one five-Markdown governing PR223 based on genuine main
+`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2` only, the owner admits that exact
+hosted result alongside 0.1.10's retained local 13/14 `scanout_front_write`
+result. Hosted Gate P run 38425309292 reproduced the already OPEN PCDN-04
+root rlvgl 0.2.5 `Cargo.toml.orig` payload drift; its consumers were skipped.
+That remains a failed Gate P, not a source or release qualification.
+
+Amend only this owning disposition and its AGENTS mirror, then refreeze and
+review the complete five postimages enumerated in 0.1.9. Freshly pass their
+unchanged unfiltered link command and literal formatting, and prove unchanged
+compiled source, fixtures, manifests, versions, locks, nested pins and release
+and parent refs outside the five paths. Keep the protected PR/squash route;
+no administrative bypass, force update or status substitution is admitted.
+This explicitly admits that documentation adoption boundary despite the
+retained exact failures; all other prerequisites remain. The exception expires
+at adoption. Any additional failing case, source/profile/input requirement or
+base drift is a new owning decision stop. It never qualifies later source.
+
+#### Exact later qualification-profile admission
+
+After adoption and verification of the actual resulting main ref, the later
+coherent implementation PR MAY additionally change exactly
+`scripts/setup-ci-env.sh` and `.github/workflows/ci.yml` for the qualification
+profile. Select `nightly-2025-07-31`: rustc 1.90.0-nightly `3048886e5` and
+Cargo 1.90.0-nightly `9b296973b`. Replace floating nightly update/selection
+with genuine dated installation, effective profile selection for all existing
+setup callers and subsequent steps, identity logging and fail-closed checks.
+Make CI's docs command use that same dated profile instead of `cargo +nightly`.
+Retain recursive submodule setup, rustfmt, clippy, rust-src,
+llvm-tools-preview, required targets and every existing command/failure return.
+A caller's unexpected profile or unavailable component/target is a stop;
+no compiler/date fallback or simulated installation is permitted.
+
+Record actual Linux compiler, Cargo, component and target identities. The
+preserved macOS profile is provenance, not proof of Linux qualification.
+Pinning b64 alone is not expected to make its inherited snapshot green.
+The subsequent genuine integrated source SHALL pass all 14 compile-fail
+cases, complete pre-commit/pre-publish, publisher/workflow contracts and full
+clean same-ref Linux/hosted Gate P, P-DIFF, archive order, extracted predecessor
+withdrawal and all three consumers. Retain accepted source/provenance checks,
+including the separately admitted scanout correction. Neither documentation
+failure disposition transfers to this source PR. Any further mismatch or
+unadmitted source, fixture, lock or guard requirement stops for a new PCDN.
+
+The shared helper's dated selection reaches its existing container callers;
+no other workflow YAML, publisher stable selection, OIDC/authentication,
+trigger, container/image or qualification guard is admitted for alteration.
+Keep all five adopted governing postimages and the ten later cleanup docs,
+0.1.12's exact two README receipt SHA leaves and every other receipt value.
+Preserve selective bridge 0.1.2, platform 0.2.7, root 0.2.8 and core 0.2.7,
+unmodified official Ratatui 0.30.2, released A2/v0.2.7 and parent pins.
+No new release identity, registry publication, hardware flash, phase
+ratification or general CI waiver follows. Stop for any new PCDN.

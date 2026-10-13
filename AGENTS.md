@@ -129,6 +129,23 @@ font, manifest, lock, version, pin or unchanged published core payload edit is
 admitted. Preserve all normal source/staging/consumer/release gates and stop
 for any extra path, base drift, source/profile requirement, error or PCDN.
 
+Owner-accepted PCDN-13 admits only PR223's exact hosted 11/14 diagnostic
+spelling failure alongside the retained PCDN-10 local result and OPEN PCDN-04
+payload drift, under
+[CRATES-CI §15 amendment 0.1.13](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Refreeze/review the exact five Markdown paths; pass fresh unchanged link and
+literal-format checks, preserve all other source/pin inputs and keep the
+protected PR/squash route. Retain failed status and evidence as OPEN; no
+fixture blessing or status substitution. This admission expires at adoption
+or any added case/input/profile/base requirement. Only the later coherent
+source PR may change `scripts/setup-ci-env.sh` and `.github/workflows/ci.yml`
+to the genuine nightly-2025-07-31 qualification profile with fail-closed
+identity checks. That source must pass all 14 snapshots and every normal
+source/pre-publish/clean Gate P/consumer/release guard. No other workflow,
+publisher toolchain/auth, source, lock or pin change is admitted by PCDN-13.
+Preserve released A2, official Ratatui 0.30.2 and parent pins; stop for any new
+PCDN. This is no passing main or release qualification.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
