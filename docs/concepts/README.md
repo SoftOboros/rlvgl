@@ -269,6 +269,54 @@ ledger; each is a §0–§15 doc with its behaviour change landing as
 
 ### Multi-wave UI/runtime initiatives
 
+- **MPY** — MicroPython-directed stage-and-actors runtime: language-neutral
+  object identity, actor descriptors and creation, requested layout with
+  rlvgl-performed geometry, queued callback cues, same-core proof, and CM7/CM4
+  transport.
+  - [MPY-00-CONCEPTS.md](MPY-00-CONCEPTS.md) — **Ratified 2026-08-09.** Defines
+    the director/stage/actor/cue vocabulary, semantic LVGL introspection parity
+    levels, ten initiative invariants, and the MPY-01 through MPY-09 dependency
+    map. Phase documents remain separately gated.
+  - [MPY-01-INTROSPECTION-BASELINE.md](MPY-01-INTROSPECTION-BASELINE.md) —
+    **Ratified 2026-08-09.** Pins the inherited LVGL reference, defines the
+    MPY-I coverage-row schema, inventories the first surfaces, and selects the
+    fully qualified `rlvgl_widgets` proof actors. It supplied MPY-02's baseline
+    without authorizing unratified later phases.
+  - [ERRATA.md](ERRATA.md) — MPY family's living errata log. No accepted MPY
+    errata entries are recorded yet.
+  - [MPY-02-IDENTITY-VALUES-PROTOCOL.md](MPY-02-IDENTITY-VALUES-PROTOCOL.md) —
+    **Ratified 2026-08-15.** Freezes stable generation-checked IDs, canonical
+    tagged values and frames, atomic Batch Results, correlation, errors, and
+    capability-negotiated capacity floors. Golden protocol vectors remain the
+    evidence prerequisite for MPY-03's separate gate.
+  - [MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md](MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md)
+    — **Draft 2026-08-09; not ratified.** Proposes the Stage Registry,
+    actor-local descriptor source, generic native actor creation, type erasure,
+    and compatibility-first `ObjectNode` reconciliation.
+  - [MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md](MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md)
+    — **Draft 2026-08-09; not ratified.** Defines tree/property/action/style/
+    state directions, atomic stage revisions, requested layout, read-only
+    computed geometry, and deterministic snapshots.
+  - [MPY-05-CUES-SAFE-SCHEDULING.md](MPY-05-CUES-SAFE-SCHEDULING.md) —
+    **Draft 2026-08-09; not ratified.** Defines descriptor-backed
+    subscriptions, tokenized queued cues, Safe Turn ordering, declarative event
+    policy, coalescing, overflow, and loss metadata.
+  - [MPY-06-MICROPYTHON-DIRECTOR-BINDING.md](MPY-06-MICROPYTHON-DIRECTOR-BINDING.md)
+    — **Draft 2026-08-09; not ratified.** Proposes the public `Stage`, `Actor`,
+    `Subscription`, and `Transaction` API, descriptor-driven conversion,
+    polling, callback lifetime, and typed exception mapping.
+  - [MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md](MPY-07-SAME-CORE-SIMULATOR-CONFORMANCE.md)
+    — **Draft 2026-08-09; not ratified.** Defines canonical scenarios and
+    direct-runtime versus actual-MicroPython trace, snapshot, geometry, and
+    simulator-frame equivalence before board transport.
+  - [MPY-08-CM7-CM4-TRANSPORT-BOARD-PROOF.md](MPY-08-CM7-CM4-TRANSPORT-BOARD-PROOF.md)
+    — **Draft 2026-08-09; not ratified.** Defines the CM7 director/CM4 runtime
+    roles, canonical-frame queues, platform-owned coherency, boot epochs,
+    backpressure, legacy-mailbox reconciliation, and board proof.
+  - [MPY-09-PARITY-CLOSURE-DOCS-RELEASE.md](MPY-09-PARITY-CLOSURE-DOCS-RELEASE.md)
+    — **Draft 2026-08-09; not ratified.** Defines row/profile parity closure,
+    evidence, resource and release gates, public docs, compatibility/SemVer
+    review, local indexing, and the owner closure record.
 - **LPAR** — LVGL parity backlog across runtime substrate, style,
   draw, layout, widget families, conformance fixtures, examples,
   documentation, and release tracking.
@@ -461,6 +509,34 @@ remaining gaps — font *selection* and anti-aliasing.
     interception limitation on the rotated glyph fast path, deferred-work
     reclassification, and forward constraints for the deferred `FontId`
     theming-registry work.
+
+### RATATUI — curated Unicode, AA text, and modifier fidelity for `ratatui-rlvgl`
+
+Extends the SCTD-04 `ratatui-rlvgl` backend with the capabilities that doc
+explicitly bypassed or deferred: box-drawing/block/arrow/status glyphs
+(today collapsed to ASCII `+`/`-`/`|`/`?`), anti-aliased text via the
+FONT-00 `PackedFont`/`WidgetFont` model (which postdates SCTD-04), real
+bold/italic font variants (replacing a pixel-offset hack and a no-op), and
+a blink-fidelity decision reconciled against SCTD-04 §7's redraw-on-change
+invariant.
+
+- [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) — **Ratified and
+  implemented 2026-07-17.** Curated 375-codepoint repertoire (box
+  drawing, block elements, full arrow block, status symbols; Braille
+  excluded this pass) packed into four crate-local `PackedFont` variants;
+  real bold/italic variant selection replacing the old pixel-offset hack;
+  a tick-driven `RatatuiSurface::advance_blink_phase()` with its
+  companion SCTD-04 §7 amendment; a `Bitmap6x10` opt-out reproducing the
+  pre-RATATUI-00 behavior byte-for-byte. Landed on `SoftOboros/ratatui`
+  `dev/ratatui-rlvgl-backend` @ `adc75755`.
+  - [RATATUI-RETROSPECTIVE.md](RATATUI-RETROSPECTIVE.md) — initiative-
+    completion retrospective (2026-07-18). Covers the single-day
+    draft-to-landed arc: the crate-local asset-placement correction, a
+    worktree/`isolation` dispatch near-miss, the 12×20→14×21 cell-geometry
+    divergence, uneven `.notdef` glyph coverage across font-style variants,
+    and forward constraints. Its §5 records the SCTD hero-popup geometry
+    resolution on 2026-07-18 using opt-in Bitmap6x10 and black-box proof;
+    the earlier geometry mismatch is historical, not reopened work.
 
 (Future concepts initiatives — for example: cross-core IPC primitives,
 non-cacheable MPU region management, SDMMC ownership lifecycle — land

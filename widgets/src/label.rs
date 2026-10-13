@@ -1,5 +1,13 @@
 //! Basic text label.
 use alloc::string::String;
+use rlvgl_core::actor::{
+    ActorCapabilities, ActorFamily, ActorPreparation, ChildPolicy, ConstructedActor,
+    ConstructorArgs, ConstructorFieldDescriptor, LayoutCapabilities, MPY_BASIC_STYLE_PARTS,
+    MpyActor, MutationEffects, PropertyAccess, PropertyConstraint, PropertyDefault,
+    PropertyDescriptor, RegistryError, ResourceCost, TargetSet, TypeDescriptor, TypeId, ValueTag,
+    construct_native_actor,
+};
+use rlvgl_core::direction::{ActorDirection, OwnedValue};
 use rlvgl_core::draw::draw_widget_bg;
 use rlvgl_core::event::Event;
 use rlvgl_core::font::{FontMetrics, WidgetFont, shape_text_ltr};
@@ -56,6 +64,10 @@ impl Label {
         self.text = text.into();
     }
 
+    pub(crate) fn replace_text(&mut self, text: String) -> String {
+        core::mem::replace(&mut self.text, text)
+    }
+
     /// Retrieve the current label text.
     pub fn text(&self) -> &str {
         &self.text
@@ -100,6 +112,71 @@ impl Label {
     }
 }
 
+const MPY_BOUNDS_FIELD: u32 = 1;
+const MPY_TEXT_FIELD: u32 = 2;
+const MPY_TEXT_PROPERTY: u32 = 1;
+
+const MPY_PROPERTIES: [PropertyDescriptor; 1] = [PropertyDescriptor {
+    id: MPY_TEXT_PROPERTY,
+    name: "text",
+    value_tag: ValueTag::Text,
+    access: PropertyAccess::ReadWrite,
+    default: PropertyDefault::Text(""),
+    constraint: PropertyConstraint::TextBytes { max: 4096 },
+    required_capabilities: ActorCapabilities::TEXT,
+    effects: MutationEffects::DRAW
+        .union(MutationEffects::LAYOUT)
+        .union(MutationEffects::SNAPSHOT),
+}];
+
+/// Stable MPY actor type identifier for [`Label`].
+pub const MPY_TYPE_ID: TypeId = TypeId::registered(0x0001_0002);
+
+/// Actor-local MPY descriptor for [`Label`].
+pub const MPY_DESCRIPTOR: TypeDescriptor = TypeDescriptor {
+    type_id: MPY_TYPE_ID,
+    stable_name: "rlvgl_widgets::label::Label",
+    schema_revision: 3,
+    family: ActorFamily::Text,
+    capabilities: ActorCapabilities::TEXT,
+    targets: TargetSet::ALL,
+    constructor_fields: &[
+        ConstructorFieldDescriptor {
+            id: MPY_BOUNDS_FIELD,
+            name: "bounds",
+            value_tag: ValueTag::Rect,
+            required: true,
+        },
+        ConstructorFieldDescriptor {
+            id: MPY_TEXT_FIELD,
+            name: "text",
+            value_tag: ValueTag::Text,
+            required: true,
+        },
+    ],
+    properties: &MPY_PROPERTIES,
+    actions: &[],
+    events: &[],
+    styles: &MPY_BASIC_STYLE_PARTS,
+    child_policy: ChildPolicy::None,
+    layout: LayoutCapabilities::ITEM_HINTS.union(LayoutCapabilities::INTRINSIC_MEASUREMENT),
+    resource_cost: ResourceCost {
+        text_bytes: 0,
+        resources: 0,
+    },
+    constructor: construct_mpy,
+};
+
+fn construct_mpy(args: ConstructorArgs<'_>) -> Result<ConstructedActor, RegistryError> {
+    Ok(construct_native_actor(
+        MPY_TYPE_ID,
+        Label::new(
+            args.required_text(MPY_TEXT_FIELD)?,
+            args.required_rect(MPY_BOUNDS_FIELD)?,
+        ),
+    ))
+}
+
 impl Widget for Label {
     fn bounds(&self) -> Rect {
         self.bounds
@@ -115,5 +192,58 @@ impl Widget for Label {
 
     fn handle_event(&mut self, _event: &Event) -> bool {
         false
+    }
+}
+
+impl MpyActor for Label {
+    type Prepared = String;
+
+    fn property(&self, id: u32) -> Result<OwnedValue, RegistryError> {
+        match id {
+            MPY_TEXT_PROPERTY => {
+                let mut text = String::new();
+                text.try_reserve_exact(self.text().len())
+                    .map_err(|_| RegistryError::Capacity {
+                        kind: rlvgl_core::actor::CapacityKind::SnapshotValues,
+                    })?;
+                text.push_str(self.text());
+                Ok(OwnedValue::Text(text))
+            }
+            _ => Err(RegistryError::UnknownProperty { property_id: id }),
+        }
+    }
+
+    fn prepare(
+        &self,
+        directions: &[ActorDirection],
+    ) -> Result<ActorPreparation<String>, RegistryError> {
+        let mut text = String::from(self.text());
+        for direction in directions {
+            match direction {
+                ActorDirection::SetProperty {
+                    id: MPY_TEXT_PROPERTY,
+                    value: OwnedValue::Text(value),
+                } => text = value.clone(),
+                ActorDirection::ResetProperty {
+                    id: MPY_TEXT_PROPERTY,
+                } => text.clear(),
+                ActorDirection::SetProperty { id, .. } | ActorDirection::ResetProperty { id } => {
+                    return Err(RegistryError::UnknownProperty { property_id: *id });
+                }
+                ActorDirection::InvokeAction { id, .. } => {
+                    return Err(RegistryError::UnknownAction { action_id: *id });
+                }
+            }
+        }
+        let text_delta = i64::try_from(text.len()).map_err(|_| RegistryError::Internal)?
+            - i64::try_from(self.text().len()).map_err(|_| RegistryError::Internal)?;
+        Ok(ActorPreparation {
+            prepared: text,
+            text_delta,
+        })
+    }
+
+    fn commit(&mut self, prepared: String) -> String {
+        self.replace_text(prepared)
     }
 }

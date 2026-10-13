@@ -136,18 +136,18 @@ fn validate_pins_against_chip(chip: &NrfChip, board: &NrfBoard) -> Result<()> {
     // Ensure labels are unique.
     let mut seen: IndexMap<&str, (u8, u8)> = IndexMap::new();
     for pin in &board.pins {
-        if let Some(label) = pin.label.as_deref() {
-            if let Some(prev) = seen.insert(label, (pin.port, pin.pin)) {
-                return Err(anyhow!(
-                    "board '{}' reuses label '{}' on P{}.{:02} and P{}.{:02}",
-                    board.name,
-                    label,
-                    prev.0,
-                    prev.1,
-                    pin.port,
-                    pin.pin
-                ));
-            }
+        if let Some(label) = pin.label.as_deref()
+            && let Some(prev) = seen.insert(label, (pin.port, pin.pin))
+        {
+            return Err(anyhow!(
+                "board '{}' reuses label '{}' on P{}.{:02} and P{}.{:02}",
+                board.name,
+                label,
+                prev.0,
+                prev.1,
+                pin.port,
+                pin.pin
+            ));
         }
     }
     Ok(())
@@ -159,10 +159,10 @@ fn validate_slot_exclusion(chip: &NrfChip, board: &NrfBoard) -> Result<()> {
     // Collect unique peripheral instances referenced by board pins.
     let mut used: Vec<&str> = Vec::new();
     for pin in &board.pins {
-        if let Some(ref p) = pin.peripheral {
-            if !used.iter().any(|u| *u == p.as_str()) {
-                used.push(p);
-            }
+        if let Some(ref p) = pin.peripheral
+            && !used.contains(&p.as_str())
+        {
+            used.push(p);
         }
     }
     // Check for slot conflicts.

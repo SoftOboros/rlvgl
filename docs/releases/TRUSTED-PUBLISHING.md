@@ -33,7 +33,10 @@ Add two GitHub Trusted Publisher entries with these values:
 
 Both entries are required. `publish.yml` performs the gated tag/manual
 release. `publish-continue.yml` resumes a partially completed dependency chain
-and uses the same publisher script.
+and uses the same publisher script. Continuation is manual-only: Gate P and
+publication use the same frozen tagged commit. Its recorded maintenance-helper
+revision is separate from package-source identity. Neither publisher has a timed
+publishing trigger. Gate R retains its independent daily registry-truth checks.
 
 The GitHub repository must also have a `release` Environment. Approval rules
 on that Environment are recommended so the OIDC exchange cannot occur until a
@@ -58,7 +61,8 @@ crates.io cannot configure a Trusted Publisher before a crate exists. A new
 crate therefore has this one-time sequence:
 
 1. complete all package and Gate P checks;
-2. publish version `0.1.0` manually with a valid owner credential;
+2. publish the crate's allocated first-release version manually with a valid
+   owner credential;
 3. add both Trusted Publisher entries above; and
 4. rerun `publish-continue.yml`, which skips the now-published version and
    resumes the dependency-ordered chain.
@@ -66,6 +70,12 @@ crate therefore has this one-time sequence:
 For v0.2.5, `ratatui-rlvgl 0.1.0` is the bootstrap crate. Do not add a secret
 fallback to the workflow: the manual first publish is the only exceptional
 step, and subsequent releases use OIDC like the other owned crates.
+
+For the v0.2.7 candidate, the four device drivers and `rlvgl-kria-i2c` retain
+their allocated first-release version `0.2.5`. The historical bridge bootstrap
+example does not assign `0.1.0` to those crates. Complete Gate P and check direct
+ownership before any bootstrap upload, then configure both publishers on each
+new crate and resume the same dependency-ordered chain.
 
 ## Workflow contract
 

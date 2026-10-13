@@ -39,4 +39,13 @@ config DFR0550_NO_TOUCH
         activity that persists across an ESP32 reset from all app-level
         display control paths.
 
+config CCPS_MODBUS_OFFLINE_SELF_TEST
+    bool "Run the CCPS read-only Modbus codec self-test at boot"
+    default n
+    help
+        Build and independently validate the retained one-register Rung-0
+        candidate frame, then log its bytes. This option performs no UART or
+        GPIO initialization and cannot transmit. It exists only to prove the
+        Rust codec is linked into the same ESP-IDF/rlvgl image.
+
 endmenu

@@ -21,6 +21,14 @@ rlvgl-core = { path = "../../../../../core", default-features = false }
 rlvgl-platform = { path = "../../../../../platform", default-features = false }
 rlvgl-app-disco-demo = { path = "../../../../apps/disco-demo", default-features = false, optional = true }
 rlvgl-app-sctd-demo = { path = "../../../../apps/sctd-demo", default-features = false, optional = true }
+rlvgl-battery-monitor = { path = "../../../../apps/battery-monitor", default-features = false, optional = true }
+rlvgl-device-stts22h = { path = "../../../../../devices/rlvgl-device-stts22h", optional = true }
+embedded-hal = { version = "1.0", optional = true }
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+display-interface-i2c = { version = "0.5", optional = true }
+# C3-only feature unification for native Ratatui core and owned portable widgets.
+portable-atomic = { version = "1", default-features = false, features = ["unsafe-assume-single-core"], optional = true }
+ratatui-core = { version = "=0.1.2", path = "../../../../../vendor/ratatui/ratatui-core", default-features = false, features = ["portable-atomic"], optional = true }
 
 [features]
 # Build-time payload selection (SCTD-02 PCDN-02-01). Default = the SCTD
@@ -30,6 +38,14 @@ rlvgl-app-sctd-demo = { path = "../../../../apps/sctd-demo", default-features = 
 default = ["app_sctd"]
 app_sctd = ["dep:rlvgl-app-sctd-demo"]
 app_disco = ["dep:rlvgl-app-disco-demo"]
+app_ccps = ["dep:rlvgl-battery-monitor"]
+diagnostic_i2c = ["dep:rlvgl-device-stts22h", "dep:embedded-hal", "dep:ssd1306", "dep:display-interface-i2c", "rlvgl-platform/ssd1306"]
+idf_c3 = [
+    "dep:portable-atomic",
+    "dep:ratatui-core",
+    "rlvgl-app-sctd-demo?/portable-atomic",
+    "rlvgl-battery-monitor?/portable-atomic",
+]
 
 [profile.release]
 opt-level = "s"
@@ -38,6 +54,12 @@ panic = "abort"
 
 [profile.dev]
 panic = "abort"
+
+# The vendored ratatui bridge declares its public rlvgl-core dependency by
+# version. Keep the detached IDF build on the same in-tree core instance as the
+# selected application payload so WidgetNode/Rect types do not split.
+[patch.crates-io]
+rlvgl-core = { path = "../../../../../core" }
 
 # Detach from the parent workspace.
 [workspace]

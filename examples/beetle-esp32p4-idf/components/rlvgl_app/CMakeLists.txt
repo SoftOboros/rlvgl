@@ -9,22 +9,35 @@
 #   - cargo on PATH (rustup)
 #   - rustup target add riscv32imafc-unknown-none-elf   (ilp32f, matches IDF)
 
-idf_component_register(INCLUDE_DIRS "include")
-
 set(RUST_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/rust")
-set(RUST_TARGET  "riscv32imafc-unknown-none-elf")
+set(RLVGL_RUST_TARGET "riscv32imafc-unknown-none-elf" CACHE STRING
+    "Rust target matching the ESP-IDF host ABI")
+set(RUST_TARGET  "${RLVGL_RUST_TARGET}")
 set(RUST_PROFILE "release")
 set(RUST_LIB     "${RUST_DIR}/target/${RUST_TARGET}/${RUST_PROFILE}/librlvgl_app.a")
 
 # Build-time payload selection (SCTD-02 PCDN-02-01): the default `sctd` payload
 # is the interactive SCXML tutorial demo; `idf.py -DRLVGL_PAYLOAD=disco build`
 # restores the original disco-demo widget tree.
-set(RLVGL_PAYLOAD "sctd" CACHE STRING "rlvgl IDF payload: sctd | disco")
+set(RLVGL_PAYLOAD "sctd" CACHE STRING "rlvgl IDF payload: sctd | disco | ccps")
+set(RLVGL_APP_REQUIRES "")
 if(RLVGL_PAYLOAD STREQUAL "disco")
     set(RUST_CARGO_FEATURES --no-default-features --features app_disco)
+elseif(RLVGL_PAYLOAD STREQUAL "ccps")
+    set(RUST_CARGO_FEATURES --no-default-features --features app_ccps)
+    if(CONFIG_CCPS_DIAGNOSTICS)
+        set(RUST_CARGO_FEATURES --no-default-features --features app_ccps,diagnostic_i2c)
+    endif()
+    set(RLVGL_APP_REQUIRES ccps_bms)
 else()
     set(RUST_CARGO_FEATURES "")
 endif()
+if(RUST_TARGET STREQUAL "riscv32imc-unknown-none-elf")
+    # C3 lacks the A extension; use the established single-core atomic polyfill.
+    list(APPEND RUST_CARGO_FEATURES --features idf_c3)
+endif()
+
+idf_component_register(INCLUDE_DIRS "include" REQUIRES ${RLVGL_APP_REQUIRES})
 
 include(ExternalProject)
 ExternalProject_Add(rlvgl_rust_build

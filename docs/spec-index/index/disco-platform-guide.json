@@ -1,0 +1,38 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "disco-platform-guide",
+  "kind_counts": {
+    "amendment": 1
+  },
+  "object_count": 1,
+  "objects": [
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-28 — DISCO-03: SDCLK 0b01 → 0b10 (column-aliasing fix).**",
+        "touches": null
+      },
+      "doc": "docs/disco-platform-guide/03-sdram-and-fmc.md",
+      "family": "disco-platform-guide",
+      "kind": "amendment",
+      "line": 226,
+      "obj_id": "docs/disco-platform-guide/03-sdram-and-fmc.md#2026-04-28@226",
+      "text": "**2026-04-28 — DISCO-03: SDCLK 0b01 → 0b10 (column-aliasing fix).**"
+    }
+  ],
+  "schema_version": 2
+}

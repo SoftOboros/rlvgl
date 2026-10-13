@@ -1,0 +1,185 @@
+{
+  "edge_count": 25,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 6,
+      "source": "docs/releases/v0.2.7-continuation-wave3.md",
+      "target": "EOQ-002-ERRATA-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 24,
+      "source": "docs/releases/v0.2.7-continuation-wave3.md",
+      "target": "INV-C1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 24,
+      "source": "docs/releases/v0.2.7-continuation-wave3.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 178,
+      "source": "docs/releases/v0.2.7-embedded-next-slice.md",
+      "target": "PCDN-MPY-08-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 36,
+      "source": "docs/releases/v0.2.7-family-execution.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 13,
+      "source": "docs/releases/v0.2.7-family-wave2.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 18,
+      "source": "docs/releases/v0.2.7-family-wave3.md",
+      "target": "EOQ-002-ERRATA-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 52,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 79,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-CPY-05-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 103,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-CPY-07-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 103,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-CPY-07-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 105,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-CPY-09-004"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 168,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-MPY-08-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 168,
+      "source": "docs/releases/v0.2.7-family-work-plan.md",
+      "target": "PCDN-MPY-08-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 76,
+      "source": "docs/releases/v0.2.7-h747-diagnostic-evidence.md",
+      "target": "PCDN-MPY-08-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 76,
+      "source": "docs/releases/v0.2.7-h747-diagnostic-evidence.md",
+      "target": "PCDN-MPY-08-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 90,
+      "source": "docs/releases/v0.2.7-mpy-evidence.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 16,
+      "source": "docs/releases/v0.2.7-mpy-next-slice.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 149,
+      "source": "docs/releases/v0.2.7-mpy-owner-decision.md",
+      "target": "PCDN-MPY-04-017"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 47,
+      "source": "docs/releases/v0.2.7-platform-next-slice.md",
+      "target": "INV-WLD-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 48,
+      "source": "docs/releases/v0.2.7-platform-next-slice.md",
+      "target": "INV-WLD-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 75,
+      "source": "docs/releases/v0.2.7-staging-20261010.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 83,
+      "source": "docs/releases/v0.2.7-staging-descriptors-20261010.md",
+      "target": "INV-C6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 12,
+      "source": "docs/releases/v0.2.7-wld-evidence.md",
+      "target": "INV-WLD-3"
+    }
+  ],
+  "family": "releases",
+  "kind_counts": {},
+  "object_count": 0,
+  "objects": [],
+  "schema_version": 2
+}

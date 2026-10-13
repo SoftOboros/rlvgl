@@ -1,0 +1,38 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "chips-esp",
+  "kind_counts": {
+    "amendment": 1
+  },
+  "object_count": 1,
+  "objects": [
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-15 — Initial retrospective authored.** CHIPS-ESP",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-esp/docs/CHIPS-ESP-RETROSPECTIVE.md",
+      "family": "chips-esp",
+      "kind": "amendment",
+      "line": 902,
+      "obj_id": "chipdb/rlvgl-chips-esp/docs/CHIPS-ESP-RETROSPECTIVE.md#2026-05-15@902",
+      "text": "**2026-05-15 — Initial retrospective authored.** CHIPS-ESP"
+    }
+  ],
+  "schema_version": 2
+}

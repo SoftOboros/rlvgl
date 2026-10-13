@@ -1,8 +1,9 @@
 # KI2C-07 — Kria I2C Hardware Conformance Handoff
 
-**Status:** Hardware-blocked 2026-07-15. The software crates and host/cross
-gates are complete, but no physical-board result is claimed. Execution resumes
-only when the §5 prerequisites are supplied.
+**Status:** Owner-ratified scope amendment 2026-10-06 (§15 0.1.0). The physical
+identity/typed-health profile remains hardware-blocked since 2026-07-15 until
+the §5 prerequisites are supplied. Software gates remain separate from physical
+qualification; no board, temperature or wiring result is claimed.
 
 ## 0. Authority Policy
 
@@ -13,11 +14,18 @@ software/hardware image. Mock transactions, address inference, cross-compiled
 binaries, and an I2C ACK without the typed probe semantics are not conformance
 evidence.
 
+The owner-ratified §6 profile requires strict read-only identity and existing
+reporting. PTN3460 and PCM3168A retain typed health semantics. Identity/health
+success MUST NOT be represented as temperature validation or board qualification.
+Temperature validation and matched prototype wiring remain gates for specific
+CCPS functions that depend on them, not generic RLVGL publication prerequisites.
+
 ## 1. Purpose
 
-Define the minimum safe, reproducible on-board procedure needed to close the
-KI2C initiative without erasing electrical risk, board readiness, or failure
-provenance.
+Define the minimum safe, reproducible identity/typed-health reporting procedure
+on an identified Kria board, preserving electrical risk, board readiness and
+failure provenance. Software release readiness does not imply completion of
+this physical profile or temperature-dependent CCPS validation.
 
 ## 2. Current Software Baseline
 
@@ -87,11 +95,11 @@ Without these inputs, the correct phase state is `hardware-blocked`.
 1. Record the §5 inputs before opening any controller.
 2. Build a caller-owned `PhysicalBusMap` and open it as one `KriaI2cBuses`
    bundle. Attribute an open failure to the exact `LogicalBus`.
-3. On PS I2C1, run `probe_stts22h`; on success, record one coherent signed
-   temperature read without changing its configuration.
-4. On the shared PL bus, run `probe_veml3235sl`; on success, record raw ALS and
-   white values only if a known active configuration already exists or a
-   separately authorized configuration step is performed.
+3. On PS I2C1, run `probe_stts22h`; on success, record the typed identity
+   result only. Do not configure the device or require a temperature read.
+4. On the shared PL bus, run `probe_veml3235sl`; on success, record the typed
+   identity result only. Do not configure the device or require raw ALS/white
+   capture for this identity-only profile.
 5. On the same PL bundle, run `probe_ptn3460` and record both the raw
    configuration magic and `configuration_valid` result. Do not call this an
    identity test.
@@ -99,7 +107,14 @@ Without these inputs, the correct phase state is `hardware-blocked`.
    convert the lent driver to `Ready`, run `probe_pcm3168a`, and record the
    decoded reset state. Do not call this an identity test.
 7. Release all three backends and record whether every expected operation was
-   attempted, skipped, or failed.
+attempted, skipped, or failed.
+
+This profile MUST NOT perform configuration writes. Use the existing §7 record
+and §3 vocabulary to name each attempted operation and retain exact errors or
+skip causes. Record temperature capture as unattempted for this profile; identity
+success MUST NOT fill a temperature-validation result. The existing reporting
+shape is retained without adopting a new schema or version. Temperature-dependent
+CCPS functions remain gated by their own validation and matched rig requirements.
 
 PS I2C0 ownership is verified by mapping/opening only. EEPROM U6 receives no
 protocol transaction until its exact part and write contract are admitted.
@@ -141,7 +156,13 @@ Each device result records the logical bus, physical identifier, operation,
 typed value when successful, exact leaf/backend error when unsuccessful, and
 one vocabulary result from §3.
 
-## 8. Release Gates
+## 8. Software Release and Physical Profile Gates
+
+The completed software gates below are generic RLVGL release inputs. The
+unchecked board/probe/electrical/record items govern this physical identity and
+typed-health profile. They MUST NOT be interpreted as missing temperature or
+CCPS prototype-wiring prerequisites for generic RLVGL publication. Identity
+success alone does not satisfy those physical qualification items.
 
 - [x] All admitted software crates pass their deterministic and cross-target
       gates.
@@ -175,9 +196,12 @@ captured evidence.
 
 ## 11. Resume Condition
 
-Resume KI2C-07 when the operator supplies the §5 hardware facts and access to
-the identified Kria environment. Until then, KI2C-01 through KI2C-06 are ready
-for human review, but the initiative as a whole remains hardware-blocked.
+Resume this physical KI2C-07 identity/typed-health profile when the operator
+supplies the §5 hardware facts and access to the identified Kria environment.
+Until then, its physical qualification remains hardware-blocked. That status
+does not make temperature validation or CCPS prototype wiring a generic RLVGL
+release blocker. Affected CCPS functions still require their own actual
+temperature/wiring validation before they can be qualified.
 
 ## 12. Change Log
 
@@ -185,3 +209,34 @@ for human review, but the initiative as a whole remains hardware-blocked.
   baseline, safe read-only probe order, evidence schema, release gates, and
   precise physical prerequisites. No board operations or conformance claims
   were made.
+
+## 15. Change Log
+
+The legacy §12 record above remains historical input. This current-SBC bridge
+governs new amendments without rewriting that record. The dedicated
+[KI2C errata log](KI2C-ERRATA.md) is activated before this scope amendment.
+
+### 0.1.0 — 2026-10-06 — amended
+
+**Author:** Ira Abbott; recorded by Codex
+**Change kind:** scope
+**Touches:** §0, §1, §6, §8, §11
+**Summary:** Owner accepts strict read-only identity/typed-health reporting for RLVGL, retaining temperature and prototype wiring qualification only for affected CCPS dependencies and physical claims.
+
+#### Rationale
+
+The former STTS22H smoke requirement combined a configuration-dependent
+temperature read with a prohibition on configuration writes. Owner decision 4
+selects identity-only probing and reporting as they stand. Adding writes or an
+observed-configuration adoption API would expand the accepted operation and
+driver contracts, so neither is selected. Identity or typed-health success
+does not establish temperature accuracy, electrical readiness or board
+qualification; all physical prerequisites and existing reporting remain.
+
+Owner decision 6 confirms that CCPS prototype wiring divergences are deliberate
+ease-of-build adaptations with matching firmware/hardware, including ESP32
+routing revisions. They are not generic RLVGL release blockers. Future firmware
+revisions may retire old rigs; this amendment does not choose a pin map,
+qualify any current rig or authorize hardware changes. Affected CCPS functions
+retain their actual temperature/wiring validation dependencies. See
+KI2C ERRATA-001 and the [owner decision receipt](../releases/v0.2.7-embedded-owner-decision.md).

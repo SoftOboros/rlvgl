@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-api"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 license = "MIT"
@@ -17,4 +17,3 @@ micropython = []
 cpython = []
 cm4 = []
 sim = []
-

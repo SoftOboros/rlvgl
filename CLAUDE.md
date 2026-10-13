@@ -489,11 +489,17 @@ edits that break compilation surface here first.
 
 ### beetle-esp32c3 feature matrix
 
-`examples/beetle-esp32c3/` has two parallel entry points selected by
-mutually exclusive features:
+`examples/beetle-esp32c3/` has three entry points selected by features:
 
 - `--features esp_hal` → `src/esp_hal_main.rs`, uses esp-hal's high-level
   I2C/Delay/`#[esp_hal::main]`. Known-working rlvgl + SSD1306 path.
+- `--features esp_hal_network_time` → `src/network_time_main.rs`, extends the
+  esp-hal display path with Wi-Fi, DHCP, ESP-IDF-compatible NVS, and SNTP. It
+  mounts `examples/apps/network-time`, consumes the portable `network/` policy
+  and `network/esp-nvs` adapter, and uses the shared STTS22H device driver. The
+  SSD1306 cadence remains one second while the network stack polls more
+  frequently. See `examples/beetle-esp32c3/README.md` for wiring, one-time
+  credential seeding, and the flash command.
 - `--features bsp_pac` → `src/bsp_pac_main.rs`, consumes the generated
   BSP under `src/bsp_generated/` and drives an LED blink via raw PAC. Proves
   the chipdb → generator → compile → boot pipeline. Does **not** currently
@@ -502,6 +508,22 @@ mutually exclusive features:
   ~1 KB) and is deferred to a follow-up milestone.
 
 ## Spec-Before-Code Planning Discipline
+
+### Current SBC authority and rlvgl adoption
+
+The current normative form of this discipline is the Softoboros
+[SBC-00 concepts document](https://github.com/iraabbott/softoboros.com/blob/ddafeb3ffb20ab4ff924b925d88ca47577f2bafb/docs/spec-before-code/docs/SBC-00-CONCEPTS.md)
+and its Addenda B, C, and D at the same parent-repository revision. It governs
+all new or materially amended multi-phase rlvgl documentation. If the local
+historical guidance below conflicts with that source, the current SBC source
+wins.
+
+The local adoption boundary, legacy-structure bridge, and open migration gates
+are recorded in [`docs/spec-index/SBC-COMPATIBILITY.md`](docs/spec-index/SBC-COMPATIBILITY.md).
+The named prefix owners are in
+[`docs/spec-index/PREFIX-REGISTRY.md`](docs/spec-index/PREFIX-REGISTRY.md).
+Those files are operational mappings only; they do not restate or replace SBC
+vocabulary.
 
 Multi-phase initiatives in this repo — the STM32H747I-DISCO bring-up
 (`docs/disco-platform-guide/`, `docs/disco-tutorial/`,
@@ -779,6 +801,12 @@ This discipline applies to:
   coverage migration, rotated-renderer glyph throughput, and the AA
   conformance fixture). Commit-subject prefix `FONT-NN[a-z]:`. Concepts doc
   ratified 2026-06-14 (FONT-00). Builds on the LPAR-08 text substrate.
+- `docs/concepts/RATATUI-*` (Curated Unicode repertoire, anti-aliased
+  glyphs, real bold/italic, and blink-fidelity extensions to the SCTD-04
+  `ratatui-rlvgl` backend). Commit-subject prefix `RATATUI-NN[a-z]:`.
+  Concepts doc ratified 2026-07-17 (RATATUI-00). Builds on the FONT-00
+  `PackedFont`/`WidgetFont` model and SCTD-04's shipped backend; amends
+  SCTD-04 §7's redraw-invariant for blink-phase advance.
 - Any future multi-chapter initiative with ≥3 phases.
 
 Single-doc TODOs, phase-1 prototypes, and one-off explorations MAY use

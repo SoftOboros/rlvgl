@@ -1,0 +1,78 @@
+# Owned no_std Ratatui backend and packed-font bridge for RLVGL.
+[package]
+name = "ratatui-rlvgl"
+version = "0.1.2"
+authors = ["Ira Abbott <ira@softoboros.com>"]
+description = "no_std Ratatui backend and rlvgl widget bridge."
+documentation = "https://docs.rs/ratatui-rlvgl"
+repository = "https://github.com/SoftOboros/rlvgl"
+homepage = "https://github.com/SoftOboros/rlvgl"
+readme = "README.md"
+license = "MIT"
+edition = "2024"
+rust-version = "1.88.0"
+keywords = ["embedded", "graphics", "tui", "no-std"]
+categories = ["embedded", "gui", "no-std"]
+include = [
+    "/Cargo.toml",
+    "/README.md",
+    "/LICENSE",
+    "/FONT-NOTICE.txt",
+    "/src/**",
+    "/assets/fonts/terminal-regular.bin",
+    "/assets/fonts/terminal-bold.bin",
+    "/assets/fonts/terminal-oblique.bin",
+    "/assets/fonts/terminal-bold-oblique.bin",
+]
+
+[features]
+default = []
+portable-atomic = ["dep:portable-atomic-util", "ratatui-core/portable-atomic"]
+
+[dependencies]
+ratatui-core = { version = "=0.1.2", path = "../../vendor/ratatui/ratatui-core", default-features = false }
+rlvgl-core = { version = "0.2.7", path = "../../core", default-features = false }
+unicode-width = ">=0.2.0"
+portable-atomic-util = { version = "0.2.5", default-features = false, features = ["alloc"], optional = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+pedantic = { level = "warn", priority = -1 }
+
+# we often split up a module into multiple files with the main type in a file named after the
+# module, so we want to allow this pattern
+module_inception = "allow"
+
+# nursery or restricted
+as_underscore = "warn"
+deref_by_slicing = "warn"
+else_if_without_else = "warn"
+empty_line_after_doc_comments = "warn"
+equatable_if_let = "warn"
+fn_to_numeric_cast_any = "warn"
+format_push_string = "warn"
+implicit_clone = "warn"
+map_err_ignore = "warn"
+missing_const_for_fn = "warn"
+mixed_read_write_in_expression = "warn"
+mod_module_files = "warn"
+needless_pass_by_ref_mut = "warn"
+needless_raw_strings = "warn"
+or_fun_call = "warn"
+redundant_type_annotations = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+string_lit_chars_any = "warn"
+string_slice = "warn"
+unnecessary_self_imports = "warn"
+use_self = "warn"
+

@@ -1,0 +1,2435 @@
+{
+  "edge_count": 104,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 211,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 212,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 213,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 214,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 215,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 367,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 393,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 394,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 401,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 413,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 434,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 450,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 470,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 493,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 510,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 527,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 558,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 628,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 641,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 645,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 649,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 719,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "INV-BEETLE-00-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 767,
+      "source": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "target": "EOQ-001-ERRATA-005"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 100,
+      "source": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "target": "INV-BEETLE-01-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 101,
+      "source": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "target": "INV-BEETLE-01-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 102,
+      "source": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "target": "INV-BEETLE-01-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 11,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 33,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 59,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 123,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 130,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-02-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 140,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-02-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 150,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-02-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 153,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-00-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 178,
+      "source": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "target": "INV-BEETLE-02-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 115,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-00-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 133,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 152,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 154,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-00-8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 160,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 168,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 178,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 210,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 309,
+      "source": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "target": "INV-BEETLE-03-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 95,
+      "source": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "target": "INV-BEETLE-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 96,
+      "source": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "target": "INV-BEETLE-04-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 133,
+      "source": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "target": "INV-BEETLE-04-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 145,
+      "source": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "target": "INV-BEETLE-04-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 159,
+      "source": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "target": "INV-BEETLE-04-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 93,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 94,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 151,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 159,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-00-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 163,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 175,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 183,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-05-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 197,
+      "source": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "target": "INV-BEETLE-00-8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 114,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 115,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 117,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 157,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 165,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 175,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 184,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 203,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 211,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 216,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 233,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 235,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 240,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 248,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 250,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 251,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 273,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 275,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 277,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 279,
+      "source": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "target": "INV-BEETLE-06-6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 78,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-07-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 108,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-07-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 117,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-07-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 126,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-07-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 135,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-07-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 157,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-06-7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 159,
+      "source": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 23,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 35,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-00-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 37,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 80,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 81,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 113,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 121,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-06-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 126,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 137,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-00-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 142,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 178,
+      "source": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "target": "INV-BEETLE-08-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 26,
+      "source": "docs/beetle-esp32p4/ERRATA.md",
+      "target": "EOQ-002-ERRATA-008"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 139,
+      "source": "docs/beetle-esp32p4/ERRATA.md",
+      "target": "INV-BEETLE-00-5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 303,
+      "source": "docs/beetle-esp32p4/ERRATA.md",
+      "target": "INV-BEETLE-00-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 312,
+      "source": "docs/beetle-esp32p4/ERRATA.md",
+      "target": "INV-BEETLE-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 340,
+      "source": "docs/beetle-esp32p4/ERRATA.md",
+      "target": "INV-BEETLE-04-2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 299,
+      "source": "docs/beetle-esp32p4/README.md",
+      "target": "INV-BEETLE-00-7"
+    }
+  ],
+  "family": "beetle",
+  "kind_counts": {
+    "amendment": 16,
+    "errata": 9,
+    "gate": 51,
+    "invariant": 36
+  },
+  "object_count": 112,
+  "objects": [
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "DSI 1-lane × 750 Mbps from 20 MHz PHY reference",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 413,
+      "obj_id": "INV-BEETLE-00-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "26 MHz DPI pixel clock from PLL_F240M / 9",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 434,
+      "obj_id": "INV-BEETLE-00-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Cache writeback C2M after every FB write",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 450,
+      "obj_id": "INV-BEETLE-00-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Continuous re-fill loop",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 470,
+      "obj_id": "INV-BEETLE-00-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "GPIO assignment SCL=8 / SDA=7",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 493,
+      "obj_id": "INV-BEETLE-00-5",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "LDO ripple suppression before enable",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 510,
+      "obj_id": "INV-BEETLE-00-6",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "PHY clk + PHY rst sequencing",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 527,
+      "obj_id": "INV-BEETLE-00-7",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Bridge wake gates downstream init",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 558,
+      "obj_id": "INV-BEETLE-00-8",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 635,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:635",
+      "text": "(a) Boot the bare-metal binary (`rlvgl-beetle-esp32p4`) from the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 637,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:637",
+      "text": "(b) Successfully wake the DSI bridge at I2C 0x45 per BEETLE-03"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 640,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:640",
+      "text": "(c) Achieve DSI PHY PLL lock and lane stop-state per BEETLE-05"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 644,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:644",
+      "text": "(d) Initialise the DPI controller per BEETLE-06 §9 and §9"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 647,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:647",
+      "text": "(e) Drive the verified first-light color cycle (R → G → B → W →"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 653,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:653",
+      "text": "(f) Mount the shared disco-demo widget tree on the live FB."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 654,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:654",
+      "text": "(g) Sustain the continuous re-fill loop while the widget tree"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 659,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md:gate:659",
+      "text": "(h) Initialise PSRAM via raw-PAC MSPI without bootloader help"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Author: assistant on session pickup",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 712,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md#2026-05-28@712",
+      "text": "**2026-05-28** (initial) — Author: assistant on session pickup"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-29",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-29** (first HIL bench session — three new errata, one",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 726,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-00-CONCEPTS.md#2026-05-29@726",
+      "text": "**2026-05-29** (first HIL bench session — three new errata, one"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 130,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md:gate:130",
+      "text": "(a) Initialise MSPI at 200 MHz against the APS6408L (or noted"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 132,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md:gate:132",
+      "text": "(b) Configure the cache MMU window for PSRAM access with"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 134,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md:gate:134",
+      "text": "(c) Export a slab API yielding ≥1 152 000 bytes of PSRAM"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 136,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md:gate:136",
+      "text": "(d) Sustain ≥78 MB/s read bandwidth from PSRAM under DSI DMA"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial shell) — Authored as part of the BEETLE",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 162,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-01-PSRAM.md#2026-05-28@162",
+      "text": "**2026-05-28** (initial shell) — Authored as part of the BEETLE"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "chan_id=3 → ext_ldo unit=2 → EXT_LDO_P0_0P2A",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 130,
+      "obj_id": "INV-BEETLE-02-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Voltage tap dref=9 / mul=6 → 2500 mV",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 140,
+      "obj_id": "INV-BEETLE-02-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "en_vdet before xpd",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 150,
+      "obj_id": "INV-BEETLE-02-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 175,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-02-LDO.md:gate:175",
+      "text": "(a) Configure `EXT_LDO_P0_0P2A` for software ownership"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 177,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-02-LDO.md:gate:177",
+      "text": "(b) Set `dref=9, mul=6` on `EXT_LDO_P0_0P2A_ANA` (→ 2500 mV)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-BEETLE-02-3"
+        ]
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 178,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-02-LDO.md:gate:178",
+      "text": "(c) Set `en_vdet=1` BEFORE setting `xpd=1` (§9 INV-BEETLE-02-3)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 179,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-02-LDO.md:gate:179",
+      "text": "(d) Allow ≥ a few µs for settling before returning."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-02-LDO.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 200,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-02-LDO.md#2026-05-28@200",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Wake sequence ordering",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 133,
+      "obj_id": "INV-BEETLE-03-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Bridge wake gates downstream",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 152,
+      "obj_id": "INV-BEETLE-03-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Open-drain on SCL/SDA",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 160,
+      "obj_id": "INV-BEETLE-03-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "GPIO matrix routing post-BSP",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 168,
+      "obj_id": "INV-BEETLE-03-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 208,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md:gate:208",
+      "text": "(a) Route GPIO8 → I2C0_SCL and GPIO7 → I2C0_SDA through the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-BEETLE-03-1"
+        ]
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 210,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md:gate:210",
+      "text": "(b) Execute the wake sequence in §9 INV-BEETLE-03-1 order."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 211,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md:gate:211",
+      "text": "(c) Surface bridge timeouts as `BridgeError::NotReady` after a"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 213,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md:gate:213",
+      "text": "(d) **HIL verification:** flash the binary, confirm"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 217,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md:gate:217",
+      "text": "(e) On bench: probe SDA/SCL with a logic analyzer if (d) fails,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 239,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-05-28@239",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-29",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-29** (bench session — partial gates closed, ERRATA-005",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 245,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-05-29@245",
+      "text": "**2026-05-29** (bench session — partial gates closed, ERRATA-005"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-30",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-30** (bench session — ERRATA-005 RESOLVED, gates (a)–(d)",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 322,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-05-30@322",
+      "text": "**2026-05-30** (bench session — ERRATA-005 RESOLVED, gates (a)–(d)"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-31",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-31** (follow-up bench session — uncovered",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 380,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-05-31@380",
+      "text": "**2026-05-31** (follow-up bench session — uncovered"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-01",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-01** (off-bench research session — ERRATA-007 root cause",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 427,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-06-01@427",
+      "text": "**2026-06-01** (off-bench research session — ERRATA-007 root cause"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-01",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-01** (single bench round — ERRATA-007 fix verified, 🟢).",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 461,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-06-01@461",
+      "text": "**2026-06-01** (single bench round — ERRATA-007 fix verified, 🟢)."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-01",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-01 (later)** (full-bring-up bench session — ERRATA-008",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 488,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-03-I2C-BRIDGE.md#2026-06-01@488",
+      "text": "**2026-06-01 (later)** (full-bring-up bench session — ERRATA-008"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Bus + reset → PHY clocks → DPI clock",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 133,
+      "obj_id": "INV-BEETLE-04-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Divider quantization is rounded *up*",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 145,
+      "obj_id": "INV-BEETLE-04-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Bridge reset is a pulse, not a level",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 159,
+      "obj_id": "INV-BEETLE-04-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 190,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md:gate:190",
+      "text": "(a) Enable bus + pulse bridge reset before any other DSI clock"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 192,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md:gate:192",
+      "text": "(b) Select + enable PHY config + PLL reference clocks before"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 194,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md:gate:194",
+      "text": "(c) Select + enable DPI clock with `div_ceil` quantization"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 196,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md:gate:196",
+      "text": "(d) **HIL verification:** confirm 0x4000_0000-domain register"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 216,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-04-DSI-CLOCKS.md#2026-05-28@216",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Init sub-step ordering",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 151,
+      "obj_id": "INV-BEETLE-05-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Exact-match PLL solver preferred",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 163,
+      "obj_id": "INV-BEETLE-05-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Post-PLL register defaults",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 175,
+      "obj_id": "INV-BEETLE-05-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Spin budget on lock + lane polls",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 183,
+      "obj_id": "INV-BEETLE-05-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 212,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:212",
+      "text": "(a) Execute the 10 sub-steps from §7 in order."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 213,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:213",
+      "text": "(b) Return `Ok(DsiBus)` with `real_mbps == 750` and"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 216,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:216",
+      "text": "(c) Return `DsiError::PllLock` if the lock poll exhausts."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 217,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:217",
+      "text": "(d) Return `DsiError::LaneCal` if lane stop-state poll"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 219,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:219",
+      "text": "(e) **HIL verification:** confirm `BringUpStatus::DsiPhyLock`"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 222,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md:gate:222",
+      "text": "(f) **HIL verification:** confirm `phy_status` reads"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 247,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-05-DSI-HOST.md#2026-05-28@247",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Pixel format RGB888 packed",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 157,
+      "obj_id": "INV-BEETLE-06-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "NON-BURST sync-event video mode",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 165,
+      "obj_id": "INV-BEETLE-06-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Pi 7″ video timing",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 175,
+      "obj_id": "INV-BEETLE-06-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "FB allocation: bootloader heap (v0/v1) vs PSRAM slab (v2)",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 184,
+      "obj_id": "INV-BEETLE-06-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "DW-GDMA descriptor list is circular and continuous",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 203,
+      "obj_id": "INV-BEETLE-06-5",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Video-mode handoff is post-arm",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 216,
+      "obj_id": "INV-BEETLE-06-6",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Cache writeback covers the initial paint",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 233,
+      "obj_id": "INV-BEETLE-06-7",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 272,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:272",
+      "text": "(a) Program the DPI controller for RGB888 packed, NON-BURST"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 274,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:274",
+      "text": "(b) Allocate a 64-B-aligned PSRAM FB of FB_BYTES (1 152 000)"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 276,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:276",
+      "text": "(c) Stand up a circular DW-GDMA descriptor list pointing at"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 278,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:278",
+      "text": "(d) Initial-paint the FB to all zeros, cache-writeback, then"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 280,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:280",
+      "text": "(e) Return `Ok((DpiPanel, FrameBuffer<'static>))` on success;"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 282,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:282",
+      "text": "(f) **HIL verification:** confirm"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 285,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md:gate:285",
+      "text": "(g) **HIL verification:** with `bsp_pac_main.rs::run_color_cycle`"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 309,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-06-DPI-PANEL.md#2026-05-28@309",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Both L1 D-cache and L2 cache participate",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 108,
+      "obj_id": "INV-BEETLE-07-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "64-B alignment",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 117,
+      "obj_id": "INV-BEETLE-07-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Drain prior sync before submitting new",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 126,
+      "obj_id": "INV-BEETLE-07-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Mutually exclusive sync enables",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 135,
+      "obj_id": "INV-BEETLE-07-4",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 176,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:176",
+      "text": "(a) Set `SYNC_MAP = 0x30` (L1-DCache + L2-Cache)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 177,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:177",
+      "text": "(b) Round `[ptr, ptr+len)` to 64-B-aligned boundaries."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 178,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:178",
+      "text": "(c) Wait for `SYNC_CTRL.SYNC_DONE` before submitting."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 179,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:179",
+      "text": "(d) Set only `SYNC_CTRL.WRITEBACK_ENA` (no other sync bits)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 180,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:180",
+      "text": "(e) Wait for `SYNC_CTRL.SYNC_DONE` after submitting."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 181,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:181",
+      "text": "(f) Short-circuit on `len == 0` (already implemented)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 182,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md:gate:182",
+      "text": "(g) **HIL verification:** confirm color cycles in BEETLE-06"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-07-CACHE.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 203,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-07-CACHE.md#2026-05-28@203",
+      "text": "**2026-05-28** (initial) — Authored alongside BEETLE-00. Reflects"
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Display adapter wraps FB pointer",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 113,
+      "obj_id": "INV-BEETLE-08-1",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Re-fill loop sustains ≥30 Hz cache-writeback cadence",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 126,
+      "obj_id": "INV-BEETLE-08-2",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "heading",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Bring-up gates demo mount",
+        "verified_by": ""
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "invariant",
+      "line": 142,
+      "obj_id": "INV-BEETLE-08-3",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 176,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:176",
+      "text": "(a) Provide a `Display` adapter wrapping the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": [
+          "INV-BEETLE-08-2"
+        ]
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 178,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:178",
+      "text": "(b) Drive a re-fill loop per INV-BEETLE-08-2."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 179,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:179",
+      "text": "(c) Run only after `run_bringup() == AllOk`."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 180,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:180",
+      "text": "(d) Mount the disco-demo widget tree (shared crate, no fork)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 181,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:181",
+      "text": "(e) **HIL verification:** disco-demo's home screen paints,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "gate",
+      "line": 184,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md:gate:184",
+      "text": "(f) **HIL verification:** frame rate sustains ≥30 Hz under"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-28",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-28** (initial shell) — Authored as part of the BEETLE",
+        "touches": null
+      },
+      "doc": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md",
+      "family": "beetle",
+      "kind": "amendment",
+      "line": 205,
+      "obj_id": "docs/beetle-esp32p4/BEETLE-08-DEMO-INTEGRATION.md#2026-05-28@205",
+      "text": "**2026-05-28** (initial shell) — Authored as part of the BEETLE"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 74,
+      "obj_id": "beetle:ERRATA-001",
+      "text": "chipdb board yaml SCL/SDA swap"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 152,
+      "obj_id": "beetle:ERRATA-002",
+      "text": "I2C0 raw-PAC port: pads work, master refuses to start"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 238,
+      "obj_id": "beetle:ERRATA-003",
+      "text": "BEETLE-04 DPI divider quantization discrepancy"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 345,
+      "obj_id": "beetle:ERRATA-004",
+      "text": "IDF image segment layout + linker script rework"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 441,
+      "obj_id": "beetle:ERRATA-005",
+      "text": "ESP32-P4 I2C0 master refuses to start after `trans_start`"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 689,
+      "obj_id": "beetle:ERRATA-006",
+      "text": "IDF bootloader leaves WDTs armed for raw-PAC apps"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 766,
+      "obj_id": "beetle:ERRATA-007",
+      "text": "ESP32-P4 WDT disable incomplete, periodic feeding required"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 969,
+      "obj_id": "beetle:ERRATA-008",
+      "text": "I2C0 master MMIO stall when full bring-up runs without WDT reset masking"
+    },
+    {
+      "attrs": {},
+      "doc": "docs/beetle-esp32p4/ERRATA.md",
+      "family": "beetle",
+      "kind": "errata",
+      "line": 1641,
+      "obj_id": "beetle:ERRATA-009",
+      "text": "DSI DPHY PLL never locks despite fully IDF-faithful config"
+    }
+  ],
+  "schema_version": 2
+}

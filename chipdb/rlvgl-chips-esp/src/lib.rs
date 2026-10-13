@@ -123,6 +123,22 @@ mod tests {
     }
 
     #[test]
+    fn dfr1117_uses_its_board_specific_i2c_gpio_map() {
+        assert!(board_names().contains(&"beetle_esp32c6_dfr1117"));
+        let yaml = board_yaml("beetle_esp32c6_dfr1117").expect("DFR1117 board yaml");
+        let parsed: serde_yaml::Value = serde_yaml::from_str(yaml).expect("board yaml parses");
+        assert_eq!(parsed["chip"].as_str(), Some("ESP32-C6"));
+
+        let pins = parsed["pins"].as_sequence().expect("pins list");
+        assert!(pins.iter().any(|pin| {
+            pin["signal"].as_str() == Some("I2C0_SDA") && pin["gpio"].as_u64() == Some(19)
+        }));
+        assert!(pins.iter().any(|pin| {
+            pin["signal"].as_str() == Some("I2C0_SCL") && pin["gpio"].as_u64() == Some(20)
+        }));
+    }
+
+    #[test]
     fn missing_names_return_none() {
         assert!(chip_yaml("nonexistent").is_none());
         assert!(board_yaml("nonexistent").is_none());

@@ -58,7 +58,53 @@ too. Prerequisites: `cargo` on `PATH` and
 To run the original solid-color control loop instead, enable
 `CONFIG_DFR0550_COLOR_CYCLE` (under "DFR0550 comparison" in `menuconfig`).
 
+### CCPS read-only Modbus scaffold
+
+The Rust payload also contains an example-local, structurally read-only Modbus
+RTU codec for the Cooperative Charger P4 prototype. Its public C ABI can only
+construct function `0x03` requests, rejects address zero and the ACP
+broadcast/configuration register range, independently validates the final wire
+frame, retains raw response bytes with decoded words, and marks parsed fields as
+candidate until a physical cross-check occurs. It contains no retry, scan, UART,
+GPIO, or generic/write-function surface.
+
+`CONFIG_CCPS_MODBUS_OFFLINE_SELF_TEST` proves that codec is linked into the same
+ESP-IDF/rlvgl image by preparing and validating the retained Rung-0 candidate
+frame at boot. The option defaults off and, even when enabled, performs no UART
+or GPIO access. Battery transmission remains governed by the Softoboros CCPS
+firmware requirements and Rung-0 bench plan; this scaffold does not authorize or
+perform it.
+
+Build the offline proof image without enabling any field I/O:
+
+```sh
+idf.py -B build-ccps-modbus-offline \
+  -DRLVGL_PAYLOAD=disco \
+  -DSDKCONFIG_DEFAULTS='sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.ccps-modbus-offline' \
+  set-target esp32p4 build
+```
+
 ## Build And Flash
+
+ESP-IDF is a host toolchain dependency, not a vendored `rlvgl` submodule. The
+HIL-verified baseline for this example is tag `v5.3.5`, exact commit
+`0c45a102a96e82000f145b786a20de229b9f8557`. Install it once outside the
+repository:
+
+```sh
+esp_sdk_root=/Users/iraabbott/esp/esp-idf
+git clone --branch v5.3.5 --depth 1 --recursive \
+  https://github.com/espressif/esp-idf.git "$esp_sdk_root"
+test "$(git -C "$esp_sdk_root" rev-parse HEAD)" = \
+  0c45a102a96e82000f145b786a20de229b9f8557
+"$esp_sdk_root/install.sh" esp32p4
+```
+
+If the system Python cannot find a CA bundle on macOS, rerun only the installer
+with `SSL_CERT_FILE="$(python3 -c 'import certifi; print(certifi.where())')"`.
+Do not disable TLS verification.
+
+Activate that checkout in each shell before using `idf.py`:
 
 ```sh
 cd examples/beetle-esp32p4-idf

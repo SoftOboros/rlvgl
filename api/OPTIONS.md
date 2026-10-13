@@ -4,7 +4,9 @@ OPTIONS.md - Cargo feature reference for the rlvgl-api crate.
 # rlvgl-api Options
 
 `rlvgl-api` defines shared ABI-facing types for bindings and coprocessor-style
-integrations. The crate is `no_std`.
+integrations. The crate is `no_std`. Its `protocol` module provides the
+allocation-free canonical MPY v1 frame and tagged-value codec without a feature
+gate.
 
 ## Default configuration
 

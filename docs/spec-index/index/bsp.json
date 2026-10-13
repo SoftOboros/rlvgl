@@ -1,0 +1,36 @@
+{
+  "edge_count": 2,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 6,
+      "source": "docs/bsp/ERRATA.md",
+      "target": "SBC-INV-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 6,
+      "source": "docs/bsp/ERRATA.md",
+      "target": "SBC-INV-7"
+    }
+  ],
+  "family": "bsp",
+  "kind_counts": {
+    "errata": 1
+  },
+  "object_count": 1,
+  "objects": [
+    {
+      "attrs": {},
+      "doc": "docs/bsp/ERRATA.md",
+      "family": "bsp",
+      "kind": "errata",
+      "line": 31,
+      "obj_id": "bsp:ERRATA-001",
+      "text": "Primary-only parser loses explicit virtual PLL source intent"
+    }
+  ],
+  "schema_version": 2
+}

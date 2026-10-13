@@ -1,6 +1,6 @@
 //! LPAR-04 §8 input-device adapters.
 //!
-//! Four thin typed wrappers that turn platform input into core [`Event`]
+//! Four thin typed wrappers that turn platform input into core [`rlvgl_core::event::Event`]
 //! streams plus the routing rules defined in LPAR-04 §8.  They are *adapters*,
 //! not a driver framework — existing raw-event producers (`PD`/`PM`/`PU`/`KD`/
 //! `KU`) remain valid without wrapping; this layer is additive.
@@ -9,14 +9,14 @@
 //!
 //! | Type | Produces | Routing rule |
 //! |---|---|---|
-//! | [`PointerDevice`] | `PointerDown/Move/Up`, optionally `Touch` | Hit-test target (§6.2), canonical recognizer chain (§8.3) |
-//! | [`KeypadDevice`] | `KeyDown`/`KeyUp`, tick-driven auto-repeat | Focused object as `ObjectEvent::Key` |
-//! | [`EncoderDevice`] | `Encoder { diff }`, Enter press | Navigate → focus movement; editing → `ObjectEvent::Rotary`/`Key` |
-//! | [`ButtonDevice`] | Synthesized `PointerDown/Up` at a configured screen point | Identical to Pointer after synthesis |
+//! | [`crate::input_device::PointerDevice`] | `PointerDown/Move/Up`, optionally `Touch` | Hit-test target (§6.2), canonical recognizer chain (§8.3) |
+//! | [`crate::input_device::KeypadDevice`] | `KeyDown`/`KeyUp`, tick-driven auto-repeat | Focused object as `ObjectEvent::Key` |
+//! | [`crate::input_device::EncoderDevice`] | `Encoder { diff }`, Enter press | Navigate → focus movement; editing → `ObjectEvent::Rotary`/`Key` |
+//! | [`crate::input_device::ButtonDevice`] | Synthesized `PointerDown/Up` at a configured screen point | Identical to Pointer after synthesis |
 //!
 //! # Per-instance state
 //!
-//! Two [`PointerDevice`]s do not share recognizer state (§8.4).  Keypad and
+//! Two [`crate::input_device::PointerDevice`]s do not share recognizer state (§8.4).  Keypad and
 //! encoder devices address focus through the single-`FOCUSED` tree invariant
 //! (§7.3); multiple simultaneous keypad/encoder devices targeting different
 //! focus groups in one tree are out of v1 scope.

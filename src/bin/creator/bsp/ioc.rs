@@ -125,7 +125,12 @@ pub fn ioc_to_ir(text: &str, af: &dyn AfProvider, allow_reserved: bool) -> Resul
 
     // Clocks/topology
     let sys_src = kv.get("RCC.SYSCLKSource").cloned();
-    let pll_src = kv.get("RCC.PLLSource").cloned();
+    // Preserve raw unsupported values for external/unowned consumers; admission
+    // diagnostics are checked only when an owned H7 PAC PLL sequence is emitted.
+    let pll_src = kv
+        .get("RCC.PLLSource")
+        .or_else(|| kv.get("RCC.PLLSourceVirtual"))
+        .map(|value| normalize_pll_source(value).unwrap_or(value).to_owned());
     let hse_hz = kv.get("RCC.HSE_VALUE").and_then(|v| v.parse::<u32>().ok());
     let d1cpu = kv.get("RCC.D1CPUPrescaler").cloned();
     let d1ppre = kv.get("RCC.D1PPRE").cloned();
@@ -277,6 +282,40 @@ fn infer_core_assignments(kv: &HashMap<String, String>, ir: &mut Ir) {
     }
 }
 
+/// Normalize only the existing HSI/CSI/HSE IOC source tokens.
+pub(crate) fn normalize_pll_source(value: &str) -> Option<&'static str> {
+    match value.trim().to_ascii_uppercase().as_str() {
+        "HSI" | "RCC_PLLSOURCE_HSI" => Some("HSI"),
+        "CSI" | "RCC_PLLSOURCE_CSI" => Some("CSI"),
+        "HSE" | "RCC_PLLSOURCE_HSE" => Some("HSE"),
+        _ => None,
+    }
+}
+
+/// Check explicit IOC source agreement for an emitted owned H7 PLL sequence.
+/// Callers outside that emission boundary retain the ordinary permissive IR parser.
+pub(crate) fn checked_pll_source(text: &str) -> Result<Option<String>> {
+    let kv = parse_kv(text);
+    let normalize = |key: &str| -> Result<Option<&'static str>> {
+        kv.get(key)
+            .map(|value| {
+                normalize_pll_source(value)
+                    .ok_or_else(|| anyhow!("BSP-CLOCK-SOURCE-UNSUPPORTED: {key}={value}"))
+            })
+            .transpose()
+    };
+    let primary = normalize("RCC.PLLSource")?;
+    let virtual_source = normalize("RCC.PLLSourceVirtual")?;
+    if let (Some(primary), Some(virtual_source)) = (primary, virtual_source)
+        && primary != virtual_source
+    {
+        return Err(anyhow!(
+            "BSP-CLOCK-SOURCE-CONFLICT: RCC.PLLSource={primary}, RCC.PLLSourceVirtual={virtual_source}"
+        ));
+    }
+    Ok(primary.or(virtual_source).map(str::to_owned))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +362,67 @@ PA1_C.GPIO_Label=ARD_A3
             }
         }
         assert!(found_pa9 && found_pa1, "expected PA9 and PA1 pins");
+    }
+    #[test]
+    fn pll_source_keys_normalize_and_require_agreement_only_on_checked_path() {
+        for source in ["HSI", "CSI", "HSE"] {
+            for keys in [
+                format!("RCC.PLLSource={source}"),
+                format!("RCC.PLLSourceVirtual=RCC_PLLSOURCE_{source}"),
+                format!("RCC.PLLSource={source}\nRCC.PLLSourceVirtual=RCC_PLLSOURCE_{source}"),
+            ] {
+                assert_eq!(checked_pll_source(&keys).unwrap().as_deref(), Some(source));
+                assert_eq!(
+                    ioc_to_ir(&keys, &DummyAf, true)
+                        .unwrap()
+                        .clocks
+                        .pll_src
+                        .as_deref(),
+                    Some(source)
+                );
+            }
+        }
+        for (keys, diagnostic) in [
+            (
+                "RCC.PLLSource=HSE\nRCC.PLLSourceVirtual=HSI",
+                "BSP-CLOCK-SOURCE-CONFLICT",
+            ),
+            (
+                "RCC.PLLSource=INVALID\nRCC.PLLSourceVirtual=HSE",
+                "BSP-CLOCK-SOURCE-UNSUPPORTED",
+            ),
+            (
+                "RCC.PLLSource=HSE\nRCC.PLLSourceVirtual=INVALID",
+                "BSP-CLOCK-SOURCE-UNSUPPORTED",
+            ),
+            ("RCC.PLLSource=", "BSP-CLOCK-SOURCE-UNSUPPORTED"),
+        ] {
+            assert!(
+                checked_pll_source(keys)
+                    .unwrap_err()
+                    .to_string()
+                    .contains(diagnostic)
+            );
+            // Ordinary IR parsing imposes no owner-only rejection or schema change.
+            assert!(ioc_to_ir(keys, &DummyAf, true).is_ok());
+        }
+        assert_eq!(checked_pll_source("").unwrap(), None);
+    }
+
+    #[test]
+    fn actual_h747_virtual_source_keeps_absent_hse_unknown() {
+        let text =
+            include_str!("../../../../examples/stm32h747i-disco/DiscoBiscuit/DiscoBiscuit.ioc");
+        let board = ioc_to_ir(text, &DummyAf, true).unwrap();
+        assert_eq!(board.clocks.pll_src.as_deref(), Some("HSE"));
+        assert_eq!(checked_pll_source(text).unwrap().as_deref(), Some("HSE"));
+        assert_eq!(board.clocks.hse_hz, None);
+        for hz in [0, 25_000_000] {
+            let input = format!("{text}\nRCC.HSE_VALUE={hz}\n");
+            assert_eq!(
+                ioc_to_ir(&input, &DummyAf, true).unwrap().clocks.hse_hz,
+                Some(hz)
+            );
+        }
     }
 }

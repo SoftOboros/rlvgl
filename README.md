@@ -11,6 +11,23 @@ rlvgl preserves the widget-based UI paradigm of LVGL while eliminating unsafe C-
 
 The C version of LVGL is included as a git submodule for reference and test vector extraction, but not linked or compiled into this library.
 
+## Current release status — 2026-10-13
+
+Released **v0.2.7 / A2** remains the immutable source release. The next owned-bridge
+maintenance candidate is **Unreleased**: package allocations are `rlvgl` 0.2.8,
+`rlvgl-platform` 0.2.7 and `ratatui-rlvgl` 0.1.2; `rlvgl-core` remains 0.2.7.
+These are candidate allocations, not a registry installation promise or a new
+release tag. Source release, package publication and family/hardware qualification
+have separate gates.
+
+The candidate uses unmodified official Ratatui 0.30.2, its `ratatui-core` 0.1.2
+primitives and the RLVGL-owned bridge at `crates/ratatui-rlvgl`. Start with the
+[Unreleased maintenance guide](docs/releases/owned-bridge-maintenance.md) for the
+package matrix, bounded compatibility APIs, native snapshot flow and release
+checks, and the [dated family state](docs/releases/v0.2.7-successor-family-state-20261013.md)
+for remaining proof and decisions. Existing versioned examples and the
+“What's New in 0.2.5” section below retain their historical context.
+
 ## Goals
 Package: `rlvgl`
 - Preserve LVGL architecture and layout system
@@ -34,8 +51,11 @@ Package: `rlvgl`
 - [core](./core/README.md) – Widget base trait, layout, event dispatch
 - [widgets](./widgets/README.md) – Rust-native reimplementations of LVGL widgets
 - [platform](./platform/README.md) – Display/input traits and HAL adapters
+- [network](./network/README.md) – Portable network configuration, retry, SNTP, and clock holdover
 - [ui](./ui/README.md) – Higher-level UI components
 - [examples/apps/demo](./examples/apps/demo/README.md) – Packaged demo application crate
+- [examples/apps/network-time](./examples/apps/network-time/README.md) – Portable 128x64 monochrome network-time app
+- [examples/beetle-esp32c6](./examples/beetle-esp32c6/README.md) – DFR1117 ESP32-C6 host for the shared I2C network clock
 - [api](./api/src/lib.rs) – Shared ABI types for bindings and coprocessor integrations
 - [i18n](./i18n/README.md) – Compile-time translations with runtime-selectable locale blobs
 - [chipdb](./chipdb/README.md) – Vendor chip databases used by creator and BSP generation

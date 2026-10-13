@@ -1,0 +1,497 @@
+{
+  "schema_version": "1.0.0",
+  "lvgl_baseline": {
+    "source_commit": "5a89ce8a27505389a0e74814fba79db69718512c",
+    "effective_target_label": "LVGL 9.4.0-dev @ 5a89ce8a",
+    "owner": "docs/concepts/LPAR-01-BASELINE.md §2"
+  },
+  "rows": [
+    {
+      "id": "MPY-BL-001",
+      "level": "MPY-I0",
+      "surface": "Enumerate actor types",
+      "reference": "LVGL class inventory; rlvgl actor catalog",
+      "required_behavior": "A director can enumerate every scriptable actor type available on the connected target without prior knowledge of the catalog (MPY-00 §6.2).",
+      "baseline_status": "missing",
+      "baseline_note": "No actor catalog exists. `api/src/lib.rs` exposes a fixed `NodeKind` of `Rect` and `Text` with no discovery surface.",
+      "owners": ["MPY-03"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::catalog_enumerates_five_actor_local_schemas"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-002",
+      "level": "MPY-I0",
+      "surface": "Describe type, capabilities, constructors, properties, actions, events, and child policy",
+      "reference": "LVGL class/property metadata plus rlvgl extensions",
+      "required_behavior": "One canonical `TypeDescriptor` per actor type answers identity, ancestry/capabilities, constructor inputs, properties, actions, events, child policy, layout capability, and target availability (MPY-00 §6.2, INV-MPY-3).",
+      "baseline_status": "missing",
+      "baseline_note": "No descriptor type exists in any crate. Widget schema knowledge is implicit in each widget's Rust API.",
+      "owners": ["MPY-03"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::catalog_enumerates_five_actor_local_schemas",
+              "note": "Type, family, capabilities, targets, constructor schema, child policy, layout, and cost are current. MPY-04/05 still own property, action, and event member IDs."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md",
+              "note": "Later MPY-04/05 native evidence extends the original partial claim; no binding or cross-driver closure is claimed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-003",
+      "level": "MPY-I1",
+      "surface": "Generic actor creation",
+      "reference": "lv_obj_class_create_obj, lv_obj_class_init_obj",
+      "required_behavior": "An actor of any catalogued type is constructed from a type id plus descriptor-validated constructor inputs, without a per-type call site in the adapter.",
+      "baseline_status": "partial",
+      "baseline_note": "Fixed `Rect`/`Text` `NodeSpec` variants exist, but the runtime calls behind them are placeholders in `micropython/src/lib.rs` and the type set is closed.",
+      "owners": ["MPY-03"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::generic_create_constructs_and_resolves_all_five_actors"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ],
+      "differences": "Classified partial rather than current because the creation set is fixed and the calls do not own a live stage. `NodeSpec` remains compatibility evidence only (MPY-01 §7)."
+    },
+    {
+      "id": "MPY-BL-004",
+      "level": "MPY-I1",
+      "surface": "Stable liveness and stale-handle rejection",
+      "reference": "lv_obj_is_valid",
+      "required_behavior": "Every operation revalidates an opaque generation-checked handle, and a handle to a deleted actor is rejected with a structured stale-handle error even after slot reuse (MPY-00 §6.1, INV-MPY-2).",
+      "baseline_status": "partial",
+      "baseline_note": "`core/src/object.rs` carries detached state, but there is no handle registry, no generation, and no global lookup.",
+      "owners": ["MPY-02", "MPY-03"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "current",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::subtree_delete_advances_generations_and_preserves_unrelated_actors"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-03-RUNTIME-REGISTRY-ACTOR-CREATION.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-005",
+      "level": "MPY-I1",
+      "surface": "Parent, children, count, index, reorder, and lifecycle",
+      "reference": "LVGL tree APIs",
+      "required_behavior": "Tree traversal and mutation are reachable by handle, with sibling order and lifecycle observation preserved across a committed batch.",
+      "baseline_status": "partial",
+      "baseline_note": "`ObjectNode` already implements the tree semantics; what is absent is stable lookup by identity rather than by held Rust value.",
+      "owners": ["MPY-03", "MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_registry.rs::subtree_delete_advances_generations_and_preserves_unrelated_actors",
+              "note": "Handle-based parent/children lookup and subtree deletion are current; MPY-04 still owns reparent, reorder, batch visibility, and lifecycle observation."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md",
+              "note": "Later MPY-04/05 native evidence extends the original partial claim; no binding or cross-driver closure is claimed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-006",
+      "level": "MPY-I2",
+      "surface": "Named typed property get/set",
+      "reference": "LVGL property APIs",
+      "required_behavior": "Properties are enumerable and typed, distinguishing access mode, requested from computed, absence from default, and available from unsupported-on-target (MPY-00 §7.2).",
+      "baseline_status": "partial",
+      "baseline_note": "`core/src/property.rs` provides `Queryable::get_property`/`set_property` over four `PropertyValue` variants (Int, Bool, Color, Text) on a directly held widget. There is no enumeration, no descriptor, and `set_property` reports failure as a bare `false`.",
+      "owners": ["MPY-03", "MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_directions.rs::list_actions_prepare_transactionally_and_property_matrix_is_descriptor_driven"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_atomic_create.rs::reset_properties_restore_static_and_absent_defaults_on_stable_and_earlier_targets"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "The five-actor catalog and Stage validate typed properties, defaults, contextual references and collective mutations. Complete Endpoint Batch-frame ingress and binding discovery remain unproved."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ],
+      "differences": "`Queryable` is an implementation seed, not the scripting contract (MPY-00 §7.2). Existing callers stay source-compatible where practical."
+    },
+    {
+      "id": "MPY-BL-007",
+      "level": "MPY-I2",
+      "surface": "Discoverable actor actions and typed results",
+      "reference": "rlvgl-adjacent scripting requirement",
+      "required_behavior": "Operations that are transitions or collection commands rather than durable state are discoverable, typed, and invoked through the action catalog rather than binding-specific methods (MPY-00 §7.2).",
+      "baseline_status": "missing",
+      "baseline_note": "No action concept exists. Equivalent operations are inherent Rust methods on each widget, e.g. `List::add_item` / `List::set_items` in `widgets/src/list.rs`.",
+      "owners": ["MPY-03", "MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_directions.rs::list_actions_prepare_transactionally_and_property_matrix_is_descriptor_driven"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_atomic_create.rs::list_actions_execute_in_order_on_stable_and_earlier_targets_with_create_only_outputs"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "Descriptor-driven outputless Transactional List actions have atomic lowering and argument/error proof. Result-bearing actions and complete wire/binding dispatch remain outside this claim."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-008",
+      "level": "MPY-I2",
+      "surface": "Flags, states, style, and applicability",
+      "reference": "LVGL object/style state",
+      "required_behavior": "Object flags, states, and local style are readable and — where the director owns them — writable, with read-only runtime-authored state clearly separated.",
+      "baseline_status": "partial",
+      "baseline_note": "`ObjectFlags` and `ObjectStates` exist in `core/src/object.rs` with native semantics, but no generic descriptors and no declared writability split.",
+      "owners": ["MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_style_directions.rs::all_properties_commit_in_one_group_and_snapshot_in_property_order"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_style_directions.rs::target_selector_property_and_value_errors_precede_without_partial_publication"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "Sparse MPY-local styles and eligible writable flags have validated atomic storage and readback. Runtime-authored state remains native-owned; complete Endpoint and binding projection is unproved."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ],
+      "differences": "`DISABLED` appears in both `ObjectFlags` and `ObjectStates`; MPY-04 must declare which is director-writable (see MPY-04 PCDN-MPY-04-001)."
+    },
+    {
+      "id": "MPY-BL-009",
+      "level": "MPY-I2",
+      "surface": "Requested flex/grid/item layout",
+      "reference": "LVGL layout APIs; LPAR-10",
+      "required_behavior": "The director writes requested layout intent — flex/grid configuration, dimensions, constraints, placement, alignment, growth, span — as protocol values (MPY-00 §8.1, INV-MPY-4).",
+      "baseline_status": "partial",
+      "baseline_note": "`core/src/layout.rs` implements the layout semantics with native Rust setters; there is no value-typed scripting path to them.",
+      "owners": ["MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_directions.rs::requested_layout_roundtrips_and_computed_geometry_is_read_only"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_atomic_create.rs::requested_layout_echoes_every_earlier_created_target_in_operation_order"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "Requested layout is lowered and echoed through stable and earlier-Batch targets with geometry separation. Complete canonical Batch-frame Endpoint ingress and cross-driver equivalence remain unproved."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-010",
+      "level": "MPY-I2",
+      "surface": "Read-only computed geometry",
+      "reference": "LVGL coordinates; LPAR-10 effective_bounds",
+      "required_behavior": "Computed geometry is observable and separately introspectable from requested layout, and is not writable through the scripting contract (MPY-00 §8.1, INV-MPY-4).",
+      "baseline_status": "partial",
+      "baseline_note": "Effective bounds are computed and stored by the layout pass, but are not exposed as a distinct read-only scripting surface.",
+      "owners": ["MPY-04"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_directions.rs::requested_layout_roundtrips_and_computed_geometry_is_read_only"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_atomic_create.rs::requested_layout_echoes_stable_targets_and_commits_last_write_once"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "In-process requested layout and read-only computed geometry have focused fixture proof. No MicroPython, simulator-presentation or board profile is claimed."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-011",
+      "level": "MPY-I3",
+      "surface": "Event catalog and payload schemas",
+      "reference": "LVGL event vocabulary; ObjectEvent",
+      "required_behavior": "Every emittable event is discoverable with its payload fields, delivery policy, coalescing policy, and applicable actor types (MPY-00 §3, §8.4).",
+      "baseline_status": "partial",
+      "baseline_note": "`ObjectEvent` in `core/src/object.rs` is a rich typed enum, but it carries no descriptor, no coalescing declaration, and no per-actor applicability metadata.",
+      "owners": ["MPY-05"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_subscriptions.rs::proof_descriptor_matrix_and_payload_adapters_are_canonical"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_subscriptions.rs::dispatch_wide_workspace_matches_the_full_non_clicked_event"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+              "note": "The five-actor event matrix, applicability, propagation policies and native payload adapters have canonical descriptor proof. This does not claim a complete scriptable native event catalog or binding discovery."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-012",
+      "level": "MPY-I3",
+      "surface": "Add/remove/enumerate subscriptions",
+      "reference": "LVGL event descriptor APIs",
+      "required_behavior": "Subscriptions are created and removed by token, and active subscriptions are enumerable for a stage.",
+      "baseline_status": "missing",
+      "baseline_note": "Native callbacks are heterogeneous Rust closures held by widgets; there is no token, no removal surface, and no enumeration.",
+      "owners": ["MPY-05"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_subscriptions.rs::invalid_policy_filter_identity_callback_and_capacity_are_rejected"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_subscriptions.rs::teardown_is_caller_postorder_exact_once_and_tombstones_are_bounded"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+              "note": "Neutral subscription tokens, validation, stage enumeration and exact-once teardown are implemented. Endpoint command/wire removal and subscription-bearing snapshot/binding projection remain unproved."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-013",
+      "level": "MPY-I3",
+      "surface": "VM-safe callback cues",
+      "reference": "rlvgl-adjacent dual-core requirement",
+      "required_behavior": "Cues are queued and delivered to the director only at VM-safe points; rlvgl never calls into the VM from an interrupt, rendering path, native event traversal, CM4 task, or allocator-critical section (MPY-00 §8.2, INV-MPY-5).",
+      "baseline_status": "missing",
+      "baseline_note": "No cue queue exists. `Subject<T>` observers and widget `FnMut` callbacks are invoked synchronously inside native dispatch.",
+      "owners": ["MPY-05", "MPY-06"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_safe_turn.rs::deletion_releases_callbacks_in_child_first_registration_order_and_blocks_turns_until_ack"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_native_endpoint.rs::native_input_continues_while_a_vm_drain_is_outstanding"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+              "note": "Native input, Safe Turns and bounded acknowledged drains operate without a language runtime and preserve sequence/release ordering. Actual VM-safe callable execution, callback-generated command deferral and cross-driver proof require MPY-06/07."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-014",
+      "level": "MPY-I4",
+      "surface": "Deterministic stage snapshot",
+      "reference": "rlvgl-adjacent diagnostic requirement",
+      "required_behavior": "A snapshot of an unchanged stage is byte-deterministic, contains no raw addresses, and marks any truncation explicitly (MPY-00 §7.3).",
+      "baseline_status": "missing",
+      "baseline_note": "No snapshot surface exists at any layer.",
+      "owners": ["MPY-04", "MPY-07"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "widgets/tests/mpy_stage_directions.rs::snapshots_are_preorder_bounded_busy_stale_and_explicitly_truncated"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_style_directions.rs::bounded_snapshot_reports_prefix_legacy_zero_staleness_and_retryable_allocation_failure"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md",
+              "note": "Neutral snapshot records have deterministic tree order, sparse style projection, explicit bounds/truncation and stale/retry semantics. Subscription metadata and canonical snapshot byte encoding/cross-driver equivalence remain missing."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MPY-BL-015",
+      "level": "MPY-I4",
+      "surface": "Capacity, queue, and capability statistics",
+      "reference": "rlvgl-adjacent embedded requirement",
+      "required_behavior": "Bounded resources report capacity, occupancy, overflow, truncation, and backpressure state, and target capability differences are discoverable (MPY-00 §8.4, INV-MPY-8).",
+      "baseline_status": "missing",
+      "baseline_note": "`mp_rlvgl_stats` exists in `micropython/mp_module.c` but is a placeholder returning a status code; it reports no capacity or queue state.",
+      "owners": ["MPY-02", "MPY-05", "MPY-08"],
+      "claims": [
+        {
+          "profile": "in-process",
+          "status": "partial",
+          "evidence": [
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_cue_queue.rs::ordinary_traffic_cannot_consume_critical_reserve"
+            },
+            {
+              "kind": "test",
+              "ref": "core/tests/mpy_native_endpoint.rs::saturation_rejects_before_mutation_and_preserves_native_sequence"
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/concepts/MPY-05-CUES-SAFE-SCHEDULING.md",
+              "note": "Native queue reserve/quota, bounded drain, overflow notices and pre-dispatch rejection have focused proof. Unified director-facing statistics/capability discovery and board flow-control claims remain open."
+            },
+            {
+              "kind": "doc",
+              "ref": "docs/releases/v0.2.7-mpy-evidence.md"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -107,10 +107,10 @@ pub fn render_nrf_pac(ir: &NrfIr, out_dir: &Path) -> Result<Vec<std::path::PathB
 fn peripherals_used(ir: &NrfIr) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for pin in &ir.pins {
-        if let Some(p) = pin.peripheral.as_deref() {
-            if !out.iter().any(|s| s == p) {
-                out.push(p.to_string());
-            }
+        if let Some(p) = pin.peripheral.as_deref()
+            && !out.iter().any(|s| s == p)
+        {
+            out.push(p.to_string());
         }
     }
     out

@@ -160,32 +160,32 @@ fn validate_pins_against_chip(chip: &EspChip, board: &EspBoard) -> Result<()> {
                 chip.gpio_count - 1
             ));
         }
-        if let Some(entry) = chip.io_mux.iter().find(|p| p.gpio == pin.gpio) {
-            if entry.flash_reserved {
-                return Err(anyhow!(
-                    "board '{}' assigns GPIO{} ({}) which is reserved for in-package SPI flash on chip '{}'",
-                    board.name,
-                    pin.gpio,
-                    entry.pad_name,
-                    chip.name
-                ));
-            }
+        if let Some(entry) = chip.io_mux.iter().find(|p| p.gpio == pin.gpio)
+            && entry.flash_reserved
+        {
+            return Err(anyhow!(
+                "board '{}' assigns GPIO{} ({}) which is reserved for in-package SPI flash on chip '{}'",
+                board.name,
+                pin.gpio,
+                entry.pad_name,
+                chip.name
+            ));
         }
     }
     // Ensure each `label` is unique so generated `pub const` names don't
     // collide.
     let mut seen: IndexMap<&str, u8> = IndexMap::new();
     for pin in &board.pins {
-        if let Some(label) = pin.label.as_deref() {
-            if let Some(prev) = seen.insert(label, pin.gpio) {
-                return Err(anyhow!(
-                    "board '{}' reuses label '{}' on GPIO{} and GPIO{}",
-                    board.name,
-                    label,
-                    prev,
-                    pin.gpio
-                ));
-            }
+        if let Some(label) = pin.label.as_deref()
+            && let Some(prev) = seen.insert(label, pin.gpio)
+        {
+            return Err(anyhow!(
+                "board '{}' reuses label '{}' on GPIO{} and GPIO{}",
+                board.name,
+                label,
+                prev,
+                pin.gpio
+            ));
         }
     }
     Ok(())

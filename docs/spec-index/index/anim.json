@@ -1,0 +1,220 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "anim",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 8,
+    "term": 7
+  },
+  "object_count": 16,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "repo",
+        "term": "Tick"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 87,
+      "obj_id": "anim:term:tick",
+      "text": "One dispatch of `Event::Tick` through the consumer's loop. As defined in `core/src/event.rs:45`; used without modification. ANIM never converts time units: callers convert ms→ticks at their loop edge."
+    },
+    {
+      "attrs": {
+        "relationship": "ANIM",
+        "term": "Tween"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 88,
+      "obj_id": "anim:term:tween",
+      "text": "A pure description of one scalar (`i32`) moving `from → to` over a duration in Ticks under an `Easing` and a `LoopMode`. Owned by ANIM-00; lands in `core/src/anim.rs`."
+    },
+    {
+      "attrs": {
+        "relationship": "ANIM",
+        "term": "AnimId"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 90,
+      "obj_id": "anim:term:animid",
+      "text": "Opaque handle returned by registration; cancel/query key. Owned by ANIM-00."
+    },
+    {
+      "attrs": {
+        "relationship": "ANIM",
+        "term": "Apply callback"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 91,
+      "obj_id": "anim:term:apply callback",
+      "text": "`FnMut(i32) -> Option<Rect>`: writes the sampled value into the target and returns the screen region invalidated by that write (`None` = nothing visible changed)."
+    },
+    {
+      "attrs": {
+        "relationship": "repo",
+        "term": "Easing"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 92,
+      "obj_id": "anim:term:easing",
+      "text": "As defined in `core/src/animation.rs:19`; used without modification."
+    },
+    {
+      "attrs": {
+        "relationship": "repo",
+        "term": "LoopMode"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 93,
+      "obj_id": "anim:term:loopmode",
+      "text": "As defined in `core/src/animation.rs:102`; used without modification. Ticket modes map: one-shot=`Once`, repeat(N)=`Repeat(N)`, infinite=`Repeat(0)`, ping-pong=`PingPong(n)`/`PingPong(0)`."
+    },
+    {
+      "attrs": {
+        "relationship": "ANIM",
+        "term": "Scale"
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "term",
+      "line": 94,
+      "obj_id": "anim:term:scale",
+      "text": "The fixed-point denominator `ANIM_SCALE = 256` used by the convenience adapters' internal progress Tweens (0..=256)."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 228,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:228",
+      "text": "`core::anim::Tween` value sequences are bit-identical across"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 231,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:231",
+      "text": "Deterministic per-tick value tables asserted for each easing ×"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 234,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:234",
+      "text": "`value_at` / `step` equivalence asserted over full loop cycles."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 235,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:235",
+      "text": "Pulse driving case: disco-demo focus border alpha/color sampled"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 241,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:241",
+      "text": "Slide driving case: a container animates from off-edge to rest"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 244,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:244",
+      "text": "Dirty-rect integration: `Animations::tick` accumulates ≤1 rect"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 247,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:247",
+      "text": "`cargo test --workspace`, fmt, clippy `-D warnings`, doc build"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "gate",
+      "line": 249,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md:gate:249",
+      "text": "Published in a crates.io 0.2.x release (consumer is"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-11** — ANIM-00 drafted and ratified. Initial frozen",
+        "touches": null
+      },
+      "doc": "docs/concepts/ANIM-00-CONCEPTS.md",
+      "family": "anim",
+      "kind": "amendment",
+      "line": 277,
+      "obj_id": "docs/concepts/ANIM-00-CONCEPTS.md#2026-06-11@277",
+      "text": "**2026-06-11** — ANIM-00 drafted and ratified. Initial frozen"
+    }
+  ],
+  "schema_version": 2
+}

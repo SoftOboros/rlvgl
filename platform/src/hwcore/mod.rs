@@ -7,7 +7,8 @@
 //!
 //! Submodules land incrementally per the staged migration plan
 //! (`~/.claude/plans/let-s-plan-to-mitigate-parallel-anchor.md`). Step 1
-//! introduces only [`addr`]; [`surface`], [`isr`], and [`regs`] follow in
+//! introduces only [`crate::hwcore::addr`]; [`crate::hwcore::surface`],
+//! [`crate::hwcore::isr`], and [`crate::hwcore::regs`] follow in
 //! later steps.
 //!
 //! [discipline]: https://github.com/softoboros/rlvgl/blob/main/CLAUDE.md

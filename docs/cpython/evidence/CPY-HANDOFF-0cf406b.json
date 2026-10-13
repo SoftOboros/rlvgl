@@ -1,0 +1,49 @@
+{
+  "schema_version": "CPY-HANDOFF-1",
+  "recorded_on": "2026-08-18",
+  "source_thread_id": "01a002c2-f717-7c91-a65b-c53f8f0e1d58",
+  "source_commit": "0cf406bb22509f1040af6a772d0476a614c7bd9c",
+  "acknowledged": true,
+  "transferred_paths_clean": true,
+  "authorized_shared_paths": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "scripts/publish_changed.sh",
+    "runtime-std/"
+  ],
+  "excluded_paths": [
+    "api/",
+    "core/",
+    "micropython/",
+    "platform/",
+    "widgets/",
+    "tests/",
+    "docs/concepts/MPY-*.md"
+  ],
+  "mpy_frontier": {
+    "last_completed_pcdn": "PCDN-MPY-04-011",
+    "source_commit": "2205c2fbf04537859f1dd943e82c85f24c379566",
+    "index_commit": "0cf406bb22509f1040af6a772d0476a614c7bd9c",
+    "api_tests": "48/48",
+    "core_unit_tests": "259/259",
+    "core_atomic_tests": "42/42",
+    "widgets_tests": "333/333",
+    "spec_scanner_tests": "20/20",
+    "suspicion_tests": "7/7",
+    "spec_index": "clean at 2,148 objects across 28 families",
+    "additional_gates": [
+      "rlvgl-api no_std check",
+      "strict API/core/widgets Clippy",
+      "strict rlvgl-api rustdoc",
+      "cargo fmt --check",
+      "git diff --check"
+    ]
+  },
+  "active_mpy_work": {
+    "pcdn": "PCDN-MPY-04-012",
+    "scope": "InvokeAction",
+    "state_at_handoff": "active and uncommitted",
+    "must_preserve": true
+  },
+  "authority_boundary": "CPY may add its native std runtime without editing or reinterpreting MPY-owned semantics."
+}

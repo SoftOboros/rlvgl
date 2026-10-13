@@ -45,6 +45,9 @@ fi
 echo "[phase 5] docs"
 RUSTFLAGS="" cargo doc --workspace --no-deps
 
+echo "[phase 5.5] documentation index"
+make spec-test spec-index-check
+
 echo "[phase 6] embedded target (CM7 full build + .hex/.bin)"
 make build-disco
 
