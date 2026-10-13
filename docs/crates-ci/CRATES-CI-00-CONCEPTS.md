@@ -117,21 +117,34 @@ One owner per concept; Consumer Projects cite these, never restate them.
 ## §5 Frozen decision — gate topology (Standards Action)
 
 1. Two gates, **both** required for a conforming release: Gate P blocks the
-   tag; Gate R verifies registry truth after publish and on a 3×-daily
-   schedule (mirroring `publish-continue.yml` cadence).
+   tag; Gate R verifies registry truth after publish and on
+   the established daily verification schedule. Publishing has no timed trigger.
 2. Gate P consumes the full ordered publish list (`ordered_crates` in
    `scripts/publish_changed.sh`; 26 crates as of the 2026-07-12 SCTD-04
    amendment) — packaging
    every crate is part of the gate even when a Consumer Project only
    depends on a subset, because P-META/P-INCLUDE failures are per-crate.
-   The list includes the upstream-shaped `ratatui-rlvgl` crate in the
-   initialized `vendor/ratatui` submodule. Because that crate is intentionally
-   excluded from the rlvgl workspace, Gate P packages it by manifest path
-   immediately after `rlvgl-core`, its sole rlvgl dependency.
+   The current list contains all 31 existing publishable crates. It includes
+   the RLVGL-owned `ratatui-rlvgl` root workspace member at
+   `crates/ratatui-rlvgl`. Gate P packages it immediately after `rlvgl-core`,
+   its sole RLVGL dependency. The official Ratatui 0.30.2 source remains
+   unmodified; its native workspace supplies only the finite preparation
+   context described in §6 and §15 0.1.7.
 3. Consumer Projects MUST NOT use `path` dependencies or `[patch]` entries
    pointing into the workspace. Violation = nonconforming run.
-4. The publish workflow (`publish.yml`) MUST require Gate P green on the
-   release ref before `scripts/publish_changed.sh` executes.
+4. Both publishing workflows (`publish.yml` and `publish-continue.yml`) MUST
+   require Gate P green on the exact frozen release commit before the publisher
+   executes. Continuation is manual-only: resolve the latest release tag and
+   previous tag to immutable commit SHAs, then use the same release SHA for
+   packaging/consumers and publication. Publication MUST depend on successful
+   Gate P, verify exact HEAD and a clean source checkout before authentication,
+   and retain all three existing packaged consumers. A newer maintenance helper
+   MAY be preserved from the workflow revision only when its identity is recorded
+   separately and it executes against the frozen release sources. Changes to crate
+   sources require a newly qualified candidate. The continuation workflow MUST
+   NOT have a scheduled publishing trigger; registry throttling requires explicit
+   operator retry after the reported reset time. Gate R's daily registry-truth
+   verification remains independent of publication.
 5. Crates.io publication MUST authenticate through Trusted Publishing, not a
    repository-stored long-lived registry token. Every publishing job MUST use
    the GitHub `release` Environment, grant only `contents: read` and
@@ -154,33 +167,70 @@ cannot be resolved through it, while third-party deps would all need
 vendoring. `[patch.crates-io]` injects candidates that do not exist
 upstream — the standard pre-publish mechanism.)*
 
-1. Gate P runs `cargo package --no-verify -p <crate>` in publish order
-   (`scripts/crates_ci_stage.sh`), **progressively**: each packaged
-   archive is extracted to `$STAGE_DIR/staged/<name>-<version>/` and
-   appended to `$STAGE_DIR/patch-config.toml` (a `[patch.crates-io]`
-   table) BEFORE the next crate packages, with the partial table fed to
-   cargo via `--config`. This is required — `cargo package` re-resolves
-   the sanitized manifest, and unpublished sibling versions are
-   unresolvable until injected (publish time solves the same problem by
-   actually publishing in order). Side effect: a publish-order topology
-   error fails Gate P at the same crate that would have failed
-   `cargo publish` (P-ORDER caught pre-tag). Consumer Projects consume
-   the finished table as their `.cargo/config.toml`; third-party
-   dependencies continue to resolve from crates.io.
-   The excluded `ratatui-rlvgl` submodule crate uses the equivalent
-   `cargo package --manifest-path vendor/ratatui/ratatui-rlvgl/Cargo.toml`;
-   its version and archive location are discovered from that manifest's
-   workspace rather than the rlvgl root workspace. Its staged consumer patch
-   entry is appended after all root-workspace packages complete. The bridge is
-   first packaged against extracted `rlvgl-core`; Gate P then defers both
-   extracted patch entries while later root packages run because the live root
-   already consumes the bridge from the submodule path and patches its own
-   core. Exposing both live and extracted paths creates an ambiguous duplicate
-   `rlvgl-core` source in Cargo's lockfile. No later publish crate depends on
-   `ratatui-rlvgl`, and consumer gates receive both extracted entries after the
-   package loop, so the deferral does not weaken publish-order or packaged-core
-   verification. Gate P restores the submodule `Cargo.lock` after packaging so
-   validation leaves the pinned gitlink clean.
+1. Gate P packages in publish order (`scripts/crates_ci_stage.sh`), using
+   workspace-detached temporary inputs that preserve each original manifest
+   and every actual Cargo-selected payload byte. Cargo owns inventory,
+   normalization and archive generation. Each archive is immediately extracted
+   to `$STAGE_DIR/staged/<name>-<version>/` and its entry is appended to the
+   progressive `$STAGE_DIR/patch-config.toml` BEFORE the next package runs.
+   Every previously packaged dependency, including core and the owned
+   Ratatui bridge, MUST resolve through its extracted package; no deferral,
+   source fallback, fabricated manifest, dependency-minimum change, or manual
+   archive/lock editing is permitted. Missing extracted predecessors fail.
+
+   Cargo MAY load a separately recorded source graph-admission input for genuine
+   path-only dev dependencies removed by Cargo normalization and their necessary
+   real path closure. Every admitted file MUST come from its actual package's
+   Cargo source inventory at the same frozen candidate, including original
+   manifests and actual targets. Missing inventory files fail. An actual graph
+   back-edge MAY point to the current package's input; previously packaged
+   predecessors MUST still route to extracted archives. This permission only
+   admits Cargo's pre-normalization graph; it does not admit source paths into
+   normalized package verification or final consumers.
+
+   Solely for Cargo archive preparation, the real RLVGL `Cargo.toml` workspace
+   and nested `vendor/ratatui/Cargo.toml` workspace MAY additionally supply their
+   actual ancestor descriptors and finite member context. Before execution,
+   enumerate and fingerprint their original descriptor/member manifests,
+   Cargo-selected payload inventories, actual targets and any inherited real
+   shared readme/license paths. Preserve those bytes; Cargo owns interpretation
+   of inherited values, inventory, normalization and generated members. The
+   current bounded context is the root's 48 metadata members and Ratatui's 42
+   metadata members, recorded by exact manifest path in
+   `scripts/crates_ci_workspace_contexts.json`, superseding the previous
+   47/43 inventories under the accepted migration in §15 0.1.7. Only the
+   already-enumerated platform manifest fingerprint additionally changes for
+   its accepted version allocation under §15 0.1.8. Under §15
+   0.1.6, the root
+   `rlvgl` member additionally admits only the integration-test target
+   `tests/bsp_clock_ownership.rs`, fingerprinted by SHA256
+   `02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.
+   Other workspace descriptors, new members/targets or additional source
+   requirements MUST stop for an owning decision rather than recursively
+   broadening admission. Previously
+   packaged predecessors MUST still resolve through their extracted archives.
+   Keep actual nested Git identity and dirty-overlay provenance; the outer
+   repository identity MUST NOT replace nested Ratatui provenance. Checkout
+   lock preservation includes retaining absence when no source lock exists.
+   All additional admission inputs MUST become unavailable before normalized
+   package verification and final consumers.
+
+   The extracted package's resolved metadata MUST contain local paths only for
+   itself and its extracted staged predecessors; other packages MUST have registry
+   sources. Any source admission/original-checkout route in that graph fails.
+   Verification MUST still resolve after admission inputs become unavailable.
+   Preserve and compare the source inventory and original manifest, record
+   Cargo's normalized manifest, packaged lock and VCS provenance, and retain
+   complete generated-member accounting separately from payload equality.
+   Temporary input-graph locks may be changed only by Cargo. Checkout locks,
+   including nested locks, MUST remain unchanged on success and failure.
+
+   The owned `ratatui-rlvgl` is discovered exactly once by root workspace
+   metadata and packaged at its dependency-ordered position against extracted core. Both
+   extracted entries remain available throughout later packaging. The completed
+   patch table points only into extracted archives and is consumed by all
+   existing Consumer Projects. An unpublished predecessor/topology error remains
+   a P-ORDER/P-RESOLVE failure; a subset diagnostic is not full Gate P.
    After installing the completed patch table, every Gate P Consumer Project
    MUST discard any `Cargo.lock` embedded by `cargo package` and resolve a fresh
    lock before building. Otherwise Cargo can retain an older registry version
@@ -509,3 +559,647 @@ upstream — the standard pre-publish mechanism.)*
   cannot configure a Trusted Publisher before a crate exists. The same change
   quotes the workflow-supplied base revision so an empty/manual `*` value
   cannot expand to a repository filename.
+
+### 0.1.0 — 2026-10-05 — drafted
+
+**Author:** Codex
+**Change kind:** semantic
+**Touches:** §6, INV-C1, INV-C2, INV-C6
+**Summary:** Records ERRATA-001 and proposes CRATES-CI-01b isolated packaging; §6 remains unchanged pending exact mechanism disposition.
+
+#### Rationale
+
+The core/bridge deferral hides an unpublished predecessor needed by later
+packages, while restoring it in the live root produces duplicate source
+identities. [The drafted correction](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md)
+specifies archive/manifest equivalence, predecessor negative controls and
+complete consumer proof. [ERRATA-001](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md) remains pending ratification.
+Considered and rejected: reducing dependency minima, live-source fallback,
+or counting a partial run as Gate P. The effective mechanism, clean-source
+rule, metadata/drift checks, release gate and owner decision remain unchanged.
+
+### 0.1.1 — 2026-10-05 — drafted
+
+**Author:** Codex
+**Change kind:** semantic
+**Touches:** §5, INV-C1, INV-C6
+**Summary:** Records ERRATA-002 and proposes frozen-source, same-ref Gate P for continuation; effective workflow and §5 remain unchanged.
+
+#### Rationale
+
+The continuation resolves a release tag but executes its publisher against the
+workflow revision without a Gate P dependency. The
+[concrete review packet](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-continuation-wave3.md) separates helper
+maintenance from package-source qualification and retains all consumers/OIDC
+requirements. [ERRATA-002](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md) awaits owning disposition. A static/local
+fixture pass does not replace full Gate P or provider execution. Updating only
+the helper while packaging unqualified later crate sources was rejected as a
+solution to the owner's one-candidate requirement.
+
+### 0.1.2 — 2026-10-06 — ratified
+
+**Author:** Codex, recording owner direction
+**Change kind:** semantic
+**Touches:** §5, INV-C1, INV-C6
+**Summary:** Owner accepts frozen-source same-ref Gate P for continuation and removes its timed publishing trigger.
+
+#### Rationale
+
+The owner agreed to decision 1 and directed that timed publishing runs are no
+longer needed. This ratifies the source/gate correction proposed in 0.1.1,
+adds manual-only continuation, and preserves separate helper identity. The
+publisher has no local five-crate cutoff; this amendment does not assume removal
+of registry-side rate limits. Existing HTTP 429 diagnostics and indexing waits
+remain. Gate R's existing daily verification schedule remains independent, and its
+post-publish trigger follows successful primary and continuation runs.
+[The decision receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-continuation-decision.md) records the
+implementation and bounded checks. ERRATA-002's owner question is settled;
+provider execution and full Gate P remain verification gates. ERRATA-001 and
+its staging-mechanism decision are unchanged.
+
+### 0.1.3 — 2026-10-06 — drafted
+
+**Author:** Codex, recording owner direction
+**Change kind:** semantic
+**Touches:** §6, INV-C1, INV-C2, INV-C6
+**Summary:** Owner accepts detached-packaging direction with original manifests and Cargo-owned normalization; exact lock mechanism awaits equivalence and final ratification.
+
+#### Rationale
+
+Decision 2 was accepted with its stated remaining lock-resolution condition.
+[CRATES-CI-01b](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md) records those accepted
+constraints. [The follow-up receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-decision.md)
+records the bounded experiment. No dependency minimum, live-source fallback,
+archive member or failed lock comparison is waived. Effective §6 remains
+unchanged until the detailed mechanism is ready for final ratification.
+
+### 0.1.4 — 2026-10-10 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner makes bounded real source graph admission effective before detached packaging; extracted-only verification, predecessor routing and all release gates remain required.
+
+#### Rationale
+
+The owner accepted recommendations 1–6 on 2026-10-10 and authorized parallel
+implementation. This adopts the exact admission boundary proposed in
+[the October 7 mechanism packet](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-mechanism.md) for
+[ERRATA-001](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md). The historical core trial separated Cargo's loading of
+real path-only dev dependencies from its normalized package graph; its all-member
+comparison and missing extracted-API control are recorded in
+[the historical receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-packaging-wave4.md). Those transcript-
+recovered observations are historical evidence, not fresh qualification of the
+restored candidate or recovered raw archives.
+
+Considered and rejected: suppressing extracted core/bridge entries, replacing
+real dependency manifests, lowering version minima, removing a source lock to
+make a trial succeed, and allowing consumer paths into the source admission
+graph. Each hides the original resolution or distribution defect. Cargo retains
+ownership of inventory, normalization, archive generation and external input-
+graph lock updates. Original manifests and checkout locks remain preserved.
+This changes §6's deferral mechanism, not INV-C1, INV-C2 or INV-C6, the release
+set/order, selective versions, asset preparation, metadata/content-drift checks,
+clean-source refusal, the three consumers, provider CI or publication authority.
+Implementation is authorized against this ratified concepts amendment. The
+[01B execution plan](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md) remains Draft with its
+remaining acceptance gates open; this entry is not its ratification or Gate P.
+
+### 0.1.5 — 2026-10-10 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner authorizes the enumerated real root and nested Ratatui descriptor/member contexts solely for Cargo archive preparation, preserving extracted predecessors and admission-free verification/consumers.
+
+#### Rationale
+
+The owner accepted both latest recommendations on October 10 local time after the bounded
+execution stopped on Ratatui's inherited descriptor. The exact frontier and two
+dispositions are recorded in [that receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-20261010.md).
+This amendment is recorded before governing implementation. Root and nested
+Ratatui are the only additional workspace contexts authorized: their actual
+descriptor bytes and finite actual member/target contexts must be enumerated
+before preparation. Cargo, rather than fabricated ancestors or flattened
+inheritance, interprets those inputs and generates normalized archives. Any
+unexpected workspace or additional source requirement stops for a new owning
+decision; this is not recursive workspace admission.
+
+Considered and rejected: continuing the previous fail-closed diagnostic as if
+full staging passed, omitting bridge/root from the publishable set, inventing an
+ancestor, rewriting inherited values, bypassing a predecessor through original
+source or registry, and assigning the outer AA Git identity to nested ED source.
+The selected disposition preserves real manifests, payload inventories/targets,
+actual nested Git provenance including dirty overlays, and every checkout lock's
+bytes or absence. Source admission is solely for archive preparation, must become
+unavailable before normalized verification and consumers, and does not waive
+clean-source, asset, metadata/drift, full-set, three-consumer or Linux CI gates.
+The 01B plan remains Draft. A frozen hashed uncommitted candidate permits local
+diagnostics; it is not a clean release ref or authorization to create a source
+commit before the remaining CLAUDE prepublish gates pass.
+
+### 0.1.6 — 2026-10-11 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §6
+**Summary:** Owner admits only the already approved BSP clock-ownership regression target into the finite root archive-preparation context.
+
+#### Rationale
+
+The owner accepted the one-target staging recommendation on October 11 local
+time after the unchanged workspace guard refused the new Cargo-discovered
+integration test. This amendment is recorded before governing implementation.
+Only `tests/bsp_clock_ownership.rs` in the root `rlvgl` member is additionally
+admitted, with SHA256
+`02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.
+It supplies the separately approved BSP null-owner regression coverage.
+The actual root and nested Ratatui descriptor bytes, original manifest/shared
+file fingerprints, and 47/43 member sets remain unchanged. Governing finite
+context implementation SHALL enumerate only this additional target. Every
+other unexpected descriptor, member, target or source requirement remains an
+owning-decision stop.
+
+Considered and rejected: removing or hiding the approved regression test,
+automatically admitting future Cargo-discovered targets, or disabling the
+unchanged fail-closed target guard. Those bypass the finite admission boundary.
+Original Cargo inventories and normalization, progressive extracted
+predecessors, withdrawal of admission inputs before normalized verification
+and all consumers, genuine nested Git/overlay provenance, checkout lock bytes
+or absence, clean release-ref, metadata/drift, normal asset preparation,
+full ordered publish set, all three consumers and Linux same-ref/provider
+gates remain required. Root/core allocation remains 0.2.7; this amendment does
+not ratify the Draft 01B execution plan or establish Gate P/publication readiness.
+
+### 0.1.7 — 2026-10-12 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance
+**Change kind:** semantic
+**Touches:** §5, §6
+**Summary:** Records the accepted RLVGL-owned bridge migration and its exact
+finite archive-preparation contexts; all release guards remain required.
+
+#### Rationale
+
+The owner accepted PCDN-07 and the migration plan, then authorized the owned
+bridge/fonts, compatibility and Stage/publisher integration slices. This entry
+records that accepted scope before adoption through protected PRs. It supersedes
+the current nested-bridge discovery and 47/43 context allocation; earlier dated
+entries retain their historical scope.
+
+`ratatui-rlvgl` is the regular root workspace member at
+`crates/ratatui-rlvgl/Cargo.toml`, discovered exactly once through root metadata.
+Its archive includes the four existing packed font variants and their notices.
+The official Ratatui 0.30.2 source is pinned, unmodified, to commit
+`e665c36cb14752a61cd777fbd06dbef8474f2add`, tree
+`cc2e7266ebf5e17f9250ef2d7bab1222dc62150f`. Its native core retains its genuine
+nested workspace and Git provenance; that context does not add another bridge
+or native crate to the RLVGL publish list.
+
+Actual locked Cargo metadata enumerates exactly 48 root members and 42 native
+members. `scripts/crates_ci_workspace_contexts.json` fingerprints their actual
+descriptors, member manifests, targets and inherited shared files; its accepted
+inventory SHA256 is
+`c757a5affa3761214abbddcc1cf9aa14d01a10c9c1232808cf39585a5a9a9f1c`.
+The root descriptor SHA256 is
+`ddb1ee0b32907519e0bf804b158e2494090e1b14b634868b0efb4f63776a2c3e`;
+the native descriptor SHA256 is
+`a5007fe4cb0d9901302c5eb201941dcec82755370917144e312d2bfe9e5a6567`.
+These are finite inventories for this candidate, not permission to discover
+and admit future descriptors, members, targets or sources automatically.
+
+The existing 31-crate order is unchanged, with core immediately before the
+bridge. Selective candidate versions are bridge 0.1.2 and root 0.2.8; core
+remains 0.2.7 and the other published packages retain their existing versions.
+Released A2/v0.2.7 and original parent pins remain unchanged. The future release
+identity requires separate admission.
+
+Progressive extracted predecessors, absence of source fallback, withdrawal of
+preparation inputs before normalized verification and consumers, actual nested
+Git/dirty-overlay provenance, checkout lock bytes or absence, clean-source
+refusal, metadata/content drift, normal asset preparation, the full ordered set,
+all three existing consumers, full source validation and Linux same-ref/provider
+gates remain required. Existing failed results remain open; this amendment does
+not ratify Draft 01B, waive a guard, qualify Gate P or authorize publication.
+The governing amendment follows the protected amendment-first PR route before
+behavior adoption. Any unexpected requirement stops for an owning decision.
+
+### 0.1.8 — 2026-10-12 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-08
+**Change kind:** semantic
+**Touches:** §6 finite context and selective-version boundary
+**Summary:** Owner admits the existing platform member's version fingerprint
+for the exact scanout diagnostic correction, without changing context membership.
+
+#### Rationale
+
+The owner accepted the named snapshot correction in SCTD-04 §15 0.1.1 and its
+mandatory `rlvgl-platform` 0.2.6 to 0.2.7 allocation. The snapshot is shipped in
+the immutable published 0.2.6 archive; changing it at that version would violate
+P-DIFF. Only `platform/Cargo.toml`'s already-enumerated member fingerprint may
+change in `scripts/crates_ci_workspace_contexts.json`, computed from the actual
+candidate bytes and verified against locked Cargo metadata before execution.
+Record and freeze the resulting policy identity. Root/native descriptor bytes,
+48/42 member sets, targets and inherited shared files remain unchanged.
+Prior dated fingerprints and failed results retain their historical scope.
+
+The actual platform manifest SHA256 for this allocation is
+`27ac01c83570036e437abd7f9b60eb74f1bba0358c568f06a634a4918ff07e61`.
+The resulting finite-context policy SHA256 is
+`460242ed77e45a8115dac0474f6a6e6d83170257843f23ccd5dbfbeb81aa8a1c`;
+locked root/native metadata verifies the unchanged 48/42 inventories.
+
+Cargo may regenerate only the necessary platform-version entries in the root
+and IDF candidate locks before they are frozen for validation; no unrelated
+dependency-resolution churn or manual lock editing is admitted. All other six
+active locks, including official Ratatui's, remain exact. Bridge 0.1.2 and root
+0.2.8 retain their accepted allocation; core stays 0.2.7 and other published
+versions and dependency minima remain unchanged.
+
+No additional descriptor/member/target, source fallback, diagnostic normalization,
+fixture refresh or guard waiver is granted. The full 31-crate order, extracted
+predecessors, unavailable preparation inputs before verification/consumers,
+actual nested provenance, runtime source-lock preservation, clean-source,
+metadata/drift, full source validation, same-ref/protected PR, Linux Gate P,
+all consumers and publication/Gate R gates remain required. This amendment is
+recorded before the correction; adoption uses the established protected
+amendment-first route. It does not establish a passing gate or authorize a
+release identity, publication or parent-pin change. Stop for any new PCDN.
+
+### 0.1.9 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-09
+**Change kind:** semantic
+**Touches:** §5 source-adoption prerequisites and owning Markdown-link instruction
+**Summary:** Owner admits a finite changed-document link result for this owned
+Ratatui maintenance candidate, retaining inherited whole-tree failures as open.
+
+#### Rationale
+
+The owner accepted PCDN-09 after the unchanged `scripts/check-links.sh` returned
+exit 1, without a timeout: 9,535 checks, 6,429 unique checks, 9,270 successful
+checks and 255 errors across 105 inputs. All failed input bodies are byte exact
+their genuine current owner HEAD: 24 unchanged A2 root inputs, one chips-child
+input, 68 vendor inputs and 12 tracked Ruby-bundle inputs. The actual failed
+receipt, error inventory, source identities and earlier negative results SHALL
+remain retained as an OPEN documentation follow-up. The separate four-document
+diagnostic passed all 23 checks; it did not qualify the failed whole-tree guard.
+
+This admission applies only to the current RLVGL-owned Ratatui migration and
+PCDN-08 candidate, anchored to its prior 44-path source freeze SHA256
+`65daac9de90e4549692372fb89cd197c7b868150c13f2c7950638b6e29df6169`.
+Before documentation adoption through protected PRs, freshly run the unchanged
+`lychee --no-progress` executable on every document in this exact finite set:
+
+- `AGENTS.md`, including its owning candidate-specific crossreference;
+- `docs/concepts/RATATUI-00-CONCEPTS.md`;
+- `docs/concepts/SCTD-04-RATATUI-RLVGL-INTEGRATION.md`;
+- `docs/crates-ci/CRATES-CI-00-CONCEPTS.md`, including this amendment;
+- `crates/ratatui-rlvgl/README.md`.
+
+All five documents SHALL pass actual checks with no added filters, exclusions,
+fabricated responses or ignored failures. Freeze their actual hashes and modes
+and retain the actual command and receipt. Any additional Markdown edit or new
+error is an owning-decision stop. Regenerate affected spec-index projections
+with the unchanged canonical generator; do not edit generated files by hand.
+The existing checker script remains unchanged, and its inherited whole-tree
+result remains FAIL rather than an all-green receipt. Outside this exact
+candidate-specific admission, the normal whole-tree instruction still applies.
+
+Official Ratatui 0.30.2 remains unmodified at `e665c36cb14752a61cd777fbd06dbef8474f2add`.
+Released A2/v0.2.7 and original parent pins remain unchanged. Selective versions
+remain bridge 0.1.2, platform 0.2.7 and root 0.2.8; core remains 0.2.7, with no
+other package allocation, dependency, source, fixture, API or compiler change.
+The full source and remaining BSP/C3 checks, clean-source refusal, P-VCS,
+P-META, P-SOURCE-LOCK, P-DIFF, the full 31-crate order, extracted predecessors,
+withdrawal of preparation inputs before verification and consumers, genuine
+nested provenance, all three consumers and the owned bridge boundary remain
+required. No source fallback or automatic descriptor/member/target admission
+is granted. Protected amendment-first source PRs, same-ref clean Linux Gate P,
+separately admitted release identity/publication/Gate R and parent adoption
+remain distinct gates. This amendment does not qualify those gates or close
+the inherited link failures. Stop for any new PCDN.
+
+### 0.1.10 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-10
+**Change kind:** semantic
+**Touches:** §5 protected amendment-first adoption and owning pre-commit instruction
+**Summary:** Owner admits one exact documentation-only protected amendment PR
+with the inherited main snapshot failure retained as OPEN; source gates remain.
+
+#### Rationale
+
+The owner accepted PCDN-10 to preserve two separate protected PRs. The governing
+invariant amendments SHALL be adopted first; a fully qualified implementation
+PR follows from the exact adopted main commit. The admission is confined to
+one documentation-only amendment PR based on genuine main
+`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2`, refreshed before any ref mutation.
+An unexpected base, authored input, source requirement or failure is an owning
+decision stop, not permission to rebase or widen this boundary automatically.
+
+The retained actual `scripts/pre-commit.sh` run failed with exit 101 after
+300.248 seconds: 13 of 14 compile-fail cases passed, and `scanout_front_write`
+differed only in the diagnostic `FrontBuffer` lifetime spelling. That run used
+main `77ac0bf3876f5c732946ed478c2e0d85d3f94e35` plus the accepted Kria manifest
+postimage that became b64. Its entire platform tree and compiled source are
+unchanged on b64; fixture program, expected diagnostic, harness and typed API
+hashes match, as do the compiler binaries and host runtime library bytes.
+This is retained actual-source causal proof, not a fresh passing main run.
+The failed receipt and source identities SHALL remain OPEN and immutable.
+
+For this one amendment PR only, the owner admits that exact inherited failed
+pre-commit result in place of the otherwise required successful pre-commit
+prerequisite. Its authored diff SHALL contain exactly the five Markdown paths
+enumerated in amendment 0.1.9, including this disposition and the matching
+AGENTS crossreference. Refreeze all five actual postimage hashes and modes,
+freshly run `lychee --no-progress` on all five without added filters or ignored
+errors, and prove that all compiled source, fixtures, manifests, versions,
+lock bytes or absence, nested pins and release/parent refs remain unchanged
+outside those five documentation paths. Review complete main-to-postimage
+document differences; do not apply A2 patches blindly. The README may stage
+the future carrier's documentation, but no bridge manifest, code, fonts or
+other implementation input belongs in this PR.
+
+Genuine b64 has no spec-index source or projections. No partial or transplanted
+index, scanner or extra tool source is admitted in the documentation PR. Keep
+the actual complete candidate's canonical index proof tied to that candidate.
+Adopt and regenerate the already-approved complete A2 index and generator with
+the later coherent source PR. Normal protected PR/squash rules remain required;
+no admin bypass, force update or retagging is authorized. The docs-only
+exception expires at adoption or any additional source/profile/error
+requirement, and never applies to the following implementation PR.
+
+The implementation PR SHALL preserve the adopted five Markdown postimages and
+compose coherent A2 plus the approved owned bridge and PCDN-08 correction. All
+normal source checks, remaining C3 checks, full pre-commit/prepublish, genuine
+source history, metadata, checkout locks, source/content drift, P-DIFF, full
+31-crate order, extracted predecessors, withdrawal of preparation inputs,
+all three consumers and the owned bridge/font boundary remain required before
+source adoption and clean-ref Linux Gate P qualification. No original-source
+fallback or automatic descriptor/member/target admission is granted.
+
+Official Ratatui 0.30.2 remains unmodified; released A2 and original parent pins
+remain unchanged. Bridge 0.1.2, platform 0.2.7 and root 0.2.8 retain their
+selective allocation, core remains 0.2.7, and other versions stay unchanged.
+PCDN-09's inherited whole-tree link failures remain OPEN. This admission makes
+no compiled/provider-green, Gate P, registry, release, hardware or parent
+qualification claim. New release identity, publication/Gate R and parent
+adoption remain separate decisions. Stop for any new PCDN.
+
+### 0.1.11 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-11
+**Change kind:** semantic
+**Touches:** §5 protected amendment-first documentation postimages and §15 history references
+**Summary:** Keep the exact five-Markdown governing PR and correct only its
+15 missing historical hyperlink destinations to immutable released-A2 sources;
+a fresh passing five-document link check remains required.
+
+#### Rationale
+
+The owner accepted the bounded historical-link correction and requested a
+release-documentation review for new features and necessary decisions before
+release. The fresh unfiltered five-document check on genuine main
+`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2` failed: 26 checks, 18 unique,
+11 passed and 15 missing-file occurrences named ten absent Markdown targets.
+The retained failed result SHALL remain OPEN and immutable. A read-only local
+prerequisite inventory reached 30 additional released-A2 Markdown documents,
+a required 31st, six unvisited bodies and a host-local HTML prerequisite. That
+inventory is not a closed import set and SHALL NOT be transplanted as one.
+
+For this one protected governing PR, retain exactly the five Markdown paths
+admitted by 0.1.9 and 0.1.10. Only the following 15 historical href occurrences
+SHALL use the GitHub blob view in `SoftOboros/rlvgl`, pinned to the full
+released-A2 commit `a2b48e108ae9e0623d2bb6217cef73f0113e8708` and their exact
+tracked target paths. Preserve each link label and its surrounding decision:
+
+- `docs/concepts/RATATUI-00-CONCEPTS.md`: one link to
+  `docs/concepts/RATATUI-RETROSPECTIVE.md`.
+- `docs/concepts/SCTD-04-RATATUI-RLVGL-INTEGRATION.md`: one link each to
+  `docs/concepts/RATATUI-RETROSPECTIVE.md` and
+  `docs/releases/v0.2.7-demo-evidence.md`.
+- This document: three links each to
+  `docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md` and
+  `docs/crates-ci/ERRATA.md`; one link each to
+  `docs/releases/v0.2.7-continuation-decision.md`,
+  `docs/releases/v0.2.7-continuation-wave3.md`,
+  `docs/releases/v0.2.7-packaging-wave4.md`,
+  `docs/releases/v0.2.7-staging-20261010.md`,
+  `docs/releases/v0.2.7-staging-decision.md` and
+  `docs/releases/v0.2.7-staging-mechanism.md`.
+
+Those URLs identify historical A2 documents, not adopted main implementation
+or repaired historical document internals. Do not rewrite labels, delete
+history, import the unclosed prerequisite chain or amend released A2. Record
+this disposition and the matching AGENTS crossreference before adopting the
+new five postimages; refreeze their hashes and modes and review the complete
+main-to-postimage differences. No other Markdown path, scanner, index,
+implementation input, manifest, font, lock, version or gitlink belongs in the
+governing PR. The complete canonical candidate index remains candidate proof
+and belongs with the later coherent implementation PR.
+
+A fresh actual `lychee --no-progress` run on all five SHALL pass, without added
+filters, exclusions or ignored errors. HTTP availability diagnostics do not
+replace that check; a failed destination requires a stop, not a missing-link
+or HTTP-status waiver. Retain every prior failed receipt. Run the unchanged
+literal formatting commands and prove compiled source, fixtures, manifests,
+versions, modes, locks or absence, nested pins and release/parent refs unchanged
+outside the five. Unexpected base drift, input, source/profile requirement,
+new error or new normative feature decision SHALL stop for an owning PCDN.
+
+Retain 0.1.10's exact inherited main pre-commit failure as OPEN for this one
+governing PR only. Keep the normal protected amendment-first PR/squash route,
+with no admin bypass, force update or retagging. The exception expires at
+adoption or any additional unapproved requirement and never transfers to the
+following implementation PR. Review release documentation against accepted
+feature decisions and actual source; do not silently ratify Draft phases,
+close missing evidence or assert hardware, consumer or publication readiness.
+
+Official Ratatui 0.30.2 remains unmodified, released A2 and original parent pins
+remain unchanged, and selective versions remain bridge 0.1.2, platform 0.2.7,
+root 0.2.8 and core 0.2.7 with other packages unchanged. All normal following
+source, complete index, full pre-commit/prepublish, P-VCS, P-META,
+P-SOURCE-LOCK, P-DIFF, 31-crate order, extracted-predecessor withdrawal,
+three-consumer and bridge/font boundaries remain required. Clean-ref Linux
+Gate P, separately admitted release identity/publication/Gate R and parent
+adoption remain distinct gates. PCDN-09 inherited whole-tree link failures and
+other retained failures remain OPEN. Stop for any new PCDN.
+
+### 0.1.12 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-12
+**Change kind:** semantic
+**Touches:** §5 documentation postimage timing and §6 shared-file admission receipts
+**Summary:** Admit the exact eleven-file factual release-documentation refresh,
+fifteen-document passing link scope and two reviewed README fingerprint values;
+retain the exact-five governing PR and all source and release guards.
+
+#### Rationale
+
+The owner accepted PCDN-12 after the bounded public-feature and family review.
+It found stale fork dependencies/imports/paths, missing owned compatibility and
+portable-atomic guidance, mismatched font metrics in examples, dated version
+navigation and imprecise native-versus-interpreter snapshot status. The review
+selected factual documentation corrections, not new feature behavior, phase
+ratification, a release identity or a registry-availability claim.
+
+The exact authored cleanup set SHALL be:
+
+- `crates/ratatui-rlvgl/README.md`;
+- `docs/ratatui-tutorial/README.md`;
+- `docs/ratatui-tutorial/01-backend-and-surface.md`;
+- `docs/ratatui-tutorial/02-rendering-cells.md`;
+- `docs/ratatui-tutorial/04-live-state.md`;
+- `README.md`;
+- `docs/CHANGELOG.md`;
+- `docs/releases/owned-bridge-maintenance.md`;
+- `docs/releases/v0.2.7-successor-family-state-20261013.md`;
+- `docs/releases/v0.2.7.md`; and
+- `docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md`.
+
+Keep the first governing PR at exactly the five Markdown paths enumerated in
+0.1.9. Finalize the owned bridge README's self-contained future-carrier
+migration documentation, including its corrected font-metrics example, before
+freezing that governing PR. Record this amendment and matching AGENTS authority
+first. Its main carrier SHALL NOT link to later documentation absent from main.
+Refreeze and review all five postimages and freshly pass their unchanged,
+unfiltered actual link command, literal formatting and source preservation.
+Keep 0.1.10's exact inherited main pre-commit failure OPEN for this governing
+PR only; no other failed result is admitted there.
+
+The other ten authored cleanup paths belong only in the later coherent
+implementation PR with complete accepted A2 source/docs/index and the owned
+bridge implementation. That PR SHALL preserve all five adopted governing
+postimages. Explain official unmodified Ratatui 0.30.2 separately from native
+core 0.1.2, native imports, the owned compatibility subset and target portability
+limits. Do not add widget behavior, hardware assumptions, font repertoire or
+rendering defaults merely to retain obsolete examples. Use Unreleased for the
+maintenance guide and distinguish prepared package allocations from registry
+availability. Add dated successor navigation; retain historical observations,
+source identities, tables, measurements and failed receipts.
+
+For this exact candidate, extend 0.1.9's changed-document admission to exactly
+fifteen distinct Markdown paths: its original five union the eleven paths above,
+with the bridge README overlapping. Every touched postimage SHALL freshly pass
+unchanged `lychee --no-progress`, without added filters, exclusions, fabricated
+responses or ignored failures. Retain the actual inherited whole-tree failure
+as FAIL and OPEN; keep the checker unchanged. Freeze actual hashes and modes,
+regenerate only affected projections with the unchanged canonical generator,
+and extend the finite freeze to the authored inputs and changed projections.
+Do not transplant index/generator source into the governing PR. Any additional
+path, unexpected source/profile requirement, base drift or new error SHALL stop
+for an owning PCDN; this is not general documentation or dependency admission.
+
+The staging receipt already fingerprints both edited READMEs. Admit only the
+reviewed, frozen postimage SHA-256 values at these two existing JSON pointers
+in `scripts/crates_ci_workspace_contexts.json`, in the later source PR:
+
+- `/workspaces/0/members/0/shared_files/0/sha256`, for `README.md`, replacing
+  `009a30632167019925ca7c38889eac1d9301ebf3f40ddc4e3885aa66ee8bda2a`;
+- `/workspaces/0/members/14/shared_files/0/sha256`, for the owned bridge README,
+  replacing `7491acc1c1b72ab08e5d147cb62149f847ebd1241a12d28376a5a1c7d59d9710`.
+
+Every other receipt value SHALL be structurally exact: same workspace identities,
+descriptor hashes, paths, members, manifest hashes, target contexts, other shared
+hashes and finite root48/native42 contexts. Keep staging/package checker code
+unchanged. No automatic receipt refresh, wildcard, profile widening, new
+workspace/descriptor/member/target, original-source fallback or baseline ratchet
+is authorized. The README postimage admission does not itself qualify staging:
+fresh full package/source-content/P-DIFF/predecessor/withdrawal/three-consumer
+and same-ref Linux Gate P proof remains mandatory at its applicable gate.
+
+Do not edit unchanged published core README/docstrings or other unchanged
+package payloads; no code, manifest, font, lock, version, gitlink or accepted
+feature contract change belongs in this refresh. The two documentation-derived
+receipt hash values are the sole additional non-Markdown authored input change.
+Native snapshot documentation does not qualify wire/interpreter/cross-driver
+or board surfaces. MPY-06/07 remain unratified; MPY-08/09 and staging01B remain
+Draft. Preserve producer production0.4.2 pins, unknown absent HSE frequency,
+CCPS-specific validation and all independent hardware/provider obligations.
+
+Official Ratatui 0.30.2, released A2 and original parent pins remain unchanged.
+Keep bridge0.1.2, platform0.2.7, root0.2.8 and core0.2.7 selective allocations,
+with other versions unchanged. All normal source, formatting, full pre-commit
+and prepublish, P-VCS, P-META, P-SOURCE-LOCK, content/P-DIFF, full31 order,
+extracted predecessors, withdrawal, three consumers and protected amendment-first
+PR/squash guards remain required. New release/tag identity, publication/Gate R
+and parent adoption remain separately admitted decisions after their gates.
+No admin bypass, force update, retagging, failure relabeling or hardware readiness
+claim is granted. Stop for any new PCDN.
+
+### 0.1.13 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-13
+**Change kind:** semantic
+**Touches:** §5 one governing documentation adoption and later qualification profile
+**Summary:** Admit the exact retained hosted diagnostic spelling failures for
+one five-document PR; admit two dated qualification inputs only in the later
+coherent source PR. All source and release gates remain required.
+
+#### Rationale and bounded documentation disposition
+
+The owner accepted PCDN-13 after PR223's hosted CI run 38425309332 failed its
+workspace test step: 11 of 14 compile-fail cases passed. Its setup script
+updated nightly from Rust 1.91 to 1.101.0-nightly `e9bbadf68` (2026-10-12).
+Only `dca_dbuf_use_after_lend`, `dca_ltdc_use_after_stop` and
+`dca_use_after_lend` differed. Each retained E0382, identical moved values,
+move/borrow positions and receiver ownership prohibition; only the explanatory
+note added `rlvgl_platform::hwcore::dca::` to its type name. Retain the actual
+11/14 failed result and complete diagnostic evidence as OPEN. Do not bless,
+normalize, filter or relabel the failed snapshots as passing.
+
+For the one five-Markdown governing PR223 based on genuine main
+`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2` only, the owner admits that exact
+hosted result alongside 0.1.10's retained local 13/14 `scanout_front_write`
+result. Hosted Gate P run 38425309292 reproduced the already OPEN PCDN-04
+root rlvgl 0.2.5 `Cargo.toml.orig` payload drift; its consumers were skipped.
+That remains a failed Gate P, not a source or release qualification.
+
+Amend only this owning disposition and its AGENTS mirror, then refreeze and
+review the complete five postimages enumerated in 0.1.9. Freshly pass their
+unchanged unfiltered link command and literal formatting, and prove unchanged
+compiled source, fixtures, manifests, versions, locks, nested pins and release
+and parent refs outside the five paths. Keep the protected PR/squash route;
+no administrative bypass, force update or status substitution is admitted.
+This explicitly admits that documentation adoption boundary despite the
+retained exact failures; all other prerequisites remain. The exception expires
+at adoption. Any additional failing case, source/profile/input requirement or
+base drift is a new owning decision stop. It never qualifies later source.
+
+#### Exact later qualification-profile admission
+
+After adoption and verification of the actual resulting main ref, the later
+coherent implementation PR MAY additionally change exactly
+`scripts/setup-ci-env.sh` and `.github/workflows/ci.yml` for the qualification
+profile. Select `nightly-2025-07-31`: rustc 1.90.0-nightly `3048886e5` and
+Cargo 1.90.0-nightly `9b296973b`. Replace floating nightly update/selection
+with genuine dated installation, effective profile selection for all existing
+setup callers and subsequent steps, identity logging and fail-closed checks.
+Make CI's docs command use that same dated profile instead of `cargo +nightly`.
+Retain recursive submodule setup, rustfmt, clippy, rust-src,
+llvm-tools-preview, required targets and every existing command/failure return.
+A caller's unexpected profile or unavailable component/target is a stop;
+no compiler/date fallback or simulated installation is permitted.
+
+Record actual Linux compiler, Cargo, component and target identities. The
+preserved macOS profile is provenance, not proof of Linux qualification.
+Pinning b64 alone is not expected to make its inherited snapshot green.
+The subsequent genuine integrated source SHALL pass all 14 compile-fail
+cases, complete pre-commit/pre-publish, publisher/workflow contracts and full
+clean same-ref Linux/hosted Gate P, P-DIFF, archive order, extracted predecessor
+withdrawal and all three consumers. Retain accepted source/provenance checks,
+including the separately admitted scanout correction. Neither documentation
+failure disposition transfers to this source PR. Any further mismatch or
+unadmitted source, fixture, lock or guard requirement stops for a new PCDN.
+
+The shared helper's dated selection reaches its existing container callers;
+no other workflow YAML, publisher stable selection, OIDC/authentication,
+trigger, container/image or qualification guard is admitted for alteration.
+Keep all five adopted governing postimages and the ten later cleanup docs,
+0.1.12's exact two README receipt SHA leaves and every other receipt value.
+Preserve selective bridge 0.1.2, platform 0.2.7, root 0.2.8 and core 0.2.7,
+unmodified official Ratatui 0.30.2, released A2/v0.2.7 and parent pins.
+No new release identity, registry publication, hardware flash, phase
+ratification or general CI waiver follows. Stop for any new PCDN.

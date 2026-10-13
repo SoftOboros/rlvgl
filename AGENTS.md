@@ -92,6 +92,60 @@ Run `./scripts/pre-commit.sh` and ensure it succeeds before opening a pull reque
 This script enforces formatting, runs clippy, builds with all features, and
 verifies documentation generation using nightly.
 
+Owner-accepted PCDN-10 admits one exact five-Markdown-only governing amendment
+PR on main `b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2`, under
+[CRATES-CI §15 amendment 0.1.10](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Retain the exact inherited main pre-commit snapshot failure as OPEN; require
+fresh five-document link checks and unchanged compiled source, fixtures,
+manifests, versions, locks and pins. No index/scanner or implementation input
+belongs in that PR. Keep the separate amendment-first protected PR/squash
+route. The exception expires at adoption or any additional source/profile/error
+requirement; the following implementation PR must pass every normal source
+and release prerequisite. This is no passing main or release qualification.
+
+Owner-accepted PCDN-11 retains that exact five-path governing PR and permits
+only the 15 enumerated historical href replacements to immutable released-A2
+URLs plus the owning disposition, under
+[CRATES-CI §15 amendment 0.1.11](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve labels, history, released A2 and all source/pin boundaries. Refreeze
+and review the five postimages; require a fresh passing unfiltered five-document
+link check and unchanged literal formatting/preservation. No new missing-link
+or HTTP-status waiver, additional document import or index/scanner input is
+admitted. Review release docs for accepted features and necessary decisions;
+stop for any new normative decision, error, base drift or unapproved input.
+The separate implementation PR retains every normal source/release guard.
+
+Owner-accepted PCDN-12 admits the exact eleven-file factual documentation
+refresh and fifteen-document passing link scope under
+[CRATES-CI §15 amendment 0.1.12](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Finalize the owned bridge README before the exact-five governing PR freeze;
+the other ten cleanup docs belong in the later implementation PR, which must
+preserve all five adopted postimages. Only the two enumerated README SHA values
+in the staging receipt may change to reviewed/frozen postimages in that source
+PR; every other receipt value and checker stays exact. Freshly pass every
+admitted changed document without filters or ignored errors, retain inherited
+whole-tree FAIL as OPEN, and regenerate projections only canonically. No code,
+font, manifest, lock, version, pin or unchanged published core payload edit is
+admitted. Preserve all normal source/staging/consumer/release gates and stop
+for any extra path, base drift, source/profile requirement, error or PCDN.
+
+Owner-accepted PCDN-13 admits only PR223's exact hosted 11/14 diagnostic
+spelling failure alongside the retained PCDN-10 local result and OPEN PCDN-04
+payload drift, under
+[CRATES-CI §15 amendment 0.1.13](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Refreeze/review the exact five Markdown paths; pass fresh unchanged link and
+literal-format checks, preserve all other source/pin inputs and keep the
+protected PR/squash route. Retain failed status and evidence as OPEN; no
+fixture blessing or status substitution. This admission expires at adoption
+or any added case/input/profile/base requirement. Only the later coherent
+source PR may change `scripts/setup-ci-env.sh` and `.github/workflows/ci.yml`
+to the genuine nightly-2025-07-31 qualification profile with fail-closed
+identity checks. That source must pass all 14 snapshots and every normal
+source/pre-publish/clean Gate P/consumer/release guard. No other workflow,
+publisher toolchain/auth, source, lock or pin change is admitted by PCDN-13.
+Preserve released A2, official Ratatui 0.30.2 and parent pins; stop for any new
+PCDN. This is no passing main or release qualification.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
@@ -99,6 +153,15 @@ pass.  The publish workflow (`scripts/publish_changed.sh`) must also detect the
 changed crates correctly — verify with `DRY_RUN=1 scripts/publish_changed.sh`.
 
 Use `scripts/check-links.sh` to validate Markdown links before committing documentation changes.
+
+For the exact RLVGL-owned Ratatui maintenance candidate covered by owner-accepted
+PCDN-09, apply [CRATES-CI §15 amendment 0.1.9](docs/crates-ci/CRATES-CI-00-CONCEPTS.md):
+retain the actual whole-tree link failure as OPEN and freshly validate all five
+enumerated changed owned Markdown documents with `lychee --no-progress`, without
+added filters, exclusions or ignored errors. Keep `scripts/check-links.sh`
+unchanged. This candidate-specific admission does not make the whole-tree
+result green or waive any other source, protected PR or release prerequisite.
+Any additional Markdown edit or new error stops for an owning decision.
 
 ## Example linker scripts
 
