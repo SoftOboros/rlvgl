@@ -1,0 +1,1268 @@
+{
+  "schema_version": "CPY-GRAPH-1",
+  "source_commit": "0cf406bb22509f1040af6a772d0476a614c7bd9c",
+  "cargo_manifest_count": 53,
+  "cargo_manifest_set_sha256": "sha256:afb1cf49c3dbe410cc20c37b196d117e03e023f35934e73a1ef32c3b0053608e",
+  "cargo_lock": {
+    "path": "docs/cpython/evidence/_generated/CPY-CARGO-LOCK-0cf406b.lock",
+    "sha256": "sha256:86447d23288e3287e54be552ee4d9c42f92caca8dff9b270ce937e41d2db6925",
+    "tracking": "workspace-ignored-resolver-snapshot"
+  },
+  "cargo_version": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "workspace_package_count": 41,
+  "workspace_packages_sha256": "sha256:7a5bf390e1dce2d36e490340c4090bab78f0ec1314d782d9b7f5a2ce2c89c5f5",
+  "workspace_packages": [
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "no_std": [],
+        "std": []
+      },
+      "manifest_path": "examples/apps/sctd-demo/machines/dining-philosophers-interactive/Cargo.toml",
+      "name": "dining-philosophers-interactive",
+      "publish": [],
+      "version": "0.1.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [],
+        "embed": [],
+        "vendor": []
+      },
+      "manifest_path": "examples/stm32h747i-disco/assets/disco-assets/Cargo.toml",
+      "name": "disco-assets",
+      "publish": null,
+      "version": "0.2.2"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "no_std": [],
+        "std": []
+      },
+      "manifest_path": "examples/apps/sctd-demo/machines/media-player/Cargo.toml",
+      "name": "media-player",
+      "publish": [],
+      "version": "0.1.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-app-demo",
+        "rlvgl-app-disco-demo",
+        "rlvgl-bsps-stm",
+        "rlvgl-chips-esp",
+        "rlvgl-chips-microchip",
+        "rlvgl-chips-nrf",
+        "rlvgl-chips-nxp",
+        "rlvgl-chips-renesas",
+        "rlvgl-chips-rp2040",
+        "rlvgl-chips-silabs",
+        "rlvgl-chips-stm",
+        "rlvgl-chips-ti",
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-i18n",
+        "rlvgl-platform",
+        "rlvgl-playit",
+        "rlvgl-ui",
+        "rlvgl-widgets",
+        "stopwatch_gen"
+      ],
+      "features": {
+        "apng": [
+          "dep:image",
+          "rlvgl-core/apng",
+          "rlvgl-platform/apng"
+        ],
+        "canvas": [
+          "dep:embedded-canvas",
+          "dep:embedded-graphics",
+          "rlvgl-core/canvas",
+          "rlvgl-platform/canvas"
+        ],
+        "compile-verify": [
+          "creator",
+          "regression"
+        ],
+        "creator": [
+          "dep:anyhow",
+          "dep:apng",
+          "dep:blake3",
+          "dep:clap",
+          "dep:fontdue",
+          "dep:image",
+          "dep:indexmap",
+          "dep:minijinja",
+          "dep:png",
+          "dep:rayon",
+          "dep:regex",
+          "dep:resvg",
+          "dep:rlvgl-bsps-stm",
+          "dep:rlvgl-chips-esp",
+          "dep:rlvgl-chips-microchip",
+          "dep:rlvgl-chips-nrf",
+          "dep:rlvgl-chips-nxp",
+          "dep:rlvgl-chips-renesas",
+          "dep:rlvgl-chips-rp2040",
+          "dep:rlvgl-chips-silabs",
+          "dep:rlvgl-chips-stm",
+          "dep:rlvgl-chips-ti",
+          "dep:rlvgl-decomp",
+          "dep:schemars",
+          "dep:serde",
+          "dep:serde_json",
+          "dep:serde_yaml",
+          "dep:spdx",
+          "dep:tar",
+          "dep:walkdir",
+          "dep:zstd"
+        ],
+        "creator_ui": [
+          "dep:anyhow",
+          "dep:apng",
+          "dep:blake3",
+          "dep:eframe",
+          "dep:image",
+          "dep:notify",
+          "dep:open",
+          "dep:png",
+          "dep:rfd",
+          "dep:rlvgl-bsps-stm",
+          "dep:rlvgl-chips-esp",
+          "dep:rlvgl-chips-microchip",
+          "dep:rlvgl-chips-nrf",
+          "dep:rlvgl-chips-nxp",
+          "dep:rlvgl-chips-renesas",
+          "dep:rlvgl-chips-rp2040",
+          "dep:rlvgl-chips-silabs",
+          "dep:rlvgl-chips-stm",
+          "dep:rlvgl-chips-ti",
+          "dep:schemars",
+          "dep:serde",
+          "dep:serde_json",
+          "dep:serde_yaml",
+          "dep:tar",
+          "dep:walkdir",
+          "dep:zstd",
+          "fontdue",
+          "gif",
+          "jpeg",
+          "png",
+          "qrcode",
+          "simulator"
+        ],
+        "creator_ui_automation": [
+          "creator_ui",
+          "dep:egui_kittest",
+          "dep:rlvgl-playit",
+          "rlvgl-playit/std"
+        ],
+        "default": [],
+        "fatfs": [
+          "dep:fatfs",
+          "dep:fscommon",
+          "rlvgl-core/fatfs",
+          "rlvgl-platform/fatfs"
+        ],
+        "fontdue": [
+          "dep:fontdue",
+          "rlvgl-app-demo?/fontdue",
+          "rlvgl-core/fontdue",
+          "rlvgl-platform/fontdue"
+        ],
+        "fs": [
+          "rlvgl-core/fs"
+        ],
+        "gif": [
+          "dep:gif",
+          "rlvgl-app-demo?/gif",
+          "rlvgl-core/gif",
+          "rlvgl-platform/gif"
+        ],
+        "jpeg": [
+          "rlvgl-app-demo?/jpeg",
+          "rlvgl-core/jpeg",
+          "rlvgl-platform/jpeg"
+        ],
+        "lottie": [
+          "rlvgl-core/lottie",
+          "rlvgl-platform/lottie"
+        ],
+        "lottie_runtime": [
+          "lottie",
+          "rlvgl-core/lottie_backend"
+        ],
+        "nes": [
+          "dep:yane",
+          "rlvgl-core/nes",
+          "rlvgl-platform/nes"
+        ],
+        "pinyin": [
+          "rlvgl-core/pinyin",
+          "rlvgl-platform/pinyin"
+        ],
+        "playit": [
+          "dep:rlvgl-playit"
+        ],
+        "png": [
+          "rlvgl-app-demo?/png",
+          "rlvgl-core/png",
+          "rlvgl-platform/png"
+        ],
+        "qrcode": [
+          "rlvgl-app-demo?/qrcode",
+          "rlvgl-core/qrcode",
+          "rlvgl-platform/qrcode"
+        ],
+        "regression": [],
+        "simulator": [
+          "dep:rlvgl-app-demo",
+          "dep:rlvgl-app-disco-demo",
+          "rlvgl-platform/simulator"
+        ]
+      },
+      "manifest_path": "Cargo.toml",
+      "name": "rlvgl",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "cm4": [],
+        "cpython": [],
+        "default": [],
+        "micropython": [],
+        "sim": []
+      },
+      "manifest_path": "api/Cargo.toml",
+      "name": "rlvgl-api",
+      "publish": null,
+      "version": "0.2.1"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-i18n",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "default": [],
+        "dylib": [],
+        "fontdue": [
+          "rlvgl-core/fontdue"
+        ],
+        "gif": [
+          "rlvgl-core/gif"
+        ],
+        "jpeg": [
+          "rlvgl-core/jpeg"
+        ],
+        "png": [
+          "rlvgl-core/png"
+        ],
+        "qrcode": [
+          "rlvgl-core/qrcode"
+        ]
+      },
+      "manifest_path": "examples/apps/demo/Cargo.toml",
+      "name": "rlvgl-app-demo",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-platform",
+        "rlvgl-ui",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "default": []
+      },
+      "manifest_path": "examples/apps/disco-demo/Cargo.toml",
+      "name": "rlvgl-app-disco-demo",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "dining-philosophers-interactive",
+        "media-player",
+        "ratatui",
+        "ratatui-rlvgl",
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-platform",
+        "rlvgl-ui",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "default": []
+      },
+      "manifest_path": "examples/apps/sctd-demo/Cargo.toml",
+      "name": "rlvgl-app-sctd-demo",
+      "publish": [],
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": []
+      },
+      "manifest_path": "audio-meters-core/Cargo.toml",
+      "name": "rlvgl-audio-meters-core",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "c_hal": [
+          "dep:cc"
+        ],
+        "c_hal_cm4": [
+          "dep:cc"
+        ],
+        "default": [
+          "hal",
+          "split"
+        ],
+        "flat": [],
+        "hal": [],
+        "i2c1": [],
+        "i2c2": [],
+        "i2c3": [],
+        "i2c4": [],
+        "i2c5": [],
+        "i2c7": [],
+        "i2c8": [],
+        "pac": [],
+        "pinreport": [],
+        "spi1": [],
+        "spi2": [],
+        "spi3": [],
+        "spi4": [],
+        "spi5": [],
+        "spi6": [],
+        "spi8": [],
+        "split": [],
+        "stm32-c0": [],
+        "stm32-f0": [],
+        "stm32-f1": [],
+        "stm32-f2": [],
+        "stm32-f3": [],
+        "stm32-f4": [],
+        "stm32-f7": [],
+        "stm32-g0": [],
+        "stm32-g4": [],
+        "stm32-h5": [],
+        "stm32-h7": [
+          "dep:stm32h7"
+        ],
+        "stm32-l0": [],
+        "stm32-l1": [],
+        "stm32-l4": [],
+        "stm32-l5": [],
+        "stm32-mp": [],
+        "stm32-n6": [],
+        "stm32-u0": [],
+        "stm32-u3": [],
+        "stm32-u5": [],
+        "stm32-wb": [],
+        "stm32-wba": [],
+        "stm32-wl": [],
+        "stm32c0xx-hal": [
+          "dep:stm32c0xx-hal"
+        ],
+        "stm32f0xx-hal": [
+          "dep:stm32f0xx-hal"
+        ],
+        "stm32f3xx-hal": [
+          "dep:stm32f3xx-hal"
+        ],
+        "stm32f4xx-hal": [
+          "dep:stm32f4xx-hal"
+        ],
+        "stm32f7xx-hal": [
+          "dep:stm32f7xx-hal"
+        ],
+        "stm32g0xx-hal": [
+          "dep:stm32g0xx-hal"
+        ],
+        "stm32g4xx-hal": [
+          "dep:stm32g4xx-hal"
+        ],
+        "stm32h5xx-hal": [
+          "dep:stm32h5xx-hal"
+        ],
+        "stm32h7xx-hal": [
+          "dep:stm32h7xx-hal"
+        ],
+        "stm32l0xx-hal": [
+          "dep:stm32l0xx-hal"
+        ],
+        "stm32l1xx-hal": [
+          "dep:stm32l1xx-hal"
+        ],
+        "stm32l4xx-hal": [
+          "dep:stm32l4xx-hal"
+        ],
+        "stm32l5xx-hal": [
+          "dep:stm32l5xx-hal"
+        ],
+        "stm32wb-hal": [
+          "dep:stm32wb-hal"
+        ],
+        "stm32wlxx-hal": [
+          "dep:stm32wlxx-hal"
+        ],
+        "summaries": [],
+        "uart10": [],
+        "uart4": [],
+        "uart5": [],
+        "uart7": [],
+        "uart8": [],
+        "usart1": [],
+        "usart2": [],
+        "usart3": [],
+        "usart4": [],
+        "usart5": [],
+        "usart6": [],
+        "usart7": [],
+        "usart8": []
+      },
+      "manifest_path": "chips/stm/bsps/Cargo.toml",
+      "name": "rlvgl-bsps-stm",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:indexmap",
+          "dep:serde",
+          "dep:serde_yaml"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-esp/Cargo.toml",
+      "name": "rlvgl-chips-esp",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:serde"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-microchip/Cargo.toml",
+      "name": "rlvgl-chips-microchip",
+      "publish": null,
+      "version": "0.2.2"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:indexmap",
+          "dep:serde",
+          "dep:serde_yaml"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-nrf/Cargo.toml",
+      "name": "rlvgl-chips-nrf",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:indexmap",
+          "dep:serde",
+          "dep:serde_yaml"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-nxp/Cargo.toml",
+      "name": "rlvgl-chips-nxp",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:indexmap",
+          "dep:serde",
+          "dep:serde_yaml"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-renesas/Cargo.toml",
+      "name": "rlvgl-chips-renesas",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:indexmap",
+          "dep:serde",
+          "dep:serde_yaml"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-rp2040/Cargo.toml",
+      "name": "rlvgl-chips-rp2040",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:serde"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-silabs/Cargo.toml",
+      "name": "rlvgl-chips-silabs",
+      "publish": null,
+      "version": "0.2.1"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "serde": [
+          "dep:serde"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-stm/Cargo.toml",
+      "name": "rlvgl-chips-stm",
+      "publish": null,
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": [
+          "std"
+        ],
+        "std": [
+          "dep:serde"
+        ]
+      },
+      "manifest_path": "chipdb/rlvgl-chips-ti/Cargo.toml",
+      "name": "rlvgl-chips-ti",
+      "publish": null,
+      "version": "0.2.1"
+    },
+    {
+      "dependencies": [
+        "rlvgl-api",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "apng": [
+          "dep:image"
+        ],
+        "canvas": [
+          "dep:embedded-canvas",
+          "dep:embedded-graphics"
+        ],
+        "default": [],
+        "fatfs": [
+          "dep:fatfs",
+          "dep:fscommon"
+        ],
+        "fontdue": [
+          "dep:blake3",
+          "dep:fontdue",
+          "dep:once_cell"
+        ],
+        "fs": [],
+        "gif": [
+          "dep:gif"
+        ],
+        "jpeg": [
+          "dep:jpeg-decoder"
+        ],
+        "lottie": [],
+        "lottie_backend": [
+          "dep:rlottie"
+        ],
+        "nes": [
+          "dep:yane"
+        ],
+        "pinyin": [],
+        "png": [
+          "dep:png"
+        ],
+        "qrcode": [
+          "dep:qrcode"
+        ]
+      },
+      "manifest_path": "core/Cargo.toml",
+      "name": "rlvgl-core",
+      "publish": null,
+      "version": "0.2.6"
+    },
+    {
+      "dependencies": [],
+      "features": {
+        "default": []
+      },
+      "manifest_path": "rlvgl-decomp/Cargo.toml",
+      "name": "rlvgl-decomp",
+      "publish": null,
+      "version": "0.2.3"
+    },
+    {
+      "dependencies": [
+        "rlvgl-i2c-test-support"
+      ],
+      "features": {},
+      "manifest_path": "devices/rlvgl-device-pcm3168a/Cargo.toml",
+      "name": "rlvgl-device-pcm3168a",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-i2c-test-support"
+      ],
+      "features": {},
+      "manifest_path": "devices/rlvgl-device-ptn3460/Cargo.toml",
+      "name": "rlvgl-device-ptn3460",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-i2c-test-support"
+      ],
+      "features": {},
+      "manifest_path": "devices/rlvgl-device-stts22h/Cargo.toml",
+      "name": "rlvgl-device-stts22h",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-i2c-test-support"
+      ],
+      "features": {},
+      "manifest_path": "devices/rlvgl-device-veml3235sl/Cargo.toml",
+      "name": "rlvgl-device-veml3235sl",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-app-disco-demo",
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-platform",
+        "rlvgl-playit",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "bare_metal": [],
+        "default": [
+          "desktop",
+          "linux",
+          "playit",
+          "splash",
+          "star_crawl"
+        ],
+        "desktop": [],
+        "freertos": [
+          "bare_metal"
+        ],
+        "linux": [
+          "rlvgl-platform/linux_fbdev"
+        ],
+        "playit": [
+          "dep:rlvgl-playit"
+        ],
+        "splash": [
+          "dep:rlvgl-decomp",
+          "rlvgl-platform/splash"
+        ],
+        "star_crawl": [
+          "dep:rlvgl-widgets"
+        ],
+        "zephyr": [
+          "bare_metal"
+        ]
+      },
+      "manifest_path": "examples/beaglebone-black/Cargo.toml",
+      "name": "rlvgl-example-bbb",
+      "publish": [],
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-platform",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "bsp_pac": [
+          "dep:esp-riscv-rt",
+          "dep:esp32c3",
+          "dep:panic-halt",
+          "dep:riscv",
+          "dep:riscv-rt"
+        ],
+        "default": [],
+        "embedded-hal": [
+          "dep:embedded-hal"
+        ],
+        "esp_hal": [
+          "dep:esp-alloc",
+          "dep:esp-backtrace",
+          "dep:esp-hal",
+          "dep:esp-println",
+          "dep:rlvgl-core",
+          "dep:rlvgl-platform",
+          "dep:rlvgl-widgets",
+          "dep:ssd1306",
+          "rlvgl-platform/ssd1306"
+        ]
+      },
+      "manifest_path": "examples/beetle-esp32c3/Cargo.toml",
+      "name": "rlvgl-example-beetle-esp32c3",
+      "publish": [],
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-platform",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "default": [],
+        "esp32p4": [
+          "dep:esp-riscv-rt",
+          "dep:esp32p4",
+          "dep:panic-halt",
+          "dep:riscv",
+          "dep:riscv-rt"
+        ]
+      },
+      "manifest_path": "examples/beetle-esp32p4/Cargo.toml",
+      "name": "rlvgl-example-beetle-esp32p4",
+      "publish": [],
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-app-demo",
+        "rlvgl-app-disco-demo",
+        "rlvgl-app-sctd-demo",
+        "rlvgl-bsps-stm",
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-i18n",
+        "rlvgl-platform",
+        "rlvgl-playit",
+        "rlvgl-ui",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "adapted_cmd": [],
+        "audio": [
+          "rlvgl-platform/audio"
+        ],
+        "backlight_pwm": [],
+        "bsp_log": [],
+        "c_hal": [
+          "dep:rlvgl-bsps-stm",
+          "rlvgl-bsps-stm/c_hal"
+        ],
+        "c_hal_cm4": [
+          "dep:rlvgl-bsps-stm",
+          "rlvgl-bsps-stm/c_hal_cm4"
+        ],
+        "clock_demo": [
+          "cpu_stats"
+        ],
+        "cm4": [
+          "dep:stm32h7",
+          "stm32h7/stm32h747cm4"
+        ],
+        "cm7": [
+          "dep:embedded-hal",
+          "dep:embedded-hal-02",
+          "dep:embedded-sdmmc",
+          "dep:stm32h7",
+          "dep:stm32h7xx-hal",
+          "rlvgl-platform/stm32h747i_disco",
+          "stm32h7/stm32h747cm7"
+        ],
+        "cpu_stats": [],
+        "default": [],
+        "desktop": [],
+        "dma2d": [
+          "rlvgl-platform/dma2d"
+        ],
+        "fatfs_nostd": [
+          "rlvgl-platform/fatfs_nostd"
+        ],
+        "freertos": [
+          "rlvgl-platform/freertos"
+        ],
+        "hal_sdram": [
+          "dep:stm32-fmc"
+        ],
+        "pac_sdram_init": [],
+        "qspi_flash": [],
+        "rlvgl-app-demo": [
+          "dep:rlvgl-app-demo"
+        ],
+        "sctd": [
+          "dep:rlvgl-app-sctd-demo"
+        ],
+        "sd_storage": [
+          "rlvgl-platform/sd_storage"
+        ],
+        "sdram_ramtest": [
+          "rlvgl-platform/sdram_ramtest"
+        ],
+        "semihosting": [
+          "dep:cortex-m-semihosting"
+        ],
+        "splash": [
+          "rlvgl-platform/splash"
+        ],
+        "zephyr": []
+      },
+      "manifest_path": "examples/stm32h747i-disco/Cargo.toml",
+      "name": "rlvgl-example-disco",
+      "publish": [],
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-app-disco-demo",
+        "rlvgl-app-sctd-demo",
+        "rlvgl-core",
+        "rlvgl-platform",
+        "rlvgl-playit",
+        "rlvgl-ui",
+        "rlvgl-widgets"
+      ],
+      "features": {},
+      "manifest_path": "examples/disco-sim/Cargo.toml",
+      "name": "rlvgl-example-disco-sim",
+      "publish": [],
+      "version": "0.2.1"
+    },
+    {
+      "dependencies": [
+        "rlvgl-app-demo",
+        "rlvgl-core",
+        "rlvgl-platform"
+      ],
+      "features": {
+        "cpu_stats": [],
+        "default": [
+          "fontdue",
+          "gif",
+          "jpeg",
+          "png",
+          "qrcode"
+        ],
+        "fontdue": [
+          "rlvgl-app-demo/fontdue",
+          "rlvgl-core/fontdue"
+        ],
+        "gif": [
+          "rlvgl-app-demo/gif",
+          "rlvgl-core/gif"
+        ],
+        "jpeg": [
+          "rlvgl-app-demo/jpeg",
+          "rlvgl-core/jpeg"
+        ],
+        "png": [
+          "rlvgl-app-demo/png",
+          "rlvgl-core/png"
+        ],
+        "qrcode": [
+          "rlvgl-app-demo/qrcode",
+          "rlvgl-core/qrcode"
+        ]
+      },
+      "manifest_path": "examples/sim/Cargo.toml",
+      "name": "rlvgl-example-sim",
+      "publish": [],
+      "version": "0.2.0"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core"
+      ],
+      "features": {
+        "default": [],
+        "memmap2": [
+          "dep:memmap2"
+        ],
+        "mmap": [
+          "memmap2"
+        ]
+      },
+      "manifest_path": "fs-sim/Cargo.toml",
+      "name": "rlvgl-fs-sim",
+      "publish": null,
+      "version": "0.2.4"
+    },
+    {
+      "dependencies": [],
+      "features": {},
+      "manifest_path": "i18n/Cargo.toml",
+      "name": "rlvgl-i18n",
+      "publish": null,
+      "version": "0.2.2"
+    },
+    {
+      "dependencies": [],
+      "features": {},
+      "manifest_path": "devices/rlvgl-i2c-test-support/Cargo.toml",
+      "name": "rlvgl-i2c-test-support",
+      "publish": [],
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-device-pcm3168a",
+        "rlvgl-device-ptn3460",
+        "rlvgl-device-stts22h",
+        "rlvgl-device-veml3235sl",
+        "rlvgl-i2c-test-support"
+      ],
+      "features": {
+        "default": [],
+        "linux": [
+          "dep:linux-embedded-hal",
+          "std"
+        ],
+        "std": [
+          "embedded-hal-bus/std"
+        ]
+      },
+      "manifest_path": "devices/rlvgl-kria-i2c/Cargo.toml",
+      "name": "rlvgl-kria-i2c",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-api"
+      ],
+      "features": {
+        "default": [],
+        "stm32h747i_disco": []
+      },
+      "manifest_path": "micropython/Cargo.toml",
+      "name": "rlvgl-micropython",
+      "publish": null,
+      "version": "0.2.3"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-decomp",
+        "rlvgl-playit"
+      ],
+      "features": {
+        "apng": [
+          "dep:image",
+          "rlvgl-core/apng"
+        ],
+        "audio": [
+          "embedded-hal",
+          "stm32h7"
+        ],
+        "canvas": [
+          "embedded-graphics",
+          "rlvgl-core/canvas"
+        ],
+        "cortex-m": [
+          "dep:cortex-m"
+        ],
+        "default": [],
+        "display-interface": [
+          "dep:display-interface"
+        ],
+        "display-interface-spi": [
+          "dep:display-interface-spi"
+        ],
+        "dma2d": [
+          "stm32h7"
+        ],
+        "eframe": [
+          "dep:eframe"
+        ],
+        "embedded-graphics": [
+          "dep:embedded-graphics"
+        ],
+        "embedded-hal": [
+          "dep:embedded-hal"
+        ],
+        "experimental_dsi_host": [],
+        "fatfs": [
+          "rlvgl-core/fatfs"
+        ],
+        "fatfs_nostd": [
+          "dep:fatfs"
+        ],
+        "fontdue": [
+          "rlvgl-core/fontdue"
+        ],
+        "freertos": [],
+        "gif": [
+          "rlvgl-core/gif"
+        ],
+        "jpeg": [
+          "rlvgl-core/jpeg"
+        ],
+        "linux_fbdev": [
+          "dep:libc"
+        ],
+        "lottie": [
+          "rlvgl-core/lottie"
+        ],
+        "mock_blitter": [],
+        "nes": [
+          "rlvgl-core/nes"
+        ],
+        "pinyin": [
+          "rlvgl-core/pinyin"
+        ],
+        "png": [
+          "rlvgl-core/png"
+        ],
+        "pollster": [
+          "dep:pollster"
+        ],
+        "qrcode": [
+          "rlvgl-core/qrcode"
+        ],
+        "regression": [],
+        "sd_storage": [
+          "dep:embedded-sdmmc"
+        ],
+        "sdram_ramtest": [],
+        "semihosting": [
+          "dep:cortex-m-semihosting"
+        ],
+        "simulator": [
+          "dep:image",
+          "dep:libloading",
+          "eframe",
+          "embedded-graphics",
+          "fontdue",
+          "pollster",
+          "tracing-subscriber",
+          "wgpu",
+          "winit"
+        ],
+        "splash": [
+          "dep:rlvgl-decomp"
+        ],
+        "ssd1306": [
+          "dep:ssd1306",
+          "display-interface",
+          "embedded-graphics",
+          "embedded-hal"
+        ],
+        "st7789": [
+          "display-interface",
+          "display-interface-spi",
+          "embedded-hal"
+        ],
+        "stm32h7": [
+          "dep:stm32h7"
+        ],
+        "stm32h747i_disco": [
+          "cortex-m",
+          "embedded-hal",
+          "rlvgl-core/fs",
+          "stm32h7",
+          "stm32h7xx-hal"
+        ],
+        "stm32h7xx-hal": [
+          "dep:stm32h7xx-hal"
+        ],
+        "tracing-subscriber": [
+          "dep:tracing-subscriber"
+        ],
+        "uefi": [
+          "dep:rlvgl-playit",
+          "dep:uefi"
+        ],
+        "wayland": [
+          "dep:smithay-client-toolkit",
+          "dep:wayland-client"
+        ],
+        "wgpu": [
+          "dep:wgpu"
+        ],
+        "winit": [
+          "dep:winit"
+        ]
+      },
+      "manifest_path": "platform/Cargo.toml",
+      "name": "rlvgl-platform",
+      "publish": null,
+      "version": "0.2.5"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core"
+      ],
+      "features": {
+        "alloc": [],
+        "default": [],
+        "std": [
+          "alloc"
+        ]
+      },
+      "manifest_path": "playit/Cargo.toml",
+      "name": "rlvgl-playit",
+      "publish": null,
+      "version": "0.2.4"
+    },
+    {
+      "dependencies": [
+        "rlvgl-core",
+        "rlvgl-widgets"
+      ],
+      "features": {
+        "default": [],
+        "view": []
+      },
+      "manifest_path": "ui/Cargo.toml",
+      "name": "rlvgl-ui",
+      "publish": null,
+      "version": "0.2.6"
+    },
+    {
+      "dependencies": [
+        "rlvgl-audio-meters-core",
+        "rlvgl-core",
+        "rlvgl-platform"
+      ],
+      "features": {
+        "lpar_arclabel": []
+      },
+      "manifest_path": "widgets/Cargo.toml",
+      "name": "rlvgl-widgets",
+      "publish": null,
+      "version": "0.2.6"
+    },
+    {
+      "dependencies": [],
+      "features": {},
+      "manifest_path": "tests/fixtures/qt/stopwatch_gen/Cargo.toml",
+      "name": "stopwatch_gen",
+      "publish": [],
+      "version": "0.1.0"
+    }
+  ],
+  "public_paths": [
+    {
+      "path": "api/src/lib.rs",
+      "sha256": "sha256:f470fc74081166765bb7403763a755c3522d7e9ac39638f5bd76422d561a6bcc"
+    },
+    {
+      "path": "api/src/protocol.rs",
+      "sha256": "sha256:84b56759a5c4056657b27d658f5ef2cb1ecb7a076b99c4169957517a059a6db4"
+    },
+    {
+      "path": "core/src/lib.rs",
+      "sha256": "sha256:54e49324a45b88983b6d91a4b17f27ac28d815aaddcca5844f336b7ec127b3b4"
+    },
+    {
+      "path": "core/src/endpoint.rs",
+      "sha256": "sha256:588b9162178db171a309418b72d05cc0f26b6dfad77bdd4b8cbc3803dd56651b"
+    },
+    {
+      "path": "core/src/actor.rs",
+      "sha256": "sha256:949847f1516fa5da70467d0aace0ac753434328f3053d3bb6fd75e0006f91ed3"
+    },
+    {
+      "path": "platform/src/lib.rs",
+      "sha256": "sha256:c2e2a7aec3e811cfb9580c5ccbf190455672142d9e572cd5d3a195a9e728e8ae"
+    },
+    {
+      "path": "micropython/src/lib.rs",
+      "sha256": "sha256:c8495421bc57300ed1e17c32e12d472f983eafe98b41466b18c62efc5bd26e38"
+    },
+    {
+      "path": "scripts/publish_changed.sh",
+      "sha256": "sha256:9f69edaeb54618a4cfdf2dbaec4eea07a92f2ede9547899e591854aa8f16c543"
+    }
+  ],
+  "publish_order": [
+    "rlvgl-chips-stm",
+    "rlvgl-chips-nrf",
+    "rlvgl-chips-esp",
+    "rlvgl-chips-nxp",
+    "rlvgl-chips-silabs",
+    "rlvgl-chips-microchip",
+    "rlvgl-chips-renesas",
+    "rlvgl-chips-ti",
+    "rlvgl-chips-rp2040",
+    "rlvgl-bsps-stm",
+    "disco-assets",
+    "rlvgl-api",
+    "rlvgl-core",
+    "ratatui-rlvgl",
+    "rlvgl-decomp",
+    "rlvgl-i18n",
+    "rlvgl-playit",
+    "rlvgl-platform",
+    "rlvgl-audio-meters-core",
+    "rlvgl-widgets",
+    "rlvgl-ui",
+    "rlvgl-fs-sim",
+    "rlvgl-micropython",
+    "rlvgl-app-demo",
+    "rlvgl-app-disco-demo",
+    "rlvgl"
+  ]
+}

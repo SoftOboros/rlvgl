@@ -23,11 +23,11 @@ The backend performs no display I/O and never stores an rlvgl `Renderer`.
 ## Create the terminal and view
 
 Start with the pixel rectangle that the terminal should occupy. The built-in
-font metrics are 12×20 pixels per cell: rlvgl's `FONT_6X10` rendered at its
-configured 2× display scale.
+packed font metrics are 14×21 pixels per cell, matching the default
+curated-Unicode family. The explicit bitmap baseline uses 12×20 metrics instead.
 
 ```rust,ignore
-use ratatui::Terminal;
+use ratatui_core::terminal::Terminal;
 use ratatui_rlvgl::{CellMetrics, RatatuiView, RlvglBackend};
 use rlvgl_core::widget::Rect;
 
@@ -38,7 +38,7 @@ let bounds = Rect {
     height: 352,
 };
 
-let metrics = CellMetrics::font_6x10();
+let metrics = CellMetrics::packed_terminal();
 let columns = (bounds.width / i32::from(metrics.width())) as u16;
 let rows = (bounds.height / i32::from(metrics.height())) as u16;
 
@@ -47,23 +47,36 @@ let mut terminal = Terminal::new(backend)?;
 let view = RatatuiView::new(bounds, surface);
 ```
 
+To retain the historical bitmap baseline, construct the surface with
+`CellMetrics::font_6x10()` and explicitly call
+`view.set_font_family(RatatuiTerminalFont::Bitmap6x10)` (import that enum from
+`ratatui_rlvgl`). Do not combine the 12×20 bitmap grid with the default packed
+14×21 family.
+
 Use checked or saturating conversions around application-provided dimensions.
 `RlvglBackend::new` rejects zero dimensions and pixel products that overflow
 the backend's `u16` size contract.
 
 ## Draw a Ratatui frame
 
-Once the terminal exists, ordinary Ratatui widgets render into it:
+Once the terminal exists, render native core widgets or the owned subset. A
+bordered text panel is composed explicitly:
 
 ```rust,ignore
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui_rlvgl::compat::{Borders, Panel, TextPanel};
 
 terminal.draw(|frame| {
-    let panel = Paragraph::new("Rust all the way down")
-        .block(Block::default().borders(Borders::ALL).title("rlvgl"));
-    frame.render_widget(panel, frame.area());
+    let area = frame.area();
+    let panel = Panel::default().borders(Borders::ALL).title("rlvgl");
+    let inner = panel.inner(area);
+    frame.render_widget(panel, area);
+    frame.render_widget(TextPanel::new("Rust all the way down"), inner);
 })?;
 ```
+
+`Panel` supports the plain background/border/title subset. `TextPanel` has
+hard-line text and clipping, with no `.block`, wrapping or scrolling API.
+This composition does not import the upstream widget facade.
 
 `Terminal::draw` computes a cell diff, calls `RlvglBackend::draw`, and finishes
 with `flush`. In this backend, `flush` publishes an atomic retained frame and
@@ -137,7 +150,7 @@ works because the only long-lived shared object is ordinary retained cell
 state.
 
 The reference implementation is in
-[`backend.rs`](../../vendor/ratatui/ratatui-rlvgl/src/backend.rs). Its unit
+[`backend.rs`](../../crates/ratatui-rlvgl/src/backend.rs). Its unit
 tests cover atomic publication, dirty unions, cursor operations, clearing,
 resize, bounds errors, and window-size reporting.
 

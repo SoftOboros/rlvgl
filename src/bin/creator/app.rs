@@ -50,10 +50,8 @@ fn format_dep_line(dep: &feature_graphs::Dep) -> String {
         && dep.default_features
         && dep.features.is_empty()
         && !dep.optional;
-    if bare_version_ok {
-        if let DepSource::Version(v) = &dep.source {
-            return format!("{} = {:?}\n", dep.name, v);
-        }
+    if bare_version_ok && let DepSource::Version(v) = &dep.source {
+        return format!("{} = {:?}\n", dep.name, v);
     }
     format!("{} = {{ {} }}\n", dep.name, parts.join(", "))
 }
@@ -246,15 +244,13 @@ pub fn find_workspace_root(start: &Path) -> PathBuf {
     let mut cur: Option<&Path> = Some(start);
     while let Some(dir) = cur {
         let cargo = dir.join("Cargo.toml");
-        if cargo.is_file() {
-            if let Ok(text) = std::fs::read_to_string(&cargo) {
-                if text
-                    .lines()
-                    .any(|l| l.trim_start().starts_with("[workspace]"))
-                {
-                    return dir.to_path_buf();
-                }
-            }
+        if cargo.is_file()
+            && let Ok(text) = std::fs::read_to_string(&cargo)
+            && text
+                .lines()
+                .any(|l| l.trim_start().starts_with("[workspace]"))
+        {
+            return dir.to_path_buf();
         }
         cur = dir.parent();
     }
@@ -640,10 +636,10 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
     // Rule 4: path safety on every <manifest-path>. (target.board,
     // target.vendor, name, ids, etc. are scalar strings — not paths —
     // and do not participate in path safety.)
-    if let Some(c) = &manifest.controller {
-        if let Some(p) = &c.path {
-            resolve_manifest_path(manifest_dir, &ws_root, p)?;
-        }
+    if let Some(c) = &manifest.controller
+        && let Some(p) = &c.path
+    {
+        resolve_manifest_path(manifest_dir, &ws_root, p)?;
     }
     if let Some(sm) = &manifest.state_machine {
         resolve_manifest_path(manifest_dir, &ws_root, &sm.source)?;
@@ -684,15 +680,15 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
             manifest.target.board
         );
     }
-    if let Some(declared) = &manifest.target.chip {
-        if declared != &resolved_chip {
-            bail!(
-                "rule 5 (cross-references): target.chip '{}' does not match chipdb's declared chip '{}' for board '{}'",
-                declared,
-                resolved_chip,
-                manifest.target.board
-            );
-        }
+    if let Some(declared) = &manifest.target.chip
+        && declared != &resolved_chip
+    {
+        bail!(
+            "rule 5 (cross-references): target.chip '{}' does not match chipdb's declared chip '{}' for board '{}'",
+            declared,
+            resolved_chip,
+            manifest.target.board
+        );
     }
     let generator = manifest
         .target
@@ -769,14 +765,14 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
             );
         }
     }
-    if let Some(t) = &manifest.theme {
-        if !THEME_FORMATS.contains(&t.format.as_str()) {
-            bail!(
-                "rule 5 (cross-references): theme.format '{}' not in supported set: {:?}",
-                t.format,
-                THEME_FORMATS
-            );
-        }
+    if let Some(t) = &manifest.theme
+        && !THEME_FORMATS.contains(&t.format.as_str())
+    {
+        bail!(
+            "rule 5 (cross-references): theme.format '{}' not in supported set: {:?}",
+            t.format,
+            THEME_FORMATS
+        );
     }
     if let Some(sm) = &manifest.state_machine {
         if !SM_GENERATORS.contains(&sm.generator.as_str()) {
@@ -816,14 +812,14 @@ pub fn validate(manifest_path: &Path) -> Result<Manifest> {
             );
         }
     }
-    if let Some(i) = &manifest.i18n {
-        if !I18N_FORMATS.contains(&i.format.as_str()) {
-            bail!(
-                "rule 5 (cross-references): i18n.format '{}' not in supported set: {:?}",
-                i.format,
-                I18N_FORMATS
-            );
-        }
+    if let Some(i) = &manifest.i18n
+        && !I18N_FORMATS.contains(&i.format.as_str())
+    {
+        bail!(
+            "rule 5 (cross-references): i18n.format '{}' not in supported set: {:?}",
+            i.format,
+            I18N_FORMATS
+        );
     }
     if let Some(c) = &manifest.controller {
         if c.crate_name.is_empty() {
@@ -1242,7 +1238,7 @@ impl Inventory {
         Self {
             manifest: manifest_path.display().to_string(),
             schema: schema.to_string(),
-            orchestrator: format!("rlvgl-creator app from-yaml (APP-02b)"),
+            orchestrator: "rlvgl-creator app from-yaml (APP-02b)".to_string(),
             generated_at: chrono_iso8601_today(),
             entries: Vec::new(),
         }
@@ -1480,9 +1476,9 @@ impl Orchestrator {
     /// a single stub `mod.rs` flagged `stub = true`. End-to-end
     /// coverage of the real path lives in
     /// `tests/creator_app_bsp_gen.rs` (subprocess invocation).
-
+    ///
     /// APP-02h: parallel stage 3 dispatch per chapter 02 §5.1
-    /// + §5.2. Spawns one thread per eligible sub-generator
+    /// and §5.2. Spawns one thread per eligible sub-generator
     /// (BSP-gen, asset-pipeline, SM-gen, i18n, theme) under
     /// `std::thread::scope`. Each thread mutates its own scratch
     /// inventory; the main thread merges them in canonical order
@@ -1514,7 +1510,7 @@ impl Orchestrator {
         // Eligible stages, in §5.2 dispatch order. We honour
         // `self.jobs` by chunking the spawn list — at most `jobs`
         // threads run concurrently within `thread::scope`.
-        let stages = self.jobs.max(2).min(5);
+        let stages = self.jobs.clamp(2, 5);
         let _ = stages; // currently used via thread::scope's natural concurrency
 
         std::thread::scope(|s| -> Result<()> {
@@ -1869,15 +1865,15 @@ impl Orchestrator {
         let state_set: std::collections::HashSet<&str> =
             sm_self.state_set.iter().map(String::as_str).collect();
         for s in &self.manifest.screens {
-            if let Some(state) = &s.state {
-                if !state_set.contains(state.as_str()) {
-                    bail!(
-                        "chapter 04 §6 CV-1: screen '{}' references state '{}' which is not in the SM's emitted state_set {:?}",
-                        s.id,
-                        state,
-                        sm_self.state_set
-                    );
-                }
+            if let Some(state) = &s.state
+                && !state_set.contains(state.as_str())
+            {
+                bail!(
+                    "chapter 04 §6 CV-1: screen '{}' references state '{}' which is not in the SM's emitted state_set {:?}",
+                    s.id,
+                    state,
+                    sm_self.state_set
+                );
             }
         }
         Ok(())
@@ -2254,13 +2250,13 @@ impl Orchestrator {
             s.push_str("[[bin]]\n");
             s.push_str(&format!("name = {:?}\n", self.manifest.name));
             s.push_str("path = \"src/main.rs\"\n");
-            if let Some(t) = template {
-                if !t.bin_required_features.is_empty() {
-                    s.push_str(&format!(
-                        "required-features = {:?}\n",
-                        t.bin_required_features
-                    ));
-                }
+            if let Some(t) = template
+                && !t.bin_required_features.is_empty()
+            {
+                s.push_str(&format!(
+                    "required-features = {:?}\n",
+                    t.bin_required_features
+                ));
             }
             s.push('\n');
             // Sibling-intent extra binaries from the template.
@@ -2398,13 +2394,13 @@ impl Orchestrator {
         s.push_str("//\n");
         s.push_str("// src/app.rs — wiring contract per chapter 00 §7 / chapter 02 §7.8.\n");
         s.push_str("// Generated by rlvgl-creator app from-yaml (APP-02c).\n");
-        s.push_str("\n");
+        s.push('\n');
         s.push_str("// TODO(user): replace with the real BSP type from bsp_generated/\n");
         s.push_str("// or rlvgl-platform once the per-prong main glue is wired up.\n");
         s.push_str("pub type Bsp = ();\n");
         s.push_str("pub type Inputs = ();\n");
         s.push_str("pub type Outputs = ();\n");
-        s.push_str("\n");
+        s.push('\n');
         if let Some(c) = &self.manifest.controller {
             let crate_ident = c.crate_name.replace('-', "_");
             s.push_str(&format!(
@@ -2658,8 +2654,7 @@ impl Orchestrator {
             false,
         )?;
 
-        let main_c = format!(
-            "/* SPDX-License-Identifier: MIT\n\
+        let main_c = "/* SPDX-License-Identifier: MIT\n\
              *\n\
              * zephyr/src/main.c — calls into the Rust staticlib.\n\
              * Generated by rlvgl-creator app from-yaml (APP-02c).\n\
@@ -2669,10 +2664,10 @@ impl Orchestrator {
              \n\
              extern int rlvgl_init(void);\n\
              \n\
-             int main(void) {{\n\
+             int main(void) {\n\
              \x20   return rlvgl_init();\n\
-             }}\n"
-        );
+             }\n"
+        .to_string();
         self.emit(
             "zephyr/src/main.c",
             main_c.as_bytes(),
@@ -2801,7 +2796,7 @@ fn parse_rgb_hex(s: &str) -> Result<u32> {
             let r = (n >> 8) & 0xF;
             let g = (n >> 4) & 0xF;
             let b = n & 0xF;
-            (r * 0x11 << 16) | (g * 0x11 << 8) | (b * 0x11)
+            ((r * 0x11) << 16) | ((g * 0x11) << 8) | (b * 0x11)
         }
         _ => bail!(
             "expected #rgb or #rrggbb (got {} chars: {:?})",

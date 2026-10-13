@@ -1,0 +1,2262 @@
+{
+  "edge_count": 49,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 34,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 36,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 139,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 170,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 175,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 203,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 204,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 215,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 237,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 247,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 255,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 273,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 282,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 286,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-T1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 304,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 312,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 317,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 325,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 330,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 342,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 353,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 365,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 372,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 380,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 389,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 421,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 461,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 535,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-W1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 541,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-W2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 542,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 547,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-W3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 596,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 597,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 598,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 605,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 621,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 716,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 743,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 892,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 892,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 893,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 894,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 895,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 896,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 897,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 898,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 899,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-A9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 901,
+      "source": "docs/audio-meters/04b-aesthetics.md",
+      "target": "INV-W1-W3"
+    }
+  ],
+  "family": "audio-meters",
+  "kind_counts": {
+    "amendment": 22,
+    "gate": 94,
+    "invariant": 12
+  },
+  "object_count": 128,
+  "objects": [
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 306,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:306",
+      "text": "§0 authority list cites IEC 60268-10/17, AES17, ITU-R BS.1770-4, and"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 308,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:308",
+      "text": "§3 glossary entry exists for every term used in §5–§9."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 309,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:309",
+      "text": "§4 source-of-truth map names exactly one owner per concept."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 310,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:310",
+      "text": "§5 enumerates ballistic variants with time constants and authority."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 311,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:311",
+      "text": "§6 enumerates initial scales."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 312,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:312",
+      "text": "§7 enumerates colour-zone identifiers (skin maps to RGB)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 313,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:313",
+      "text": "§8 sketches the scale-descriptor JSON schema; AM-03 ratifies the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 315,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:315",
+      "text": "§9 pins the widget update contract (per-frame, dBFS-in, calibration as"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 317,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:317",
+      "text": "§10 reconciles with `ProgressBar`, `Slider`, `motion`,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 319,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:319",
+      "text": "§11 lists non-goals."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 320,
+      "obj_id": "docs/audio-meters/00-concepts.md:gate:320",
+      "text": "§15 change log carries today's ratification entry."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-001** — Initial ratification. Establishes vocabulary, enums,",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 350,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@350",
+      "text": "**2026-04-26-001** — Initial ratification. Establishes vocabulary, enums,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-002** — Decision: TS port of L0 is hand-written, not",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 353,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@353",
+      "text": "**2026-04-26-002** — Decision: TS port of L0 is hand-written, not"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-003** — Decision: ballistics live in the widget, not in a",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 357,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@357",
+      "text": "**2026-04-26-003** — Decision: ballistics live in the widget, not in a"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-004** — Refinement: §5 ballistic time constants restated in",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 363,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@363",
+      "text": "**2026-04-26-004** — Refinement: §5 ballistic time constants restated in"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-005** — Schema fix in `scale.schema.json`: `pivot` gains a",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 373,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@373",
+      "text": "**2026-04-26-005** — Schema fix in `scale.schema.json`: `pivot` gains a"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-007** — Add `RelativelyGatedLufsI<const N: usize>`",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 388,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@388",
+      "text": "**2026-04-26-007** — Add `RelativelyGatedLufsI<const N: usize>`"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26-006** — `Ballistic::LufsI` semantic upgrade: now applies",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/00-concepts.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 410,
+      "obj_id": "docs/audio-meters/00-concepts.md#2026-04-26@410",
+      "text": "**2026-04-26-006** — `Ballistic::LufsI` semantic upgrade: now applies"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 82,
+      "obj_id": "docs/audio-meters/03-scales.md:gate:82",
+      "text": "Author `assets/audio-meters/schema/scale.schema.json` (JSON Schema"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 84,
+      "obj_id": "docs/audio-meters/03-scales.md:gate:84",
+      "text": "Ship the §6 enumeration as on-disk JSON files in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 86,
+      "obj_id": "docs/audio-meters/03-scales.md:gate:86",
+      "text": "Validate every checked-in scale against the validator contract"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 88,
+      "obj_id": "docs/audio-meters/03-scales.md:gate:88",
+      "text": "Reject unknown top-level fields (`additionalProperties: false`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 90,
+      "obj_id": "docs/audio-meters/03-scales.md:gate:90",
+      "text": "Document this chapter in [`docs/audio-meters/README.md`](README.md)."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification. Schema + 6 canonical scales",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/03-scales.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 120,
+      "obj_id": "docs/audio-meters/03-scales.md#2026-04-26@120",
+      "text": "**2026-04-26** — Initial ratification. Schema + 6 canonical scales"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 107,
+      "obj_id": "docs/audio-meters/04-skins.md:gate:107",
+      "text": "Author `assets/audio-meters/schema/skin.schema.json`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 108,
+      "obj_id": "docs/audio-meters/04-skins.md:gate:108",
+      "text": "Ship at least three skins covering bargraph + needle and at"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 110,
+      "obj_id": "docs/audio-meters/04-skins.md:gate:110",
+      "text": "Validate every checked-in skin against the validator contract"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 112,
+      "obj_id": "docs/audio-meters/04-skins.md:gate:112",
+      "text": "Reject unknown top-level fields."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 113,
+      "obj_id": "docs/audio-meters/04-skins.md:gate:113",
+      "text": "Document AM-04b (SVG/PNG layer) as deferred but not lost."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-04a). Schema + 4 canonical",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/04-skins.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 140,
+      "obj_id": "docs/audio-meters/04-skins.md#2026-04-26@140",
+      "text": "**2026-04-26** — Initial ratification (AM-04a). Schema + 4 canonical"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 317,
+      "obj_id": "INV-A1",
+      "text": "— SVG sources MUST be plain SVG: no `<script>`, no"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 325,
+      "obj_id": "INV-A2",
+      "text": "— PNG sources MUST be 8-bit-per-channel (sRGB or no"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 330,
+      "obj_id": "INV-A3",
+      "text": "— Asset rasterisation target sizes derive from the"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 342,
+      "obj_id": "INV-A4",
+      "text": "— The `AssetSlot` set MUST stay set-equal across"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 353,
+      "obj_id": "INV-A5",
+      "text": "— Asset-aware and procedural draw paths MUST be"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 365,
+      "obj_id": "INV-A6",
+      "text": "— Runtime SVG parsing in `no_std` Rust is **out of"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 372,
+      "obj_id": "INV-A7",
+      "text": "— Cross-runtime visual parity at the segment-state"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 380,
+      "obj_id": "INV-A8",
+      "text": "— JSON `assets` block format: filenames are"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 389,
+      "obj_id": "INV-A9",
+      "text": "— Alternate-look skin variants MUST ship as"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 535,
+      "obj_id": "INV-W1",
+      "text": "— Neither branch reads from nor writes to widget"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST NOT"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 541,
+      "obj_id": "INV-W2",
+      "text": "— The asset-aware branch MUST NOT panic on a"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "invariant",
+      "line": 547,
+      "obj_id": "INV-W3",
+      "text": "— No `unsafe` is introduced into widget draw"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 690,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:690",
+      "text": "(a) **Rasteriser subcommand wired.** `cargo run --features"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 698,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:698",
+      "text": "(b) **At least one preset migrated.** At least one preset"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 706,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:706",
+      "text": "(c) **Per-widget asset-aware unit tests.** Each of the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 720,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:720",
+      "text": "(d) **TS demo: asset-bearing skin.** At least one custom-"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 727,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:727",
+      "text": "(e) **2-3 alternate-look skin variants.** At least three"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 737,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:737",
+      "text": "(f) **Cross-runtime slot-set parity.** The"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 746,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:746",
+      "text": "(g) **No `unsafe` in widget draw paths.** AM-04b"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 755,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:755",
+      "text": "(h) **Schema unchanged.** `assets/audio-meters/schema/skin.schema.json`"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 761,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md:gate:761",
+      "text": "(i) **`13-asset-hooks.md` reclassified.** A subsequent"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-11 — ratified (owner: ira abbott)",
+        "summary": "**2026-05-11 — Ratified (owner: Ira Abbott).** Doc *shape*",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 862,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md#2026-05-11@862",
+      "text": "**2026-05-11 — Ratified (owner: Ira Abbott).** Doc *shape*"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-11",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-11 — draft — awaiting ratification",
+        "summary": "**2026-05-11 — DRAFT — awaiting ratification.** Initial",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/04b-aesthetics.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 874,
+      "obj_id": "docs/audio-meters/04b-aesthetics.md#2026-05-11@874",
+      "text": "**2026-05-11 — DRAFT — awaiting ratification.** Initial"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 136,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:136",
+      "text": "Implement `LedBargraph` widget in `widgets/src/meters/`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 137,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:137",
+      "text": "Implement `LedBargraphCore` + `RlvglLedBargraphElement` in"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 139,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:139",
+      "text": "Both runtimes pass headless rendering tests:"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 142,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:142",
+      "text": "Cortex-M7 cross-compile of the widgets crate succeeds."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 143,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:143",
+      "text": "Editor-discipline test (`meter_presets_match_json`) pins the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 145,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md:gate:145",
+      "text": "Document path (b) → path (a) progression (this chapter)."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-05 / AM-06). Mono",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/05-led-bargraph.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 184,
+      "obj_id": "docs/audio-meters/05-led-bargraph.md#2026-04-26@184",
+      "text": "**2026-04-26** — Initial ratification (AM-05 / AM-06). Mono"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 106,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:106",
+      "text": "Implement `NeedleVu` in `widgets/src/meters/needle.rs`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 107,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:107",
+      "text": "Implement `NeedleVuCore` + `RlvglNeedleVuElement` under"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 109,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:109",
+      "text": "Adopt the `dbfs_to_scale_units` model in **both** widgets"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 111,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:111",
+      "text": "Update the schema, all six canonical scale JSON files, and both"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 113,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:113",
+      "text": "Both runtimes pass headless rendering tests."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 114,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:114",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 115,
+      "obj_id": "docs/audio-meters/06-needle-vu.md:gate:115",
+      "text": "Concepts §15 amended with the schema-fix entry"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-07). NeedleVu shipped on",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/06-needle-vu.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 147,
+      "obj_id": "docs/audio-meters/06-needle-vu.md#2026-04-26@147",
+      "text": "**2026-04-26** — Initial ratification (AM-07). NeedleVu shipped on"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 56,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:56",
+      "text": "`NumericPeak` widget in Rust under `widgets/src/meters/numeric.rs`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 57,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:57",
+      "text": "`NumericPeakCore` + `RlvglNumericPeakElement` in TS."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 58,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:58",
+      "text": "First numeric skin (`digital_studio_numeric`) shipped under"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 60,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:60",
+      "text": "Cross-runtime tests pass on both sides."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 61,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:61",
+      "text": "`meter_presets_match_json` covers the new preset and also adds"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 63,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md:gate:63",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08a). NumericPeak widget",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/07-numeric-peak.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 93,
+      "obj_id": "docs/audio-meters/07-numeric-peak.md#2026-04-26@93",
+      "text": "**2026-04-26** — Initial ratification (AM-08a). NumericPeak widget"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 56,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:56",
+      "text": "`TickLabel` struct + `Scale.tick_labels` field + `label_for_major`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 57,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:57",
+      "text": "All three Rust scale presets carry `tick_labels`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 58,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:58",
+      "text": "`meter_presets_match_json` asserts label parity."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 59,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:59",
+      "text": "`LedBargraph` and `NeedleVu` render major ticks + labels when"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 61,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:61",
+      "text": "TS `LedBargraphCore` and `NeedleVuCore` mirror."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 62,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:62",
+      "text": "Both runtimes pass headless rendering tests for the new path."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 63,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md:gate:63",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08b). Major ticks +",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/08-ticks-labels.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 90,
+      "obj_id": "docs/audio-meters/08-ticks-labels.md#2026-04-26@90",
+      "text": "**2026-04-26** — Initial ratification (AM-08b). Major ticks +"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 92,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:92",
+      "text": "`MeterWidget` trait exposes the minimal `update + reset` surface."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 93,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:93",
+      "text": "All three first-party meters implement it."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 94,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:94",
+      "text": "`StereoPair<W>` is generic and `Widget`-implementing."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 95,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:95",
+      "text": "TS `StereoPair<C>` mirrors the surface duck-typed."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 96,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:96",
+      "text": "`splitHorizontal` matches between runtimes."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 97,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:97",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 98,
+      "obj_id": "docs/audio-meters/09-stereo.md:gate:98",
+      "text": "Both runtimes pass headless tests."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08c). `MeterWidget` trait",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/09-stereo.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 124,
+      "obj_id": "docs/audio-meters/09-stereo.md#2026-04-26@124",
+      "text": "**2026-04-26** — Initial ratification (AM-08c). `MeterWidget` trait"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/10-integration.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 147,
+      "obj_id": "docs/audio-meters/10-integration.md:gate:147",
+      "text": "Rust integration test passes: builds 4 widgets, drives 480"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/10-integration.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 149,
+      "obj_id": "docs/audio-meters/10-integration.md:gate:149",
+      "text": "TS integration test passes: same 4-widget assembly, same"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/10-integration.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 151,
+      "obj_id": "docs/audio-meters/10-integration.md:gate:151",
+      "text": "Three integration recipes documented (MicCapture, AudioWorklet,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/10-integration.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 153,
+      "obj_id": "docs/audio-meters/10-integration.md:gate:153",
+      "text": "Cortex-M7 cross-compile clean (recipe uses `libm::log10f`,"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-09). Kitchen-sink",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/10-integration.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 194,
+      "obj_id": "docs/audio-meters/10-integration.md#2026-04-26@194",
+      "text": "**2026-04-26** — Initial ratification (AM-09). Kitchen-sink"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 83,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:83",
+      "text": "`LufsGauge` widget in Rust with three internal ballistics."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 84,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:84",
+      "text": "`LufsGaugeCore` + `RlvglLufsGaugeElement` in TS."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 85,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:85",
+      "text": "First `lufs_gauge` skin shipped under `assets/audio-meters/skins/`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 86,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:86",
+      "text": "`SCALE_LUFS_EBU_R128` Rust preset added to fill the previously"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 88,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:88",
+      "text": "`meter_presets_match_json` covers the new scale + skin."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 89,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:89",
+      "text": "Both runtimes pass headless tests including colour-banding"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 91,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md:gate:91",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08d). LufsGauge shipped",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/11-lufs-gauge.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 139,
+      "obj_id": "docs/audio-meters/11-lufs-gauge.md#2026-04-26@139",
+      "text": "**2026-04-26** — Initial ratification (AM-08d). LufsGauge shipped"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 84,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md:gate:84",
+      "text": "`LUFS_ABSOLUTE_GATE_DB` constant in both runtimes; same value."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 85,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md:gate:85",
+      "text": "`LufsI` skips samples below the gate; previous reading is held."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 86,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md:gate:86",
+      "text": "Parity fixtures regenerated; both runtimes pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 87,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md:gate:87",
+      "text": "LufsGauge tests still pass without modification."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 88,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md:gate:88",
+      "text": "Concepts §5 LufsI row + §15-006 change-log entry updated."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08e). LufsI applies",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/12-lufs-gating.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 108,
+      "obj_id": "docs/audio-meters/12-lufs-gating.md#2026-04-26@108",
+      "text": "**2026-04-26** — Initial ratification (AM-08e). LufsI applies"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 80,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md:gate:80",
+      "text": "`SkinAssets` struct + `EMPTY` const + `any_present` helper"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 82,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md:gate:82",
+      "text": "`SkinAssets` interface shipped in TS."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 83,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md:gate:83",
+      "text": "All existing Rust skin presets carry `assets: SkinAssets::EMPTY`."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 84,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md:gate:84",
+      "text": "No widget code change; existing tests pass unmodified."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 85,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md:gate:85",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-04b-stub). `SkinAssets`",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/13-asset-hooks.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 107,
+      "obj_id": "docs/audio-meters/13-asset-hooks.md#2026-04-26@107",
+      "text": "**2026-04-26** — Initial ratification (AM-04b-stub). `SkinAssets`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 123,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md:gate:123",
+      "text": "Rust type `RelativelyGatedLufsI<const N: usize>` with const"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 126,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md:gate:126",
+      "text": "TS class `RelativelyGatedLufsI` with `windowSize` constructor"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 128,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md:gate:128",
+      "text": "Eight unit tests on each side covering: floor, capacity,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 132,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md:gate:132",
+      "text": "Cortex-M7 cross-compile clean."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 133,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md:gate:133",
+      "text": "Concepts §15-007 change-log entry."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-08h). Both runtimes",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/14-bs1770-relative-gating.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 160,
+      "obj_id": "docs/audio-meters/14-bs1770-relative-gating.md#2026-04-26@160",
+      "text": "**2026-04-26** — Initial ratification (AM-08h). Both runtimes"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 118,
+      "obj_id": "docs/audio-meters/15-multi-channel.md:gate:118",
+      "text": "`MultiChannel<W: MeterWidget, const N: usize>` Rust type"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 122,
+      "obj_id": "docs/audio-meters/15-multi-channel.md:gate:122",
+      "text": "`split_horizontal_n<N>` and `split_vertical_n<N>` helpers."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 123,
+      "obj_id": "docs/audio-meters/15-multi-channel.md:gate:123",
+      "text": "TS `MultiChannel<C>` with runtime channel count + parallel"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 125,
+      "obj_id": "docs/audio-meters/15-multi-channel.md:gate:125",
+      "text": "Six tests on each side: 5.1 surround forwarding, 8-band EQ"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "gate",
+      "line": 129,
+      "obj_id": "docs/audio-meters/15-multi-channel.md:gate:129",
+      "text": "Cortex-M7 cross-compile clean — `[W; N]` storage works in"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-04-26",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-04-26** — Initial ratification (AM-10). `MultiChannel<W, N>`",
+        "touches": null
+      },
+      "doc": "docs/audio-meters/15-multi-channel.md",
+      "family": "audio-meters",
+      "kind": "amendment",
+      "line": 162,
+      "obj_id": "docs/audio-meters/15-multi-channel.md#2026-04-26@162",
+      "text": "**2026-04-26** — Initial ratification (AM-10). `MultiChannel<W, N>`"
+    }
+  ],
+  "schema_version": 2
+}

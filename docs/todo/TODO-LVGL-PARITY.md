@@ -7,7 +7,9 @@ TODO-LVGL-PARITY.md - Ordered backlog for outstanding LVGL parity work.
 Status: Promoted to spec-before-code initiative. The canonical phase,
 wave, dependency, and conflict plan is
 [`docs/concepts/LPAR-00-CONCEPTS.md`](../concepts/LPAR-00-CONCEPTS.md).
-This file remains the raw ordered backlog that fed LPAR-00.
+This file remains the raw ordered backlog that fed LPAR-00. Items appended
+after that initiative are follow-up candidates and do not retroactively change
+ratified LPAR contracts.
 
 Reference baseline: the local C LVGL submodule under `lvgl/src`. This
 list is ordered by dependency and expected implementation leverage: core
@@ -79,3 +81,4 @@ the current implementation is intentionally narrower than LVGL.
 55. [ ] Add no-std and allocation policy gates. For every new parity widget, record whether it is `no_std`, `alloc`, or `std` only, and test the intended feature combination.
 56. [ ] Add parity documentation. For each shipped widget, document LVGL behavior covered, intentional Rust API differences, unsupported LVGL features, and migration notes.
 57. [ ] Add release tracking. Tie each parity item to a crate version and changelog entry when it lands, so downstream consumers can target the correct `0.x` release.
+58. [ ] Add native Wayland display and input backend parity. Provide an `std`-only XDG-shell session with SHM buffers, compositor-paced and release-safe presentation, configure/resize/close lifecycle, and seat-derived pointer, keyboard, touch, and pointer-axis input. Keep DMA-BUF, fractional scaling, and multi-window support evidence-gated follow-ups. See the Draft [`WLD-00`](../wayland/WLD-00-CONCEPTS.md) initiative.

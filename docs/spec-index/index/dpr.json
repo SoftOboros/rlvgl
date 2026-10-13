@@ -1,0 +1,477 @@
+{
+  "edge_count": 13,
+  "edges": [
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 154,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 157,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 161,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 165,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 169,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 173,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-6"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 176,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 180,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 184,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-9"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 188,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "INV-DPR-10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 306,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "PCDN-DPR-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 309,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "PCDN-DPR-002"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 312,
+      "source": "docs/concepts/DPR-00-CONCEPTS.md",
+      "target": "PCDN-DPR-003"
+    }
+  ],
+  "family": "dpr",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 5,
+    "invariant": 10,
+    "term": 10
+  },
+  "object_count": 26,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Disco Platform Runtime"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 79,
+      "obj_id": "dpr:term:disco platform runtime",
+      "text": "The reusable RLVGL-owned runtime surface for STM32H747I-DISCO board bring-up, display scheduling, warm-reset cleanup, IRQ ownership, and board telemetry."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "First App"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 80,
+      "obj_id": "dpr:term:first app",
+      "text": "The existing RLVGL STM32H747I-DISCO demo. It remains the first hardware validation target for every DPR phase."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Second App"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 81,
+      "obj_id": "dpr:term:second app",
+      "text": "The disco analyzer. It proves the runtime surface can serve a non-demo application with audio/DSP constraints and different frame pacing needs."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Board Runtime"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 82,
+      "obj_id": "dpr:term:board runtime",
+      "text": "The initialized collection of board services returned by a platform entry point: display, frame scheduler, optional audio/codec services, input handles, telemetry, and any ownership tokens needed to install ISRs safely."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Runtime Profile"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 83,
+      "obj_id": "dpr:term:runtime profile",
+      "text": "A named configuration for Board Runtime construction. Profiles choose policy, not hardware facts: e.g. demo vs analyzer display mode, audio ownership, render pacing, and telemetry slots."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Warm-Reset Safe Stop"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 84,
+      "obj_id": "dpr:term:warm-reset safe stop",
+      "text": "A bounded sequence that stops autonomous peripherals left running across CPU reset, clears pending IRQs, and records telemetry before normal init programs those peripherals."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Frame Scheduler"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 85,
+      "obj_id": "dpr:term:frame scheduler",
+      "text": "The platform object that owns DSI ERIF handling, LTDC layer handoff, render-dirty gating, optional holdoff timing, and the single-writer rule for display MMIO."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Scan Mode"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 86,
+      "obj_id": "dpr:term:scan mode",
+      "text": "The DSI/LTDC scheduling strategy selected by a profile. Initial values are `AdaptedCommandHoldoff` and `VideoShadowReload`; see §5."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Display MMIO Owner"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 87,
+      "obj_id": "dpr:term:display mmio owner",
+      "text": "The sole code path allowed to write `DSI_WCR`, `DSI_WIER`, `LTDC_LxCFBAR`, and `LTDC_SRCR` after display init. In DPR, this is the Frame Scheduler."
+    },
+    {
+      "attrs": {
+        "relationship": "DPR.",
+        "term": "Platform Telemetry"
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "term",
+      "line": 88,
+      "obj_id": "dpr:term:platform telemetry",
+      "text": "SRAM4 or serial breadcrumbs emitted by Board Runtime primitives for bench validation. Telemetry addresses are part of a profile contract and MUST avoid application-owned slots."
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "Demo-first validation.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 154,
+      "obj_id": "INV-DPR-1",
+      "text": "Every DPR execution phase MUST"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Analyzer as second-app proof.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 157,
+      "obj_id": "INV-DPR-2",
+      "text": "A DPR API is not"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Apps do not own display MMIO.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 161,
+      "obj_id": "INV-DPR-3",
+      "text": "After Board Runtime"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "ISR ownership is explicit.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 165,
+      "obj_id": "INV-DPR-4",
+      "text": "A Board Runtime profile"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Warm-reset cleanup is platform-owned.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 169,
+      "obj_id": "INV-DPR-5",
+      "text": "If a profile"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "Telemetry does not collide.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 173,
+      "obj_id": "INV-DPR-6",
+      "text": "Platform telemetry MUST"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "No demo UI leakage.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 176,
+      "obj_id": "INV-DPR-7",
+      "text": "`DiscoController` and demo"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Register-mashing discipline remains in force.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 180,
+      "obj_id": "INV-DPR-8",
+      "text": "New"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Profiles choose policy, not silicon facts.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 184,
+      "obj_id": "INV-DPR-9",
+      "text": "Clock"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "No application-local mythology.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "invariant",
+      "line": 188,
+      "obj_id": "INV-DPR-10",
+      "text": "Any H747I-DISCO"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "gate",
+      "line": 320,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md:gate:320",
+      "text": "§3 vocabulary is accepted."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "gate",
+      "line": 321,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md:gate:321",
+      "text": "§5 `ScanMode` and `RuntimeProfile` sets are accepted."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "gate",
+      "line": 322,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md:gate:322",
+      "text": "§6 invariants are accepted."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "gate",
+      "line": 323,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md:gate:323",
+      "text": "§8 phase plan is accepted or amended."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "gate",
+      "line": 324,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md:gate:324",
+      "text": "§11 open questions are resolved or explicitly deferred to"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-19",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-19** — Initial draft. Captures the analyzer-surfaced",
+        "touches": null
+      },
+      "doc": "docs/concepts/DPR-00-CONCEPTS.md",
+      "family": "dpr",
+      "kind": "amendment",
+      "line": 353,
+      "obj_id": "docs/concepts/DPR-00-CONCEPTS.md#2026-05-19@353",
+      "text": "**2026-05-19** — Initial draft. Captures the analyzer-surfaced"
+    }
+  ],
+  "schema_version": 2
+}

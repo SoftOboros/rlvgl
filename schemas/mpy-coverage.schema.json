@@ -1,0 +1,168 @@
+{
+  "$comment": "schemas/mpy-coverage.schema.json - MPY introspection coverage ledger. Governs docs/concepts/MPY-COVERAGE-MATRIX.json. Hand-authored per MPY-01 §5.1; the ledger is a claim ledger, NOT a descriptor catalog (INV-MPY-01-6). Adding a coverage status or MPY-I level requires an MPY-01 amendment (Specification Required, MPY-01 §3 / MPY-00 §7.1).",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rlvgl.dev/schemas/mpy-coverage.schema.json",
+  "title": "MPY Introspection Coverage Ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "lvgl_baseline", "rows"],
+  "properties": {
+    "schema_version": {
+      "description": "Ledger schema version. Bumping requires an MPY-01 §15 amendment.",
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "lvgl_baseline": {
+      "description": "Inherited LPAR-01 §2 pin. INV-MPY-01-1: MPY MUST NOT advance this independently.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_commit", "effective_target_label", "owner"],
+      "properties": {
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "effective_target_label": { "type": "string" },
+        "owner": {
+          "const": "docs/concepts/LPAR-01-BASELINE.md §2"
+        }
+      }
+    },
+    "rows": {
+      "description": "MPY Coverage Rows. One row is the entire claim unit (MPY-01 §5); crate-wide or release-wide statements are forbidden by INV-MPY-01-5.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "level": {
+      "description": "Introspection parity level. Frozen by Standards Action in MPY-00 §7.1.",
+      "enum": ["MPY-I0", "MPY-I1", "MPY-I2", "MPY-I3", "MPY-I4"]
+    },
+    "status": {
+      "description": "Coverage status. Frozen by Specification Required in MPY-01 §3.",
+      "enum": ["current", "partial", "missing", "unsupported", "deferred"]
+    },
+    "phase": {
+      "description": "Owning MPY phase.",
+      "enum": [
+        "MPY-01", "MPY-02", "MPY-03", "MPY-04", "MPY-05",
+        "MPY-06", "MPY-07", "MPY-08", "MPY-09"
+      ]
+    },
+    "profile": {
+      "description": "Evidence target profile. MPY-01 §8 requires evidence to be recorded separately per profile; a report MUST NOT collapse profiles to the best result.",
+      "enum": ["in-process", "micropython-host", "simulator", "board-cm7-cm4"]
+    },
+    "evidence": {
+      "description": "One deterministic evidence artifact. MPY-01 §8: every row promoted to `current` cites at least one deterministic test plus the relevant public documentation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "enum": ["test", "fixture", "snapshot", "doc", "board-run"]
+        },
+        "ref": {
+          "description": "Path, test name, or artifact id. Must be resolvable from the repository root.",
+          "type": "string",
+          "minLength": 1
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "claim": {
+      "description": "A per-profile status claim with its evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "status", "evidence"],
+      "properties": {
+        "profile": { "$ref": "#/$defs/profile" },
+        "status": { "$ref": "#/$defs/status" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "unsupported_reason": {
+          "description": "Required when status is `unsupported`. INV-MPY-01-3: an unsupported row MUST name the rejecting capability or profile.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reopen_trigger": {
+          "description": "Required when status is `deferred`. MPY-01 §3 requires a named reopen trigger.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "current" } }, "required": ["status"] },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "unsupported" } }, "required": ["status"] },
+          "then": { "required": ["unsupported_reason"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "deferred" } }, "required": ["status"] },
+          "then": { "required": ["reopen_trigger"] }
+        }
+      ]
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "level", "surface", "reference", "required_behavior",
+        "baseline_status", "owners", "claims"
+      ],
+      "properties": {
+        "id": {
+          "description": "Stable row id. Never re-bound: a retired row keeps its id.",
+          "type": "string",
+          "pattern": "^MPY-BL-[0-9]{3}$"
+        },
+        "level": { "$ref": "#/$defs/level" },
+        "surface": {
+          "description": "Actor type or runtime surface this row claims.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reference": {
+          "description": "Reference LVGL symbols, or an explicit rlvgl-adjacent label when no upstream symbol governs.",
+          "type": "string",
+          "minLength": 1
+        },
+        "required_behavior": {
+          "description": "The semantic behavior the row requires, independent of implementation.",
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_status": {
+          "description": "The MPY-01 §6 frozen classification at ratification. Historical; later phases add per-profile claims rather than editing this.",
+          "$ref": "#/$defs/status"
+        },
+        "baseline_note": {
+          "description": "Why the baseline classification is what it is.",
+          "type": "string"
+        },
+        "owners": {
+          "description": "Owning MPY phase(s).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/phase" }
+        },
+        "claims": {
+          "description": "Per-profile evidence-backed claims. Empty at baseline: MPY-01 freezes row scope and status, and later phases update status only with cited evidence (MPY-01 §6).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/claim" }
+        },
+        "differences": {
+          "description": "Intentional differences from the reference, or unsupported markers.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

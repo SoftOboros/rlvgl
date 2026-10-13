@@ -1,0 +1,35 @@
+# DFRobot Beetle ESP32-C6 (SKU DFR1117), board revision V1.1.
+#
+# The connector locations are compatible with the DFR0868 Beetle ESP32-C3,
+# while the MCU GPIO mapping is board-specific. The V1.1 rear silkscreen and
+# schematic identify SDA as GPIO19 and SCL as GPIO20.
+
+name: DFR1117 Beetle ESP32-C6
+chip: ESP32-C6
+module: null
+flash_mb: 4
+psram_mb: null
+
+console:
+  peripheral: usb_sj
+  baud: 115200
+
+pins:
+  - { gpio: 20, signal: I2C0_SCL, peripheral: i2c0, direction: inout, label: scl }
+  - { gpio: 19, signal: I2C0_SDA, peripheral: i2c0, direction: inout, label: sda }
+  - { gpio: 12, signal: USB_DM, peripheral: usb_sj, direction: inout, label: usb_dm }
+  - { gpio: 13, signal: USB_DP, peripheral: usb_sj, direction: inout, label: usb_dp }
+  - { gpio: 15, signal: GPIO, direction: out, label: led }
+
+i2c_configs:
+  i2c0:
+    scl_hz: 100000
+
+features:
+  vendor: dfrobot
+  sku: DFR1117
+  board_revision: v1.1
+  usb: type_c
+  wifi: wifi6
+  bluetooth: ble5
+  ieee802154: zigbee_thread

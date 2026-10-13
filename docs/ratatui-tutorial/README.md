@@ -5,7 +5,7 @@ README.md - Index for the Ratatui on rlvgl progressive tutorial.
 # Ratatui on rlvgl — Rust All the Way Down
 
 This tutorial builds a Ratatui interface that is also a native rlvgl widget.
-The result runs unchanged inside the host simulator and on the
+The worked SCTD example uses the host simulator and the
 STM32H747I-DISCO bare-metal display stack. There is no C LVGL, terminal
 emulator, C HAL, FFI display shim, or host font rasterizer in the embedded
 path.
@@ -21,6 +21,10 @@ graphics. Pressing its **Ratatui** button opens a second presentation:
 
 ![Native and Ratatui Dining Philosophers transitions](../media/ratatui-rlvgl-dining-philosophers-full-table.gif)
 
+The captures and board statements below describe the recorded SCTD execution.
+The owned bridge migration requires fresh checks of its exact source and
+packages; historical captures do not qualify a new dependency pin or target.
+
 ## What you will build
 
 | Stage | Result |
@@ -29,7 +33,7 @@ graphics. Pressing its **Ratatui** button opens a second presentation:
 | End of Chapter 2 | A retained cell surface that an rlvgl widget can paint safely |
 | End of Chapter 3 | A hybrid window with native rlvgl chrome around Ratatui content |
 | End of Chapter 4 | A live Ratatui view driven by presentation snapshots from the state machine |
-| End of Chapter 5 | The same UI verified on the host and on STM32H747I-DISCO bare metal |
+| End of Chapter 5 | A host and bare-metal validation workflow with evidence tied to the checked source |
 
 ## The two composition directions
 
@@ -82,31 +86,41 @@ different application.
 - The `thumbv7em-none-eabihf` Rust target and an STM32H747I-DISCO for the
   optional hardware chapter.
 
-The bridge crate is `no_std` but requires an allocator. The complete SCTD
-example pins the coordinated Ratatui contribution revision so the facade,
-core, widgets, and bridge all resolve from one source while the upstream PR is
-pending:
+The bridge crate is `no_std + alloc`. The owned maintenance source uses
+`crates/ratatui-rlvgl` in RLVGL and native `ratatui-core` from official,
+unmodified Ratatui 0.30.2 at
+`e665c36cb14752a61cd777fbd06dbef8474f2add`. This supersedes the historical
+coordinated fork/facade recipe; no upstream bridge contribution is required.
+
+For a consumer of the owned 0.1.2 package **after publication**, the normalized
+registry dependencies are:
 
 ```toml
 [dependencies]
-ratatui = { git = "https://github.com/SoftOboros/ratatui.git", rev = "fc7c6a70794eebeaad5a1b732b9d5446dc9a4cb0", default-features = false }
-ratatui-rlvgl = { git = "https://github.com/SoftOboros/ratatui.git", rev = "fc7c6a70794eebeaad5a1b732b9d5446dc9a4cb0", default-features = false }
-rlvgl-core = { version = "0.2.5", default-features = false }
+ratatui-core = { version = "=0.1.2", default-features = false }
+ratatui-rlvgl = { version = "0.1.2", default-features = false }
+rlvgl-core = { version = "0.2.7", default-features = false }
 ```
 
-Inside this repository, those two Git dependencies are paths into the pinned
-`vendor/ratatui` submodule. `ratatui-rlvgl 0.1.0` is also published for
-backend consumers using the matching crates.io `ratatui-core`; keep every
-Ratatui package on the same source/version line to avoid duplicate, incompatible
-copies of the `Backend` trait. After the coordinated Ratatui changes are
-released upstream, applications can replace both Git entries with the
-corresponding crates.io releases.
+The native core package version 0.1.2 and upstream Ratatui release 0.30.2 refer
+to different packages. Inside this checkout, the demo manifests use the owned
+bridge and pinned native core paths. Use one native core type identity;
+packaged consumers must not fall back to source/vendor paths. These examples
+do not assert that the maintenance package has already been published.
+
+The chapters use `ratatui_core` primitives and the scoped owned
+`ratatui_rlvgl::compat` panel/text helpers. They do not require the upstream
+`ratatui` facade or `ratatui-widgets` on the target-neutral path. On targets
+without pointer atomics, enable `portable-atomic` and forward it to native core
+and the bridge as the demo manifests do. Supply an allocator and the existing
+board-specific atomic support; do not generalize C3's single-core assumption
+or claim hardware qualification from a host-only check.
 
 ## Reference implementation
 
 The tutorial follows these files:
 
-- [`vendor/ratatui/ratatui-rlvgl/`](../../vendor/ratatui/ratatui-rlvgl/) —
+- [`crates/ratatui-rlvgl/`](../../crates/ratatui-rlvgl/) —
   bridge crate;
 - [`examples/apps/sctd-demo/src/ratatui_hero.rs`](../../examples/apps/sctd-demo/src/ratatui_hero.rs)
   — hybrid hero and Ratatui table widget;

@@ -32,6 +32,8 @@ extern crate std;
 
 extern crate alloc;
 
+/// MPY actor descriptors and compatibility-first Stage Registry.
+pub mod actor;
 /// Tick-driven tween/animation system (deterministic, no wall clock).
 pub mod anim;
 pub mod animation;
@@ -41,12 +43,18 @@ pub mod asset;
 pub mod bitmap_font;
 /// Graphics-language layer: structured drawing commands as data.
 pub mod cmd;
+/// MPY endpoint-owned cue queue, admission, coalescing, and bounded draining.
+pub mod cue;
+/// MPY descriptor-driven stage directions, transactions, and snapshots.
+pub mod direction;
 /// Drawing helpers for rounded rectangles and borders.
 pub mod draw;
 /// Shared edit-state machine (buffer, caret, mutation gates) promoted from
 /// `rlvgl-ui` so that `rlvgl-widgets` can depend on it without a crate cycle
 /// (LPAR-14 §5.C).
 pub mod edit;
+/// MPY endpoint-owned Safe Turn batching, completions, and global drains.
+pub mod endpoint;
 pub mod event;
 /// Focus traversal and group policy for the LPAR-04 event/focus runtime.
 pub mod focus;
@@ -85,6 +93,8 @@ pub mod scroll;
 pub mod style;
 /// LPAR-07 style cascade substrate: `Part`, `Selector`, `StylePatch`, `StyleState`, and resolution.
 pub mod style_cascade;
+/// MPY bounded native-event subscriptions and descriptor-derived cue inputs.
+pub mod subscription;
 pub mod theme;
 /// Tick-driven timer registry; see [`timer::Timers`].
 pub mod timer;

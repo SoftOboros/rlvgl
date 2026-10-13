@@ -9,4 +9,7 @@
 	url = https://github.com/SoftOboros/scjson.git
 [submodule "vendor/ratatui"]
 	path = vendor/ratatui
-	url = https://github.com/SoftOboros/ratatui.git
+	url = https://github.com/ratatui/ratatui.git
+[submodule "vendor/micropython"]
+	path = vendor/micropython
+	url = https://github.com/micropython/micropython.git

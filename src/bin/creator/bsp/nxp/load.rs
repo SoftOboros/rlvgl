@@ -123,21 +123,21 @@ fn validate_pins(chip: &NxpChip, board: &NxpBoard) -> Result<()> {
         }
 
         // Peripheral existence.
-        if let Some(periph) = &pin.peripheral {
-            if !chip.peripherals.contains_key(periph.as_str()) {
-                bail!(
-                    "pad '{}' references peripheral '{}' not in chip",
-                    pin.pad,
-                    periph
-                );
-            }
+        if let Some(periph) = &pin.peripheral
+            && !chip.peripherals.contains_key(periph.as_str())
+        {
+            bail!(
+                "pad '{}' references peripheral '{}' not in chip",
+                pin.pad,
+                periph
+            );
         }
 
         // Label uniqueness.
-        if let Some(label) = &pin.label {
-            if !labels_seen.insert(label.clone()) {
-                bail!("duplicate label '{}'", label);
-            }
+        if let Some(label) = &pin.label
+            && !labels_seen.insert(label.clone())
+        {
+            bail!("duplicate label '{}'", label);
         }
     }
 

@@ -1,0 +1,908 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "font",
+  "kind_counts": {
+    "amendment": 15,
+    "gate": 29,
+    "term": 13
+  },
+  "object_count": 57,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "FONT-00 §5",
+        "term": "Font handle"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 123,
+      "obj_id": "font:term:font handle",
+      "text": "`&'static dyn FontMetrics` — the borrow a widget holds to draw glyphs. Fat pointer; `'static` so widgets need no lifetime parameter."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §5",
+        "term": "`WidgetFont`"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 124,
+      "obj_id": "font:term:`widgetfont`",
+      "text": "The frozen newtype `WidgetFont(Option<&'static dyn FontMetrics>)` embedded in text widgets; `resolve()` returns the assigned handle or the `FONT_6X10` fallback."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §5",
+        "term": "`set_font`"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 125,
+      "obj_id": "font:term:`set_font`",
+      "text": "The uniform widget method `fn set_font(&mut self, font: &'static dyn FontMetrics)` (mirrors `ArcLabel`). Assigns the handle."
+    },
+    {
+      "attrs": {
+        "relationship": "LPAR-08 / `core/src/font.rs`",
+        "term": "Coverage"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 126,
+      "obj_id": "font:term:coverage",
+      "text": "Per-pixel A8 alpha (`0..=255`) for a glyph, pulled row-wise via `FontMetrics::glyph_coverage_row`."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §6",
+        "term": "1-bit font"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 127,
+      "obj_id": "font:term:1-bit font",
+      "text": "A `FontMetrics` whose coverage is only `0` or `255` (e.g. `FONT_6X10`). Crisp, not anti-aliased."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §6",
+        "term": "AA font"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 128,
+      "obj_id": "font:term:aa font",
+      "text": "A `FontMetrics` whose coverage spans `0..=255` (e.g. `PackedFont`, `FontdueFont`)."
+    },
+    {
+      "attrs": {
+        "relationship": "LPAR-08 §5.F / LPAR-16 §5.D",
+        "term": "Software-reference oracle"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 129,
+      "obj_id": "font:term:software-reference oracle",
+      "text": "The deterministic `core` coverage path (`draw_glyph_coverage` → default `blend_row`). The canonical pixels a hardware path must match within §5.H."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §8",
+        "term": "Rotated glyph blit"
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "term",
+      "line": 130,
+      "obj_id": "font:term:rotated glyph blit",
+      "text": "Rendering a glyph's coverage on the portrait-rotated hardware widget path without per-pixel dispatch through the rotation layer."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 401,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:401",
+      "text": "This document is ratified with a dated §15 entry (2026-06-14)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 402,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:402",
+      "text": "`WidgetFont` newtype + `resolve()` land with the `FONT_6X10` fallback"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 404,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:404",
+      "text": "Every text widget in `widgets/src/` (and the `ui/` text widgets) gains"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 417,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:417",
+      "text": "Existing widget goldens still pass unchanged (default = `FONT_6X10`)."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 418,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:418",
+      "text": "`cargo fmt`, per-crate `clippy -D warnings`, and widget/ui tests pass."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 422,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:422",
+      "text": "A widget fed a `PackedFont` via `set_font` renders 8-bit AA coverage."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 425,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:425",
+      "text": "The §9.A AA fixture asserts a partial-alpha glyph pixel through a real"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 428,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:428",
+      "text": "The §9.B 1-bit-vs-AA contrast fixture proves font selection changes the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 431,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:431",
+      "text": "Fixture cites §9; runs host-only; gates green. *fmt + `clippy -D warnings`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 436,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:436",
+      "text": "`ArcLabel` adopts `WidgetFont`/`set_font` (moved here from FONT-01): its"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 443,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:443",
+      "text": "`ArcLabel::draw` renders glyph coverage at each arc origin via the §7.B"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 446,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:446",
+      "text": "The §7.B helper is a defaulted/free addition breaking no existing"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 452,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:452",
+      "text": "An ArcLabel coverage fixture asserts real glyph pixels (not opaque"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 457,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:457",
+      "text": "`config_menu.rs:608` migrated. *Close-\"X\" fallback now uses"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 463,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:463",
+      "text": "`RotatedRenderer` blits glyph coverage via rotate-bitmap-then-blit"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 470,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:470",
+      "text": "A parity check asserts the rotated path matches the software reference"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 474,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:474",
+      "text": "Bounded scratch, no render-loop heap (§8.C); `platform` discipline"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 479,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:479",
+      "text": "`make build-disco` builds; per-crate `clippy`/tests green. *ELF/hex/bin"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 485,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:485",
+      "text": "`docs/CHANGELOG.md` notes the FONT surface; `docs/concepts/README.md`"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 488,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:488",
+      "text": "`CLAUDE.md` Spec-Before-Code applicability + commit-prefix lists gain"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 491,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md:gate:491",
+      "text": "FONT retrospective at completion per the CLAUDE.md discipline."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — FONT-00 drafted. Reframes the LPAR-retrospective \"end-to-end",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 528,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-14@528",
+      "text": "**2026-06-14** — FONT-00 drafted. Reframes the LPAR-retrospective \"end-to-end"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — Ratified by owner (\"draft ratified along with runbook",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 543,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-14@543",
+      "text": "**2026-06-14** — Ratified by owner (\"draft ratified along with runbook"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — §5.C / §10 accuracy correction during FONT-01. The draft",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 550,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-14@550",
+      "text": "**2026-06-14** — §5.C / §10 accuracy correction during FONT-01. The draft"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — §12 sequencing refinement during FONT-01. `ArcLabel`'s",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 561,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-14@561",
+      "text": "**2026-06-14** — §12 sequencing refinement during FONT-01. `ArcLabel`'s"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-14** — FONT-01 complete (§12.A all boxed). `WidgetFont` +",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 567,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-14@567",
+      "text": "**2026-06-14** — FONT-01 complete (§12.A all boxed). `WidgetFont` +"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-02a §6.C / §9.C clarification, ahead of implementing the",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 576,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@576",
+      "text": "**2026-06-15** — FONT-02a §6.C / §9.C clarification, ahead of implementing the"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-02 complete (§12.B all boxed). The AA conformance",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 588,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@588",
+      "text": "**2026-06-15** — FONT-02 complete (§12.B all boxed). The AA conformance"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 8,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-03 complete (§12.C all boxed). Closed the last",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 600,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@600",
+      "text": "**2026-06-15** — FONT-03 complete (§12.C all boxed). Closed the last"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 9,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-04 complete (§12.D all boxed). `RotatedRenderer` now",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 622,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@622",
+      "text": "**2026-06-15** — FONT-04 complete (§12.D all boxed). `RotatedRenderer` now"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 10,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT initiative closed (§12.E all boxed). `docs/CHANGELOG.md`",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 647,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@647",
+      "text": "**2026-06-15** — FONT initiative closed (§12.E all boxed). `docs/CHANGELOG.md`"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 11,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — **FONT-05 reopen, ratified.** The deferred `FontId → handle`",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-00-CONCEPTS.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 659,
+      "obj_id": "docs/concepts/FONT-00-CONCEPTS.md#2026-06-15@659",
+      "text": "**2026-06-15** — **FONT-05 reopen, ratified.** The deferred `FontId → handle`"
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-05 §5.A",
+        "term": "Font registry"
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "term",
+      "line": 91,
+      "obj_id": "font:term:font registry",
+      "text": "An immutable `FontId → &'static dyn FontMetrics` lookup, holding `'static` font handles. No interior mutability, no global."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-05 §5.A",
+        "term": "`FontRegistry<'a>`"
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "term",
+      "line": 92,
+      "obj_id": "font:term:`fontregistry<'a>`",
+      "text": "The concrete type: a thin wrapper over `&'a [(FontId, &'static dyn FontMetrics)]` with `resolve(FontId) -> Option<&'static dyn FontMetrics>`. Handles are `'static`; the entry table is borrowed for `'a` (§5.A rationale)."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-05 §5.B",
+        "term": "Font sink"
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "term",
+      "line": 93,
+      "obj_id": "font:term:font sink",
+      "text": "The defaulted `Widget` method `widget_font_mut(&mut self) -> Option<&mut WidgetFont>` that exposes a widget's `WidgetFont` slot to the resolution pass; `None` for non-text widgets."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-05 §5.C",
+        "term": "Font resolution pass"
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "term",
+      "line": 94,
+      "obj_id": "font:term:font resolution pass",
+      "text": "The tree walk (built on `resolve_tree_with_text`) that maps each node's resolved `font_id` through the registry and writes the handle into the node's font sink."
+    },
+    {
+      "attrs": {
+        "relationship": "FONT-00 §5",
+        "term": "Explicit assignment"
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "term",
+      "line": 95,
+      "obj_id": "font:term:explicit assignment",
+      "text": "A direct `widget.set_font(handle)` call (FONT-00). The fallback when the cascade `font_id` is `DEFAULT`/unmapped."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 251,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:251",
+      "text": "FONT-00 §5.D amended (defaulted-`Widget`-method carve-out) + §5.C/§11/§14"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 254,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:254",
+      "text": "`FontRegistry` (§5.A) lands in `core` with `resolve` returning `None` for"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 257,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:257",
+      "text": "`Widget::widget_font_mut` defaulted method (§5.B) lands; every text widget"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 262,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:262",
+      "text": "`apply_font_registry` (§5.C) lands over `resolve_tree_with_text`; a test"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 268,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:268",
+      "text": "Precedence + idempotency test (§5.D): registered `font_id` overrides;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 272,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:272",
+      "text": "Inheritance test: a child with no own `font_id` inherits the parent's"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 275,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:275",
+      "text": "`cargo fmt`, per-crate `clippy -D warnings`, core/widgets/ui tests pass;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "gate",
+      "line": 279,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md:gate:279",
+      "text": "FONT-00 §15 + concepts README updated; FONT retrospective §8 amended (this"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-05 drafted. Reopens the FONT initiative's deferred",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 311,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md#2026-06-15@311",
+      "text": "**2026-06-15** — FONT-05 drafted. Reopens the FONT initiative's deferred"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — Ratified by owner (\"proposed amendment allowing new defaulted",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 321,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md#2026-06-15@321",
+      "text": "**2026-06-15** — Ratified by owner (\"proposed amendment allowing new defaulted"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — §5.A refinement during implementation: `FontRegistry` gains a",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 325,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md#2026-06-15@325",
+      "text": "**2026-06-15** — §5.A refinement during implementation: `FontRegistry` gains a"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-06-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-06-15** — FONT-05 complete (§12 all boxed). Landed `FontRegistry<'a>` +",
+        "touches": null
+      },
+      "doc": "docs/concepts/FONT-05-FONT-REGISTRY.md",
+      "family": "font",
+      "kind": "amendment",
+      "line": 335,
+      "obj_id": "docs/concepts/FONT-05-FONT-REGISTRY.md#2026-06-15@335",
+      "text": "**2026-06-15** — FONT-05 complete (§12 all boxed). Landed `FontRegistry<'a>` +"
+    }
+  ],
+  "schema_version": 2
+}

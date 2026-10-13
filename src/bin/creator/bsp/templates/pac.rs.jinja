@@ -22,7 +22,7 @@
 #![allow(unused_unsafe)]
 {% if mod_name %}#![cfg(feature = "{{ mod_name }}")]{% endif %}
 
-{% if init_by is defined and this_core is defined %}
+{% if init_by is defined and init_by is not none and this_core is defined and this_core is not none %}
 /// Clock initialization ownership: {{ init_by }}
 #[doc(hidden)]
 pub const CLOCKS_INIT_BY: &str = "{{ init_by }}";
@@ -112,7 +112,7 @@ fn _bsp_log(_args: core::fmt::Arguments) { /* user-defined sink */ }
 #[cfg(feature = "bsp_log")]
 macro_rules! bsp_log { ($($arg:tt)*) => { _bsp_log(format_args!($($arg)*)); } }
 #[cfg(not(feature = "bsp_log"))]
-macro_rules! bsp_log { ($($arg:tt)*) => { let _ = ($(& $arg),*); } }
+macro_rules! bsp_log { ($($arg:tt)*) => { let _ = core::format_args!($($arg)*); } }
 {# Provide board defaults inline when not part of a parent module tree #}
 {% if mod_name is defined %}
 use super::board::{Supply, Vos};
@@ -256,16 +256,16 @@ pub fn init_power(dp: &pac::Peripherals) {
     {%- endif %}
 }
 
-{% if init_by is defined and this_core is defined and this_core == init_by %}
+{% if init_by is defined and init_by is not none and this_core is defined and this_core is not none and this_core == init_by %}
 /// Configure system clocks from CubeMX `.ioc` settings (CM7 owner).
 pub fn init_clocks(dp: &pac::Peripherals) {
     // Parsed from .ioc (raw tokens): SYSCLK={{ spec.clocks.sys_src | default("unknown") }}, PLLSRC={{ spec.clocks.pll_src | default("unknown") }}
     // Prescalers: D1CPU={{ spec.clocks.d1cpu | default("-") }}, D1PPRE={{ spec.clocks.d1ppre | default("-") }}, D2PPRE1={{ spec.clocks.d2ppre1 | default("-") }}, D2PPRE2={{ spec.clocks.d2ppre2 | default("-") }}, D3PPRE={{ spec.clocks.d3ppre | default("-") }}
-    // HSE: {{ spec.clocks.hse_hz | default(0) }} Hz
+    // HSE: {% if spec.clocks.hse_hz is defined and spec.clocks.hse_hz is not none %}{{ spec.clocks.hse_hz }} Hz{% else %}unknown{% endif %}
     bsp_log!("[bsp] SYS={} PLLSRC={} HSE={}Hz D1CPU={} D1PPRE={} D2PPRE1={} D2PPRE2={} D3PPRE={}\n",
         "{{ spec.clocks.sys_src | default("unknown") }}",
         "{{ spec.clocks.pll_src | default("unknown") }}",
-        {{ spec.clocks.hse_hz | default(0) }},
+        {% if spec.clocks.hse_hz is defined and spec.clocks.hse_hz is not none %}{{ spec.clocks.hse_hz }}{% else %}"unknown"{% endif %},
         "{{ spec.clocks.d1cpu | default("-") }}",
         "{{ spec.clocks.d1ppre | default("-") }}",
         "{{ spec.clocks.d2ppre1 | default("-") }}",
@@ -295,7 +295,7 @@ pub fn init_clocks(dp: &pac::Peripherals) {
     while dp.RCC.cr.read().bits() & (1 << 25) != 0 {} // wait PLL1RDY=0
     // 2) Select PLL source and DIVM1
     // PLLSRC: 00=HSI, 01=CSI, 10=HSE
-    let pllsrc_str: &str = "{{ spec.clocks.pll_src | default("HSI") | upper }}";
+    let pllsrc_str: &str = "{{ spec.clocks.pll_src | default("HSI") | trim | upper }}";
     let pllsrc_bits: u32 = match pllsrc_str {
         "HSE" | "RCC_PLLSOURCE_HSE" => 0b10,
         "CSI" | "RCC_PLLSOURCE_CSI" => 0b01,

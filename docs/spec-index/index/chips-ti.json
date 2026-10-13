@@ -1,0 +1,399 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "chips-ti",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 30
+  },
+  "object_count": 31,
+  "objects": [
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 683,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:683",
+      "text": "§0 authority table reviewed; every cited TI TRM part number"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 686,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:686",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 687,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:687",
+      "text": "§4 source-of-truth map has exactly one owner per row; the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 689,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:689",
+      "text": "§5.1 chip-IR required field set reviewed against the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 691,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:691",
+      "text": "§5.2 board-IR required field set reviewed against the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 693,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:693",
+      "text": "§5.3 template emission set confirmed identical to the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 695,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:695",
+      "text": "§5.5 SimpleLink Cortex-M4F member set ratified; first chip"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 697,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:697",
+      "text": "§6 target-triple table confirmed; PAC crate version pins"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 700,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:700",
+      "text": "§10.1 AM335x reconciliation reviewed by the BBB initiative"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 705,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:705",
+      "text": "§11 non-goals each carry a resurrection-prevention note."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 706,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-00-CONCEPTS.md:gate:706",
+      "text": "§15 has a dated ratification entry signed off by the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 471,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:471",
+      "text": "§0 authority table reviewed; SWCU185G §1.5 (Memory Map) and"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 474,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:474",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker per"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 476,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:476",
+      "text": "§4 source-of-truth map has exactly one owner per row."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 477,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:477",
+      "text": "§5.1 file-set frozen; concrete file-name substitution"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 479,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:479",
+      "text": "§5.2 CC1352R memory map values match"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 483,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:483",
+      "text": "§5.3 CCFG placement values match"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 487,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:487",
+      "text": "§5.5 cortex-m-rt linker-arg sequence consistent with the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 489,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:489",
+      "text": "§7 verification gates already implemented and green"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 491,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:491",
+      "text": "§10.1 cortex-m-rt boundary documented; §10.4 BBB carve-out"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 493,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-05-LINKER.md:gate:493",
+      "text": "§15 dated ratification entry."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 543,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:543",
+      "text": "§0 authority table reviewed; SWCU185G + SWRS196I + SWRU527 cited"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 546,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:546",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker per"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 550,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:550",
+      "text": "§4 source-of-truth map has exactly one owner per row."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 551,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:551",
+      "text": "§5.1 frozen crate / binary names; §5.2 frozen feature matrix;"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 554,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:554",
+      "text": "§6 verification gates name three gates: snapshot render"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 557,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:557",
+      "text": "§10 reconciliation: §10.1 example-crate gate vs. compile-verify"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 561,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:561",
+      "text": "v0 scaffold landed at `examples/launchxl-cc1352r1/` with"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 566,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:566",
+      "text": "`cargo check --manifest-path examples/launchxl-cc1352r1/Cargo.toml --target thumbv7em-none-eabihf` passes."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md",
+      "family": "chips-ti",
+      "kind": "gate",
+      "line": 567,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-06-EXAMPLE.md:gate:567",
+      "text": "§15 dated ratification entry."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-15 — drafted",
+        "summary": "**2026-05-15 — Drafted.** Initiative-completion",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-RETROSPECTIVE.md",
+      "family": "chips-ti",
+      "kind": "amendment",
+      "line": 698,
+      "obj_id": "chipdb/rlvgl-chips-ti/docs/CHIPS-TI-RETROSPECTIVE.md#2026-05-15@698",
+      "text": "**2026-05-15 — Drafted.** Initiative-completion"
+    }
+  ],
+  "schema_version": 2
+}

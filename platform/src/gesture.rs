@@ -17,7 +17,7 @@
 //! DoubleTap, INPUT-00 §6.1), converting pointer movement past a start
 //! threshold into `DragStart`/`DragMove`/`DragEnd` and consuming the raw
 //! move/up stream while dragging so the tap chain never settles into a
-//! `PressRelease` — pipelines MUST also call [`TapRecognizer::cancel`]
+//! `PressRelease` — pipelines MUST also call [`crate::gesture::TapRecognizer::cancel`]
 //! when a `DragStart` crosses the chain (click-vs-drag suppression).
 
 use rlvgl_core::event::Event;

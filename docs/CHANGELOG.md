@@ -7,6 +7,40 @@ CHANGELOG.md - Notes on chip & board database releases.
 
 # Changelog
 
+## Unreleased — owned-bridge maintenance
+
+Status as of **2026-10-13**: released v0.2.7 / A2 is preserved. The successor
+candidate allocates `rlvgl` 0.2.8, `rlvgl-platform` 0.2.7 and `ratatui-rlvgl`
+0.1.2 selectively; `rlvgl-core` remains 0.2.7. This entry does not announce
+registry availability or select a new tag.
+
+- Use official unmodified Ratatui 0.30.2 and exact native `ratatui-core` 0.1.2
+  with the root-owned bridge at `crates/ratatui-rlvgl`.
+- Carry the four existing packed font variants and their notices in the bridge
+  package; document the bounded compatibility and portable-atomic boundary.
+- Retain A2's native Stage/Endpoint snapshots, independent page budgets,
+  stale/retry rules and exact subscription-removal outcomes. This maintenance
+  does not implement additional interpreter or wire bindings.
+- Preserve full 31-crate packaging, selective three-package publication and
+  the independent source, consumer, registry, family and parent-adoption gates.
+
+See the [Unreleased maintenance guide](releases/owned-bridge-maintenance.md) and
+[dated family state](releases/v0.2.7-successor-family-state-20261013.md). The
+v0.2.7 candidate narrative and older release entries below are retained history;
+their dated plans and validation receipts do not qualify the successor.
+
+## v0.2.7 (candidate)
+
+Consolidates the existing v0.2.7 source with the read-only CCPS Modbus handoff,
+C3 diagnostic Rust bridge, and pinned Ratatui portable atomics. Includes the
+native MPY/CPY runtime substrate, Wayland presentation work, C3/C6 network-time
+examples, and new I2C device crates. Both `rlvgl` and `rlvgl-core` target
+`0.2.7`; other package versions advance selectively;
+family release/conformance closure remains governed by each initiative.
+See [candidate scope and package versions](releases/v0.2.7.md) and
+[validation status](releases/v0.2.7-validation.md). Latest bounded work is
+recorded in [family wave three](releases/v0.2.7-family-wave3.md).
+
 ## v0.2.5
 
 Qt → reactive rlvgl release. Full notes: [`releases/v0.2.5.md`](releases/v0.2.5.md).

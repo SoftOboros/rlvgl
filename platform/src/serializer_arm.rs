@@ -7,8 +7,8 @@
 //! "bit or two shift" → amplitude scaling + capture discontinuities).
 //!
 //! Intended use is the closed-loop re-arm calibration (R3.4): the consumer
-//! plays a known mono tone, captures `SAI1 RX`, calls [`detect_arm_phase`], and
-//! re-arms the serializers until [`SerializerArmOutcome::accepted`] (or a budget
+//! plays a known mono tone, captures `SAI1 RX`, calls [`crate::serializer_arm::detect_arm_phase`], and
+//! re-arms the serializers until [`crate::serializer_arm::SerializerArmOutcome::accepted`] (or a budget
 //! is exhausted). This module is the host-testable "unblocked slice" — it has
 //! NO codec/register/hardware dependency, only DSP arithmetic on an `[i16]`.
 //!

@@ -1,0 +1,63 @@
+# DFR1117 Beetle ESP32-C6 host for the shared rlvgl network-time runner.
+[package]
+name = "rlvgl-example-beetle-esp32c6"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.86"
+build = "build.rs"
+
+[[bin]]
+name = "rlvgl-beetle-esp32c6-network-time"
+path = "src/network_time_main.rs"
+required-features = ["esp_hal_network_time"]
+
+[features]
+default = []
+## Low-rate SSD1306/STTS22H network clock on the DFR1117 I2C connector.
+esp_hal_network_time = [
+    "dep:embedded-hal-bus",
+    "dep:esp-alloc",
+    "dep:esp-backtrace",
+    "dep:esp-bootloader-esp-idf",
+    "dep:esp-hal",
+    "dep:esp-println",
+    "dep:esp-storage",
+    "dep:esp-wifi",
+    "dep:rlvgl-app-network-time",
+    "dep:rlvgl-core",
+    "dep:rlvgl-device-stts22h",
+    "dep:rlvgl-network",
+    "dep:rlvgl-network-esp-nvs",
+    "dep:rlvgl-platform",
+    "dep:smoltcp",
+    "dep:ssd1306",
+    "rlvgl-platform/ssd1306",
+]
+
+[dependencies]
+embedded-hal-bus = { version = "0.3", default-features = false, optional = true }
+rlvgl-app-network-time = { path = "../apps/network-time", default-features = false, optional = true }
+rlvgl-core = { path = "../../core", default-features = false, optional = true }
+rlvgl-device-stts22h = { path = "../../devices/rlvgl-device-stts22h", default-features = false, optional = true }
+rlvgl-network = { path = "../../network", default-features = false, optional = true }
+rlvgl-network-esp-nvs = { path = "../../network/esp-nvs", default-features = false, features = ["esp-storage"], optional = true }
+rlvgl-platform = { path = "../../platform", default-features = false, optional = true }
+smoltcp = { version = "0.12", default-features = false, features = [
+    "medium-ethernet",
+    "proto-dhcpv4",
+    "proto-ipv4",
+    "socket-dhcpv4",
+    "socket-raw",
+    "socket-udp",
+], optional = true }
+ssd1306 = { version = "0.9", default-features = false, features = ["graphics"], optional = true }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+esp-alloc = { version = "0.7", optional = true }
+esp-backtrace = { version = "0.15", features = ["esp32c6", "panic-handler", "println"], optional = true }
+esp-bootloader-esp-idf = { version = "=0.1.0", default-features = false, optional = true }
+esp-hal = { version = "=1.0.0-beta.0", features = ["esp32c6", "unstable"], optional = true }
+esp-println = { version = "0.13", features = ["esp32c6", "log"], optional = true }
+esp-storage = { version = "=0.5.0", default-features = false, features = ["critical-section", "esp32c6", "nor-flash", "storage"], optional = true }
+esp-wifi = { version = "=0.13.0", features = ["esp32c6", "smoltcp", "wifi"], optional = true }

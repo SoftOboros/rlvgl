@@ -20,6 +20,8 @@ backends used during desktop development.
 ## Common Feature Groups
 
 - `simulator`: desktop integration and dynamic app loading
+- `wayland`: native Linux XDG-shell and bounded SHM presentation without an
+  imposed event-loop framework
 - `uefi`: UEFI GOP display + keyboard + serial transport for pre-OS runtimes
 - `stm32h747i_disco`: board-specific hardware support for the flagship demo
   target
@@ -27,6 +29,22 @@ backends used during desktop development.
   subsystems layered onto that board support
 - passthrough asset features such as `png`, `jpeg`, `gif`, `qrcode`, `apng`,
   `fontdue`, `lottie`, and `canvas`
+
+## Wayland backend
+
+The optional `wayland` feature provides a session-owned native client for
+Linux windowed and kiosk deployments. `WaylandSession::connect` performs only
+bounded registry setup; applications then integrate its file descriptor and
+`io_interest`/`dispatch_ready` methods with their own poller. Configure notices
+must be explicitly accepted before presentation. The `WaylandDisplay` adapter
+implements `DisplayDriver` over a complete private shadow frame, while frame
+callbacks pace submission and `wl_buffer.release` exclusively controls SHM
+slot reuse.
+
+WLD-01 intentionally has no seat-input API. Pointer, keyboard, and touch
+translation remain in the separately gated WLD-02 phase. See the
+[WLD initiative](../docs/wayland/README.md) for the accepted lifecycle,
+geometry, resource, and evidence contracts.
 
 ## UEFI backend
 

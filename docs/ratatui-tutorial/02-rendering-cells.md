@@ -41,10 +41,23 @@ The bridge resolves Ratatui colors to opaque rlvgl RGBA colors:
 `REVERSED` swaps the resolved foreground and background. `DIM` darkens the
 foreground. `HIDDEN` suppresses the symbol after the background is painted.
 
-## Modifiers
+## Font family and metrics
+
+The default `Packed` family uses the crate-local curated DejaVu Sans Mono
+assets: regular, bold, oblique and bold-oblique. Pair it with
+`CellMetrics::packed_terminal()` (14×21). Packed `BOLD`/`ITALIC` select the
+matching real variants. `SLOW_BLINK` and `RAPID_BLINK` use the caller-driven
+`RatatuiSurface::advance_blink_phase()`; the off phase paints only background.
+The bridge owns no timer or wall clock.
+
+To select the historical bitmap renderer, pair `CellMetrics::font_6x10()`
+(12×20) with an explicit `RatatuiTerminalFont::Bitmap6x10` view. Do not reuse
+bitmap grid geometry with the default packed family.
+
+## Historical bitmap modifier baseline
 
 Graphical output cannot reproduce every terminal convention literally. The
-v0.1 bridge uses deterministic static mappings:
+explicit `Bitmap6x10` profile preserves the original v0.1 static mappings:
 
 | Ratatui modifier | rlvgl rendering |
 |---|---|
@@ -62,8 +75,8 @@ host and embedded targets.
 
 ## Glyphs and Unicode
 
-The deterministic embedded baseline is rlvgl's built-in `FONT_6X10` bitmap
-font. In v0.1:
+The explicit deterministic bitmap baseline is rlvgl's built-in `FONT_6X10`
+font. It preserves the original v0.1 behavior:
 
 - ASCII renders directly;
 - common box-drawing characters degrade to ASCII `+`, `-`, and `|`;
@@ -74,10 +87,18 @@ The renderer advances over the full display width of a symbol and clips its
 paint to that span. This prevents the trailing cell of a wide grapheme from
 being rendered as an unrelated character.
 
-For richer text graphics, add glyph coverage to an rlvgl-owned packed or
-procedural font and keep host/embedded behavior identical. Do not silently use
-a host font library in the simulator; that would make the host preview lie
-about the board output.
+The default packed family covers ASCII, box drawing, block elements, arrows
+and the curated status symbols described by the bridge README. Outside that
+repertoire, including CJK and Braille, the existing ASCII/`?` fallback remains.
+Native display-width handling prevents trailing cells from being treated as
+independent glyphs; it does not add font coverage. The owned `BarValueLabel`
+uses display columns to center a label over caller-owned bar content and does
+not replace upstream `BarChart`.
+
+This maintenance does not regenerate fonts or expand the repertoire. A future
+font-coverage change needs its owning disposition and matching host/embedded
+proof. Do not silently use a host font library in the simulator; that would
+make the preview differ from the board output.
 
 ## Dirty regions
 
@@ -121,8 +142,8 @@ local pixel coordinates and derived cell coordinates. The consuming app still
 owns commands and focus; Ratatui does not impose a global embedded event loop.
 
 Read the complete mapping in
-[`view.rs`](../../vendor/ratatui/ratatui-rlvgl/src/view.rs) and
-[`color.rs`](../../vendor/ratatui/ratatui-rlvgl/src/color.rs).
+[`view.rs`](../../crates/ratatui-rlvgl/src/view.rs) and
+[`color.rs`](../../crates/ratatui-rlvgl/src/color.rs).
 
 ---
 

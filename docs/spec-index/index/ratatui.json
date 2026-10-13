@@ -1,0 +1,197 @@
+{
+  "edge_count": 0,
+  "edges": [],
+  "family": "ratatui",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 11,
+    "rationale": 1
+  },
+  "object_count": 13,
+  "objects": [
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 415,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:415",
+      "text": "§6.3's codepoint set is ratified (§15 dated entry) before any"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 417,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:417",
+      "text": "All four terminal `PackedFont` variants pack the identical"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 420,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:420",
+      "text": "`draw_cell` renders through the shared `FontMetrics` coverage"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 424,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:424",
+      "text": "Glyphs outside the ratified repertoire still degrade through the"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 426,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:426",
+      "text": "`FONT_6X10` remains selectable as an explicit low-flash-cost"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 429,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:429",
+      "text": "`Modifier::BOLD`/`Modifier::ITALIC` select real font-variant"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 431,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:431",
+      "text": "A bold or italic box-drawing border (e.g. a `Block` with"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 435,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:435",
+      "text": "SCTD-04 §7's invariant carries a dated §15 amendment naming this"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 437,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:437",
+      "text": "Blink-phase advance is caller-driven only; no wall clock,"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 439,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:439",
+      "text": "Advancing the blink phase marks the full surface dirty and is"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "gate",
+      "line": 443,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md:gate:443",
+      "text": "`Viewport::Inline` and `scrolling-regions` remain unimplemented,"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording owner acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-12",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.0",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Owner accepted the exact stable-native authority and RLVGL-owned bridge/font carrier migration, carrier/fonts first and compatibility after its checkpoint, without changing rendering contracts or relaxing guards.",
+        "touches": [
+          "RATATUI-00-CONCEPTS §0",
+          "RATATUI-00-CONCEPTS §5",
+          "RATATUI-00-CONCEPTS §12",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §0",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §5",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §12"
+        ]
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "amendment",
+      "line": 563,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md#0.1.0",
+      "text": "Owner accepted the exact stable-native authority and RLVGL-owned bridge/font carrier migration, carrier/fonts first and compatibility after its checkpoint, without changing rendering contracts or relaxing guards."
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "RATATUI-00-CONCEPTS §0",
+          "RATATUI-00-CONCEPTS §5",
+          "RATATUI-00-CONCEPTS §12",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §0",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §5",
+          "SCTD-04-RATATUI-RLVGL-INTEGRATION §12"
+        ]
+      },
+      "doc": "docs/concepts/RATATUI-00-CONCEPTS.md",
+      "family": "ratatui",
+      "kind": "rationale",
+      "line": 563,
+      "obj_id": "docs/concepts/RATATUI-00-CONCEPTS.md#0.1.0-rationale",
+      "text": "The July fork-first crate topology and independent Ratatui-repository build\nrule cannot carry an unmodified official Ratatui 0.30.2 tree, which has no\n`ratatui-rlvgl` member. The owner accepted the concrete PCDN-07 migration plan:\nuse the unchanged native core contract at e665, own the existing published-name\nbridge and scoped compatibility in RLVGL, carry the four exact packed variants\ninside that crate, and validate a cold extracted archive through genuine\npredecessor/registry routes. The normal protected RLVGL PR is the integration\nroute; no fork formatting/security route or upstream source patch is resumed.\n\nThis named delta replaces only the authority/carrier/font-destination/route\nclauses in §§0/5/12 and the companion SCTD-04 clauses. §§6–9's repertoire,\nAA/style/variant selection, metrics, caller-driven blink and fallback policy\nremain; input, retained-surface ownership, redraw and atomic-frame obligations\nalso remain. No regeneration, whole-widget-facade equivalence, new target\nwaiver or unsafe-code authority is granted. Implementation and fresh package,\nconsumer and full validation results remain unqualified until actually run.\nReleased A2 and the immutable bridge0.1.1 missing-font evidence are preserved;\nJuly execution receipts and historical reference-map failures are not rewritten."
+    }
+  ],
+  "schema_version": 2
+}

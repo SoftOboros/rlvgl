@@ -1,0 +1,24 @@
+{
+  "edge_count": 2,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 97,
+      "source": "docs/spec-index/SBC-COMPATIBILITY.md",
+      "target": "PCDN-CPY-00-001"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 98,
+      "source": "docs/spec-index/SBC-COMPATIBILITY.md",
+      "target": "PCDN-CPY-00-003"
+    }
+  ],
+  "family": "spec-index",
+  "kind_counts": {},
+  "object_count": 0,
+  "objects": [],
+  "schema_version": 2
+}

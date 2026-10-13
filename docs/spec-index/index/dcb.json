@@ -1,0 +1,2029 @@
+{
+  "edge_count": 134,
+  "edges": [
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 24,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 120,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 120,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 120,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 123,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 174,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 183,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 220,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 229,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 234,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 234,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 234,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 234,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 253,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 254,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 286,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 302,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 330,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 333,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 337,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 338,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 338,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 339,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 342,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D4"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D5"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 359,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 372,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 374,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 376,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 385,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 389,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 394,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 401,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 427,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 481,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 489,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 494,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 497,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D8"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 499,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D11"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 504,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 507,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D12"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 511,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 518,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 526,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D10"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 536,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 538,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 541,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 543,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 624,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 638,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 779,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 794,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 807,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 813,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 818,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D8"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 839,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 839,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 840,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 866,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 869,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 906,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 943,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1001,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1037,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1038,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1039,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1039,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1080,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1081,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D11"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1081,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1081,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1081,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1123,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D11"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1123,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D13"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1123,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1123,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1124,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1124,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1178,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 1243,
+      "source": "docs/concepts/DCB-00-CONCEPTS.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 4,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 4,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 141,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D17"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 143,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 182,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 182,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 219,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 221,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 223,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 223,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 283,
+      "source": "docs/concepts/DCB-01b-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 47,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D11"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 73,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 117,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 164,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 226,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 235,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 236,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D1"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 237,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 239,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 241,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 243,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 262,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 262,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 265,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 299,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D14"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 300,
+      "source": "docs/concepts/DCB-02-A.md",
+      "target": "INV-D15"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 168,
+      "source": "docs/concepts/DCB-02b-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 74,
+      "source": "docs/concepts/DCB-02c-A.md",
+      "target": "INV-D2"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 142,
+      "source": "docs/concepts/DCB-02c-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 176,
+      "source": "docs/concepts/DCB-02c-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 277,
+      "source": "docs/concepts/DCB-02c-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 151,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 203,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 249,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 249,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 257,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 318,
+      "source": "docs/concepts/DCB-03-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 132,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D7"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 143,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 168,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 180,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D6"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 217,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 261,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 315,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 346,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 351,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 386,
+      "source": "docs/concepts/DCB-04-A.md",
+      "target": "INV-D16"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 156,
+      "source": "docs/concepts/DCB-04-B.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 193,
+      "source": "docs/concepts/DCB-04-B.md",
+      "target": "INV-D9"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 306,
+      "source": "docs/concepts/DCB-04-B.md",
+      "target": "INV-D9"
+    }
+  ],
+  "family": "dcb",
+  "kind_counts": {
+    "amendment": 24,
+    "invariant": 16,
+    "term": 16
+  },
+  "object_count": 56,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "ARM ARMv7-M ARM.",
+        "term": "Cache line"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 111,
+      "obj_id": "dcb:term:cache line",
+      "text": "The granule at which the M7 D-cache moves data between cache and main memory. Architecturally 32 bytes on Cortex-M7. DCB buffers MUST be cache-line aligned and MUST be padded to a whole multiple of cache lines."
+    },
+    {
+      "attrs": {
+        "relationship": "RM0399 §2 / §4.",
+        "term": "Cacheable region"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 112,
+      "obj_id": "dcb:term:cacheable region",
+      "text": "A range of physical address space mapped as Normal cacheable memory (write-back, write-allocate by default on H747). All H747 SRAMs (D1 SRAM, D2 SRAM, AXI SRAM) are cacheable from the M7's perspective unless an MPU region overrides them."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "CPU-owned"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 113,
+      "obj_id": "dcb:term:cpu-owned",
+      "text": "Typestate. The CPU may freely read and write the buffer. No DMA master is reading or writing it. The buffer's cache state is unconstrained — the CPU's view is authoritative."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Device-read-pending"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 114,
+      "obj_id": "dcb:term:device-read-pending",
+      "text": "Typestate. A DMA master is about to read the buffer (or is reading it now). The buffer has been cleaned to RAM at the boundary so the DMA engine sees CPU-written data. The CPU MUST NOT touch it through this handle."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Device-write-pending"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 115,
+      "obj_id": "dcb:term:device-write-pending",
+      "text": "Typestate. A DMA master is about to write the buffer (or is writing it now). Cache lines spanning the buffer are invalidated at the boundary so any subsequent CPU read returns DMA-written data. The CPU MUST NOT touch it through this handle."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Device-active circular"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 116,
+      "obj_id": "dcb:term:device-active circular",
+      "text": "Typestate. A DMA master is continuously reading or writing the buffer in circular / double-buffer mode. The CPU is permitted to access only the *inactive half* (or, more generally, the half not currently targeted by the DMA stream), through a guard that performs the appropriate cache op for that half."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Cache op"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 117,
+      "obj_id": "dcb:term:cache op",
+      "text": "One of the SCB primitives `clean_dcache_by_address` (CPU→device handoff), `invalidate_dcache_by_address` (device→CPU handoff), `clean_invalidate_dcache_by_address` (bidirectional handoff or unaligned-slice case). DCB owns *which* op is applied at *which* transition; user code does not choose."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "DcaBuf\\<T, N\\>"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 118,
+      "obj_id": "dcb:term:dcabuf\\<t, n\\>",
+      "text": "The owning, cache-line-aligned, cache-line-padded buffer type. Lives in CPU-owned typestate at construction. Type parameters: element type `T`, element count `N`. Reborrows produce typestate-transitioned guards that consume / restore ownership."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Half-guard"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 119,
+      "obj_id": "dcb:term:half-guard",
+      "text": "The wait-free RAII handle returned when the CPU asks for the inactive half of a Device-active-circular buffer. Performs the cache op on entry (e.g. invalidate, for a device-writer ring) and revokes itself on drop / on next half toggle."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "DcaDoubleBuf\\<T, N\\>"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 120,
+      "obj_id": "dcb:term:dcadoublebuf\\<t, n\\>",
+      "text": "The owning, cache-line-aligned, cache-line-padded buffer family for **STM32 DMA double-buffer mode** (M0AR + M1AR alternating). Holds two `[T; N]` banks that MAY be physically non-contiguous. Each bank independently satisfies INV-D1 / INV-D2 / INV-D3. Distinct from `DcaBuf<T, N>` because the engine register layout (M0AR + M1AR + `CT` bit + `MBM` flag) is different from circular mode."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Bank"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 121,
+      "obj_id": "dcb:term:bank",
+      "text": "One of `M0` / `M1`; analogous to `Half` for the double-buffer-mode case. The DMA engine alternates which bank is the active write target (read target for TX-style direction); the CPU operates on the *inactive* bank."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Bank-guard"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 122,
+      "obj_id": "dcb:term:bank-guard",
+      "text": "The RAII handle returned when the CPU asks for the inactive bank of a `DeviceActiveDoubleBuf<DIR>` buffer. Performs the cache op on entry (clean for `Read`, invalidate for `Write`) and revokes itself on drop. Live-recheck on `release(current_target)` reads the engine's `CT` bit to detect bank flip during the guard's lifetime — the double-buffer-mode analogue of `HalfGuard`'s NDTR re-read."
+    },
+    {
+      "attrs": {
+        "relationship": "RM0399 §15 (DMA).",
+        "term": "CT bit (current target)"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 123,
+      "obj_id": "dcb:term:ct bit (current target)",
+      "text": "Bit field in the STM32 DMA stream's `CR` register (bit 19 on H7) reporting which bank (M0 or M1) the engine is *currently* writing or reading. The single-read source-of-truth for `BankGuard::release`'s INV-D15 live-recheck."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "DeviceLtdcScan\\<T, N\\>"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 124,
+      "obj_id": "dcb:term:deviceltdcscan\\<t, n\\>",
+      "text": "Typestate for a buffer continuously read by a fixed-rate pixel-stream consumer (LTDC, DCMI display-out, parallel RGB) where the CPU paints in place between consumer reads. The engine never pauses; per-frame ordering between CPU writes and consumer reads is enforced by `present()` (cache clean + DSB, draining the AXI / interconnect write buffer). Distinct from `DeviceActiveCirc<DIR>` because there'"
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "Scanout-FB region"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 125,
+      "obj_id": "dcb:term:scanout-fb region",
+      "text": "A `DcaBuf<T, N>` (or `DcaDoubleBuf<T, N>` for the swap-pair form) configured in `DeviceLtdcScan<...>` typestate. Lives in cacheable RAM with the Write-Through MPU attribute on STM32H7 platforms (the current disco default); the per-frame `present()` drains the AXI write buffer rather than writing back dirty cache lines."
+    },
+    {
+      "attrs": {
+        "relationship": "DCB.",
+        "term": "MPU non-cacheable carve-out"
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "term",
+      "line": 126,
+      "obj_id": "dcb:term:mpu non-cacheable carve-out",
+      "text": "An alternative compliance path for buffers where per-frame cache maintenance is too expensive (LTDC scanout is the canonical case): an MPU region marks the buffer non-cacheable, and DCB's typestate becomes a no-op on that buffer. Covered in §10; not the default — DCB-04-A §3 / §4 ratified `DeviceLtdcScan` over MPU carve-out for the LTDC scanout class."
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "Cache-line alignment.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 330,
+      "obj_id": "INV-D1",
+      "text": "`DcaBuf<T, N>` MUST be aligned to"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "Cache-line padding.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 333,
+      "obj_id": "INV-D2",
+      "text": "`DcaBuf<T, N>`'s storage MUST be"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "No cache-line sharing.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 337,
+      "obj_id": "INV-D3",
+      "text": "Two distinct `DcaBuf` instances"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Single owner.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 342,
+      "obj_id": "INV-D4",
+      "text": "At any instant a `DcaBuf` is in exactly"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Cacheable region required.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 351,
+      "obj_id": "INV-D6",
+      "text": "DCB typestate transitions"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "`DcaDoubleBuf<T, N>` per-bank alignment / padding.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 372,
+      "obj_id": "INV-D14",
+      "text": ""
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "`DeviceLtdcScan<T, N>` ordering contract.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 401,
+      "obj_id": "INV-D16",
+      "text": "The"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Forbid raw cache ops in cacheable-DMA paths.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 481,
+      "obj_id": "INV-D8",
+      "text": "The"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "New DMA buffers MUST use `DcaBuf`.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 489,
+      "obj_id": "INV-D9",
+      "text": "Any new DMA"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Existing call sites are grandfathered.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 494,
+      "obj_id": "INV-D10",
+      "text": "The three"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "HalfGuard observation is mandatory.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 499,
+      "obj_id": "INV-D11",
+      "text": "A"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "`unsafe` containment.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 507,
+      "obj_id": "INV-D12",
+      "text": "Every `unsafe { ... }` block"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "SCB ownership consolidation.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 511,
+      "obj_id": "INV-D13",
+      "text": "The `&mut SCB` borrow"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — drafted",
+        "summary": "**2026-05-02 — Drafted.** Initial draft written following the",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 762,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@762",
+      "text": "**2026-05-02 — Drafted.** Initial draft written following the"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — Pre-ratification clarifications (non-substantive).**",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 766,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@766",
+      "text": "**2026-05-02 — Pre-ratification clarifications (non-substantive).**"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 3,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — ratified",
+        "summary": "**2026-05-02 — Ratified.** §0–§14 ratified at the form above. DCB-01",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 814,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@814",
+      "text": "**2026-05-02 — Ratified.** §0–§14 ratified at the form above. DCB-01"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 4,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — `DeviceActiveDoubleBuf<DIR>` amendment (DCB-02-A",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 821,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@821",
+      "text": "**2026-05-02 — `DeviceActiveDoubleBuf<DIR>` amendment (DCB-02-A"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 5,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — `DeviceLtdcScan<T, N>` amendment (DCB-04-A",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 881,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@881",
+      "text": "**2026-05-02 — `DeviceLtdcScan<T, N>` amendment (DCB-04-A"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 6,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — DCB-03-A resolution: Option C",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 957,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-02@957",
+      "text": "**2026-05-02 — DCB-03-A resolution: Option C"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 7,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — DCB-01b-A resolution: Option A (cache-op",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 1016,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-03@1016",
+      "text": "**2026-05-03 — DCB-01b-A resolution: Option A (cache-op"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 8,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — DCB-02b-A resolution: Option A (callback",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 1091,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-03@1091",
+      "text": "**2026-05-03 — DCB-02b-A resolution: Option A (callback"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 9,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — DCB-02c-A resolution: Option C (closure-with",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 1131,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-03@1131",
+      "text": "**2026-05-03 — DCB-02c-A resolution: Option C (closure-with"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 10,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — DCB-04-B resolution: Option C (closure",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-00-CONCEPTS.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 1194,
+      "obj_id": "docs/concepts/DCB-00-CONCEPTS.md#2026-05-03@1194",
+      "text": "**2026-05-03 — DCB-04-B resolution: Option C (closure"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — drafted",
+        "summary": "**2026-05-02 — Drafted.** Surfaced during post-DCB-04",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-01b-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 272,
+      "obj_id": "docs/concepts/DCB-01b-A.md#2026-05-02@272",
+      "text": "**2026-05-02 — Drafted.** Surfaced during post-DCB-04"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — Resolved.** Option A ratified by owner",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-01b-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 280,
+      "obj_id": "docs/concepts/DCB-01b-A.md#2026-05-03@280",
+      "text": "**2026-05-03 — Resolved.** Option A ratified by owner"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "Per-bank alignment / padding.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-02-A.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 235,
+      "obj_id": "INV-D14",
+      "text": "For `DcaDoubleBuf<T,"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "CT-bit live-recheck.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-02-A.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 241,
+      "obj_id": "INV-D15",
+      "text": "`BankGuard<DIR>::release(ct)`"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — drafted",
+        "summary": "**2026-05-02 — Drafted.** Surfaced during DCB-02 SAI1 TX",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 289,
+      "obj_id": "docs/concepts/DCB-02-A.md#2026-05-02@289",
+      "text": "**2026-05-02 — Drafted.** Surfaced during DCB-02 SAI1 TX"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — Resolved.** Option A ratified by owner go-ahead.",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 295,
+      "obj_id": "docs/concepts/DCB-02-A.md#2026-05-02@295",
+      "text": "**2026-05-02 — Resolved.** Option A ratified by owner go-ahead."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-03 — drafted",
+        "summary": "**2026-05-03 — Drafted.** Surfaced during the post-DCB-04",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02b-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 255,
+      "obj_id": "docs/concepts/DCB-02b-A.md#2026-05-03@255",
+      "text": "**2026-05-03 — Drafted.** Surfaced during the post-DCB-04"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — Resolved.** Option A ratified by owner",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02b-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 261,
+      "obj_id": "docs/concepts/DCB-02b-A.md#2026-05-03@261",
+      "text": "**2026-05-03 — Resolved.** Option A ratified by owner"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-03 — drafted",
+        "summary": "**2026-05-03 — Drafted.** Surfaced during the post-DCB-04",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02c-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 291,
+      "obj_id": "docs/concepts/DCB-02c-A.md#2026-05-03@291",
+      "text": "**2026-05-03 — Drafted.** Surfaced during the post-DCB-04"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — Resolved.** Option C ratified by owner",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-02c-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 297,
+      "obj_id": "docs/concepts/DCB-02c-A.md#2026-05-03@297",
+      "text": "**2026-05-03 — Resolved.** Option C ratified by owner"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — drafted",
+        "summary": "**2026-05-02 — Drafted.** Surfaced when DCB-04 cleared the",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-03-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 333,
+      "obj_id": "docs/concepts/DCB-03-A.md#2026-05-02@333",
+      "text": "**2026-05-02 — Drafted.** Surfaced when DCB-04 cleared the"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — Resolved.** Option C ratified by owner go-ahead",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-03-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 339,
+      "obj_id": "docs/concepts/DCB-03-A.md#2026-05-02@339",
+      "text": "**2026-05-02 — Resolved.** Option C ratified by owner go-ahead"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "`DeviceLtdcScan<T, N>` ordering contract.",
+        "verified_by": ""
+      },
+      "doc": "docs/concepts/DCB-04-A.md",
+      "family": "dcb",
+      "kind": "invariant",
+      "line": 315,
+      "obj_id": "INV-D16",
+      "text": "The"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-02 — drafted",
+        "summary": "**2026-05-02 — Drafted.** Surfaced during DCB-02c",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-04-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 375,
+      "obj_id": "docs/concepts/DCB-04-A.md#2026-05-02@375",
+      "text": "**2026-05-02 — Drafted.** Surfaced during DCB-02c"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-02",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-02 — Resolved.** Option A ratified by owner go-ahead.",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-04-A.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 380,
+      "obj_id": "docs/concepts/DCB-04-A.md#2026-05-02@380",
+      "text": "**2026-05-02 — Resolved.** Option A ratified by owner go-ahead."
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": false,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": "2026-05-03 — drafted",
+        "summary": "**2026-05-03 — Drafted.** Surfaced during the post",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-04-B.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 324,
+      "obj_id": "docs/concepts/DCB-04-B.md#2026-05-03@324",
+      "text": "**2026-05-03 — Drafted.** Surfaced during the post"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 2,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-03",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-03 — Resolved.** Option C ratified by owner",
+        "touches": null
+      },
+      "doc": "docs/concepts/DCB-04-B.md",
+      "family": "dcb",
+      "kind": "amendment",
+      "line": 331,
+      "obj_id": "docs/concepts/DCB-04-B.md#2026-05-03@331",
+      "text": "**2026-05-03 — Resolved.** Option C ratified by owner"
+    }
+  ],
+  "schema_version": 2
+}

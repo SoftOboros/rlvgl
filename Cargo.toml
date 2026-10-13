@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl"
-version = "0.2.5"
+version = "0.2.8"
 authors = ["Ira Abbott <ira@softoboros.com>"]
 edition = "2024"
 license = "MIT"
@@ -134,9 +134,9 @@ path = "tests/creator_ui_kittest.rs"
 required-features = ["creator", "creator_ui"]
 
 [dependencies]
-rlvgl-core = { version = "0.2.4", path = "core", default-features = false }
-rlvgl-widgets = { version = "0.2.5", path = "widgets", default-features = false }
-rlvgl-platform = { version = "0.2.4", path = "platform", default-features = false }
+rlvgl-core = { version = "0.2.7", path = "core", default-features = false }
+rlvgl-widgets = { version = "0.2.6", path = "widgets", default-features = false }
+rlvgl-platform = { version = "0.2.6", path = "platform", default-features = false }
 rlvgl-ui = { version = "0.2.6", path = "ui", default-features = false }
 rlvgl-i18n = { version = "0.2.2", path = "i18n" }
 rlvgl-app-demo = { version = "0.2.5", path = "examples/apps/demo", default-features = false, optional = true }
@@ -286,7 +286,7 @@ path = "chipdb/rlvgl-chips-nrf"
 optional = true
 
 [dependencies.rlvgl-chips-esp]
-version = "0.2.0"
+version = "0.2.1"
 path = "chipdb/rlvgl-chips-esp"
 optional = true
 
@@ -344,7 +344,7 @@ tempfile = "3"
 egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
 rlvgl-chips-stm = { version = "0.2.0", path = "chipdb/rlvgl-chips-stm" }
 rlvgl-chips-nrf = { version = "0.2.0", path = "chipdb/rlvgl-chips-nrf" }
-rlvgl-chips-esp = { version = "0.2.0", path = "chipdb/rlvgl-chips-esp" }
+rlvgl-chips-esp = { version = "0.2.1", path = "chipdb/rlvgl-chips-esp" }
 rlvgl-chips-nxp = { version = "0.2.0", path = "chipdb/rlvgl-chips-nxp" }
 rlvgl-chips-silabs = { version = "0.2.1", path = "chipdb/rlvgl-chips-silabs" }
 rlvgl-chips-microchip = { version = "0.2.2", path = "chipdb/rlvgl-chips-microchip" }
@@ -479,6 +479,11 @@ panic = "abort"
 strip = true
 incremental = false
 
+# The ESP radio scheduler needs speed optimization even when the surrounding
+# low-footprint firmware is optimized for size.
+[profile.release.package.esp-wifi]
+opt-level = 3
+
 [profile.dev]
 opt-level = 2
 debug = true
@@ -499,14 +504,17 @@ rlvgl-core = { path = "core" }
 
 [workspace]
 members = [
-    "core", "platform", "widgets", "ui", "api", "micropython", "fs-sim", "i18n", "playit",
+    "crates/ratatui-rlvgl",
+    "core", "platform", "widgets", "ui", "api", "network", "network/esp-nvs", "micropython", "runtime-std", "fs-sim", "i18n", "playit",
     "devices/rlvgl-i2c-test-support", "devices/rlvgl-kria-i2c",
     "devices/rlvgl-device-stts22h", "devices/rlvgl-device-veml3235sl",
     "devices/rlvgl-device-ptn3460",
     "devices/rlvgl-device-pcm3168a",
     "examples/apps/demo", "examples/apps/disco-demo", "examples/apps/sctd-demo",
+    "examples/apps/battery-monitor", "examples/apps/network-time",
     "examples/sim", "examples/disco-sim", "examples/stm32h747i-disco",
     "examples/beetle-esp32c3",
+    "examples/beetle-esp32c6",
     "examples/beetle-esp32p4",
     "examples/beaglebone-black",
     "examples/stm32h747i-disco/assets/disco-assets",

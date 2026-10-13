@@ -1305,80 +1305,80 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
             BspCommand::ListBoards { vendor, chip } => match vendor.as_str() {
                 "esp" | "espressif" => {
                     for info in rlvgl_chips_esp::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "nrf" | "nordic" => {
                     for info in rlvgl_chips_nrf::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "nxp" | "imxrt" => {
                     for info in rlvgl_chips_nxp::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "rp" | "rp2040" => {
                     for info in rlvgl_chips_rp2040::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "renesas" | "ra" => {
                     for info in rlvgl_chips_renesas::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "ti" => {
                     for info in rlvgl_chips_ti::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "microchip" => {
                     for info in rlvgl_chips_microchip::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
                 }
                 "silabs" => {
                     for info in rlvgl_chips_silabs::boards() {
-                        if let Some(ref filter) = chip {
-                            if !info.chip.eq_ignore_ascii_case(filter) {
-                                continue;
-                            }
+                        if let Some(ref filter) = chip
+                            && !info.chip.eq_ignore_ascii_case(filter)
+                        {
+                            continue;
                         }
                         println!("{:<40} {}", info.board, info.chip);
                     }
@@ -1419,10 +1419,10 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         if let Some(hz) = cpu_hz {
                             ir.clocks.cpu_hz = hz;
                         }
-                        if let Some(baud) = baud {
-                            if let Some(console) = ir.board.console.as_mut() {
-                                console.baud = baud;
-                            }
+                        if let Some(baud) = baud
+                            && let Some(console) = ir.board.console.as_mut()
+                        {
+                            console.baud = baud;
                         }
                         let written = crate::bsp::espressif::render_esp_pac(&ir, &out)?;
                         if !cli.silent {
@@ -1532,10 +1532,10 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         if let Some(hz) = cpu_hz {
                             ir.clocks.cpu_hz = hz;
                         }
-                        if let Some(baud) = baud {
-                            if let Some(console) = ir.board.console.as_mut() {
-                                console.baud = baud;
-                            }
+                        if let Some(baud) = baud
+                            && let Some(console) = ir.board.console.as_mut()
+                        {
+                            console.baud = baud;
                         }
                         let written = crate::bsp::ti::render_ti_pac(&ir, &out)?;
                         if !cli.silent {
@@ -1561,10 +1561,10 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         if let Some(hz) = cpu_hz {
                             ir.clocks.cpu_hz = hz;
                         }
-                        if let Some(baud) = baud {
-                            if let Some(console) = ir.board.console.as_mut() {
-                                console.baud = baud;
-                            }
+                        if let Some(baud) = baud
+                            && let Some(console) = ir.board.console.as_mut()
+                        {
+                            console.baud = baud;
                         }
                         let written = crate::bsp::microchip::render_microchip_pac(&ir, &out)?;
                         if !cli.silent {
@@ -1590,10 +1590,10 @@ pub fn run(bsp_gen: app::BspGenFn) -> Result<()> {
                         if let Some(hz) = cpu_hz {
                             ir.clocks.cpu_hz = hz;
                         }
-                        if let Some(baud) = baud {
-                            if let Some(console) = ir.board.console.as_mut() {
-                                console.baud = baud;
-                            }
+                        if let Some(baud) = baud
+                            && let Some(console) = ir.board.console.as_mut()
+                        {
+                            console.baud = baud;
                         }
                         let written = crate::bsp::silabs::render_silabs_pac(&ir, &out)?;
                         if !cli.silent {

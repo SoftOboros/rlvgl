@@ -81,6 +81,14 @@ fn script_orders_publish_dependencies_topologically() {
     assert!(find("rlvgl-platform") < find("rlvgl-app-disco-demo"));
     assert!(find("rlvgl-app-demo") < find("rlvgl"));
     assert!(find("rlvgl-app-disco-demo") < find("rlvgl"));
+    for device in [
+        "rlvgl-device-pcm3168a",
+        "rlvgl-device-ptn3460",
+        "rlvgl-device-stts22h",
+        "rlvgl-device-veml3235sl",
+    ] {
+        assert!(find(device) < find("rlvgl-kria-i2c"));
+    }
 }
 
 #[test]

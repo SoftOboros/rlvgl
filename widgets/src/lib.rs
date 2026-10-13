@@ -55,6 +55,8 @@ pub mod message_box;
 pub mod meters;
 /// UI motion components (crawls, scrollers, tickers).
 pub mod motion;
+/// MPY descriptor catalog for the built-in proof actors.
+pub mod mpy;
 /// Progress bar widget.
 pub mod progress;
 /// Radio button widget for mutually exclusive options.

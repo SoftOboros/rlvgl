@@ -88,6 +88,13 @@ pub(crate) fn from_ioc(
         }
     }
 
+    // Ownership defaults and explicit overrides are resolved before applying
+    // the narrow source-admission contract. HAL/custom and external paths do
+    // not inherit an unrelated PAC initialization prerequisite.
+    if matches!(&template, TemplateKind::Pac) && emits_owned_h7_pll(&ir, core_filter) {
+        ir.clocks.pll_src = ioc::checked_pll_source(&text)?;
+    }
+
     render_from_ir(
         &ir,
         template,
@@ -101,6 +108,31 @@ pub(crate) fn from_ioc(
         emit_label_consts,
         core_filter,
     )
+}
+
+// Match the existing PAC template's non-null owner and simple-SYSCLK guards.
+fn emits_owned_h7_pll(ir: &ir::Ir, core_filter: Option<ir::Core>) -> bool {
+    ir.mcu.starts_with("STM32H7")
+        && ir.clocks.init_by.is_some()
+        && core_filter == ir.clocks.init_by
+        && !ir
+            .clocks
+            .sys_src
+            .as_deref()
+            .is_some_and(|source| matches!(source.to_ascii_uppercase().as_str(), "HSI" | "HSE"))
+}
+
+fn validate_owned_h7_pll_source(ir: &ir::Ir, core_filter: Option<ir::Core>) -> Result<()> {
+    if !emits_owned_h7_pll(ir, core_filter) {
+        return Ok(());
+    }
+    match ir.clocks.pll_src.as_deref() {
+        Some(source) if ioc::normalize_pll_source(source).is_some() => Ok(()),
+        Some(source) => Err(anyhow!("BSP-CLOCK-SOURCE-UNSUPPORTED: PLL source={source}")),
+        None => Err(anyhow!(
+            "BSP-CLOCK-SOURCE-UNRESOLVED: owned H7 PLL initialization requires explicit IOC source"
+        )),
+    }
 }
 
 /// Render Rust source from a precomputed IR using MiniJinja templates.
@@ -120,6 +152,9 @@ pub(crate) fn render_from_ir(
     // Optional core filter for split-core generation
     core_filter: Option<ir::Core>,
 ) -> Result<()> {
+    if matches!(&template, TemplateKind::Pac) {
+        validate_owned_h7_pll_source(ir, core_filter)?;
+    }
     let (tmpl_src, out_name, subdir) = match template {
         TemplateKind::Hal => (
             include_str!("bsp/templates/hal.rs.jinja").to_string(),
@@ -576,5 +611,244 @@ mod tests {
             .render(context! { spec => &spec, grouped_writes => false, with_deinit => false, use_label_names => true, idents })
             .unwrap();
         assert!(rendered.contains("let stlink_rx ="));
+    }
+    fn h7_clock_spec() -> ir::Ir {
+        ir::Ir {
+            mcu: "STM32H747XIHx".to_owned(),
+            package: "TFBGA240".to_owned(),
+            clocks: ir::Clocks {
+                init_by: Some(ir::Core::Cm7),
+                sys_src: Some("RCC_SYSCLKSOURCE_PLLCLK".to_owned()),
+                pll: IndexMap::from([(
+                    "pll1".to_owned(),
+                    ir::Pll {
+                        m: 5,
+                        n: 400,
+                        p: 2,
+                        q: 4,
+                        r: 2,
+                    },
+                )]),
+                ..Default::default()
+            },
+            pinctrl: vec![],
+            peripherals: IndexMap::new(),
+            pwr: ir::Power::default(),
+        }
+    }
+
+    fn render_pac(board: &ir::Ir, core: Option<ir::Core>) -> Result<String> {
+        let out = tempfile::tempdir()?;
+        render_from_ir(
+            board,
+            TemplateKind::Pac,
+            out.path(),
+            false,
+            false,
+            Layout::OneFile,
+            false,
+            None,
+            false,
+            false,
+            core,
+        )?;
+        Ok(fs::read_to_string(out.path().join("pac.rs"))?)
+    }
+
+    #[test]
+    fn owned_h7_pll_admission_checks_actual_render_and_preserves_external_paths() {
+        let mut board = h7_clock_spec();
+        assert!(
+            render_pac(&board, Some(ir::Core::Cm7))
+                .unwrap_err()
+                .to_string()
+                .contains("BSP-CLOCK-SOURCE-UNRESOLVED")
+        );
+        for source in [" hse ", "rcc_pllsource_hse", "HSE"] {
+            board.clocks.pll_src = Some(source.to_owned());
+            let rendered = render_pac(&board, Some(ir::Core::Cm7)).unwrap();
+            let expected = source.trim().to_ascii_uppercase();
+            assert!(rendered.contains(&format!("let pllsrc_str: &str = \"{expected}\"")));
+        }
+        board.clocks.pll_src = Some("INVALID".to_owned());
+        assert!(
+            render_pac(&board, Some(ir::Core::Cm7))
+                .unwrap_err()
+                .to_string()
+                .contains("BSP-CLOCK-SOURCE-UNSUPPORTED")
+        );
+        for core in [None, Some(ir::Core::Cm4)] {
+            let output = render_pac(&board, core).unwrap();
+            assert!(!output.contains("pub fn init_clocks"));
+        }
+        board.clocks.init_by = None;
+        assert!(
+            !render_pac(&board, Some(ir::Core::Cm7))
+                .unwrap()
+                .contains("pub fn init_clocks")
+        );
+        board.clocks.init_by = Some(ir::Core::Cm7);
+        board.clocks.sys_src = Some("HSE".to_owned());
+        board.clocks.pll_src = None;
+        assert!(
+            render_pac(&board, Some(ir::Core::Cm7))
+                .unwrap()
+                .contains("pub fn init_clocks")
+        );
+        board.mcu = "STM32F030R8Tx".to_owned();
+        board.clocks.init_by = None;
+        board.clocks.sys_src = None;
+        assert!(
+            !render_pac(&board, None)
+                .unwrap()
+                .contains("pub fn init_clocks")
+        );
+    }
+
+    #[test]
+    fn actual_ioc_admission_follows_resolved_owner_and_pac_emission() {
+        let text = include_str!("../../../examples/stm32h747i-disco/DiscoBiscuit/DiscoBiscuit.ioc");
+        let run = |input: &str,
+                   core: Option<ir::Core>,
+                   owner: Option<ir::Core>,
+                   kind: TemplateKind|
+         -> Result<String> {
+            let out = tempfile::tempdir()?;
+            let input_path = out.path().join("board.ioc");
+            fs::write(&input_path, input)?;
+            from_ioc(
+                &input_path,
+                kind,
+                out.path(),
+                false,
+                false,
+                true,
+                Layout::OneFile,
+                false,
+                None,
+                false,
+                false,
+                core,
+                owner,
+                None,
+            )?;
+            Ok(fs::read_to_string(out.path().join("pac.rs")).unwrap_or_default())
+        };
+        let generated = run(text, Some(ir::Core::Cm7), None, TemplateKind::Pac).unwrap();
+        assert!(generated.contains("let pllsrc_str: &str = \"HSE\""));
+        assert!(generated.contains("// HSE: unknown"));
+        let missing = text
+            .lines()
+            .filter(|line| !line.starts_with("RCC.PLLSourceVirtual="))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            run(&missing, Some(ir::Core::Cm7), None, TemplateKind::Pac)
+                .unwrap_err()
+                .to_string()
+                .contains("BSP-CLOCK-SOURCE-UNRESOLVED")
+        );
+        for (extra, diagnostic) in [
+            ("RCC.PLLSource=CSI", "BSP-CLOCK-SOURCE-CONFLICT"),
+            ("RCC.PLLSource=INVALID", "BSP-CLOCK-SOURCE-UNSUPPORTED"),
+        ] {
+            let input = format!("{text}\n{extra}\n");
+            assert!(
+                run(&input, Some(ir::Core::Cm7), None, TemplateKind::Pac)
+                    .unwrap_err()
+                    .to_string()
+                    .contains(diagnostic)
+            );
+            assert!(run(&input, Some(ir::Core::Cm4), None, TemplateKind::Pac).is_ok());
+            assert!(run(&input, None, None, TemplateKind::Pac).is_ok());
+            assert!(run(&input, Some(ir::Core::Cm7), None, TemplateKind::Hal).is_ok());
+        }
+        let agreed = format!("{text}\nRCC.PLLSource=HSE\n");
+        assert!(run(&agreed, Some(ir::Core::Cm7), None, TemplateKind::Pac).is_ok());
+        assert!(
+            run(
+                text,
+                Some(ir::Core::Cm4),
+                Some(ir::Core::Cm4),
+                TemplateKind::Pac
+            )
+            .unwrap()
+            .contains("pub fn init_clocks")
+        );
+    }
+    #[test]
+    fn optional_hse_diagnostics_preserve_unknown_and_explicit_numeric_values() {
+        for hz in [None, Some(0), Some(25_000_000)] {
+            let mut board = h7_clock_spec();
+            board.clocks.pll_src = Some("HSE".to_owned());
+            board.clocks.hse_hz = hz;
+            let output = render_pac(&board, Some(ir::Core::Cm7)).unwrap();
+            match hz {
+                None => {
+                    assert!(output.contains("// HSE: unknown"));
+                    assert!(output.contains("\"unknown\","));
+                    assert!(!output.contains("// HSE: none"));
+                }
+                Some(value) => assert!(output.contains(&format!("// HSE: {value} Hz"))),
+            }
+            assert!(!output.contains("\n        none,"));
+            assert!(!output.contains("let _ = ($(& $arg),*)"));
+        }
+    }
+
+    #[test]
+    fn disabled_logging_macro_compiles_borrows_and_preserves_rhs_failures() {
+        let mut board = h7_clock_spec();
+        board.clocks.pll_src = Some("HSE".to_owned());
+        let output = render_pac(&board, Some(ir::Core::Cm7)).unwrap();
+        let macro_line = output
+            .lines()
+            .find(|line| line.starts_with("macro_rules! bsp_log") && line.contains("let _ ="))
+            .unwrap();
+        let call_start = output.find("    bsp_log!(\"[bsp]").unwrap();
+        let call_tail = &output[call_start..];
+        let call_end = call_tail.find("    );").unwrap() + "    );".len();
+        let rendered_call = &call_tail[..call_end];
+        let input = format!(
+            r#"
+{macro_line}
+fn main() {{
+    {rendered_call}
+    let calls = std::cell::Cell::new(0);
+    bsp_log!("{{}} {{}}", {{ calls.set(calls.get() + 1); 1 }}, {{ calls.set(calls.get() + 1); String::from("temporary") }});
+    let value = {{ calls.set(calls.get() + 1); 3 }};
+    bsp_log!("{{value}}");
+    assert_eq!(calls.get(), 3);
+    let borrowed = String::from("owned");
+    bsp_log!("{{}}", borrowed);
+    assert_eq!(borrowed, "owned");
+    let failed = std::panic::catch_unwind(|| {{ bsp_log!("{{}}", panic_rhs()); }});
+    assert!(failed.is_err());
+}}
+fn panic_rhs() -> u32 {{ panic!("retained RHS failure") }}
+"#
+        );
+        let out = tempfile::tempdir().unwrap();
+        let source = out.path().join("logging.rs");
+        std::fs::write(&source, input).unwrap();
+        let binary = out.path().join("logging");
+        let compile = std::process::Command::new("rustc")
+            .args(["--edition=2021"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&binary)
+            .output()
+            .unwrap();
+        assert!(
+            compile.status.success(),
+            "{}",
+            String::from_utf8_lossy(&compile.stderr)
+        );
+        let run = std::process::Command::new(&binary).output().unwrap();
+        assert!(
+            run.status.success(),
+            "{}",
+            String::from_utf8_lossy(&run.stderr)
+        );
     }
 }

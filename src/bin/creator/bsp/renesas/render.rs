@@ -109,10 +109,10 @@ pub fn render_renesas_pac(ir: &RenesasIr, out_dir: &Path) -> Result<Vec<std::pat
 fn peripherals_used(ir: &RenesasIr) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for pin in &ir.pins {
-        if let Some(p) = pin.peripheral.as_deref() {
-            if !out.iter().any(|s| s == p) {
-                out.push(p.to_string());
-            }
+        if let Some(p) = pin.peripheral.as_deref()
+            && !out.iter().any(|s| s == p)
+        {
+            out.push(p.to_string());
         }
     }
     out

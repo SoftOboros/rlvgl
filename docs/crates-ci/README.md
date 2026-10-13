@@ -38,8 +38,12 @@ This initiative adds two gates and two harness layers:
 
 | Doc | Status |
 |---|---|
-| [CRATES-CI-00-CONCEPTS.md](CRATES-CI-00-CONCEPTS.md) | RATIFIED 2026-06-10 (§15 amendments through CRATES-CI-01a) |
+| [CRATES-CI-00-CONCEPTS.md](CRATES-CI-00-CONCEPTS.md) | RATIFIED 2026-06-10; effective §15 amendments through 0.1.5 |
 | [CRATES-CI-RETROSPECTIVE.md](CRATES-CI-RETROSPECTIVE.md) | Drafted 2026-06-10 at initiative completion |
+| [CRATES-CI-01B-STAGING-ISOLATION.md](CRATES-CI-01B-STAGING-ISOLATION.md) | Bounded mechanism effective in CRATES-CI-00 §15 0.1.5; Draft execution/consumer/CI proof open |
+| [ERRATA.md](ERRATA.md) | Active family log; bounded staging mechanism and continuation accepted, execution/provider proof open |
+| [October 10 staging receipt](../releases/v0.2.7-staging-20261010.md) | 10 guard tests and bounded real controls pass; mixed full attempt stops at Ratatui descriptor admission |
+| [Accepted descriptor staging receipt](../releases/v0.2.7-staging-descriptors-20261010.md) | New immutable current-MPY input, finite root/nested contexts and local diagnostic evidence; clean Linux CI remains separate |
 
 ## Phases — all shipped 2026-06-10
 

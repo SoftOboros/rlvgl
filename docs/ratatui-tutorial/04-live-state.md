@@ -52,8 +52,9 @@ fn update(&mut self, snapshot: HeroSnapshot) {
         return;
     }
     self.terminal
-        .get_mut()
-        .draw(|frame| render_snapshot(frame, &snapshot))?;
+        .borrow_mut()
+        .draw(|frame| render_snapshot(frame, &snapshot))
+        .expect("rendering to a retained rlvgl surface cannot fail");
     self.snapshot = Some(snapshot);
 }
 ```
@@ -73,13 +74,14 @@ Update after:
 
 ## Compose a spatial table in Ratatui
 
-The hero implements Ratatui's `Widget` trait directly. It clears the area,
+The hero implements the unchanged native `ratatui_core::widgets::Widget`
+trait directly. It clears the area,
 paints a cell-space ellipse as the central table, and places five seat blocks
 and five forks using percentage positions.
 
 ```rust,ignore
-impl ratatui::widgets::Widget for DiningTableScene<'_> {
-    fn render(self, area: ratatui::layout::Rect, buf: &mut ratatui::buffer::Buffer) {
+impl ratatui_core::widgets::Widget for DiningTableScene<'_> {
+    fn render(self, area: ratatui_core::layout::Rect, buf: &mut ratatui_core::buffer::Buffer) {
         // 1. Fill every cell with the background style.
         // 2. Paint the central table ellipse.
         // 3. Add AUTO/MANUAL/PAUSED and speed status.

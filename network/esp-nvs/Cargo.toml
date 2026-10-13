@@ -1,0 +1,34 @@
+# ESP-IDF-compatible NVS adapter for the portable rlvgl network store.
+[package]
+name = "rlvgl-network-esp-nvs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "ESP-IDF-compatible NVS storage adapter for rlvgl network configuration."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+# Discover and open an ESP-IDF data/NVS partition through `esp-storage`.
+# The consuming board crate selects the concrete ESP chip feature on
+# `esp-storage`; this adapter deliberately stays chip-neutral.
+esp-storage = [
+    "dep:embedded-storage",
+    "dep:esp-bootloader-esp-idf",
+    "dep:esp-storage",
+]
+
+[dependencies]
+esp-nvs = { version = "0.5", default-features = false }
+rlvgl-network = { path = "..", default-features = false }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+embedded-storage = { version = "0.3", default-features = false, optional = true }
+esp-bootloader-esp-idf = { version = "=0.1.0", default-features = false, optional = true }
+esp-storage = { version = "=0.5.0", default-features = false, features = ["critical-section", "nor-flash", "storage"], optional = true }

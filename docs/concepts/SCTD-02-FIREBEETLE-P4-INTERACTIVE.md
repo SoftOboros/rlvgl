@@ -1,6 +1,7 @@
 # SCTD-02 - FireBeetle 2 ESP32-P4 Interactive Mount
 
-**Status:** DRAFT 2026-06-20. Awaiting ratification. Normative for the
+**Status:** RATIFIED 2026-06-20, as recorded by the owner in §15. Implementation
+acceptance remains governed by §12. Normative for the
 SCTD initiative's FireBeetle-2-ESP32-P4 ESP-IDF target and the
 interactive Dining Philosophers extension. Builds on
 [`SCTD-00-CONCEPTS.md`](SCTD-00-CONCEPTS.md) (ratified 2026-06-19) and the
@@ -388,6 +389,11 @@ SCTD-02 implementation is complete when:
   into a reusable app-crate harness for other interactive machines.
 
 ## 15. Change Log
+
+Informative release-candidate regression reconciliation:
+[`v0.2.7-demo-evidence.md`](../releases/v0.2.7-demo-evidence.md). The header
+correction reflects the existing June 20 owner ratification; it does not
+ratify new behavior or close any implementation acceptance item.
 
 | Date | Status | Notes |
 |---|---|---|

@@ -24,10 +24,25 @@ use ssd1306::prelude::{DisplayRotation, DisplaySize128x64};
 
 const HEAP_SIZE: usize = 32 * 1024;
 
+#[used]
+#[unsafe(export_name = "esp_app_desc")]
+#[unsafe(link_section = ".rodata_desc.appdesc")]
+static ESP_APP_DESC: esp_bootloader_esp_idf::EspAppDesc =
+    esp_bootloader_esp_idf::EspAppDesc::new_internal(
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_NAME"),
+        esp_bootloader_esp_idf::BUILD_TIME,
+        esp_bootloader_esp_idf::BUILD_DATE,
+        "0.0.0",
+        0,
+        u16::MAX,
+        esp_bootloader_esp_idf::MMU_PAGE_SIZE,
+    );
+
 /// Entry point: init heap + peripherals, bring up SSD1306, spin a demo loop.
 #[main]
 fn beetle_main() -> ! {
-    esp_alloc::heap_allocator!(HEAP_SIZE);
+    esp_alloc::heap_allocator!(size: HEAP_SIZE);
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let i2c = I2c::new(

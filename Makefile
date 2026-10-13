@@ -4,6 +4,8 @@ PACKAGE       := rlvgl-example-disco
 BIN_CM7       := rlvgl-stm32h747i-disco
 BIN_CM4       := rlvgl-stm32h747i-disco-cm4
 TARGET        := thumbv7em-none-eabihf
+CPU_CM7       := cortex-m7
+CPU_CM4       := cortex-m4
 FEATURES_CM7  := cm7,splash,desktop,dma2d,cpu_stats,qspi_flash,sd_storage,audio
 FEATURES_CM4  := cm4
 CHIP          := STM32H747XIHx
@@ -11,6 +13,11 @@ FLASH_BASE    := 0x08000000
 OBJCOPY       := rust-objcopy
 PROBE_ID      ?= 0483:3754:004F00273133510837363734
 PROBE_SPEED   ?= 1000
+DISCO_EVIDENCE_DIR      := target/mpy08-evidence
+DISCO_STATIC_EVIDENCE   := $(DISCO_EVIDENCE_DIR)/stm32h747i-disco-pair.json
+DISCO_PHYSICAL_EVIDENCE := $(DISCO_EVIDENCE_DIR)/stm32h747i-disco-physical.json
+DISCO_SETTLE_SECONDS    ?= 5
+DISCO_CAPTURE_TIMEOUT   ?= 10
 
 # Host simulators and tools
 SIM_PACKAGE        := rlvgl-example-sim
@@ -30,6 +37,13 @@ UEFI_BIN           := rlvgl-uefi-disco
 # Host triple — detected from rustc, used for locating host binaries.
 HOST_TRIPLE := $(shell rustc -vV | sed -n 's/^host: //p')
 
+# Pinned MPY-07 host proof.
+MPY_MICROPYTHON_COMMIT := e0e9fbb17ed6fd06bb76e266ae554784c9c80804
+MPY_UNIX_DIR := vendor/micropython/ports/unix
+MPY_HOST_BUILD := build-rlvgl-standard
+MPY_HOST_BIN := $(MPY_UNIX_DIR)/$(MPY_HOST_BUILD)/micropython
+MPY_HOST_CC ?= cc
+
 # Derived paths
 ELF_CM7       := target/$(TARGET)/debug/$(BIN_CM7)
 ELF_CM7_REL   := target/$(TARGET)/release/$(BIN_CM7)
@@ -38,8 +52,10 @@ DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 
 .PHONY: help build-disco build-disco-release build-disco-cm4 build-disco-all \
 	build-disco-freertos flash-disco-freertos release-artifacts \
-	objcopy-disco objcopy-disco-release \
-	flash-disco flash-disco-hex flash-disco-bin \
+	objcopy-disco objcopy-disco-release objcopy-disco-cm4 verify-disco-pair \
+	test-disco-pair-tools \
+	flash-disco flash-disco-cm4 flash-disco-all flash-disco-hex flash-disco-bin \
+	capture-disco-pair \
 	probe-rs-gdb \
 	openocd openocd-dual openocd-erase \
 	gen-stm32h747i-disco-bsp \
@@ -49,12 +65,16 @@ DISCO_SIM_ELF := target/$(HOST_TRIPLE)/debug/$(DISCO_SIM_BIN)
 	translate-all-i18n translate-all-i18n-force translate-all-i18n-dry-run \
 	extract-i18n-keys extract-icons import-icons
 
+.PHONY: mpy-host-test
+
 help:
 	@echo "STM32H747I-DISCO firmware:"
 	@echo "  make build-disco              # Build CM7 debug + generate .hex/.bin"
 	@echo "  make build-disco-release      # Build CM7 release + generate .hex/.bin"
-	@echo "  make build-disco-cm4          # Build CM4 debug"
-	@echo "  make build-disco-all          # Build both cores"
+	@echo "  make build-disco-cm4          # Build CM4 debug + generate .hex"
+	@echo "  make build-disco-all          # Build and verify the paired CM7/CM4 images"
+	@echo "  make verify-disco-pair        # Verify CPU, flash-bank, mailbox, and artifact metadata"
+	@echo "  make test-disco-pair-tools    # Run host tests for physical capture accounting"
 	@echo "  make build-disco-freertos     # Build FreeRTOS preemptive task variant"
 	@echo "  make flash-disco-freertos     # Build + flash FreeRTOS variant"
 	@echo "  make release-artifacts        # Build all platforms (release) into release/"
@@ -75,6 +95,9 @@ help:
 	@echo ""
 	@echo "Flash & debug:"
 	@echo "  make flash-disco              # Build + flash CM7 via probe-rs (ELF)"
+	@echo "  make flash-disco-cm4          # Build + flash CM4 via probe-rs (ELF)"
+	@echo "  make flash-disco-all          # Build, verify, flash both cores, then reset"
+	@echo "  make capture-disco-pair       # Flash pair + capture physical ring progress"
 	@echo "  make flash-disco-hex          # Flash from .hex"
 	@echo "  make flash-disco-bin          # Flash from .bin (with base address)"
 	@echo "  make probe-rs-gdb             # Flash + launch probe-rs GDB server"
@@ -106,26 +129,77 @@ help:
 	@echo "Icon extraction:"
 	@echo "  make extract-icons             # Extract Lucide SVGs to assets/icons/"
 	@echo "  make import-icons              # Extract + convert to .raw via creator"
+	@echo ""
+	@echo "Documentation index:"
+	@echo "  make spec-index                # Regenerate the committed rlvgl index"
+	@echo "  make spec-index-check          # Verify regeneration is a no-op"
+	@echo "  make spec-index-report         # Print diagnostic corpus findings"
+	@echo "  make spec-test                 # Run local index unit/regression tests"
+	@echo ""
+	@echo "MicroPython proof:"
+	@echo "  make mpy-host-test             # Clean pinned v1.28 Unix host build + import proof"
+
+# ── Documentation object index ───────────────────────────────────
+# This is subrepo-owned. The parent softoboros scanner intentionally excludes
+# submodules and consumes this committed projection through separate tooling.
+.PHONY: spec-index spec-index-check spec-index-report spec-suspect spec-test
+
+spec-index:
+	python3 scripts/specidx/scan.py --emit-index
+
+spec-index-check:
+	python3 scripts/specidx/scan.py --check-index
+
+spec-index-report:
+	python3 scripts/specidx/scan.py
+
+spec-suspect:
+	python3 scripts/specidx/suspect.py
+
+spec-test:
+	python3 scripts/specidx/test_scan.py
+	python3 scripts/specidx/test_suspect.py
+
+# ── MicroPython host proof ────────────────────────────────────────
+# A dedicated build directory keeps the proof isolated from ordinary Unix-port
+# development. Cleaning it on every invocation makes compiler flags, toolchain
+# changes, and Rust target configuration part of the rebuilt evidence.
+mpy-host-test:
+	@test "$$(git -C vendor/micropython rev-parse HEAD)" = "$(MPY_MICROPYTHON_COMMIT)"
+	@test -z "$$(git -C vendor/micropython status --porcelain --untracked-files=no)"
+	@echo "micropython_commit=$(MPY_MICROPYTHON_COMMIT)"
+	@echo "micropython_variant=standard"
+	@echo "rust_target=$(HOST_TRIPLE)"
+	@rustc -vV
+	@$(MPY_HOST_CC) --version | head -1
+	$(MAKE) -C $(MPY_UNIX_DIR) BUILD=$(MPY_HOST_BUILD) clean
+	$(MAKE) -C $(MPY_UNIX_DIR) -j2 \
+		BUILD=$(MPY_HOST_BUILD) VARIANT=standard CC=$(MPY_HOST_CC) \
+		USER_C_MODULES="$(CURDIR)/micropython" RLVGL_RUST_TARGET=$(HOST_TRIPLE)
+	$(MPY_HOST_BIN) micropython/tests/test_module_imports.py
+	$(MPY_HOST_BIN) micropython/tests/test_exception_hook.py
+	@shasum -a 256 $(MPY_HOST_BIN)
 
 # ── Build ─────────────────────────────────────────────────────────
 build-disco:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM7)" \
 	cargo build --target $(TARGET) \
 	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
 	$(MAKE) objcopy-disco
 
 build-disco-release:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM7)" \
 	cargo build --target $(TARGET) --release \
 	  -p $(PACKAGE) --bin $(BIN_CM7) --features $(FEATURES_CM7)
 	$(MAKE) objcopy-disco-release
 
 build-disco-cm4:
-	RUSTFLAGS="-C target-cpu=cortex-m7" \
+	RUSTFLAGS="-C target-cpu=$(CPU_CM4)" \
 	cargo build --target $(TARGET) \
 	  -p $(PACKAGE) --bin $(BIN_CM4) --features $(FEATURES_CM4)
+	$(MAKE) objcopy-disco-cm4
 
-build-disco-all: build-disco build-disco-cm4
+build-disco-all: verify-disco-pair
 
 # FreeRTOS build: preemptive present / render / touch tasks.
 FEATURES_CM7_FREERTOS := cm7,freertos,adapted_cmd,dma2d,splash,desktop
@@ -182,6 +256,20 @@ objcopy-disco-release:
 	@echo "── artifacts ──"
 	@ls -lh $(ELF_CM7_REL) $(ELF_CM7_REL).hex $(ELF_CM7_REL).bin
 
+objcopy-disco-cm4:
+	$(OBJCOPY) -O ihex $(ELF_CM4) $(ELF_CM4).hex
+	@echo "── CM4 artifact ──"
+	@ls -lh $(ELF_CM4) $(ELF_CM4).hex
+
+verify-disco-pair: build-disco build-disco-cm4
+	python3 scripts/test_capture_stm32h747i_disco_pair.py
+	python3 scripts/verify_stm32h747i_disco_pair.py \
+	  --cm7 $(ELF_CM7) --cm4 $(ELF_CM4) \
+	  --json-out $(DISCO_STATIC_EVIDENCE)
+
+test-disco-pair-tools:
+	python3 scripts/test_capture_stm32h747i_disco_pair.py
+
 # ── Release artifacts ────────────────────────────────────────────
 #
 # Build all platform variants in release mode, rename with platform
@@ -224,6 +312,32 @@ flash-disco: build-disco
 	  --non-interactive --connect-under-reset \
 	  --probe $(PROBE_ID) $(ELF_CM7)
 	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+flash-disco-cm4: build-disco-cm4
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM4)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+flash-disco-all: build-disco-all
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM7)
+	probe-rs download --chip $(CHIP) \
+	  --protocol swd --speed $(PROBE_SPEED) \
+	  --non-interactive --connect-under-reset --verify \
+	  --probe $(PROBE_ID) $(ELF_CM4)
+	probe-rs reset --chip $(CHIP) --probe $(PROBE_ID)
+
+capture-disco-pair: flash-disco-all
+	python3 scripts/capture_stm32h747i_disco_pair.py \
+	  --chip $(CHIP) --probe $(PROBE_ID) --speed $(PROBE_SPEED) \
+	  --settle-seconds $(DISCO_SETTLE_SECONDS) \
+	  --timeout-seconds $(DISCO_CAPTURE_TIMEOUT) \
+	  --static-evidence $(DISCO_STATIC_EVIDENCE) \
+	  --json-out $(DISCO_PHYSICAL_EVIDENCE)
 
 flash-disco-freertos: build-disco-freertos
 	probe-rs download --chip $(CHIP) \

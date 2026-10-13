@@ -1,0 +1,19 @@
+# Portable 128x64 monochrome network-time application for rlvgl runtimes.
+[package]
+name = "rlvgl-app-network-time"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Portable low-rate monochrome network-time application for rlvgl."
+readme = "README.md"
+repository = "https://github.com/softoboros/rlvgl"
+homepage = "https://github.com/softoboros/rlvgl"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+heapless = { version = "0.8", default-features = false }
+rlvgl-core = { path = "../../../core", default-features = false }
+rlvgl-network = { path = "../../../network", default-features = false }

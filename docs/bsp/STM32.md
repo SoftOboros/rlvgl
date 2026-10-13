@@ -8,6 +8,8 @@
 
 This document explains how the rlvgl‑creator BSP generator consumes CubeMX `.ioc` files to produce STM32 board support code (PAC and HAL styles), how environment overrides work, what flags are supported, and the current behavior for dual‑core parts like STM32H747. It also outlines a plan to enhance the generator to cover additional, commonly used STM features.
 
+The owner-accepted clock-source contract is [CREATOR-00 §5–§6](CREATOR-00-CONCEPTS.md). This legacy guide remains informative; its other roadmap and behavior descriptions are not newly ratified by that bounded activation.
+
 ## Inputs
 
 - CubeMX `.ioc` file for the target board/MCU. The generator parses:

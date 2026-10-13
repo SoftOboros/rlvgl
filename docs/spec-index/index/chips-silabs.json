@@ -1,0 +1,730 @@
+{
+  "edge_count": 6,
+  "edges": [
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 530,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL1"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 537,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL2"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 541,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL3"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 544,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL4"
+    },
+    {
+      "edge_type": "defines",
+      "kind_provenance": "inferred",
+      "line": 548,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL5"
+    },
+    {
+      "edge_type": "cites",
+      "kind_provenance": "inferred",
+      "line": 945,
+      "source": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "target": "INV-SL5"
+    }
+  ],
+  "family": "chips-silabs",
+  "kind_counts": {
+    "amendment": 1,
+    "gate": 31,
+    "invariant": 5,
+    "term": 16
+  },
+  "object_count": 53,
+  "objects": [
+    {
+      "attrs": {
+        "relationship": "*As defined in* the existing chipdb convention (`chipdb/rlvgl-chips-esp/db/chips/*.yaml`); *used without modification* for the file-naming + lookup contract. SiLabs-specific schema fields are §5 froze",
+        "term": "Chip YAML"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 122,
+      "obj_id": "chips-silabs:term:chip yaml",
+      "text": "A document under `chipdb/rlvgl-chips-silabs/db/chips/<chip>.yaml` describing one Silicon Labs SoC's memory map, clock tree, peripheral instances, and IO routing tables. The file stem is the canonical chip id."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* the existing chipdb convention (`chipdb/rlvgl-chips-esp/db/boards/*.yaml`); *used without modification*.",
+        "term": "Board YAML"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 123,
+      "obj_id": "chips-silabs:term:board yaml",
+      "text": "A document under `chipdb/rlvgl-chips-silabs/db/boards/<board>.yaml` naming a chip and a pin-by-pin assignment of the chip's peripheral signals to physical package pins."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter; first reference in repo `db/chips/EFM32GG11.yaml`.",
+        "term": "Chip id"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 124,
+      "obj_id": "chips-silabs:term:chip id",
+      "text": "The `name:` field of a chip YAML. SHOULD match the silkscreen / orderable-part-number stem (e.g. `EFM32GG11`, `EFR32MG24`, `EFR32BG22`). MUST be unique within the crate."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter.",
+        "term": "Board id"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 125,
+      "obj_id": "chips-silabs:term:board id",
+      "text": "The `name:` field of a board YAML. SHOULD match the vendor's marketed board name with vendor-prefix stripped (e.g. `EFM32GG11_STK` for the SLSTK3701A Giant Gecko 11 starter kit; `BRD4002A` for the WPK mainboard)."
+    },
+    {
+      "attrs": {
+        "relationship": "*Owned by* each upstream PAC's maintainer; *cited* by chip YAML.",
+        "term": "PAC crate"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 126,
+      "obj_id": "chips-silabs:term:pac crate",
+      "text": "The Rust `svd2rust`-derived peripheral access crate named by a chip YAML's `pac_crate:` field. CHIPS-SILABS does not generate or vendor PACs; it generates code that calls them."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter; mirrors the ESP set defined in `src/bin/creator/bsp/espressif/templates/`.",
+        "term": "6-file emission set"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 127,
+      "obj_id": "chips-silabs:term:6-file emission set",
+      "text": "The fixed output produced by `rlvgl-creator bsp from-yaml --vendor silabs`: `mod.rs`, `pac.rs`, `clocks.rs`, `io_mux.rs`, `peripherals.rs`, `board.rs`. See §6. *Linker scripts (`memory.x`, `chip.x`)* are NOT in this set at v0 — they are §11 deferred work."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* per-family Silicon Labs RMs (EFM32GG11 RM §11, EFR32MG24 RM §8); *cited*.",
+        "term": "CMU"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 128,
+      "obj_id": "chips-silabs:term:cmu",
+      "text": "Clock Management Unit. The Silicon Labs peripheral that owns clock source selection, branch enables, and per-peripheral clock gating across Series 0/1/2. CMU register layout differs between Series 0/1 (single-register CMU_HFPERCLKEN0) and Series 2 (`CMU.CLKEN0/CLKEN1` + per-peripheral `CMU.<periph>CLKCTRL`)."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* per-family RMs; *cited*.",
+        "term": "HFCLK / HFXO / HFRCO"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 129,
+      "obj_id": "chips-silabs:term:hfclk / hfxo / hfrco",
+      "text": "High-frequency clock tree roots. HFXO is the external crystal; HFRCO is the internal RC oscillator; HFCLK is the post-mux high-frequency root that feeds the CPU and most peripherals. Series 2 renames these to SYSCLK / HFXO / HFRCODPLL."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* per-family RMs; *cited*.",
+        "term": "EM mode"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 130,
+      "obj_id": "chips-silabs:term:em mode",
+      "text": "Energy Mode. The Silicon Labs naming for low-power states: EM0 (run), EM1 (sleep), EM2 (deep sleep, retains state), EM3 (stop), EM4 (off/hibernate). CHIPS-SILABS template output MUST leave the part in EM0 at the end of `init()`."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* per-family RMs (EFM32GG11 RM §32.5); *cited*.",
+        "term": "GPIO ROUTE / ROUTELOC"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 131,
+      "obj_id": "chips-silabs:term:gpio route / routeloc",
+      "text": "Series 0/1 peripheral pin routing mechanism: each peripheral has a `<PERIPH>_ROUTEPEN` enable register and one or more `<PERIPH>_ROUTELOC0/1` location-select registers that pick which physical pin a peripheral signal exits on. Distinct from Series 2 DPLLOC."
+    },
+    {
+      "attrs": {
+        "relationship": "*As defined in* Series 2 family RMs (EFR32MG24 RM §24.5 \"GPIO pin routing\"); *cited*. **TBD: needs Silabs EFR32xG2x RM cite** for the exact register-block naming (some Series 2 parts use `GPIO_USART0_",
+        "term": "DPLLOC (digital peripheral allocator / pin allocator)"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 132,
+      "obj_id": "chips-silabs:term:dplloc (digital peripheral allocator / pin allocator)",
+      "text": "Series 2 replacement for ROUTELOC: each peripheral signal (e.g. `USART0_TX`) is allocated to a specific GPIO via `GPIO.<PERIPH>ROUTE.<signal>ROUTE` registers, with `GPIO.<PERIPH>ROUTE.ROUTEEN.<signal>PEN` gating the connection. The §10 reconciliation notes that DPLLOC is NOT a \"matrix\" in the ESP sense — there is no opaque signal-id table; instead each peripheral has a *named* per-signal route reg"
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter; mirrors `chipdb/rlvgl-chips-esp/db/chips/esp32c3.yaml` lines 39–108.",
+        "term": "System gate"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 133,
+      "obj_id": "chips-silabs:term:system gate",
+      "text": "A row in a chip YAML's `clock_tree.system_gates:` map: `{ clk_en_reg, clk_en_field, rst_reg, rst_field, [clk_sel_reg, clk_sel_field] }`. Drives the `clocks.rs.jinja` template's per-peripheral clock-enable + reset-pulse emission. Mirrors the ESP / Nordic shape; SiLabs-specific differences are noted in §10."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter; mirrors ESP/Nordic shape.",
+        "term": "Peripheral instance"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 134,
+      "obj_id": "chips-silabs:term:peripheral instance",
+      "text": "A row in a chip YAML's `peripherals:` map: `{ class, instance, base, irq, signals: [...] }`. The `class` is a frozen enum (§5); `instance` is the PAC peripheral name; `signals` lists the pin-routable signals each peripheral exposes."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter.",
+        "term": "Signal"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 135,
+      "obj_id": "chips-silabs:term:signal",
+      "text": "One entry in a peripheral's `signals:` list: `{ role, direction, [route_reg, route_field, pen_field] }`. The `role` is peripheral-specific (`tx`, `rx`, `sck`, `mosi`, etc.). The route fields name DPLLOC route registers on Series 2 or ROUTELOC slots on Series 0/1. The route-field naming convention is one of the §10 reconciliation decisions because it differs between Series 0/1 and Series 2."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter.",
+        "term": "Pin route"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 136,
+      "obj_id": "chips-silabs:term:pin route",
+      "text": "An entry in a board YAML's `pins:` list: `{ port, pin, signal, peripheral, direction, [pull], [drive_strength], [label] }`. SiLabs GPIO addressing is `(port, pin)` (e.g. `(PortA, 5)`), distinct from ESP's flat `gpio:` integer and Nordic's `(port, pin)` packed `psel` u32. The schema MUST keep `port` and `pin` as separate scalar fields."
+    },
+    {
+      "attrs": {
+        "relationship": "Owned by this chapter.",
+        "term": "Console"
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "term",
+      "line": 137,
+      "obj_id": "chips-silabs:term:console",
+      "text": "The peripheral instance that the generated `peripherals.rs` brings up as a UART debug console, named by a board YAML's `console:` block. SiLabs Series 0/1 uses `USARTn`, `LEUARTn`, or `UART0`; Series 2 uses `USARTn` or `EUSARTn`. The `console.peripheral:` value MUST be one of the chip's frozen peripheral instances."
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "invariant",
+      "line": 530,
+      "obj_id": "INV-SL1",
+      "text": "Every emitted `unsafe { ... }` block carries a"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "invariant",
+      "line": 537,
+      "obj_id": "INV-SL2",
+      "text": "Generated `init()` functions are top-down: clocks"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "invariant",
+      "line": 541,
+      "obj_id": "INV-SL3",
+      "text": "Sibling-module references use `super::` not"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "invariant",
+      "line": 544,
+      "obj_id": "INV-SL4",
+      "text": "No emitted code calls `cortex_m::interrupt::free`"
+    },
+    {
+      "attrs": {
+        "def_shape": "bullet",
+        "doc_status": "",
+        "has_verification": false,
+        "normative_keywords": [
+          "MUST"
+        ],
+        "title": "",
+        "verified_by": ""
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "invariant",
+      "line": 548,
+      "obj_id": "INV-SL5",
+      "text": "Watchdog disable MUST happen during"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 786,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:786",
+      "text": "§0 authority table reviewed; no silent restatement of"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 788,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:788",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 789,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:789",
+      "text": "§4 source-of-truth map has exactly one owner per row;"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 792,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:792",
+      "text": "§5.1 family set reviewed against repo state; both"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 795,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:795",
+      "text": "§5.2 out-of-scope family set reviewed; each entry has a"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 797,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:797",
+      "text": "§5.3 peripheral class set reviewed against the existing"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 801,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:801",
+      "text": "§6.4 6-file emission set matches the ESP precedent"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 803,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:803",
+      "text": "§10.2 (ROUTELOC vs DPLLOC) decision ratified."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 804,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:804",
+      "text": "§10.3 (port-pin tuple vs flat integer) decision"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 807,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:807",
+      "text": "§10.4 (four console classes) consequences for"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 809,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:809",
+      "text": "§11 non-goals reviewed; nothing currently in scope is"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 811,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-00-CONCEPTS.md:gate:811",
+      "text": "§15 has a dated ratification entry signed off by the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 293,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:293",
+      "text": "§0 authority table reviewed."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 294,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:294",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 295,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:295",
+      "text": "§4 source-of-truth map names one owner per concept."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 296,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:296",
+      "text": "§5 freezes the FLASH / SRAM origin/length and the"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 298,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:298",
+      "text": "§10 reconciles cleanly with `cortex-m-rt`'s `link.x`,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 300,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:300",
+      "text": "§11 names every deferred region (AAP, DCI, XIP, DMA, vectors,"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 302,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:302",
+      "text": "§15 carries a dated ratification entry."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 307,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:307",
+      "text": "`cargo test -p rlvgl-chips-silabs` — passes."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 308,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:308",
+      "text": "`cargo test -p rlvgl --test bsp_silabs_slstk3701a_render"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 312,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-05-LINKER.md:gate:312",
+      "text": "`cargo test -p rlvgl --test bsp_silabs_slstk3701a_compile"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 159,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:159",
+      "text": "§0 authority table reviewed."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 160,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:160",
+      "text": "§3 glossary terms each carry a cite-vs-restate marker."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 161,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:161",
+      "text": "§4 source-of-truth map names one owner per concept."
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 162,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:162",
+      "text": "§10 reconciles with compile-verify (`-04`), linker emission"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 164,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:164",
+      "text": "§11 enumerates every v0 non-goal so consumers can reason"
+    },
+    {
+      "attrs": {
+        "checked": true,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 166,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:166",
+      "text": "§15 carries a dated ratification entry."
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 171,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:171",
+      "text": "`cargo check -p rlvgl-example-slstk3701a --target thumbv7em-none-eabihf` —"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 173,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:173",
+      "text": "The example binary links (no unresolved symbols against"
+    },
+    {
+      "attrs": {
+        "checked": false,
+        "cited_ids": []
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md",
+      "family": "chips-silabs",
+      "kind": "gate",
+      "line": 176,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-06-EXAMPLE.md:gate:176",
+      "text": "`board::init()` is callable from the `#[entry]` reset"
+    },
+    {
+      "attrs": {
+        "author": null,
+        "change_kind": null,
+        "chronological_rank": 1,
+        "commits": null,
+        "conformant_change_kind": null,
+        "conformant_status": null,
+        "date": "2026-05-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "inferred",
+        "has_rationale": false,
+        "rationale_required": null,
+        "rev": null,
+        "shape": "legacy-bullet",
+        "status": null,
+        "summary": "**2026-05-15** — Initial retrospective drafted at natural",
+        "touches": null
+      },
+      "doc": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-RETROSPECTIVE.md",
+      "family": "chips-silabs",
+      "kind": "amendment",
+      "line": 489,
+      "obj_id": "chipdb/rlvgl-chips-silabs/docs/CHIPS-SILABS-RETROSPECTIVE.md#2026-05-15@489",
+      "text": "**2026-05-15** — Initial retrospective drafted at natural"
+    }
+  ],
+  "schema_version": 2
+}
