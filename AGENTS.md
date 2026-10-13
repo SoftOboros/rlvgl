@@ -146,6 +146,31 @@ publisher toolchain/auth, source, lock or pin change is admitted by PCDN-13.
 Preserve released A2, official Ratatui 0.30.2 and parent pins; stop for any new
 PCDN. This is no passing main or release qualification.
 
+Owner-accepted PCDN-14 admits only activation and recording of the owned
+bridge's existing exact normal `ratatui-core =0.1.2` path dependency under
+[CRATES-CI §15 amendment 0.1.14](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve the original bridge manifest, finite 48/42 policy and all descriptor,
+member, target, shared-file, lock and provenance identities. No generic
+activation, new source/member/descriptor/target or native publish entry is
+admitted. Keep extracted predecessors mandatory and withdraw native admission
+inputs before normalized verification and consumers; native-core resolution
+must be registry-only. The later bounded helper/test correction requires the
+separate protected amendment-first adoption and canonical index generation.
+
+For only that two-governing-Markdown PR on unchanged main
+`16a6631aae0ae0cb9917f2332414f917a69b5dca`, retain the exact inherited local
+13/14, hosted 11/14 and OPEN PCDN-04 root 0.2.5 payload failures as OPEN under
+0.1.14's renewed one-PR disposition. Freshly review and pass the two documents'
+unfiltered link and literal-format checks; preserve all baseline source/pin
+inputs. No other path, new failure, base/profile requirement, index or code
+belongs in that PR. PR223's expired exception does not transfer. This renewed
+disposition expires at adoption; corrected source must pass all 14 snapshots,
+full source/pre-publish and complete clean Linux/hosted Gate P with all three
+consumers. Preserve official Ratatui 0.30.2, A2, selective allocations and
+parent pins. Keep the admitted dated compiler until a separate nightly policy
+is settled. Stop for any new PCDN; no release qualification or publication is
+granted by this amendment.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
