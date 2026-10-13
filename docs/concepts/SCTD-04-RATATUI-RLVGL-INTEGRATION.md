@@ -8,14 +8,21 @@ the host demo, and the STM32H747I-DISCO bare-metal demonstration.
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT, MAY, and RECOMMENDED are
 per RFC 2119 / 8174.
 
+Current migration amendment: the 2026-10-12 §15 entry adopts stable native
+Ratatui authority and an RLVGL-owned carrier. The 2026-07-12 ratification and
+bench/execution timeline remains historical and is not a migration acceptance
+result.
+
 ## §0 Authority policy
 
-- Ratatui's `Backend`, `Terminal`, `Buffer`, `Cell`, `Color`, `Modifier`,
-  `Position`, `Size`, and `WindowSize` semantics are **as defined in
-  `SoftOboros/ratatui` at `fc7c6a70794eebeaad5a1b732b9d5446dc9a4cb0`;
-  used without modification**. At this baseline, `ratatui-core` and
-  `ratatui` are `#![no_std]`, and `Backend::Error` is bounded by
-  `core::error::Error` rather than `std::io::Error`.
+- Ratatui's native `Backend`, `Terminal`, `Buffer`, `Cell`, `Color`,
+  `Modifier`, `Position`, `Size` and `WindowSize` semantics are **as defined
+  in official `ratatui-v0.30.2`, commit
+  `e665c36cb14752a61cd777fbd06dbef8474f2add`; used without modification.**
+  `vendor/ratatui` MUST retain upstream tree
+  `cc2e7266ebf5e17f9250ef2d7bab1222dc62150f` without patches. The bridge
+  consumes native core type identities; owned compatibility does not replace
+  or silently widen the native contracts.
 - rlvgl `Renderer`, `Widget`, `WidgetNode`, `Event`, `Color`, and `Rect`
   are **as defined in `core/src/{renderer.rs,widget.rs,lib.rs,event.rs}`;
   used without modification**.
@@ -30,8 +37,11 @@ per RFC 2119 / 8174.
   fork or copy the low-level bring-up sequence.
 - `RlvglBackend`, `RatatuiSurface`, `RatatuiView`, `CellMetrics`, and
   `RlvglInput` are **as defined in
-  `vendor/ratatui/ratatui-rlvgl/src/{backend.rs,view.rs}`; implemented under
-  SCTD-04 and used without modification**.
+  `crates/ratatui-rlvgl/src/{backend.rs,view.rs}`; implemented under
+  SCTD-04 and adapted only by the accepted carrier/compatibility migration**.
+  Its scoped compatibility is RLVGL-owned; it covers the admitted shadow,
+  actual battery panel/text subset and display-width label behavior, not the
+  complete upstream widget/facade API.
 
 SCTD-04 execution is authorized by the 2026-07-12 ratification in §15.
 
@@ -66,15 +76,18 @@ Ratatui `Terminal` would create an invalid lifetime and ownership boundary.
 The integration therefore needs a shared retained cell surface between the
 Ratatui backend and the rlvgl view.
 
-The two projects also have independent workspaces. The new backend must remain
-buildable in the Ratatui repository against a published rlvgl crate while the
-rlvgl superproject must test the same source against its in-tree `rlvgl-core`.
+The original two-workspace independent-build requirement was the historical
+fork carrier boundary. Under the accepted migration, the corresponding
+independence requirement is a cold extracted owned-bridge package using genuine
+extracted predecessor/registry dependencies, without source/vendor fallback
+(§§5/12).
 
 ## §3 Canonical glossary
 
-- **Ratatui baseline** — *Owned by SCTD-04.* The pinned
-  `SoftOboros/ratatui` gitlink named in §0. Updating it requires a §15
-  amendment and rerunning all acceptance gates.
+- **Ratatui baseline** — *Owned by SCTD-04.* The exact unmodified official
+  stable native source named in §0. Updating it requires a §15 amendment and
+  rerunning all applicable acceptance gates; old fork evidence does not qualify
+  the stable-source migration.
 - **`RlvglBackend`** — *Owned by SCTD-04.* A `no_std + alloc`
   implementation of `ratatui_core::backend::Backend`. It applies Ratatui cell
   diffs to a `RatatuiSurface`; it does not own, borrow, or call a physical
@@ -113,39 +126,45 @@ rlvgl superproject must test the same source against its in-tree `rlvgl-core`.
 | Demo composition and machine snapshot | `rlvgl-app-sctd-demo` under §8 |
 | Host window/event loop | existing `examples/disco-sim` SCTD host |
 | DISCO clocks, SDRAM, display, touch, LTDC/DSI, DMA2D | existing Rust bare-metal runtime (§9) |
-| Gitlink and local dependency override | rlvgl root workspace (§5) |
-| Ratatui workspace membership and publish metadata | Ratatui submodule (§5) |
+| Stable upstream gitlink and source dependency routes | rlvgl root workspace (§5) |
+| Owned bridge membership and publish metadata | RLVGL-owned `crates/ratatui-rlvgl` (§5) |
 
 ## §5 Frozen decision — repository, branch, and crate topology
 
 Registration policy: **Standards Action**.
 
-After ratification, execution SHALL use two coordinated branches:
-
-| Repository | Branch | Purpose |
-|---|---|---|
-| `SoftOboros/rlvgl` | `codex/sctd04-ratatui-integration` | gitlink, local patch, SCTD app, host, and DISCO mount |
-| `SoftOboros/ratatui` | `dev/ratatui-rlvgl-backend` | upstreamable `ratatui-rlvgl` crate and its tests/docs |
-
-- rlvgl SHALL add `https://github.com/SoftOboros/ratatui.git` as the
-  `vendor/ratatui` submodule and pin the Ratatui baseline. The outer commit
-  MUST record only a committed submodule revision, never a dirty gitlink.
-- The backend crate SHALL live at `vendor/ratatui/ratatui-rlvgl/`. Ratatui's
-  existing `ratatui-*` workspace glob admits it without a one-off workspace
-  layout.
-- `ratatui-rlvgl` SHALL be MIT licensed, `#![no_std]`, require `alloc`, depend
-  on `ratatui-core` and the published `rlvgl-core`, and enable no terminal or
-  OS backend by default. It MUST NOT depend on SDL, crossterm, termion,
-  embedded-graphics, a C library, or a board crate.
-- The rlvgl root workspace SHALL use a `[patch.crates-io]` override so the
-  submodule crate resolves `rlvgl-core` to `/core` during superproject tests.
-  The Ratatui repository MUST still build the crate independently without
-  that patch.
-- The SCTD app MAY depend on Ratatui's facade crate with
-  `default-features = false`; it MUST NOT enable a `std` or terminal-backend
-  feature in embedded builds.
-- Upstream/backend commits SHALL land in the submodule branch first. The outer
-  rlvgl branch SHALL then advance the gitlink and add the conformance consumer.
+- The bridge SHALL live at `crates/ratatui-rlvgl` as an explicit regular
+  RLVGL root workspace member, retaining the published package name and
+  existing backend/surface/view/metrics/input/font interfaces. It SHALL use
+  explicit owned package metadata and archive includes. No separate published
+  compatibility package or copied upstream widget facade is admitted.
+- `vendor/ratatui` SHALL use the official upstream repository
+  `https://github.com/ratatui/ratatui.git`, pinned to §0's committed stable
+  revision. Its tree MUST remain unmodified. The root MUST record genuine
+  committed gitlinks; a dirty source overlay is not an integration pin.
+- `ratatui-rlvgl` SHALL remain MIT licensed, `#![no_std]`, require `alloc`,
+  preserve the no-owned-unsafe-code policy and enable no terminal or OS backend
+  by default. It MUST NOT acquire SDL, crossterm, termion, embedded-graphics,
+  a C library or board dependencies.
+- The owned bridge's source dependencies SHALL use the unchanged native
+  `ratatui-core` identity and RLVGL core contracts. Normalized packages and
+  cold consumers MUST use genuine extracted predecessor/registry routes,
+  without a source/vendor fallback. No independent upstream-repository bridge
+  member or fork-first backend commit is required by this topology.
+- Current SCTD/battery target-neutral consumers SHALL use native core
+  primitives and the accepted owned subset. The C3 dependency closure MUST
+  exclude the upstream `ratatui` facade and `ratatui-widgets`; admitted
+  portable-atomic and existing single-core configuration retain their scope.
+  This does not claim whole upstream widget equivalence or runtime atomic
+  qualification from a host-only pass.
+- Packed-font destination/provenance remains owned by RATATUI-00 §5. The
+  carrier and four-font archive checkpoint SHALL pass before compatibility
+  implementation proceeds. No generator/repertoire change is admitted.
+- Owned source integration SHALL use the normal protected RLVGL main PR route
+  only after required source/package/validation guards. Fresh same-ref Gate P,
+  P-DIFF, full31 order and extracted predecessors remain required. Publication,
+  a new release identity and parent adoption remain separately admitted;
+  released A2/v0.2.7 and existing parent pins MUST remain untouched.
 
 ## §6 Frozen decision — bridge API and cell semantics
 
@@ -228,8 +247,8 @@ Registration policy: **Specification Required**.
   redraw: a full redraw after background restoration SHALL produce identical
   pixels.
 - The SCTD consumer SHALL render a new Ratatui frame only when its snapshot,
-  event log, focus, cursor, or bounds changes. A display refresh alone MUST
-  NOT allocate or rebuild the Ratatui model.
+  event log, focus, cursor, bounds, or blink phase (RATATUI-00 §8) changes. A
+  display refresh alone MUST NOT allocate or rebuild the Ratatui model.
 - No allocation is permitted in the per-cell `RatatuiView::draw` inner loop.
 
 ## §8 Frozen decision — additional full-screen hybrid Dining Philosophers window
@@ -400,12 +419,20 @@ a separate action after the rlvgl release; it is not part of this release gate.
 
 A conforming SCTD-04 implementation MUST satisfy all of the following:
 
-- [ ] The two branches, submodule location, clean gitlink, and crate ownership
-      match §5.
-- [ ] `ratatui-rlvgl` builds and tests independently in the Ratatui repo with
-      default features disabled and no rlvgl-superproject patch (§5).
-- [ ] The rlvgl workspace consumes that exact gitlink source with its local
-      `rlvgl-core` patch; no copied bridge source exists (§5).
+- [ ] The explicit owned workspace member, unmodified official stable gitlink,
+      source routes and protected RLVGL integration boundary match §5.
+- [ ] A cold extracted `ratatui-rlvgl` consumer compiles outside the original
+      source/admission trees with default features disabled and genuine
+      extracted predecessor/registry dependencies; no source/vendor fallback
+      or upstream bridge member is used (§5).
+- [ ] Its archive includes all four exact packed variants and font-license
+      notices; decoder/bitmap-fallback and family selection checks pass under
+      RATATUI-00 §§5–8. Reused bridge0.1.1 or an asset listing alone does not
+      establish this package boundary.
+- [ ] Current C3/host consumers use one native core type identity and the
+      admitted owned subset. Actual no_std/C3 dependency closure, scoped
+      display-width vectors and target checks pass; host-only results do not
+      qualify a non-pointer-atomic target (§5).
 - [ ] Backend size, draw, clear variants, resize, cursor, color, modifier,
       wide-cell, clipping, invalid-coordinate, and overflow tests pass (§6).
 - [ ] Input translation, dirty-union conversion, full-vs-partial pixel parity,
@@ -442,7 +469,9 @@ A conforming SCTD-04 implementation MUST satisfy all of the following:
 - `examples/stm32h747i-disco/src/{main.rs,sctd_main.rs}`
 - `core/src/{bitmap_font.rs,event.rs,renderer.rs,widget.rs}`
 - `platform/src/{blit.rs,dma2d.rs,display_init.rs,dsi_cmd_mode.rs,stm32h747i_disco.rs}`
-- `.gitmodules`, `vendor/ratatui/ratatui-rlvgl/`
+- `.gitmodules`, `vendor/ratatui/` (unmodified stable upstream),
+  `crates/ratatui-rlvgl/` (owned carrier); old nested bridge paths in §15/§16
+  identify historical execution.
 - Ratatui baseline:
   `ratatui-core/src/{backend.rs,buffer/cell.rs,terminal.rs}` and root
   `Cargo.toml`
@@ -538,8 +567,111 @@ Owner ratification unblocks the following ordered execution phases:
   fifth and final seat already occupied. Native and Ratatui halves shall each
   show full → Depart → Arrive, with the popup inheriting the native full-table
   state.
+- 2026-07-17 — **RATIFIED AMENDMENT — RATATUI-00 §8.** §7's redraw-only-on-
+  change invariant now names an explicit blink-phase advance as an additional
+  trigger, alongside snapshot/event log/focus/cursor/bounds changes. This is
+  not a stealth revert of the "redraw only on change" guarantee: a blink-phase
+  advance remains an explicit, caller-driven, non-wall-clock signal — the
+  invariant's intent (no periodic redraw from a bare display refresh) is
+  unchanged. See
+  [RATATUI-00-CONCEPTS.md](RATATUI-00-CONCEPTS.md) §8 for the full
+  tick-driven blink-phase design this amendment unblocks.
+- 2026-07-18 — **RATIFIED CORRECTION — post-RATATUI-00 font/grid mismatch.**
+  `RatatuiView` began defaulting to RATATUI-00's curated `Packed` AA font
+  family, designed for `CellMetrics::packed_terminal()` (14×21). The hero
+  popup's `HeroContent::new()` still sizes its grid from `CellMetrics::
+  font_6x10()` (12×20 — the exact geometry the 2026-07-12 bench reviews
+  above hand-tuned to avoid clipping/overlap) and never called
+  `RatatuiView::set_font_family`, so it silently inherited the new default
+  on the old grid: several curated glyphs run up to 14px wide against this
+  popup's 12px fixed-advance step. Live dining-table content (all-caps
+  ASCII, no descenders, no glyph wider than 11px) happened not to visibly
+  clip or overlap, but the mismatch was real. Corrected by explicitly
+  selecting `RatatuiTerminalFont::Bitmap6x10`, restoring byte-for-byte
+  pre-RATATUI-00 rendering fidelity for this popup — `rlvgl` `v0.2.6`
+  `9364094f` — with a regression test guarding the pairing. Full writeup:
+  [RATATUI-RETROSPECTIVE.md](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/concepts/RATATUI-RETROSPECTIVE.md) §6 FC1.
+
+### 0.1.0 — 2026-10-12 — amended
+
+**Author:** Codex, recording owner acceptance
+**Change kind:** semantic
+**Touches:** SCTD-04-RATATUI-RLVGL-INTEGRATION §0, SCTD-04-RATATUI-RLVGL-INTEGRATION §3, SCTD-04-RATATUI-RLVGL-INTEGRATION §4, SCTD-04-RATATUI-RLVGL-INTEGRATION §5, SCTD-04-RATATUI-RLVGL-INTEGRATION §12, RATATUI-00-CONCEPTS §0, RATATUI-00-CONCEPTS §5, RATATUI-00-CONCEPTS §12
+**Summary:** Owner accepted stable native-core authority and the owned bridge/font carrier, with a cold extracted consumer boundary and normal protected RLVGL PR route; old historical conformance is not expanded.
+
+#### Rationale
+
+The original §5 fork-first branches, upstream-owned bridge member and §12
+independent Ratatui-repository gate cannot coexist with the accepted unmodified
+Ratatui 0.30.2 source, which has no bridge member. This amendment names that
+prior rule and its replacement explicitly: official native core semantics stay
+upstream; `crates/ratatui-rlvgl` owns the retained bridge and narrowly admitted
+compatibility, all four packed variants remain crate-local, and an extracted
+cold consumer proves the independent package route. Carrier/font checkpoint
+validation precedes compatibility; source adoption uses RLVGL's normal protected
+main PR after complete required guards.
+
+The replacement does not weaken §§6–9's retained surface/writer ownership,
+input/caller-driven timing, pixel/style/font/fallback fidelity, unchanged DP
+selector/composition, redraw-only-on-change or atomic-frame/hardware obligations.
+The root ordered Stage, P-DIFF, no-source-fallback, clean-source, same-ref and
+protected-PR guards remain; no expired waiver, compiler fallback or fixture
+blessing is admitted. The 2026-07-12/17/18 timeline and §16 execution receipts
+remain historical. A2/v0.2.7, existing parent pins and immutable bridge0.1.1's
+missing-font evidence are preserved; this amendment records acceptance, not
+fresh implementation, cold-package or hardware qualification.
+
+### 0.1.1 — 2026-10-12 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-08
+**Change kind:** semantic
+**Touches:** §15 0.1.0 migration admission and its validation boundary
+**Summary:** Owner authorizes one exact diagnostic snapshot correction and its
+mandatory selective platform package version, retaining all safety and release gates.
+
+#### Rationale
+
+The owner accepted PCDN-08 after reviewing the preserved full validation failure.
+Only the first headline of `platform/tests/ui/scanout_front_write.stderr` changes
+from `FrontBuffer<'a>` to `FrontBuffer` under the unchanged rustc 1.90.0-nightly
+3048886e5 profile. The fixture still MUST fail with E0599 for the forbidden
+`cpu_slice_mut` call at line 33, column 35 and match its entire expected diagnostic.
+The actual type retains its lifetime and read-only access contract. The expected
+snapshot SHA256 changes only from
+`fba7665867963f209f7c7a5915874c6f46d69625d1f65f83c3bba73e44b51651` to
+`a4770737a8dc044933c8e5669bead64a988a467b85e9353f594e22200b8967e0`.
+
+This named manual correction supersedes only §15 0.1.0's fixture-blessing
+prohibition and the accepted validation-plan restriction for this exact file
+and delta. The sealed old plan, dated history and failed result remain retained.
+No blanket `TRYBUILD=overwrite`, diagnostic normalization, test omission,
+compiler/profile change, fixture-program change, framebuffer API change or
+executable harness/matcher change is authorized. Other diagnostics remain exact.
+
+Because the published platform 0.2.6 archive includes this snapshot, allocate
+`rlvgl-platform` 0.2.7 to preserve immutable payloads and P-DIFF. Bridge 0.1.2,
+root 0.2.8, core 0.2.7 and other package versions retain their accepted allocation.
+Existing dependency minima remain. Cargo may update only necessary candidate
+platform-version entries in the root and IDF locks; unrelated resolution churn
+is not admitted. The remaining six active locks stay exact, including the
+unmodified official Ratatui lock. CRATES-CI §15 0.1.8 records the corresponding
+already-enumerated platform manifest fingerprint within the same 48/42 contexts.
+
+All 14 compile cases, strict discipline, full pre-commit and applicable
+pre-publish phases MUST pass before source adoption. The established protected
+amendment-first PR route, full ordered 31-crate clean-ref Linux Gate P, existing
+consumers plus the bridge boundary, P-DIFF, no source fallback, same-ref,
+publication/Gate R and separate parent-adoption gates remain required. Ratatui
+0.30.2, released A2/v0.2.7, original parent pins and all earlier negative evidence
+remain preserved. Any further mismatch or new owning decision stops execution.
 
 ## §16 Execution record
+
+The 2026-10-05 release-candidate software regression and remaining acceptance
+boundaries are recorded in
+[`v0.2.7-demo-evidence.md`](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-demo-evidence.md). This informative
+receipt preserves the dated bench observations below; it does not close the
+ten-minute hardware soak, independent bridge-package, or publication gates.
 
 - 2026-07-12 — Implemented `ratatui-rlvgl` on the Ratatui contribution branch
   and pinned its committed gitlink. Independent host tests, strict clippy, and
