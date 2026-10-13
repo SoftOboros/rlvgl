@@ -422,6 +422,8 @@ class PackageInput:
                 continue
             elif target_name == self.current['name']:
                 continue  # A real closure back-edge loads the current source input.
+            elif self.admit_owned_bridge_native_edge(package, dependency, target_package):
+                self.add(target_package, closure=True)
             elif (self.policy is not None and dep_manifest in self.policy.members and
                   self.policy.context_for(dep_manifest)['descriptor'] in self.active_contexts):
                 self.add(target_package, closure=True)
@@ -429,6 +431,69 @@ class PackageInput:
                 self.add(target_package, closure=True)
             else:
                 raise GateFailure(f'P-ORDER: {name} has nonadmitted path dependency {target_name}')
+
+    def admit_owned_bridge_native_edge(self, package: dict, dependency: dict,
+                                       target_package: dict) -> bool:
+        """PCDN-14: activate only the original owned bridge/native-core edge."""
+        source = Path(package['manifest_path']).resolve()
+        target = Path(target_package['manifest_path']).resolve()
+        bridge = self.repo / 'crates/ratatui-rlvgl/Cargo.toml'
+        native = self.repo / 'vendor/ratatui/ratatui-core/Cargo.toml'
+        current = Path(self.current['manifest_path']).resolve()
+        if source != bridge or target != native or current != bridge:
+            return False
+        if self.policy is None:
+            raise GateFailure('P-NATIVE-EDGE: missing finite workspace authority')
+        source_member = self.policy.members.get(source)
+        target_member = self.policy.members.get(target)
+        if (source_member is None or target_member is None or
+                source_member[0]['descriptor'] != 'Cargo.toml' or
+                target_member[0]['descriptor'] != 'vendor/ratatui/Cargo.toml' or
+                source_member[1]['name'] != 'ratatui-rlvgl' or
+                target_member[1]['name'] != 'ratatui-core'):
+            raise GateFailure('P-NATIVE-EDGE: wrong finite source/target authority')
+        for manifest, member in [(source, source_member), (target, target_member)]:
+            if sha(manifest) != member[1]['manifest_sha256']:
+                raise GateFailure(f'P-MEMBER-CHANGED: {manifest}')
+            descriptor = self.repo / member[0]['descriptor']
+            if sha(descriptor) != member[0]['descriptor_sha256']:
+                raise GateFailure(f'P-DESCRIPTOR-CHANGED: {descriptor}')
+        original = tomllib.loads(source.read_text())
+        declared = original.get('dependencies', {}).get('ratatui-core')
+        if (package['name'] != 'ratatui-rlvgl' or
+                self.current['name'] != 'ratatui-rlvgl' or
+                package.get('version') != original['package']['version'] or
+                self.current.get('version') != package.get('version') or
+                target_package['name'] != 'ratatui-core' or
+                target_package.get('version') != '0.1.2' or
+                dependency['name'] != 'ratatui-core' or
+                dependency.get('kind') is not None or
+                dependency.get('req') != '=0.1.2' or
+                dependency.get('uses_default_features') is not False or
+                not dependency.get('path') or
+                (Path(dependency['path']) / 'Cargo.toml').resolve() != native or
+                not isinstance(declared, dict) or
+                declared.get('version') != '=0.1.2' or
+                declared.get('default-features') is not False or
+                not declared.get('path') or
+                (source.parent / declared['path'] / 'Cargo.toml').resolve() != native):
+            raise GateFailure('P-NATIVE-EDGE: changed original normal dependency tuple')
+        context = target_member[0]
+        activated = context['descriptor'] not in self.active_contexts
+        self.prepare_workspace(context)
+        edge = {'from': str(source), 'to': str(target),
+                'descriptor': context['descriptor'], 'kind': 'normal',
+                'requirement': '=0.1.2', 'default_features': False,
+                'admission': 'PCDN-14-owned-bridge-native-core',
+                'descriptor_sha256': context['descriptor_sha256'],
+                'source_manifest_sha256': source_member[1]['manifest_sha256'],
+                'target_manifest_sha256': target_member[1]['manifest_sha256'],
+                'activated': activated}
+        if not any(record.get('admission') == edge['admission'] and
+                   record['from'] == edge['from'] and record['to'] == edge['to']
+                   for record in self.context_edges):
+            self.context_edges.append(edge)
+        return True
 
     def preserve_check(self) -> None:
         for source, digest in self.source_files.items():

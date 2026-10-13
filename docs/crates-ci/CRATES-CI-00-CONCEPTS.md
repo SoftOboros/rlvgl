@@ -215,6 +215,23 @@ upstream — the standard pre-publish mechanism.)*
    All additional admission inputs MUST become unavailable before normalized
    package verification and final consumers.
 
+   Solely when preparing the owned `ratatui-rlvgl` package at
+   `crates/ratatui-rlvgl/Cargo.toml`, its existing normal dependency
+   `ratatui-core` with exact requirement `=0.1.2`, `default-features = false`
+   and resolved original manifest `vendor/ratatui/ratatui-core/Cargo.toml`
+   MAY activate and record the already-admitted finite native workspace context
+   before adding that graph prerequisite. This permission applies only to that
+   exact edge under §15 0.1.14; it adds no descriptor, member, target, source,
+   policy fingerprint or publish-list entry. Preserve all existing descriptor,
+   member, target and shared-file fingerprints, original Cargo inventories,
+   actual nested Git provenance and checkout locks or their absence. Native
+   admission inputs MUST become unavailable before normalized verification and
+   consumers. Cargo-generated normalized metadata MUST resolve native
+   `ratatui-core =0.1.2` from the registry, with no native path or additional
+   native patch. Extracted owned predecessors remain mandatory. Every other
+   unadmitted normal path edge MUST still fail; no generic activation or
+   automatic context widening is granted.
+
    The extracted package's resolved metadata MUST contain local paths only for
    itself and its extracted staged predecessors; other packages MUST have registry
    sources. Any source admission/original-checkout route in that graph fails.
@@ -1203,3 +1220,81 @@ Preserve selective bridge 0.1.2, platform 0.2.7, root 0.2.8 and core 0.2.7,
 unmodified official Ratatui 0.30.2, released A2/v0.2.7 and parent pins.
 No new release identity, registry publication, hardware flash, phase
 ratification or general CI waiver follows. Stop for any new PCDN.
+
+### 0.1.14 — 2026-10-13 — amended
+
+**Author:** Codex, recording I. Abbott's acceptance of PCDN-14
+**Change kind:** semantic
+**Touches:** §6 finite preparation activation and the protected amendment boundary
+**Summary:** Activate only the existing owned-bridge to native-core preparation
+edge; preserve all source, publication and verification guards.
+
+#### Rationale and exact behavior admission
+
+The owner authorized patching the PCDN-14 staging blocker. Genuine source
+`0326c3a522d4937d310aeebbd59b5d75dd1cf116`, tree
+`66ca38fd5af133a085fe6d08866b7f9d80135bca`, failed hosted Gate P run
+38446207092 and clean-reference Linux Gate P at package 19, the owned bridge,
+after the first 18 packages completed. Retain both actual P-ORDER failures:
+`ratatui-rlvgl has nonadmitted path dependency ratatui-core`. Hosted consumers
+were skipped and local consumers were not run; the full 31-package gate is
+FAIL, not partially qualified.
+
+Native `ratatui-core` is already in the 42-member admitted native context.
+The explicit bridge manifest has neither a workspace section nor inherited
+fields, so archive preparation does not activate that context before its normal
+path dependency check. Admit only activation and receipt recording of the exact
+edge specified in §6. Keep the original bridge manifest, genuine native
+descriptor/member/target/shared-file identities and actual source inventories.
+The native descriptor fingerprint remains
+`a5007fe4cb0d9901302c5eb201941dcec82755370917144e312d2bfe9e5a6567`;
+native-core member manifest fingerprint remains
+`6f8222cb1d4a15490641faec42314bc8975b7e8e265f8ab2e0a3e4925ff068ca`.
+The current 48 root / 42 native member policy stays unchanged. This permits no
+generic admission, new descriptor/member/target or native publish-list entry.
+
+The later bounded implementation MAY change only the existing package helper
+and meaningful finite boundary tests, followed by canonical index generation.
+Record the exact edge and activated context. Require positive coverage for that
+edge and refusal controls for another consumer, name/path/version/dependency
+kind/default-feature tuple, changed fingerprints, added membership or source
+leaks. Preserve Cargo ownership of manifests, inventories and normalization,
+progressive extracted predecessors, source lock bytes or absence on success
+and failure, genuine nested provenance, P-VCS/P-META/P-INCLUDE/content/P-DIFF,
+clean-source refusal, full package order and all three consumers. Withdraw
+native/original admission inputs before normalized verification and consumers;
+native-core must then resolve solely from the registry at its exact version.
+An unavailable registry version or further source/lock/guard requirement stops
+for another owning decision.
+
+#### One protected two-document amendment disposition
+
+Adopt this owning amendment and then its AGENTS mirror in a separate protected
+PR on unchanged main `16a6631aae0ae0cb9917f2332414f917a69b5dca` before behavior
+adoption. That PR contains exactly these two governing Markdown paths, with no
+index, helper, test, workflow, source, fixture, manifest, lock, version or pin
+change. The owner admits only this one documentation adoption boundary despite
+independently classified inherited main failures: the retained dated local
+13/14 scanout diagnostic result, floating hosted 11/14 with the exact three
+DCA spelling differences recorded in 0.1.13, and OPEN PCDN-04 root 0.2.5
+`Cargo.toml.orig` payload drift. Require full two-document review, fresh
+applicable unfiltered link and literal-format checks, and exact unchanged
+baseline custody. Preserve failed statuses and complete negative evidence as
+OPEN. Any added failing case, source/profile/input requirement or base drift
+stops for another owning decision. No administrative bypass, status
+substitution, fixture blessing or force update is admitted.
+
+PR223's prior exception has expired. This new two-document disposition expires
+at its own adoption and never transfers to PR224 or corrected source. After
+authority adoption, qualify a genuine corrected source ref with all 14
+snapshots, full pre-commit/pre-publish, complete clean Linux and hosted
+31-package Gate P, predecessor withdrawal and all three extracted consumers.
+Preserve the failed predecessor source and its evidence.
+
+Unmodified official Ratatui 0.30.2, eight source locks, fonts/notices, selective
+bridge 0.1.2 / platform 0.2.7 / root 0.2.8 / core 0.2.7 allocations, released
+A2/v0.2.7, parent pins and all other guards remain preserved. PCDN-13's genuine
+dated qualification profile remains unchanged; tracking later nightly changes
+requires a separately settled compiler policy. No new release identity,
+registry publication, hardware qualification, phase ratification or parent
+adoption follows. Stop for any new PCDN.

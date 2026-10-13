@@ -462,5 +462,224 @@ class PackageBoundary(unittest.TestCase):
             module.WorkspacePolicy(self.repo, policy, documents)
 
 
+    def native_edge_fixture(self):
+        """Real Cargo/Git fixture; it is not a candidate package qualification."""
+        import json
+        bridge = self.repo / 'crates/ratatui-rlvgl'
+        native = self.repo / 'vendor/ratatui/ratatui-core'
+        for name, version, directory in [('rlvgl-core', '0.2.7', self.repo / 'core'),
+                                         ('ratatui-rlvgl', '0.1.2', bridge),
+                                         ('ratatui-core', '0.1.2', native)]:
+            (directory / 'src').mkdir(parents=True, exist_ok=True)
+            (directory / 'Cargo.toml').write_text(
+                f'[package]\nname="{name}"\nversion="{version}"\n'
+                'edition="2024"\nlicense="MIT"\ndescription="Finite graph fixture"\n')
+            (directory / 'src/lib.rs').write_text('// Genuine finite fixture payload.\n')
+        with (bridge / 'Cargo.toml').open('a') as handle:
+            handle.write('[dependencies]\n'
+                         'rlvgl-core={version="0.2.7",path="../../core",default-features=false}\n'
+                         'ratatui-core={version="=0.1.2",path="../../vendor/ratatui/ratatui-core",default-features=false}\n')
+        (self.repo / 'Cargo.toml').write_text(
+            '[workspace]\nmembers=["core","crates/ratatui-rlvgl"]\nresolver="3"\n')
+        nested = native.parent
+        (nested / 'Cargo.toml').write_text('[workspace]\nmembers=["ratatui-core"]\nresolver="3"\n')
+        environment = dict(os.environ, CARGO_TARGET_DIR=str(self.root / 'cargo-target'))
+        documents = []
+        for descriptor in [self.repo / 'Cargo.toml', nested / 'Cargo.toml']:
+            result = module.run(['cargo', 'metadata', '--no-deps', '--format-version', '1',
+                                 '--manifest-path', str(descriptor)], cwd=self.repo, env=environment)
+            documents.append(json.loads(result.stdout))
+        self.git_fixture(nested, ['Cargo.toml', 'ratatui-core'])
+        self.git_fixture(self.repo, ['Cargo.toml', 'core', 'crates/ratatui-rlvgl'])
+        contexts = []
+        for document in documents:
+            descriptor = Path(document['workspace_root']) / 'Cargo.toml'
+            members = []
+            for package in document['packages']:
+                if package['id'] not in document['workspace_members']:
+                    continue
+                manifest = Path(package['manifest_path'])
+                members.append({'name': package['name'],
+                                'manifest': str(manifest.relative_to(self.repo)),
+                                'manifest_sha256': module.sha(manifest),
+                                'targets': sorted(str(Path(t['src_path']).relative_to(self.repo))
+                                                  for t in package['targets']),
+                                'shared_files': []})
+            contexts.append({'descriptor': str(descriptor.relative_to(self.repo)),
+                             'descriptor_sha256': module.sha(descriptor), 'members': members})
+        policy = {'workspaces': contexts}
+        packages = [p for document in documents for p in document['packages']]
+        by_name = {p['name']: p for p in packages}
+        return {'policy': policy, 'authority': module.WorkspacePolicy(self.repo, policy, documents),
+                'documents': documents, 'packages': packages, 'by_name': by_name,
+                'environment': environment,
+                'dependency': next(d for d in by_name['ratatui-rlvgl']['dependencies']
+                                   if d['name'] == 'ratatui-core')}
+
+    def native_edge_state(self, fixture, staged=None):
+        return module.PackageInput(self.repo, self.graph, fixture['by_name']['ratatui-rlvgl'],
+                                   fixture['packages'], ['rlvgl-core', 'ratatui-rlvgl'], staged or {},
+                                   policy=fixture['authority'], patch=self.root / 'private-patch.toml')
+
+    def native_edge_execute_args(self, fixture):
+        import argparse
+        import json
+        environment = fixture['environment']
+        module.run(['cargo', 'package', '--no-verify', '--allow-dirty',
+                    '--manifest-path', str(self.repo / 'core/Cargo.toml')],
+                   cwd=self.repo, env=environment)
+        archive = self.root / 'cargo-target/package/rlvgl-core-0.2.7.crate'
+        stage = self.root / 'stage'
+        extracted = stage / 'staged/rlvgl-core-0.2.7'
+        extracted.mkdir(parents=True)
+        for relative, content in module.members(archive).items():
+            target = extracted / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+        (self.repo / 'scripts').mkdir()
+        (self.repo / 'scripts/crates_ci_workspace_contexts.json').write_text(json.dumps(fixture['policy']))
+        metadata = self.root / 'root-metadata.json'
+        ratatui_metadata = self.root / 'native-metadata.json'
+        metadata.write_text(json.dumps(fixture['documents'][0]))
+        ratatui_metadata.write_text(json.dumps(fixture['documents'][1]))
+        order = self.root / 'order.txt'
+        order.write_text('rlvgl-core\nratatui-rlvgl\n')
+        caller = self.root / 'caller-patch.toml'
+        caller.write_text(f'[patch.crates-io]\nrlvgl-core={{path="{extracted}"}}\n')
+        return argparse.Namespace(repo=self.repo, stage=stage, crate='ratatui-rlvgl',
+                                  metadata=metadata, ratatui_metadata=ratatui_metadata,
+                                  order=order, patch=caller), extracted
+
+    def test_real_explicit_native_edge_archive_withdrawal_and_registry_resolution(self):
+        import json
+        fixture = self.native_edge_fixture()
+        args, extracted_core = self.native_edge_execute_args(fixture)
+        manifests = [Path(p['manifest_path']) for p in fixture['packages']]
+        originals = {p: p.read_bytes() for p in manifests}
+        locks = module.lock_snapshot([self.repo / 'Cargo.lock', self.repo / 'core/Cargo.lock',
+                                      self.repo / 'crates/ratatui-rlvgl/Cargo.lock',
+                                      self.repo / 'vendor/ratatui/Cargo.lock'])
+        caller = args.patch.read_bytes()
+        module.execute(args)
+        receipt = json.loads((args.stage / 'inputs/ratatui-rlvgl/receipt.json').read_text())
+        edge = next(e for e in receipt['workspace_context_edges']
+                    if e.get('admission') == 'PCDN-14-owned-bridge-native-core')
+        self.assertEqual(edge['from'], str(self.repo / 'crates/ratatui-rlvgl/Cargo.toml'))
+        self.assertEqual(edge['to'], str(self.repo / 'vendor/ratatui/ratatui-core/Cargo.toml'))
+        self.assertEqual((edge['descriptor'], edge['kind'], edge['requirement'], edge['default_features']),
+                         ('vendor/ratatui/Cargo.toml', 'normal', '=0.1.2', False))
+        self.assertTrue(edge['activated'])
+        for field, path in [('descriptor_sha256', self.repo / 'vendor/ratatui/Cargo.toml'),
+                            ('source_manifest_sha256', self.repo / 'crates/ratatui-rlvgl/Cargo.toml'),
+                            ('target_manifest_sha256', self.repo / 'vendor/ratatui/ratatui-core/Cargo.toml')]:
+            self.assertEqual(edge[field], module.sha(path))
+        self.assertEqual(len(receipt['workspace_context_edges']), 1)
+        self.assertEqual(receipt['extracted_aliases']['rlvgl-core'], str(extracted_core.resolve()))
+        detached = Path(receipt['input_directory'])
+        self.assertFalse((detached / 'graph').exists())
+        retained = detached / 'admission-retained'
+        source_native = module.run(['git', 'rev-parse', 'HEAD'], cwd=self.repo / 'vendor/ratatui').stdout
+        retained_native = module.run(['git', 'rev-parse', 'HEAD'], cwd=retained / 'vendor/ratatui').stdout
+        self.assertEqual(source_native, retained_native)
+        archive = self.repo / 'target/package/ratatui-rlvgl-0.1.2.crate'
+        payload = module.members(archive)
+        self.assertEqual(payload['Cargo.toml.orig'], originals[self.repo / 'crates/ratatui-rlvgl/Cargo.toml'])
+        normalized = module.tomllib.loads(payload['Cargo.toml'].decode())['dependencies']['ratatui-core']
+        self.assertEqual(normalized['version'], '=0.1.2')
+        self.assertNotIn('path', normalized)
+        metadata = json.loads((args.stage / 'inputs/ratatui-rlvgl/extracted-metadata.json').read_text())
+        native = next(p for p in metadata['packages'] if p['name'] == 'ratatui-core')
+        self.assertEqual(native['version'], '0.1.2')
+        self.assertTrue(native['source'].startswith('registry+'))
+        allowed = {detached / 'extracted/ratatui-rlvgl-0.1.2/Cargo.toml', extracted_core / 'Cargo.toml'}
+        module.local_graph_audit(metadata, {p.resolve() for p in allowed})
+        self.assertTrue(receipt['admission_absent_resolution'])
+        self.assertEqual({p: p.read_bytes() for p in manifests}, originals)
+        module.preserve_locks(locks)
+        self.assertEqual(args.patch.read_bytes(), caller)
+
+    def test_exact_native_edge_tuple_refusals_do_not_activate_context(self):
+        import copy
+        fixture = self.native_edge_fixture()
+        changes = [('source', 'name', 'another-consumer'), ('source', 'version', '0.1.3'),
+                   ('target', 'name', 'another-native'), ('target', 'version', '0.1.3'),
+                   ('dependency', 'name', 'another-native'), ('dependency', 'kind', 'dev'),
+                   ('dependency', 'req', '0.1.2'), ('dependency', 'uses_default_features', True),
+                   ('dependency', 'path', str(self.repo / 'other-native'))]
+        for owner, key, value in changes:
+            with self.subTest(owner=owner, key=key):
+                source = copy.deepcopy(fixture['by_name']['ratatui-rlvgl'])
+                target = copy.deepcopy(fixture['by_name']['ratatui-core'])
+                dependency = copy.deepcopy(fixture['dependency'])
+                {'source': source, 'target': target, 'dependency': dependency}[owner][key] = value
+                state = self.native_edge_state(fixture)
+                with self.assertRaisesRegex(module.GateFailure, 'P-NATIVE-EDGE'):
+                    state.admit_owned_bridge_native_edge(source, dependency, target)
+                self.assertEqual(state.active_contexts, set())
+                self.assertEqual(state.context_edges, [])
+
+    def test_native_activation_does_not_admit_other_consumer_or_paths(self):
+        import copy
+        fixture = self.native_edge_fixture()
+        for owner, path in [('source', self.repo / 'widgets/Cargo.toml'),
+                            ('target', self.repo / 'other-native/Cargo.toml'),
+                            ('current', self.repo / 'widgets/Cargo.toml')]:
+            with self.subTest(owner=owner):
+                source = copy.deepcopy(fixture['by_name']['ratatui-rlvgl'])
+                target = copy.deepcopy(fixture['by_name']['ratatui-core'])
+                state = self.native_edge_state(fixture)
+                {'source': source, 'target': target, 'current': state.current}[owner]['manifest_path'] = str(path)
+                self.assertFalse(state.admit_owned_bridge_native_edge(source, fixture['dependency'], target))
+                self.assertEqual(state.active_contexts, set())
+                self.assertEqual(state.context_edges, [])
+
+    def test_native_edge_rechecks_member_and_descriptor_postimages(self):
+        fixture = self.native_edge_fixture()
+        for relative, guard in [('crates/ratatui-rlvgl/Cargo.toml', 'P-MEMBER-CHANGED'),
+                                ('vendor/ratatui/ratatui-core/Cargo.toml', 'P-MEMBER-CHANGED'),
+                                ('Cargo.toml', 'P-DESCRIPTOR-CHANGED'),
+                                ('vendor/ratatui/Cargo.toml', 'P-DESCRIPTOR-CHANGED')]:
+            with self.subTest(relative=relative):
+                path = self.repo / relative
+                before = path.read_bytes()
+                path.write_bytes(before + b'\n# Changed after policy construction.\n')
+                state = self.native_edge_state(fixture)
+                try:
+                    with self.assertRaisesRegex(module.GateFailure, guard):
+                        state.admit_owned_bridge_native_edge(fixture['by_name']['ratatui-rlvgl'],
+                                                           fixture['dependency'], fixture['by_name']['ratatui-core'])
+                    self.assertEqual(state.active_contexts, set())
+                    self.assertEqual(state.context_edges, [])
+                finally:
+                    path.write_bytes(before)
+
+    def test_native_edge_untracked_member_source_is_refused(self):
+        fixture = self.native_edge_fixture()
+        (self.repo / 'vendor/ratatui/ratatui-core/src/unexpected.rs').write_text('// Unadmitted source.\n')
+        state = self.native_edge_state(fixture)
+        with self.assertRaisesRegex(module.GateFailure, 'P-WORKSPACE-UNTRACKED'):
+            state.admit_owned_bridge_native_edge(fixture['by_name']['ratatui-rlvgl'],
+                                               fixture['dependency'], fixture['by_name']['ratatui-core'])
+        self.assertEqual(state.context_edges, [])
+
+    def test_failed_native_edge_execute_preserves_checkout_locks_and_absence(self):
+        import json
+        fixture = self.native_edge_fixture()
+        args, _ = self.native_edge_execute_args(fixture)
+        document = json.loads(args.metadata.read_text())
+        bridge = next(p for p in document['packages'] if p['name'] == 'ratatui-rlvgl')
+        next(d for d in bridge['dependencies'] if d['name'] == 'ratatui-core')['uses_default_features'] = True
+        args.metadata.write_text(json.dumps(document))
+        paths = [self.repo / 'Cargo.lock', self.repo / 'core/Cargo.lock',
+                 self.repo / 'crates/ratatui-rlvgl/Cargo.lock', self.repo / 'vendor/ratatui/Cargo.lock']
+        before = module.lock_snapshot(paths)
+        with self.assertRaisesRegex(module.GateFailure, 'P-NATIVE-EDGE'):
+            module.execute(args)
+        module.preserve_locks(before)
+        guard = json.loads((args.stage / 'inputs/ratatui-rlvgl/source-preservation.json').read_text())
+        self.assertTrue(guard['checkout_lock_hashes_and_absence_preserved'])
+        self.assertFalse((args.stage / 'inputs/ratatui-rlvgl/receipt.json').exists())
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

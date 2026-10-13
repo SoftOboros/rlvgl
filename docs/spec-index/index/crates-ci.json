@@ -4,210 +4,210 @@
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 243,
+      "line": 260,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 256,
+      "line": 273,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 309,
+      "line": 326,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 310,
+      "line": 327,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 312,
+      "line": 329,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C3"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 315,
+      "line": 332,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C4"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 317,
+      "line": 334,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 319,
+      "line": 336,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
     {
       "edge_type": "defines",
       "kind_provenance": "inferred",
-      "line": 322,
+      "line": 339,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 358,
+      "line": 375,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 361,
+      "line": 378,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 422,
+      "line": 439,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 423,
+      "line": 440,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 449,
+      "line": 466,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C4"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 449,
+      "line": 466,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C5"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 459,
+      "line": 476,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C7"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 460,
+      "line": 477,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C3"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 567,
+      "line": 584,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 567,
+      "line": 584,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 567,
+      "line": 584,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 585,
+      "line": 602,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 585,
+      "line": 602,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 603,
+      "line": 620,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 603,
+      "line": 620,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 624,
+      "line": 641,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 624,
+      "line": 641,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 624,
+      "line": 641,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 661,
+      "line": 678,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C1"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 661,
+      "line": 678,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C2"
     },
     {
       "edge_type": "cites",
       "kind_provenance": "inferred",
-      "line": 661,
+      "line": 678,
       "source": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "target": "INV-C6"
     },
@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 37,
+    "amendment": 38,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
     "rationale": 19
   },
-  "object_count": 78,
+  "object_count": 79,
   "objects": [
     {
       "attrs": {
@@ -346,7 +346,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 309,
+      "line": 326,
       "obj_id": "INV-C1",
       "text": "— No release tag without Gate P green on the same ref."
     },
@@ -362,7 +362,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 310,
+      "line": 327,
       "obj_id": "INV-C2",
       "text": "— Consumer Projects contain zero `path`/`[patch]` routes into"
     },
@@ -378,7 +378,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 312,
+      "line": 329,
       "obj_id": "INV-C3",
       "text": "— Playit verb set is frozen vocabulary (Standards Action per"
     },
@@ -394,7 +394,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 315,
+      "line": 332,
       "obj_id": "INV-C4",
       "text": "— Snapshot comparisons always carry an explicit threshold;"
     },
@@ -410,7 +410,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 317,
+      "line": 334,
       "obj_id": "INV-C5",
       "text": "— No CI job for this initiative requires a display server or"
     },
@@ -426,7 +426,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 319,
+      "line": 336,
       "obj_id": "INV-C6",
       "text": "— `cargo package` artifacts consumed by Gate P are built from"
     },
@@ -442,7 +442,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "invariant",
-      "line": 322,
+      "line": 339,
       "obj_id": "INV-C7",
       "text": "— Layer W's stdout handshake string `PLAYIT_READY tcp://…` is"
     },
@@ -468,8 +468,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 398,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@398",
+      "line": 415,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@415",
       "text": "**2026-06-10** — Initial draft (CRATES-CI-00). Gate topology (§5),"
     },
     {
@@ -494,8 +494,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 404,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@404",
+      "line": 421,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@421",
       "text": "**2026-06-10** — **RATIFIED** by owner. CLAUDE.md applicability list and"
     },
     {
@@ -520,8 +520,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 407,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@407",
+      "line": 424,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@424",
       "text": "**2026-06-10** — §6 amended during CRATES-CI-01 validation (per §6.4):"
     },
     {
@@ -546,8 +546,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 419,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@419",
+      "line": 436,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@436",
       "text": "**2026-06-10** — CRATES-CI-02 landed: `consumers/user-sim/` (custom"
     },
     {
@@ -572,8 +572,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 441,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@441",
+      "line": 458,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@458",
       "text": "**2026-06-10** — CRATES-CI-03 landed: Layer K via"
     },
     {
@@ -598,8 +598,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 453,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@453",
+      "line": 470,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@470",
       "text": "**2026-06-10** — CRATES-CI-04 landed: Layer W. New root-crate feature"
     },
     {
@@ -624,8 +624,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 473,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@473",
+      "line": 490,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@490",
       "text": "**2026-06-10** — CRATES-CI-05 landed: Gate R."
     },
     {
@@ -650,8 +650,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 483,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@483",
+      "line": 500,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@500",
       "text": "**2026-06-10** — CRATES-CI-01a: two Gate P blind spots closed after"
     },
     {
@@ -676,8 +676,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 498,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@498",
+      "line": 515,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@515",
       "text": "**2026-06-10** — CRATES-CI-01a amendment: the two asset-bearing"
     },
     {
@@ -702,8 +702,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 509,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@509",
+      "line": 526,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@526",
       "text": "**2026-06-10** — CRATES-CI-06: initiative retrospective drafted at"
     },
     {
@@ -728,8 +728,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 515,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@515",
+      "line": 532,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-06-10@532",
       "text": "**2026-06-10** — Post-close amendment (owner request): pre-publish"
     },
     {
@@ -754,8 +754,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 528,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@528",
+      "line": 545,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@545",
       "text": "**2026-07-12** — SCTD-04 release amendment: Gate P and the publish chain"
     },
     {
@@ -780,8 +780,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 535,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@535",
+      "line": 552,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@552",
       "text": "**2026-07-12** — SCTD-04 Gate P validation amendment: packaging the bridge"
     },
     {
@@ -806,8 +806,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 543,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@543",
+      "line": 560,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@560",
       "text": "**2026-07-12** — Gate P host-target amendment: the creator-cli and user-sim"
     },
     {
@@ -832,8 +832,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 548,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@548",
+      "line": 565,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-12@565",
       "text": "**2026-07-12** — Gate P packaged-lock amendment: every Gate P consumer now"
     },
     {
@@ -858,8 +858,8 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 553,
-      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-13@553",
+      "line": 570,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#2026-07-13@570",
       "text": "**2026-07-13** — Trusted Publishing amendment (owner direction): the 403 on"
     },
     {
@@ -889,7 +889,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 563,
+      "line": 580,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.0",
       "text": "Records ERRATA-001 and proposes CRATES-CI-01b isolated packaging; §6 remains unchanged pending exact mechanism disposition."
     },
@@ -905,7 +905,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 563,
+      "line": 580,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.0-rationale",
       "text": "The core/bridge deferral hides an unpublished predecessor needed by later\npackages, while restoring it in the live root produces duplicate source\nidentities. [The drafted correction](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md)\nspecifies archive/manifest equivalence, predecessor negative controls and\ncomplete consumer proof. [ERRATA-001](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md) remains pending ratification.\nConsidered and rejected: reducing dependency minima, live-source fallback,\nor counting a partial run as Gate P. The effective mechanism, clean-source\nrule, metadata/drift checks, release gate and owner decision remain unchanged."
     },
@@ -935,7 +935,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 581,
+      "line": 598,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.1",
       "text": "Records ERRATA-002 and proposes frozen-source, same-ref Gate P for continuation; effective workflow and §5 remain unchanged."
     },
@@ -950,7 +950,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 581,
+      "line": 598,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.1-rationale",
       "text": "The continuation resolves a release tag but executes its publisher against the\nworkflow revision without a Gate P dependency. The\n[concrete review packet](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-continuation-wave3.md) separates helper\nmaintenance from package-source qualification and retains all consumers/OIDC\nrequirements. [ERRATA-002](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md) awaits owning disposition. A static/local\nfixture pass does not replace full Gate P or provider execution. Updating only\nthe helper while packaging unqualified later crate sources was rejected as a\nsolution to the owner's one-candidate requirement."
     },
@@ -980,7 +980,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 599,
+      "line": 616,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.2",
       "text": "Owner accepts frozen-source same-ref Gate P for continuation and removes its timed publishing trigger."
     },
@@ -995,7 +995,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 599,
+      "line": 616,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.2-rationale",
       "text": "The owner agreed to decision 1 and directed that timed publishing runs are no\nlonger needed. This ratifies the source/gate correction proposed in 0.1.1,\nadds manual-only continuation, and preserves separate helper identity. The\npublisher has no local five-crate cutoff; this amendment does not assume removal\nof registry-side rate limits. Existing HTTP 429 diagnostics and indexing waits\nremain. Gate R's existing daily verification schedule remains independent, and its\npost-publish trigger follows successful primary and continuation runs.\n[The decision receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-continuation-decision.md) records the\nimplementation and bounded checks. ERRATA-002's owner question is settled;\nprovider execution and full Gate P remain verification gates. ERRATA-001 and\nits staging-mechanism decision are unchanged."
     },
@@ -1026,7 +1026,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 620,
+      "line": 637,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.3",
       "text": "Owner accepts detached-packaging direction with original manifests and Cargo-owned normalization; exact lock mechanism awaits equivalence and final ratification."
     },
@@ -1042,7 +1042,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 620,
+      "line": 637,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.3-rationale",
       "text": "Decision 2 was accepted with its stated remaining lock-resolution condition.\n[CRATES-CI-01b](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md) records those accepted\nconstraints. [The follow-up receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-decision.md)\nrecords the bounded experiment. No dependency minimum, live-source fallback,\narchive member or failed lock comparison is waived. Effective §6 remains\nunchanged until the detailed mechanism is ready for final ratification."
     },
@@ -1070,7 +1070,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 636,
+      "line": 653,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.4",
       "text": "Owner makes bounded real source graph admission effective before detached packaging; extracted-only verification, predecessor routing and all release gates remain required."
     },
@@ -1083,7 +1083,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 636,
+      "line": 653,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.4-rationale",
       "text": "The owner accepted recommendations 1–6 on 2026-10-10 and authorized parallel\nimplementation. This adopts the exact admission boundary proposed in\n[the October 7 mechanism packet](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-mechanism.md) for\n[ERRATA-001](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/ERRATA.md). The historical core trial separated Cargo's loading of\nreal path-only dev dependencies from its normalized package graph; its all-member\ncomparison and missing extracted-API control are recorded in\n[the historical receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-packaging-wave4.md). Those transcript-\nrecovered observations are historical evidence, not fresh qualification of the\nrestored candidate or recovered raw archives.\n\nConsidered and rejected: suppressing extracted core/bridge entries, replacing\nreal dependency manifests, lowering version minima, removing a source lock to\nmake a trial succeed, and allowing consumer paths into the source admission\ngraph. Each hides the original resolution or distribution defect. Cargo retains\nownership of inventory, normalization, archive generation and external input-\ngraph lock updates. Original manifests and checkout locks remain preserved.\nThis changes §6's deferral mechanism, not INV-C1, INV-C2 or INV-C6, the release\nset/order, selective versions, asset preparation, metadata/content-drift checks,\nclean-source refusal, the three consumers, provider CI or publication authority.\nImplementation is authorized against this ratified concepts amendment. The\n[01B execution plan](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md) remains Draft with its\nremaining acceptance gates open; this entry is not its ratification or Gate P."
     },
@@ -1111,7 +1111,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 668,
+      "line": 685,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.5",
       "text": "Owner authorizes the enumerated real root and nested Ratatui descriptor/member contexts solely for Cargo archive preparation, preserving extracted predecessors and admission-free verification/consumers."
     },
@@ -1124,7 +1124,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 668,
+      "line": 685,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.5-rationale",
       "text": "The owner accepted both latest recommendations on October 10 local time after the bounded\nexecution stopped on Ratatui's inherited descriptor. The exact frontier and two\ndispositions are recorded in [that receipt](https://github.com/SoftOboros/rlvgl/blob/a2b48e108ae9e0623d2bb6217cef73f0113e8708/docs/releases/v0.2.7-staging-20261010.md).\nThis amendment is recorded before governing implementation. Root and nested\nRatatui are the only additional workspace contexts authorized: their actual\ndescriptor bytes and finite actual member/target contexts must be enumerated\nbefore preparation. Cargo, rather than fabricated ancestors or flattened\ninheritance, interprets those inputs and generates normalized archives. Any\nunexpected workspace or additional source requirement stops for a new owning\ndecision; this is not recursive workspace admission.\n\nConsidered and rejected: continuing the previous fail-closed diagnostic as if\nfull staging passed, omitting bridge/root from the publishable set, inventing an\nancestor, rewriting inherited values, bypassing a predecessor through original\nsource or registry, and assigning the outer AA Git identity to nested ED source.\nThe selected disposition preserves real manifests, payload inventories/targets,\nactual nested Git provenance including dirty overlays, and every checkout lock's\nbytes or absence. Source admission is solely for archive preparation, must become\nunavailable before normalized verification and consumers, and does not waive\nclean-source, asset, metadata/drift, full-set, three-consumer or Linux CI gates.\nThe 01B plan remains Draft. A frozen hashed uncommitted candidate permits local\ndiagnostics; it is not a clean release ref or authorization to create a source\ncommit before the remaining CLAUDE prepublish gates pass."
     },
@@ -1152,7 +1152,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 701,
+      "line": 718,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.6",
       "text": "Owner admits only the already approved BSP clock-ownership regression target into the finite root archive-preparation context."
     },
@@ -1165,7 +1165,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 701,
+      "line": 718,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.6-rationale",
       "text": "The owner accepted the one-target staging recommendation on October 11 local\ntime after the unchanged workspace guard refused the new Cargo-discovered\nintegration test. This amendment is recorded before governing implementation.\nOnly `tests/bsp_clock_ownership.rs` in the root `rlvgl` member is additionally\nadmitted, with SHA256\n`02e67e0539fa9f86d41d2d4f349deca56c6bc0a1513950c9759a24a0925d153e`.\nIt supplies the separately approved BSP null-owner regression coverage.\nThe actual root and nested Ratatui descriptor bytes, original manifest/shared\nfile fingerprints, and 47/43 member sets remain unchanged. Governing finite\ncontext implementation SHALL enumerate only this additional target. Every\nother unexpected descriptor, member, target or source requirement remains an\nowning-decision stop.\n\nConsidered and rejected: removing or hiding the approved regression test,\nautomatically admitting future Cargo-discovered targets, or disabling the\nunchanged fail-closed target guard. Those bypass the finite admission boundary.\nOriginal Cargo inventories and normalization, progressive extracted\npredecessors, withdrawal of admission inputs before normalized verification\nand all consumers, genuine nested Git/overlay provenance, checkout lock bytes\nor absence, clean release-ref, metadata/drift, normal asset preparation,\nfull ordered publish set, all three consumers and Linux same-ref/provider\ngates remain required. Root/core allocation remains 0.2.7; this amendment does\nnot ratify the Draft 01B execution plan or establish Gate P/publication readiness."
     },
@@ -1194,7 +1194,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 734,
+      "line": 751,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.7",
       "text": "Records the accepted RLVGL-owned bridge migration and its exact"
     },
@@ -1208,7 +1208,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 734,
+      "line": 751,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.7-rationale",
       "text": "The owner accepted PCDN-07 and the migration plan, then authorized the owned\nbridge/fonts, compatibility and Stage/publisher integration slices. This entry\nrecords that accepted scope before adoption through protected PRs. It supersedes\nthe current nested-bridge discovery and 47/43 context allocation; earlier dated\nentries retain their historical scope.\n\n`ratatui-rlvgl` is the regular root workspace member at\n`crates/ratatui-rlvgl/Cargo.toml`, discovered exactly once through root metadata.\nIts archive includes the four existing packed font variants and their notices.\nThe official Ratatui 0.30.2 source is pinned, unmodified, to commit\n`e665c36cb14752a61cd777fbd06dbef8474f2add`, tree\n`cc2e7266ebf5e17f9250ef2d7bab1222dc62150f`. Its native core retains its genuine\nnested workspace and Git provenance; that context does not add another bridge\nor native crate to the RLVGL publish list.\n\nActual locked Cargo metadata enumerates exactly 48 root members and 42 native\nmembers. `scripts/crates_ci_workspace_contexts.json` fingerprints their actual\ndescriptors, member manifests, targets and inherited shared files; its accepted\ninventory SHA256 is\n`c757a5affa3761214abbddcc1cf9aa14d01a10c9c1232808cf39585a5a9a9f1c`.\nThe root descriptor SHA256 is\n`ddb1ee0b32907519e0bf804b158e2494090e1b14b634868b0efb4f63776a2c3e`;\nthe native descriptor SHA256 is\n`a5007fe4cb0d9901302c5eb201941dcec82755370917144e312d2bfe9e5a6567`.\nThese are finite inventories for this candidate, not permission to discover\nand admit future descriptors, members, targets or sources automatically.\n\nThe existing 31-crate order is unchanged, with core immediately before the\nbridge. Selective candidate versions are bridge 0.1.2 and root 0.2.8; core\nremains 0.2.7 and the other published packages retain their existing versions.\nReleased A2/v0.2.7 and original parent pins remain unchanged. The future release\nidentity requires separate admission.\n\nProgressive extracted predecessors, absence of source fallback, withdrawal of\npreparation inputs before normalized verification and consumers, actual nested\nGit/dirty-overlay provenance, checkout lock bytes or absence, clean-source\nrefusal, metadata/content drift, normal asset preparation, the full ordered set,\nall three existing consumers, full source validation and Linux same-ref/provider\ngates remain required. Existing failed results remain open; this amendment does\nnot ratify Draft 01B, waive a guard, qualify Gate P or authorize publication.\nThe governing amendment follows the protected amendment-first PR route before\nbehavior adoption. Any unexpected requirement stops for an owning decision."
     },
@@ -1236,7 +1236,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 787,
+      "line": 804,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.8",
       "text": "Owner admits the existing platform member's version fingerprint"
     },
@@ -1249,7 +1249,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 787,
+      "line": 804,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.8-rationale",
       "text": "The owner accepted the named snapshot correction in SCTD-04 §15 0.1.1 and its\nmandatory `rlvgl-platform` 0.2.6 to 0.2.7 allocation. The snapshot is shipped in\nthe immutable published 0.2.6 archive; changing it at that version would violate\nP-DIFF. Only `platform/Cargo.toml`'s already-enumerated member fingerprint may\nchange in `scripts/crates_ci_workspace_contexts.json`, computed from the actual\ncandidate bytes and verified against locked Cargo metadata before execution.\nRecord and freeze the resulting policy identity. Root/native descriptor bytes,\n48/42 member sets, targets and inherited shared files remain unchanged.\nPrior dated fingerprints and failed results retain their historical scope.\n\nThe actual platform manifest SHA256 for this allocation is\n`27ac01c83570036e437abd7f9b60eb74f1bba0358c568f06a634a4918ff07e61`.\nThe resulting finite-context policy SHA256 is\n`460242ed77e45a8115dac0474f6a6e6d83170257843f23ccd5dbfbeb81aa8a1c`;\nlocked root/native metadata verifies the unchanged 48/42 inventories.\n\nCargo may regenerate only the necessary platform-version entries in the root\nand IDF candidate locks before they are frozen for validation; no unrelated\ndependency-resolution churn or manual lock editing is admitted. All other six\nactive locks, including official Ratatui's, remain exact. Bridge 0.1.2 and root\n0.2.8 retain their accepted allocation; core stays 0.2.7 and other published\nversions and dependency minima remain unchanged.\n\nNo additional descriptor/member/target, source fallback, diagnostic normalization,\nfixture refresh or guard waiver is granted. The full 31-crate order, extracted\npredecessors, unavailable preparation inputs before verification/consumers,\nactual nested provenance, runtime source-lock preservation, clean-source,\nmetadata/drift, full source validation, same-ref/protected PR, Linux Gate P,\nall consumers and publication/Gate R gates remain required. This amendment is\nrecorded before the correction; adoption uses the established protected\namendment-first route. It does not establish a passing gate or authorize a\nrelease identity, publication or parent-pin change. Stop for any new PCDN."
     },
@@ -1277,7 +1277,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 830,
+      "line": 847,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.9",
       "text": "Owner admits a finite changed-document link result for this owned"
     },
@@ -1290,7 +1290,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 830,
+      "line": 847,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.9-rationale",
       "text": "The owner accepted PCDN-09 after the unchanged `scripts/check-links.sh` returned\nexit 1, without a timeout: 9,535 checks, 6,429 unique checks, 9,270 successful\nchecks and 255 errors across 105 inputs. All failed input bodies are byte exact\ntheir genuine current owner HEAD: 24 unchanged A2 root inputs, one chips-child\ninput, 68 vendor inputs and 12 tracked Ruby-bundle inputs. The actual failed\nreceipt, error inventory, source identities and earlier negative results SHALL\nremain retained as an OPEN documentation follow-up. The separate four-document\ndiagnostic passed all 23 checks; it did not qualify the failed whole-tree guard.\n\nThis admission applies only to the current RLVGL-owned Ratatui migration and\nPCDN-08 candidate, anchored to its prior 44-path source freeze SHA256\n`65daac9de90e4549692372fb89cd197c7b868150c13f2c7950638b6e29df6169`.\nBefore documentation adoption through protected PRs, freshly run the unchanged\n`lychee --no-progress` executable on every document in this exact finite set:\n\n- `AGENTS.md`, including its owning candidate-specific crossreference;\n- `docs/concepts/RATATUI-00-CONCEPTS.md`;\n- `docs/concepts/SCTD-04-RATATUI-RLVGL-INTEGRATION.md`;\n- `docs/crates-ci/CRATES-CI-00-CONCEPTS.md`, including this amendment;\n- `crates/ratatui-rlvgl/README.md`.\n\nAll five documents SHALL pass actual checks with no added filters, exclusions,\nfabricated responses or ignored failures. Freeze their actual hashes and modes\nand retain the actual command and receipt. Any additional Markdown edit or new\nerror is an owning-decision stop. Regenerate affected spec-index projections\nwith the unchanged canonical generator; do not edit generated files by hand.\nThe existing checker script remains unchanged, and its inherited whole-tree\nresult remains FAIL rather than an all-green receipt. Outside this exact\ncandidate-specific admission, the normal whole-tree instruction still applies.\n\nOfficial Ratatui 0.30.2 remains unmodified at `e665c36cb14752a61cd777fbd06dbef8474f2add`.\nReleased A2/v0.2.7 and original parent pins remain unchanged. Selective versions\nremain bridge 0.1.2, platform 0.2.7 and root 0.2.8; core remains 0.2.7, with no\nother package allocation, dependency, source, fixture, API or compiler change.\nThe full source and remaining BSP/C3 checks, clean-source refusal, P-VCS,\nP-META, P-SOURCE-LOCK, P-DIFF, the full 31-crate order, extracted predecessors,\nwithdrawal of preparation inputs before verification and consumers, genuine\nnested provenance, all three consumers and the owned bridge boundary remain\nrequired. No source fallback or automatic descriptor/member/target admission\nis granted. Protected amendment-first source PRs, same-ref clean Linux Gate P,\nseparately admitted release identity/publication/Gate R and parent adoption\nremain distinct gates. This amendment does not qualify those gates or close\nthe inherited link failures. Stop for any new PCDN."
     },
@@ -1318,7 +1318,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 884,
+      "line": 901,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.10",
       "text": "Owner admits one exact documentation-only protected amendment PR"
     },
@@ -1331,7 +1331,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 884,
+      "line": 901,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.10-rationale",
       "text": "The owner accepted PCDN-10 to preserve two separate protected PRs. The governing\ninvariant amendments SHALL be adopted first; a fully qualified implementation\nPR follows from the exact adopted main commit. The admission is confined to\none documentation-only amendment PR based on genuine main\n`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2`, refreshed before any ref mutation.\nAn unexpected base, authored input, source requirement or failure is an owning\ndecision stop, not permission to rebase or widen this boundary automatically.\n\nThe retained actual `scripts/pre-commit.sh` run failed with exit 101 after\n300.248 seconds: 13 of 14 compile-fail cases passed, and `scanout_front_write`\ndiffered only in the diagnostic `FrontBuffer` lifetime spelling. That run used\nmain `77ac0bf3876f5c732946ed478c2e0d85d3f94e35` plus the accepted Kria manifest\npostimage that became b64. Its entire platform tree and compiled source are\nunchanged on b64; fixture program, expected diagnostic, harness and typed API\nhashes match, as do the compiler binaries and host runtime library bytes.\nThis is retained actual-source causal proof, not a fresh passing main run.\nThe failed receipt and source identities SHALL remain OPEN and immutable.\n\nFor this one amendment PR only, the owner admits that exact inherited failed\npre-commit result in place of the otherwise required successful pre-commit\nprerequisite. Its authored diff SHALL contain exactly the five Markdown paths\nenumerated in amendment 0.1.9, including this disposition and the matching\nAGENTS crossreference. Refreeze all five actual postimage hashes and modes,\nfreshly run `lychee --no-progress` on all five without added filters or ignored\nerrors, and prove that all compiled source, fixtures, manifests, versions,\nlock bytes or absence, nested pins and release/parent refs remain unchanged\noutside those five documentation paths. Review complete main-to-postimage\ndocument differences; do not apply A2 patches blindly. The README may stage\nthe future carrier's documentation, but no bridge manifest, code, fonts or\nother implementation input belongs in this PR.\n\nGenuine b64 has no spec-index source or projections. No partial or transplanted\nindex, scanner or extra tool source is admitted in the documentation PR. Keep\nthe actual complete candidate's canonical index proof tied to that candidate.\nAdopt and regenerate the already-approved complete A2 index and generator with\nthe later coherent source PR. Normal protected PR/squash rules remain required;\nno admin bypass, force update or retagging is authorized. The docs-only\nexception expires at adoption or any additional source/profile/error\nrequirement, and never applies to the following implementation PR.\n\nThe implementation PR SHALL preserve the adopted five Markdown postimages and\ncompose coherent A2 plus the approved owned bridge and PCDN-08 correction. All\nnormal source checks, remaining C3 checks, full pre-commit/prepublish, genuine\nsource history, metadata, checkout locks, source/content drift, P-DIFF, full\n31-crate order, extracted predecessors, withdrawal of preparation inputs,\nall three consumers and the owned bridge/font boundary remain required before\nsource adoption and clean-ref Linux Gate P qualification. No original-source\nfallback or automatic descriptor/member/target admission is granted.\n\nOfficial Ratatui 0.30.2 remains unmodified; released A2 and original parent pins\nremain unchanged. Bridge 0.1.2, platform 0.2.7 and root 0.2.8 retain their\nselective allocation, core remains 0.2.7, and other versions stay unchanged.\nPCDN-09's inherited whole-tree link failures remain OPEN. This admission makes\nno compiled/provider-green, Gate P, registry, release, hardware or parent\nqualification claim. New release identity, publication/Gate R and parent\nadoption remain separate decisions. Stop for any new PCDN."
     },
@@ -1359,7 +1359,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 951,
+      "line": 968,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.11",
       "text": "Keep the exact five-Markdown governing PR and correct only its"
     },
@@ -1372,7 +1372,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 951,
+      "line": 968,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.11-rationale",
       "text": "The owner accepted the bounded historical-link correction and requested a\nrelease-documentation review for new features and necessary decisions before\nrelease. The fresh unfiltered five-document check on genuine main\n`b64ec7ec7dda87f2d30f3160bf2fb8094fd3fee2` failed: 26 checks, 18 unique,\n11 passed and 15 missing-file occurrences named ten absent Markdown targets.\nThe retained failed result SHALL remain OPEN and immutable. A read-only local\nprerequisite inventory reached 30 additional released-A2 Markdown documents,\na required 31st, six unvisited bodies and a host-local HTML prerequisite. That\ninventory is not a closed import set and SHALL NOT be transplanted as one.\n\nFor this one protected governing PR, retain exactly the five Markdown paths\nadmitted by 0.1.9 and 0.1.10. Only the following 15 historical href occurrences\nSHALL use the GitHub blob view in `SoftOboros/rlvgl`, pinned to the full\nreleased-A2 commit `a2b48e108ae9e0623d2bb6217cef73f0113e8708` and their exact\ntracked target paths. Preserve each link label and its surrounding decision:\n\n- `docs/concepts/RATATUI-00-CONCEPTS.md`: one link to\n  `docs/concepts/RATATUI-RETROSPECTIVE.md`.\n- `docs/concepts/SCTD-04-RATATUI-RLVGL-INTEGRATION.md`: one link each to\n  `docs/concepts/RATATUI-RETROSPECTIVE.md` and\n  `docs/releases/v0.2.7-demo-evidence.md`.\n- This document: three links each to\n  `docs/crates-ci/CRATES-CI-01B-STAGING-ISOLATION.md` and\n  `docs/crates-ci/ERRATA.md`; one link each to\n  `docs/releases/v0.2.7-continuation-decision.md`,\n  `docs/releases/v0.2.7-continuation-wave3.md`,\n  `docs/releases/v0.2.7-packaging-wave4.md`,\n  `docs/releases/v0.2.7-staging-20261010.md`,\n  `docs/releases/v0.2.7-staging-decision.md` and\n  `docs/releases/v0.2.7-staging-mechanism.md`.\n\nThose URLs identify historical A2 documents, not adopted main implementation\nor repaired historical document internals. Do not rewrite labels, delete\nhistory, import the unclosed prerequisite chain or amend released A2. Record\nthis disposition and the matching AGENTS crossreference before adopting the\nnew five postimages; refreeze their hashes and modes and review the complete\nmain-to-postimage differences. No other Markdown path, scanner, index,\nimplementation input, manifest, font, lock, version or gitlink belongs in the\ngoverning PR. The complete canonical candidate index remains candidate proof\nand belongs with the later coherent implementation PR.\n\nA fresh actual `lychee --no-progress` run on all five SHALL pass, without added\nfilters, exclusions or ignored errors. HTTP availability diagnostics do not\nreplace that check; a failed destination requires a stop, not a missing-link\nor HTTP-status waiver. Retain every prior failed receipt. Run the unchanged\nliteral formatting commands and prove compiled source, fixtures, manifests,\nversions, modes, locks or absence, nested pins and release/parent refs unchanged\noutside the five. Unexpected base drift, input, source/profile requirement,\nnew error or new normative feature decision SHALL stop for an owning PCDN.\n\nRetain 0.1.10's exact inherited main pre-commit failure as OPEN for this one\ngoverning PR only. Keep the normal protected amendment-first PR/squash route,\nwith no admin bypass, force update or retagging. The exception expires at\nadoption or any additional unapproved requirement and never transfers to the\nfollowing implementation PR. Review release documentation against accepted\nfeature decisions and actual source; do not silently ratify Draft phases,\nclose missing evidence or assert hardware, consumer or publication readiness.\n\nOfficial Ratatui 0.30.2 remains unmodified, released A2 and original parent pins\nremain unchanged, and selective versions remain bridge 0.1.2, platform 0.2.7,\nroot 0.2.8 and core 0.2.7 with other packages unchanged. All normal following\nsource, complete index, full pre-commit/prepublish, P-VCS, P-META,\nP-SOURCE-LOCK, P-DIFF, 31-crate order, extracted-predecessor withdrawal,\nthree-consumer and bridge/font boundaries remain required. Clean-ref Linux\nGate P, separately admitted release identity/publication/Gate R and parent\nadoption remain distinct gates. PCDN-09 inherited whole-tree link failures and\nother retained failures remain OPEN. Stop for any new PCDN."
     },
@@ -1400,7 +1400,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 1030,
+      "line": 1047,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.12",
       "text": "Admit the exact eleven-file factual release-documentation refresh,"
     },
@@ -1413,7 +1413,7 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "rationale",
-      "line": 1030,
+      "line": 1047,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.12-rationale",
       "text": "The owner accepted PCDN-12 after the bounded public-feature and family review.\nIt found stale fork dependencies/imports/paths, missing owned compatibility and\nportable-atomic guidance, mismatched font metrics in examples, dated version\nnavigation and imprecise native-versus-interpreter snapshot status. The review\nselected factual documentation corrections, not new feature behavior, phase\nratification, a release identity or a registry-availability claim.\n\nThe exact authored cleanup set SHALL be:\n\n- `crates/ratatui-rlvgl/README.md`;\n- `docs/ratatui-tutorial/README.md`;\n- `docs/ratatui-tutorial/01-backend-and-surface.md`;\n- `docs/ratatui-tutorial/02-rendering-cells.md`;\n- `docs/ratatui-tutorial/04-live-state.md`;\n- `README.md`;\n- `docs/CHANGELOG.md`;\n- `docs/releases/owned-bridge-maintenance.md`;\n- `docs/releases/v0.2.7-successor-family-state-20261013.md`;\n- `docs/releases/v0.2.7.md`; and\n- `docs/concepts/MPY-04-STAGE-DIRECTIONS-INTROSPECTION.md`.\n\nKeep the first governing PR at exactly the five Markdown paths enumerated in\n0.1.9. Finalize the owned bridge README's self-contained future-carrier\nmigration documentation, including its corrected font-metrics example, before\nfreezing that governing PR. Record this amendment and matching AGENTS authority\nfirst. Its main carrier SHALL NOT link to later documentation absent from main.\nRefreeze and review all five postimages and freshly pass their unchanged,\nunfiltered actual link command, literal formatting and source preservation.\nKeep 0.1.10's exact inherited main pre-commit failure OPEN for this governing\nPR only; no other failed result is admitted there.\n\nThe other ten authored cleanup paths belong only in the later coherent\nimplementation PR with complete accepted A2 source/docs/index and the owned\nbridge implementation. That PR SHALL preserve all five adopted governing\npostimages. Explain official unmodified Ratatui 0.30.2 separately from native\ncore 0.1.2, native imports, the owned compatibility subset and target portability\nlimits. Do not add widget behavior, hardware assumptions, font repertoire or\nrendering defaults merely to retain obsolete examples. Use Unreleased for the\nmaintenance guide and distinguish prepared package allocations from registry\navailability. Add dated successor navigation; retain historical observations,\nsource identities, tables, measurements and failed receipts.\n\nFor this exact candidate, extend 0.1.9's changed-document admission to exactly\nfifteen distinct Markdown paths: its original five union the eleven paths above,\nwith the bridge README overlapping. Every touched postimage SHALL freshly pass\nunchanged `lychee --no-progress`, without added filters, exclusions, fabricated\nresponses or ignored failures. Retain the actual inherited whole-tree failure\nas FAIL and OPEN; keep the checker unchanged. Freeze actual hashes and modes,\nregenerate only affected projections with the unchanged canonical generator,\nand extend the finite freeze to the authored inputs and changed projections.\nDo not transplant index/generator source into the governing PR. Any additional\npath, unexpected source/profile requirement, base drift or new error SHALL stop\nfor an owning PCDN; this is not general documentation or dependency admission.\n\nThe staging receipt already fingerprints both edited READMEs. Admit only the\nreviewed, frozen postimage SHA-256 values at these two existing JSON pointers\nin `scripts/crates_ci_workspace_contexts.json`, in the later source PR:\n\n- `/workspaces/0/members/0/shared_files/0/sha256`, for `README.md`, replacing\n  `009a30632167019925ca7c38889eac1d9301ebf3f40ddc4e3885aa66ee8bda2a`;\n- `/workspaces/0/members/14/shared_files/0/sha256`, for the owned bridge README,\n  replacing `7491acc1c1b72ab08e5d147cb62149f847ebd1241a12d28376a5a1c7d59d9710`.\n\nEvery other receipt value SHALL be structurally exact: same workspace identities,\ndescriptor hashes, paths, members, manifest hashes, target contexts, other shared\nhashes and finite root48/native42 contexts. Keep staging/package checker code\nunchanged. No automatic receipt refresh, wildcard, profile widening, new\nworkspace/descriptor/member/target, original-source fallback or baseline ratchet\nis authorized. The README postimage admission does not itself qualify staging:\nfresh full package/source-content/P-DIFF/predecessor/withdrawal/three-consumer\nand same-ref Linux Gate P proof remains mandatory at its applicable gate.\n\nDo not edit unchanged published core README/docstrings or other unchanged\npackage payloads; no code, manifest, font, lock, version, gitlink or accepted\nfeature contract change belongs in this refresh. The two documentation-derived\nreceipt hash values are the sole additional non-Markdown authored input change.\nNative snapshot documentation does not qualify wire/interpreter/cross-driver\nor board surfaces. MPY-06/07 remain unratified; MPY-08/09 and staging01B remain\nDraft. Preserve producer production0.4.2 pins, unknown absent HSE frequency,\nCCPS-specific validation and all independent hardware/provider obligations.\n\nOfficial Ratatui 0.30.2, released A2 and original parent pins remain unchanged.\nKeep bridge0.1.2, platform0.2.7, root0.2.8 and core0.2.7 selective allocations,\nwith other versions unchanged. All normal source, formatting, full pre-commit\nand prepublish, P-VCS, P-META, P-SOURCE-LOCK, content/P-DIFF, full31 order,\nextracted predecessors, withdrawal, three consumers and protected amendment-first\nPR/squash guards remain required. New release/tag identity, publication/Gate R\nand parent adoption remain separately admitted decisions after their gates.\nNo admin bypass, force update, retagging, failure relabeling or hardware readiness\nclaim is granted. Stop for any new PCDN."
     },
@@ -1441,9 +1441,37 @@
       "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
       "family": "crates-ci",
       "kind": "amendment",
-      "line": 1132,
+      "line": 1149,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.13",
       "text": "Admit the exact retained hosted diagnostic spelling failures for"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's acceptance of PCDN-14",
+        "change_kind": "semantic",
+        "chronological_rank": 31,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-13",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.14",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Activate only the existing owned-bridge to native-core preparation",
+        "touches": [
+          "§6 finite preparation activation and the protected amendment boundary"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1224,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.14",
+      "text": "Activate only the existing owned-bridge to native-core preparation"
     },
     {
       "attrs": {
