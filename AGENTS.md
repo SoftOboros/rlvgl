@@ -225,6 +225,27 @@ targets, fonts, A2, unmodified official Ratatui, all other allocations and paren
 pins. No generic lint allowance, API redesign, additional nightly cleanup,
 release/tag/publication, hardware or phase claim follows. Stop for a new PCDN.
 
+Owner-accepted PCDN-19 admits only [CRATES-CI §15 amendment 0.1.18](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Use the const-safe slice pattern only in ResolvedObjectDispatch::target_view;
+preserve its public const signature, last cached view and exact empty panic.
+Introduce no lint allowance, expectation, language feature or compiler floor.
+Add controls only in the existing inline object test module and preserve all
+original tests; const-callability is not allocated Vec CTFE qualification.
+Allocate only the corrected future core payload as 0.2.8; retain published
+core 0.2.7/A2, API 0.2.2 and every other allocation and dependent minimum.
+Admit only the core manifest fingerprint at policy member13 and local core
+version nodes in root and IDF component locks; keep other values/checksums
+and the other six locks exact. Record this governing amendment/mirror before
+implementation, then regenerate only the unchanged-generator two canonical
+outputs. This is the exact nine-path protected integration boundary, without
+an authority waiver or dated-result substitution. Retain the actual Clippy
+failure OPEN; require fresh most-recent same-ref full source/prepublish,
+const/core/API controls, strict fourteen cases, publisher/cohort controls,
+clean Linux and hosted31+3, exact provenance and normal protected adoption.
+Preserve 48/42 policy, targets, shared receipts, Ratatui, fonts, A2, frozen
+623/13df sources/results, parent pins and all other guards. No tag, publication,
+parent adoption, hardware or phase claim follows. Stop for any new PCDN.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

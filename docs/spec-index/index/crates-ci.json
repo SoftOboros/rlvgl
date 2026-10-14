@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 41,
+    "amendment": 42,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
     "rationale": 19
   },
-  "object_count": 82,
+  "object_count": 83,
   "objects": [
     {
       "attrs": {
@@ -1556,6 +1556,34 @@
       "line": 1440,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.17",
       "text": "Preserve the exposed wire iterator with one exact lint expectation,"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's PCDN-19 acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 35,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.18",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Use a const-safe slice pattern in the target view, preserve its public",
+        "touches": [
+          "§5 newest-nightly const dispatch compatibility and selective core allocation"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1514,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.18",
+      "text": "Use a const-safe slice pattern in the target view, preserve its public"
     },
     {
       "attrs": {

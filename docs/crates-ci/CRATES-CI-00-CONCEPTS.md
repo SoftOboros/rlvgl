@@ -1510,3 +1510,88 @@ generic lint allowance, further nightly cleanup, new release identity, registry
 publication, parent adoption, hardware qualification or phase ratification is
 granted. Any additional failure, source/profile requirement or scope drift stops
 for another owning PCDN.
+
+### 0.1.18 — 2026-10-14 — amended
+
+**Author:** Codex, recording I. Abbott's PCDN-19 acceptance
+**Change kind:** semantic
+**Touches:** §5 newest-nightly const dispatch compatibility and selective core allocation
+**Summary:** Use a const-safe slice pattern in the target view, preserve its public
+contract and allocate only the corrected future core payload as 0.2.8.
+
+The owner accepted PCDN-19 after genuine source
+62357e8e99b6369be97b8d6b20346d7248a9352f passed latest-nightly read-only
+formatting, all three full locked metadata graphs, all 67 API golden tests,
+all fourteen strict snapshots and strict discipline, then failed workspace
+Clippy with -D warnings at core/src/object.rs:935:19. The actual official
+cohort was nightly-2026-10-14. Retain the complete exit-101 failure as OPEN
+historical evidence; it is not full source or release qualification.
+
+#### Exact const-safe correction
+
+Admit only the target_view production expression in core/src/object.rs.
+Keep public const fn target_view(&self) -> NativeNodeView and the private
+route representation unchanged. Match self.route.as_slice() directly:
+the nonempty [.., target] pattern returns target.view; the empty pattern
+panics with the exact existing "resolved routes contain a target" message.
+Preserve last-node selection, pre-dispatch cached view semantics and the
+nonempty resolved-route invariant. Change no other production method or type.
+
+The selected genuine standard-library source makes Vec::as_slice const-stable,
+while Vec const Deref remains gated by const_convert and there is no inherent
+Vec::last. Merely deleting as_slice is not admitted as a const-compatible
+correction. Introduce no language feature, new compiler minimum, lint
+allowance or additional expectation. Global -D warnings and the existing
+API's named expectation and unfulfilled-expectation guard remain unchanged.
+
+Add meaningful controls only within the existing inline object test module:
+a compiler-checked const caller, actual selected-root and deep-route final
+cached views, and the exact empty-route invariant panic payload. Preserve every
+original test, assertion and helper; add no Cargo target. A const caller
+establishes callability, not nonempty allocated Vec CTFE evaluation.
+
+#### Selective allocation and nine-path boundary
+
+Core 0.2.7 is already published and remains immutable with released A2.
+Allocate only the corrected future rlvgl-core payload as 0.2.8 in
+core/Cargo.toml. The 27 existing dependent records use compatible 0.2, 0.2.4
+or 0.2.7 minima or path-only edges; keep every dependent requirement unchanged.
+Retain API 0.2.2 and its exact PCDN-18 implementation, bridge 0.1.2,
+platform 0.2.7 and root 0.2.8. No blanket family increment follows.
+
+Record this owning amendment and its AGENTS mirror before implementation,
+then mechanically regenerate only docs/spec-index/index/crates-ci.json and
+docs/spec-index/index/_manifest.json with the unchanged canonical generator.
+Use the established protected source integration route; no additional
+authority PR, dated-result substitution, transferred waiver or direct main
+update is admitted.
+
+The remaining five paths are core/src/object.rs, core/Cargo.toml,
+scripts/crates_ci_workspace_contexts.json, Cargo.lock and
+examples/beetle-esp32p4-idf/components/rlvgl_app/rust/Cargo.lock.
+Only /workspaces/0/members/13/manifest_sha256 in the finite policy may change
+to the new core manifest fingerprint. In exactly those two locks, admit only
+the local rlvgl-core node version from 0.2.7 to 0.2.8. Preserve every other
+parsed value/checksum and the other six governed lock bodies. Keep root/native
+memberships 48/42, descriptors, targets and shared-file receipts unchanged.
+
+Freshly resolve the most recent official nightly and qualify the corrected
+genuine ref. Require the const/route controls, all 67 API goldens, all fourteen
+strict cases, strict discipline and workspace Clippy, unchanged publisher,
+package-boundary and cohort suites, full source/pre-publish phases and current
+canonical projections. Require complete clean same-ref Linux and hosted Gate P
+with all 31 packages and all three extracted consumers, source/payload/P-DIFF/
+lock/withdrawal/native-context custody, freshness and normal protected adoption.
+Automatic PR merge-ref integration evidence and exact head-ref Gate P evidence
+retain their actual distinct provenance; relabel no source or passing result.
+Retain every failed receipt; a narrower or older result replaces no guard.
+
+Preserve frozen 62357e8e and 13dfd3b1 and their failed results, released
+A2/v0.2.7 and published core 0.2.7, official unmodified Ratatui 0.30.2 and
+native-core 0.1.2, fonts/notices, parent pins and every other package allocation.
+Keep daily newest-nightly main builds, most-recent release freshness, stable
+publisher selection, Trusted Publishing/OIDC, release environment, frozen-ref
+authentication prerequisites, manual continuation and separate Gate R.
+No new tag, registry publication, parent adoption, hardware qualification or
+phase ratification follows. Any additional failure, source/profile requirement
+or scope drift stops for another owning PCDN.

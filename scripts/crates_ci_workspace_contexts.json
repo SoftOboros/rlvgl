@@ -284,7 +284,7 @@
         {
           "name": "rlvgl-core",
           "manifest": "core/Cargo.toml",
-          "manifest_sha256": "2b282023a36431d1c23309bac9ba15efecee4ac8124e40d728138840ec118e50",
+          "manifest_sha256": "158570fcf65dc9e9058835c6a7eaa8fd867a07833bfcaad89117a71ce1d514b4",
           "targets": [
             "core/src/lib.rs",
             "core/tests/anim_slide.rs",
