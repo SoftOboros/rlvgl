@@ -1436,3 +1436,77 @@ parent pins, original eight locks, fonts/notices, fixed48/42 policy and selectiv
 bridge0.1.2 / platform0.2.7 / root0.2.8 / core0.2.7 allocations. No new tag,
 registry publication, hardware qualification, phase ratification or parent
 adoption follows. Stop for any new PCDN.
+
+### 0.1.17 — 2026-10-14 — amended
+
+**Author:** Codex, recording I. Abbott's PCDN-18 acceptance
+**Change kind:** semantic
+**Touches:** §5 newest-nightly public iterator compatibility and selective API allocation
+**Summary:** Preserve the exposed wire iterator with one exact lint expectation,
+allocate API 0.2.2 and admit only its necessary fingerprint and lock-node updates.
+
+The owner accepted PCDN-18 after genuine source
+13dfd3b143864ab74c6da62e078ecddc610e6cfe passed newest-nightly formatting,
+all fourteen strict snapshots and strict discipline, then failed workspace
+Clippy with -D warnings at api/src/protocol.rs:1442:65. The actual compiler
+cohort was official nightly-2026-10-14. Retain this complete exit-101 failure
+as OPEN historical evidence; it is not a passing release or substituted status.
+
+#### Exact compatibility correction
+
+Admit one function-scoped #[expect(clippy::chunks_exact_to_as_chunks)] with a
+documented reason at OpcodeList::iter. Preserve the production method body and
+public OpcodeIter::Wire(core::slice::ChunksExact<'a, u8>) payload. Replacing it
+with an array-slice iterator would change the exposed public type. Preserve
+native/wire ordering, little-endian decoding, length, size_hint, remainder
+behavior and ExactSizeIterator. This admits no API redesign or data reinterpretation.
+Global -D warnings and unfulfilled-expectation detection remain mandatory;
+an absent or changed diagnostic requires review, not a permanent blanket allow.
+
+API 0.2.1 is already published. Allocate only rlvgl-api 0.2.2 in api/Cargo.toml
+and align API_VERSION.patch from 1 to 2 in api/src/lib.rs. Preserve MPY_V1 and
+wire framing. Existing core, runtime-std dev and MicroPython requirements of
+0.2.1 already admit this patch release; keep their manifests and published core
+payload unchanged. Add meaningful public Wire construction/matching, native/wire
+sequence, advancing length/size_hint, empty/remainder and advertised-version
+controls only within existing api/tests/mpy_v1_golden.rs. Keep existing
+assertions and golden bytes; add no Cargo target.
+
+#### Twelve-path amendment and source boundary
+
+Record this owning amendment and AGENTS mirror before implementation, then
+mechanically regenerate docs/spec-index/index/crates-ci.json and
+docs/spec-index/index/_manifest.json with the unchanged canonical generator.
+Use the established protected integration route. No additional authority PR,
+dated-result substitution, transferred waiver or direct main update is admitted.
+
+The remaining eight paths are api/src/protocol.rs, api/Cargo.toml,
+api/src/lib.rs, api/tests/mpy_v1_golden.rs,
+scripts/crates_ci_workspace_contexts.json, Cargo.lock,
+micropython/staticlib/Cargo.lock and
+examples/beetle-esp32p4-idf/components/rlvgl_app/rust/Cargo.lock.
+Only /workspaces/0/members/1/manifest_sha256 in the finite policy may change to
+the corrected API manifest fingerprint. Admit only the local rlvgl-api node's
+version from 0.2.1 to 0.2.2 in those three locks. Every other parsed lock value,
+checksum and the other five governed lock bodies stays exact. Root/native
+memberships remain 48/42, with no descriptor, member, target or shared-file
+expansion. No other dependency minimum, package allocation or payload edit follows.
+
+Freshly resolve the most recent official nightly cohort and qualify the genuine
+corrected ref. Require all fourteen strict snapshots, the unchanged publisher
+and package-boundary suites, meaningful cohort/API controls, full source and
+pre-publish phases, complete clean same-ref Linux and hosted Gate P all31
+packages and all three extracted consumers, current canonical projections,
+source/payload/P-DIFF/lock/withdrawal/native-context custody and normal protected
+adoption. Retain every failed receipt; no narrowed or older result replaces a guard.
+
+Preserve original frozen source 13dfd3b1 and its actual failed results, released
+A2/v0.2.7, official unmodified Ratatui0.30.2/native-core0.1.2, fonts/notices,
+parent pins and selective bridge0.1.2 / platform0.2.7 / root0.2.8 / core0.2.7.
+Keep daily newest-nightly main builds, most-recent release freshness, stable
+publisher selection, Trusted Publishing/OIDC, release environment, frozen-ref
+authentication prerequisites, manual continuation and separate Gate R. No
+generic lint allowance, further nightly cleanup, new release identity, registry
+publication, parent adoption, hardware qualification or phase ratification is
+granted. Any additional failure, source/profile requirement or scope drift stops
+for another owning PCDN.

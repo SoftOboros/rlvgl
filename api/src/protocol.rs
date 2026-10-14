@@ -1436,6 +1436,10 @@ impl<'a> OpcodeList<'a> {
     }
 
     /// Iterates decoded opcode IDs.
+    #[expect(
+        clippy::chunks_exact_to_as_chunks,
+        reason = "OpcodeIter::Wire publicly exposes ChunksExact; preserve the compatible iterator type"
+    )]
     pub fn iter(self) -> OpcodeIter<'a> {
         match self.source {
             OpcodeSource::Native(values) => OpcodeIter::Native(values.iter()),

@@ -28,7 +28,7 @@ pub struct ApiVersion {
 pub const API_VERSION: ApiVersion = ApiVersion {
     major: 0,
     minor: 2,
-    patch: 1,
+    patch: 2,
 };
 
 /// Z-index for stacking nodes.

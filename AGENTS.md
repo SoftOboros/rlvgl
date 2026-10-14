@@ -205,6 +205,26 @@ protected source integration; no dated-result substitution or second authority
 waiver is admitted. Preserve A2, Ratatui, parent pins and all other guards.
 Stop for any new PCDN; no tag, publication, pin or phase closure is authorized.
 
+Owner-accepted PCDN-18 admits only [CRATES-CI §15 amendment 0.1.17](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve public OpcodeIter::Wire(ChunksExact) with one named, documented
+chunks_exact_to_as_chunks expectation at OpcodeList::iter; keep its production
+body, global -D warnings and unfulfilled-expectation detection unchanged.
+Allocate only rlvgl-api 0.2.2 and API_VERSION.patch 2. Preserve the three existing
+compatible dependency requirements and published core payload. Admit only the
+API manifest fingerprint leaf and local API version nodes in Cargo.lock,
+micropython/staticlib/Cargo.lock and the beetle-esp32p4-idf Rust component lock.
+Keep every other lock value/checksum and the other five governed locks exact.
+Add compatibility controls only to the existing api/tests/mpy_v1_golden.rs.
+Record owning amendment and mirror before implementation, then mechanically
+regenerate the same two canonical outputs. This is the twelve-path protected
+integration scope, without another authority waiver or dated-result substitute.
+Retain actual Clippy failure OPEN; require most-recent same-ref full source,
+prepublish, fourteen strict cases, publisher/cohort controls and clean Linux and
+hosted31+3 before protected adoption. Preserve 48/42 memberships, descriptors,
+targets, fonts, A2, unmodified official Ratatui, all other allocations and parent
+pins. No generic lint allowance, API redesign, additional nightly cleanup,
+release/tag/publication, hardware or phase claim follows. Stop for a new PCDN.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

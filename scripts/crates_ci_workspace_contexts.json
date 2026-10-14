@@ -107,7 +107,7 @@
         {
           "name": "rlvgl-api",
           "manifest": "api/Cargo.toml",
-          "manifest_sha256": "82d7daf461ea35b53d801b4da41cca532f826434eca65fc62b9e6872b7e139de",
+          "manifest_sha256": "82d1bc354b7d9b54bb617bca50519857068dcdaa5155428d48b54a17c4187f0e",
           "targets": [
             "api/src/lib.rs",
             "api/tests/mpy_v1_golden.rs"

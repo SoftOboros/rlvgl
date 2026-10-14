@@ -5365,3 +5365,117 @@ fn eight_minimal_creates_and_one_object_results_fit_the_floor() {
         Err(CodecError::LimitExceeded)
     );
 }
+
+#[test]
+fn opcode_iter_public_wire_type_sequence_and_remainder() {
+    use rlvgl_api::protocol::OpcodeIter;
+
+    let expected = [0x0403_0201u32, 0x1234_5678];
+    let bytes = [
+        0x01, 0x02, 0x03, 0x04, 0x78, 0x56, 0x34, 0x12, 0xe1, 0xe2, 0xe3,
+    ];
+    for trailing in 0..4 {
+        let input = &bytes[..8 + trailing];
+        let chunks: core::slice::ChunksExact<'_, u8> = input.chunks_exact(4);
+        let mut wire = OpcodeIter::Wire(chunks);
+        let mut native = OpcodeList::from_slice(&expected).iter();
+        assert!(matches!(&native, OpcodeIter::Native(_)));
+
+        for (index, word) in expected.into_iter().enumerate() {
+            let remaining = expected.len() - index;
+            assert_eq!(wire.len(), remaining);
+            assert_eq!(wire.size_hint(), (remaining, Some(remaining)));
+            assert_eq!(wire.next(), Some(word));
+            assert_eq!(native.next(), Some(word));
+        }
+        assert_eq!(wire.len(), 0);
+        assert_eq!(wire.size_hint(), (0, Some(0)));
+        assert_eq!(wire.next(), None);
+        assert_eq!(wire.next(), None);
+        assert_eq!(native.next(), None);
+        match wire {
+            OpcodeIter::Wire(chunks) => {
+                let chunks: core::slice::ChunksExact<'_, u8> = chunks;
+                assert_eq!(chunks.remainder(), &bytes[8..8 + trailing]);
+            }
+            OpcodeIter::Native(_) => panic!("public Wire construction changed variant"),
+        }
+    }
+
+    let sub_word = [0xe1, 0xe2, 0xe3];
+    for length in 0..4 {
+        let input = &sub_word[..length];
+        let chunks: core::slice::ChunksExact<'_, u8> = input.chunks_exact(4);
+        let mut wire = OpcodeIter::Wire(chunks);
+        assert_eq!(wire.len(), 0);
+        assert_eq!(wire.size_hint(), (0, Some(0)));
+        assert_eq!(wire.next(), None);
+        match wire {
+            OpcodeIter::Wire(chunks) => assert_eq!(chunks.remainder(), input),
+            OpcodeIter::Native(_) => panic!("empty public Wire changed variant"),
+        }
+    }
+}
+
+#[test]
+fn decoded_opcode_list_preserves_public_wire_iterator() {
+    use rlvgl_api::protocol::OpcodeIter;
+
+    let expected = [0x0403_0201u32, 0x1234_5678];
+    for words in [&[][..], &expected[..]] {
+        let native = OpcodeList::from_slice(words);
+        let frame = FrameRef::Capabilities(Capabilities {
+            schema_version: MPY_V1,
+            limits: limits(),
+            features: 5,
+            value_tags: 0x0001_ffff,
+            opcodes: native,
+        });
+        let mut buffer = [0u8; 256];
+        let length = encode_frame(MPY_V1, frame, &mut buffer).unwrap();
+        let decoded = decode_frame(&buffer[..length]).unwrap();
+        let FrameRef::Capabilities(capabilities) = decoded.frame else {
+            panic!("Capabilities wire frame changed kind");
+        };
+        assert_eq!(decoded.version, MPY_V1);
+        assert_eq!(capabilities.opcodes, native);
+        assert_eq!(capabilities.opcodes.len(), words.len());
+        assert_eq!(capabilities.opcodes.is_empty(), words.is_empty());
+        let wire = capabilities.opcodes.iter();
+        assert_eq!(wire.len(), words.len());
+        assert_eq!(wire.size_hint(), (words.len(), Some(words.len())));
+        match wire {
+            OpcodeIter::Wire(chunks) => {
+                let chunks: core::slice::ChunksExact<'_, u8> = chunks;
+                assert!(chunks.remainder().is_empty());
+                let reconstructed = OpcodeIter::Wire(chunks);
+                assert_eq!(
+                    reconstructed.collect::<Vec<_>>(),
+                    native.iter().collect::<Vec<_>>()
+                );
+            }
+            OpcodeIter::Native(_) => panic!("decoded OpcodeList lost its public Wire iterator"),
+        }
+    }
+}
+
+#[test]
+fn api_patch_matches_package_version_without_wire_version_change() {
+    assert_eq!(
+        rlvgl_api::API_VERSION,
+        rlvgl_api::ApiVersion {
+            major: 0,
+            minor: 2,
+            patch: 2,
+        }
+    );
+    assert_eq!(env!("CARGO_PKG_VERSION"), "0.2.2");
+    assert_eq!(
+        MPY_V1,
+        ProtocolVersion {
+            major: 1,
+            minor: 0,
+            patch: 0,
+        }
+    );
+}
