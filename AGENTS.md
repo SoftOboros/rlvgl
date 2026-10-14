@@ -171,6 +171,26 @@ parent pins. Keep the admitted dated compiler until a separate nightly policy
 is settled. Stop for any new PCDN; no release qualification or publication is
 granted by this amendment.
 
+Owner-accepted PCDN-15 supersedes the continuing dated qualification hold and
+pending nightly policy under [CRATES-CI §15 amendment 0.1.15](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Build main daily on newest nightly; qualify every release on most recent nightly.
+Resolve an immutable latest-manifest dated cohort, record/verify actual identities
+and required components/targets, reject older fallback, and requalify if newest
+advances at release preflight. Daily registry verification stays separate.
+Owner-accepted PCDN-16 admits only the two governing Markdown paths plus their
+two unchanged-generator canonical index outputs in the protected authority PR.
+Preserve the committed-current-index guard and all previous failure receipts;
+require normal passing guards. Unchanged setup uses its existing dated profile only for
+that authority boundary, not latest release qualification. Later source may
+change bounded qualification/cohort inputs, daily CI and canonical outputs, plus
+only the three named DCA stderr receiver-path notes after fresh same-ref latest
+execution and semantic review. Preserve strict fourteen-case coverage; no generic
+snapshot blessing or additional fixture/harness/Rust-body change is admitted.
+Retain historical failures OPEN. Require full source/prepublish, clean Linux and
+hosted31+3, exact custody and protected adoption. Keep stable publisher/OIDC,
+manual continuation/no scheduled publishing, A2, parent pins, official Ratatui and all other guards.
+Stop for any new PCDN; this does not authorize release/tag/publication or pins.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
