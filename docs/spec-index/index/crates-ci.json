@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 42,
+    "amendment": 44,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
     "rationale": 19
   },
-  "object_count": 83,
+  "object_count": 85,
   "objects": [
     {
       "attrs": {
@@ -1584,6 +1584,62 @@
       "line": 1514,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.18",
       "text": "Use a const-safe slice pattern in the target view, preserve its public"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's PCDN-20 acceptance",
+        "change_kind": "semantic",
+        "chronological_rank": 36,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.19",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Replace exactly two deprecated atomic method names while preserving",
+        "touches": [
+          "§5 newest-nightly private runtime atomic compatibility"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1599,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.19",
+      "text": "Replace exactly two deprecated atomic method names while preserving"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's PCDN-21 one-retry authorization",
+        "change_kind": "semantic",
+        "chronological_rank": 37,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-14",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.20",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Admit one identical unfiltered retry after four HTTP503 responses;",
+        "touches": [
+          "§5 owning-document link-check retry disposition"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1687,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.20",
+      "text": "Admit one identical unfiltered retry after four HTTP503 responses;"
     },
     {
       "attrs": {

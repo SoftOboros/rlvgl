@@ -1595,3 +1595,164 @@ authentication prerequisites, manual continuation and separate Gate R.
 No new tag, registry publication, parent adoption, hardware qualification or
 phase ratification follows. Any additional failure, source/profile requirement
 or scope drift stops for another owning PCDN.
+
+### 0.1.19 — 2026-10-14 — amended
+
+**Author:** Codex, recording I. Abbott's PCDN-20 acceptance
+**Change kind:** semantic
+**Touches:** §5 newest-nightly private runtime atomic compatibility
+**Summary:** Replace exactly two deprecated atomic method names while preserving
+service admission and epoch behavior, with no package allocation or lock change.
+
+The owner accepted PCDN-20 after genuine source
+5d75506225e21f04a2910ba7a429a4327f47c20d passed latest-nightly read-only
+formatting, three full locked metadata graphs, all 272 core library tests,
+all 67 API golden tests, all fourteen strict compile cases and strict
+discipline, then failed workspace Clippy with -D warnings. Exactly two fatal
+deprecation diagnostics identify runtime-std/src/service.rs:892:14 in
+NativeService::try_submit and :1729:10 in next_epoch. The actual official
+cohort was nightly-2026-10-14. Retain its full exit-101 result, nonfatal
+warnings, provenance and terminal custody as OPEN historical evidence.
+These partial results do not qualify full pre-commit, Gate P or release.
+
+#### Exact atomic spelling correction and compiler consequence
+
+In runtime-std/src/service.rs replace only the two fetch_update method names
+with try_update. Genuine selected standard-library source proves the integer
+atomic fetch_update alias delegates directly to
+try_update(set_order, fetch_order, f). Preserve Relaxed/Relaxed, checked_add(1),
+closure retry behavior, returned previous value, NonZeroU64 conversion,
+request ownership on failure, existing counter consumption, exhaustion,
+epoch isolation, ticket validation, lifecycle and backpressure. Change no
+other production body, helper, public API, type, test or assertion.
+Introduce no lint allowance, expectation, feature, fallback or dependency.
+
+try_update is stable since Rust 1.95. Accept this API-imposed lower bound for
+the private runtime source; it is not a verified whole-crate MSRV or a new
+compiler floor for public packages. Claim no historical Rust 1.90 compatibility.
+Effective 0.1.15 supersedes the ongoing dated compiler hold: daily main builds
+track newest nightly and every release is freshly qualified on most recent
+nightly. Retain all older successes and failures as historical evidence.
+
+The private package rlvgl-runtime-std remains 0.0.0 with publish=false and no
+declared rust-version. No Cargo manifest, package version, dependency minimum,
+policy leaf, target membership, shared-file fingerprint or lock update is
+admitted. service.rs is neither an enumerated policy fingerprint nor an
+admitted target leaf; its module remains reached through the existing library
+target. Preserve core 0.2.8, API 0.2.2, bridge 0.1.2, platform 0.2.7, root 0.2.8
+and every other existing allocation, all eight governed locks and 48/42 policy.
+
+#### Exact five-path protected integration boundary
+
+Record this owning amendment and its AGENTS mirror before implementation.
+Mechanically regenerate only docs/spec-index/index/crates-ci.json and
+docs/spec-index/index/_manifest.json using the unchanged canonical generator.
+Those four governing paths and runtime-std/src/service.rs are the complete
+five-path boundary. Use fresh owned source derived from frozen 5d755062 and
+genuine normal history through the established protected source route.
+No additional authority PR, dated-result substitution, transferred waiver or
+direct main update is admitted.
+
+Run unchanged complete runtime unit/integration/doc tests, including all
+thirteen native-service controls and headless-owner coverage. Existing controls
+cover terminal ticket accounting, Full/Closing returned ownership, FIFO and
+backpressure, restart/stale epoch/ticket/record rejection, fault fencing,
+lifecycle and owner destruction. Direct u64::MAX request/epoch exhaustion
+coverage remains unqualified; the unchanged checked_add and selected alias
+source establish arithmetic/exhaustion equivalence. Add no tests mirroring
+the standard library and do not mutate the global epoch for a test.
+
+Freshly resolve the most recent official nightly in a new private profile.
+Require complete source/index/document/publisher/cohort/context/lock/payload
+guards, all core and API controls, all fourteen strict compile cases, strict
+discipline, workspace Clippy and full scripts/pre-commit.sh before opening a
+PR. Require literal CLAUDE pre-publish phases, all-features documentation,
+complete clean same-ref Linux and hosted Gate P all 31 packages and all three
+extracted consumers, P-DIFF/withdrawal/native-context custody, freshness and
+normal protected adoption. Automatic PR merge-ref integration and exact
+head-ref Gate P keep their distinct provenance. Missing manual CI dispatch
+on current main waives no guard. Preserve inherited whole-tree link failures
+OPEN under the accepted dispositions and freshly pass owning changed documents
+without added exclusions. An older or narrower passing result replaces no guard.
+
+Preserve frozen 5d755062, 62357e8e and 13dfd3b1, their private profiles and all
+failed receipts, released A2/v0.2.7, published core 0.2.7, unmodified official
+Ratatui 0.30.2/native-core 0.1.2, fonts/notices, parent pins and all other guards.
+Keep stable publisher selection, Trusted Publishing/OIDC, release environment,
+frozen-ref authentication prerequisites, manual continuation and separate Gate R.
+No new tag, registry publication, parent adoption, hardware qualification or
+phase ratification follows. Any additional failure, input expansion, source or
+profile requirement or new normative choice stops for another owning PCDN.
+
+### 0.1.20 — 2026-10-14 — amended
+
+**Author:** Codex, recording I. Abbott's PCDN-21 one-retry authorization
+**Change kind:** semantic
+**Touches:** §5 owning-document link-check retry disposition
+**Summary:** Admit one identical unfiltered retry after four HTTP503 responses;
+retain failure evidence and require a complete passing result.
+
+The owner authorized one retry after the PCDN-20 five-path WIP, derived from
+genuine 5d75506225e21f04a2910ba7a429a4327f47c20d, passed canonical index/diff
+and eighteen cohort, six publisher and all thirty-four package-boundary
+controls, then failed the required unfiltered owning-two-document link check.
+Twenty checks passed; four unchanged immutable released-A2 GitHub URLs returned
+HTTP503 Service Unavailable. Retain that full exit-2 command/log/duration and
+the complete frozen PCDN-20 postimages and seals as OPEN historical evidence.
+No link status pass, runtime qualification or publisher fault was established.
+
+#### One exact retry, with no status or source waiver
+
+Admit exactly one further execution of the identical command:
+
+    /Users/iraabbott/.cargo/bin/lychee --no-progress AGENTS.md docs/crates-ci/CRATES-CI-00-CONCEPTS.md
+
+Use the same network access and default status policy. Check the complete two
+owning documents after this expressly admitted amendment; identical command
+does not mean retaining the old governing postimage bytes. Freeze the new
+governing postimages and prove all four failed href strings and occurrences
+remain unchanged. Their released-A2 files are ERRATA.md,
+v0.2.7-continuation-decision.md, v0.2.7-staging-mechanism.md and
+v0.2.7-staging-20261010.md, originally at concepts lines607/646/678/710.
+
+The retry MUST produce an actual complete PASS before any following release
+guard or genuine-history operation. Accept no HTTP503, filter, ignored error,
+cache substitution, URL rewrite or narrowed diagnostic in place of the whole
+check. If the retry fails, stop and retain both outcomes, without another
+automatic retry or recursive remediation. This disposition expires after
+that retry outcome; it grants no failing source or release claim.
+
+#### Four-path recording and preservation
+
+Record this owning amendment and its AGENTS mirror before the retry. Regenerate
+only docs/spec-index/index/crates-ci.json and docs/spec-index/index/_manifest.json
+with the unchanged canonical generator. These exact four governing paths are
+the complete new admission in a fresh derived checkout. Preserve the accepted
+PCDN-20 runtime postimage byte-for-byte and the complete old five-path WIP/seal
+as historical evidence. No Rust, test, manifest, version, dependency, lock,
+policy, workflow, target, source pin or publisher-tool change is admitted.
+A possible publisher cause is read-only investigation, not implementation
+authority; the failed inputs here are unchanged GitHub documentation hrefs.
+
+A passing retry permits the existing genuine-history and fresh most-recent
+same-ref qualification sequence to resume. Require complete unchanged runtime
+tests, core/API controls, all fourteen strict compile cases, strict discipline,
+Clippy, full scripts/pre-commit.sh before opening a PR, literal CLAUDE pre-publish
+phases, all-features documentation, complete clean Linux and hosted Gate P
+all31 packages/all3 extracted consumers, exact context/payload/lock/P-DIFF/
+withdrawal/source/profile custody, latest freshness and normal protected
+adoption. Keep automatic PR merge-ref and exact head-ref evidence distinct.
+Preserve inherited whole-tree link failures OPEN under their accepted
+dispositions; this one retry waives no other guard or following fresh check.
+
+Preserve genuine5d/623/13df and all old postimages/private profiles/failed
+receipts, released A2/v0.2.7 and published core0.2.7, official unmodified
+Ratatui0.30.2/native-core0.1.2, fonts/notices, all current allocations and
+dependency minima, every governed lock, finite48/42 policy and parent pins.
+Keep daily newest-nightly main, most-recent release qualification, stable
+publisher selection, Trusted Publishing/OIDC, release environment, frozen-ref
+authentication, manual continuation and separate Gate R. No tag, registry
+publication, parent adoption, hardware/live qualification or phase closure
+follows. Any additional source, URL, status-policy, profile, input or normative
+requirement stops for owner disposition; any subsequent guard failure stops
+for another owning PCDN.

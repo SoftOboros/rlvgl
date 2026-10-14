@@ -246,6 +246,48 @@ Preserve 48/42 policy, targets, shared receipts, Ratatui, fonts, A2, frozen
 623/13df sources/results, parent pins and all other guards. No tag, publication,
 parent adoption, hardware or phase claim follows. Stop for any new PCDN.
 
+Owner-accepted PCDN-20 admits only [CRATES-CI §15 amendment 0.1.19](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Replace exactly two fetch_update names with try_update in runtime-std/src/service.rs;
+preserve Relaxed/Relaxed, checked_add, prior-value/nonzero conversion, ownership,
+counter consumption, exhaustion, epochs, tickets, lifecycle and backpressure.
+Introduce no allowance, expectation, feature, fallback, API or test change.
+Accept the private-source API lower bound of Rust 1.95, not a verified whole-crate
+MSRV or public compiler floor; claim no older 1.90 compatibility. Preserve
+effective 0.1.15 daily newest-main and most-recent release qualification.
+Runtime stays 0.0.0/publish=false; no manifest, allocation, dependency, policy,
+target, shared fingerprint or lock change. Preserve all eight locks and 48/42.
+Record governing amendment/mirror before implementation and regenerate only the
+unchanged-generator two canonical projections: these plus service.rs are the
+exact five paths. Derive fresh owned source from frozen 5d755062 and use genuine
+normal protected integration without a second authority waiver or direct main.
+Run unchanged complete runtime tests, all thirteen native controls and headless
+owner coverage; direct MAX exhaustion tests remain unqualified, with equivalence
+supported by unchanged checked_add and genuine standard-library alias source.
+Require fresh most-recent same-ref full source/prepublish, core/API controls,
+all fourteen strict cases, Clippy, full precommit before PR, publisher/cohort,
+all-features docs and clean Linux/hosted31+3 with actual provenance and protected
+adoption. Preserve failed receipts, profiles, 5d/623/13df, A2, Ratatui, fonts,
+allocations, parent pins and every other guard. No tag, publication, parent,
+hardware or phase claim follows. Stop for any new PCDN.
+
+Owner-authorized PCDN-21 admits only [CRATES-CI §15 amendment 0.1.20](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+After recording this amendment/mirror and unchanged-generator canonical2 in a
+fresh derived checkout, admit one identical unfiltered lychee two-document retry
+with unchanged network/default status policy. Preserve all four failed A2 hrefs
+and old five-path WIP/seal; new governing text is the expressly admitted delta.
+Retain the four503 failure OPEN and require actual complete PASS. Accept no503,
+filter, ignore, cache substitution, href rewrite or narrowed diagnostic. Stop
+if the retry fails; no further automatic retry or recursive remediation. This
+disposition expires after its outcome and waives no source or release guard.
+Runtime postimage stays byte-exact; no code/test/manifest/version/dependency/
+policy/lock/workflow/target/pin or publisher-tool change is admitted. A possible
+publisher cause is read-only investigation, not new implementation authority.
+Only PASS permits genuine history and fresh most-recent same-ref full runtime,
+core/API/fourteen/Clippy/precommit/CLAUDE/allfeatures/publisher/cohort/Linux/
+hosted31+3/custody/freshness/protected-route sequence. Preserve all profiles,
+failed results, 5d/623/13df, A2, Ratatui, fonts, allocations and parent pins.
+No tag/publication/parent/hardware/live/phase claim follows. Stop for any new PCDN.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all
