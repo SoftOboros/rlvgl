@@ -191,6 +191,20 @@ hosted31+3, exact custody and protected adoption. Keep stable publisher/OIDC,
 manual continuation/no scheduled publishing, A2, parent pins, official Ratatui and all other guards.
 Stop for any new PCDN; this does not authorize release/tag/publication or pins.
 
+Owner-accepted PCDN-17 adds only the `FrontBuffer` to `FrontBuffer<'a>`
+headline spelling in platform/tests/ui/scanout_front_write.stderr under
+[CRATES-CI §15 amendment 0.1.16](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve E0599, the missing cpu_slice_mut prohibition, location 33:35 and the
+final inferred FrontBuffer<'_>; keep the fixture Rust, API and fourteen-case
+harness unchanged. The three PCDN-15 receiver-path notes remain the only other
+admitted snapshots. Retain the actual latest 10/14 failure OPEN, then freshly
+prove all fourteen and every existing source/prepublish/Linux/hosted31+3 guard
+on the immutable most-recent-nightly cohort. Record this owning amendment and
+mirror with only their unchanged-generator canonical projections in the normal
+protected source integration; no dated-result substitution or second authority
+waiver is admitted. Preserve A2, Ratatui, parent pins and all other guards.
+Stop for any new PCDN; no tag, publication, pin or phase closure is authorized.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

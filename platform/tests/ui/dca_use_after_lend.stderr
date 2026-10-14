@@ -9,7 +9,7 @@ error[E0382]: borrow of moved value: `cpu`
 22 |     let _slice = cpu.as_slice();
    |                  ^^^ value borrowed here after move
    |
-note: `Cpu::<'a, T, N>::lend_for_read` takes ownership of the receiver `self`, which moves `cpu`
+note: `rlvgl_platform::hwcore::dca::Cpu::<'a, T, N>::lend_for_read` takes ownership of the receiver `self`, which moves `cpu`
   --> src/hwcore/dca.rs
    |
    |         self,

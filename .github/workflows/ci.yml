@@ -4,9 +4,44 @@ on:
   pull_request:
     branches:
       - main
-env:
-  RUSTUP_TOOLCHAIN: nightly-2025-07-31
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
 jobs:
+  nightly-cohort:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      date: ${{ steps.nightly.outputs.date }}
+      manifest_sha256: ${{ steps.nightly.outputs.manifest_sha256 }}
+      helper_sha256: ${{ steps.nightly.outputs.helper_sha256 }}
+      source_sha: ${{ steps.nightly.outputs.source_sha }}
+      workflow_sha: ${{ steps.nightly.outputs.workflow_sha }}
+      artifact_id: ${{ steps.nightly_artifact.outputs.artifact-id }}
+      artifact_digest: ${{ steps.nightly_artifact.outputs.artifact-digest }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}
+        fetch-depth: 0
+    - name: Resolve immutable newest nightly cohort
+      id: nightly
+      shell: bash
+      run: |
+        bash scripts/setup-ci-env.sh resolve \
+          --output-dir "$RUNNER_TEMP/rlvgl-nightly-cohort" \
+          --source-sha "$(git rev-parse HEAD)" \
+          --workflow-sha "$(git rev-parse HEAD)"
+    - name: Retain immutable nightly cohort
+      id: nightly_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-cohort-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ runner.temp }}/rlvgl-nightly-cohort/channel-rust-nightly.toml
+          ${{ runner.temp }}/rlvgl-nightly-cohort/cohort.json
+        if-no-files-found: error
   publish-contracts:
     runs-on: ubuntu-latest
     permissions:
@@ -19,8 +54,11 @@ jobs:
       - name: Install declared workflow parser
         run: python3 -m pip install "$(sed -n '/^PyYAML==/p' requirements.txt)"
       - name: Check frozen publishing and manual recovery
-        run: python3 scripts/test_publish_workflows.py
+        run: |
+          python3 scripts/test_publish_workflows.py
+          python3 scripts/test_ci_nightly_cohort.py
   build:
+    needs: nightly-cohort
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
@@ -29,25 +67,62 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Check documentation index
         run: make spec-test spec-index-check
       - run: cargo build --workspace --verbose
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace -- -D warnings
       - run: cargo test --workspace --target x86_64-unknown-linux-gnu --verbose
+      - name: Strict hardware-abstraction discipline
+        run: RLVGL_LINT_STRICT=1 RUSTFLAGS="" cargo test -p rlvgl-platform --test discipline
       - run: RUSTDOCFLAGS="--cfg docsrs --cfg nightly" cargo doc --all-features --no-deps --target x86_64-unknown-linux-gnu
 
   stm32h747i-disco:
+    needs: nightly-cohort
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Install target
         run: rustup target add thumbv7em-none-eabihf
       - name: Build firmware
@@ -68,14 +143,32 @@ jobs:
             size.txt
 
   stm32h747i-disco-fatfs:
+    needs: nightly-cohort
     continue-on-error: true
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Install target
         run: rustup target add thumbv7em-none-eabihf
       - name: Build firmware (fatfs no_std demo)
@@ -87,25 +180,61 @@ jobs:
             --target thumbv7em-none-eabihf --release || true
 
   polish:
+    needs: nightly-cohort
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Run polish
         run: bash scripts/pre-commit.sh
 
   chipdb:
+    needs: nightly-cohort
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Generate vendor databases
         run: tools/build_vendor.sh
       - name: Build vendor crate
@@ -114,13 +243,31 @@ jobs:
         run: cargo build -p rlvgl-chips-stm
 
   boards:
+    needs: nightly-cohort
     runs-on: ubuntu-latest
     container:
       image: docker.io/iraa/rlvgl:latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.nightly-cohort.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Download immutable producer cohort
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.nightly-cohort.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ needs.nightly-cohort.outputs.manifest_sha256 }}" \
+            --source-sha "${{ needs.nightly-cohort.outputs.source_sha }}" \
+            --workflow-sha "${{ needs.nightly-cohort.outputs.workflow_sha }}"
       - name: Build STM32 board database
         run: bash scripts/stm32_afdb_pipeline.sh
       - name: Upload boards.json
