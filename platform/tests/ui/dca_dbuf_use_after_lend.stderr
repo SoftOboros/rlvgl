@@ -12,5 +12,8 @@ error[E0382]: borrow of moved value: `cpu`
 note: `rlvgl_platform::hwcore::dca::DbufCpu::<'a, 'b, T, N>::start_double_buffer_read` takes ownership of the receiver `self`, which moves `cpu`
   --> src/hwcore/dca.rs
    |
+   | impl<'a, 'b, T: Copy, const N: usize> DbufCpu<'a, 'b, T, N> {
+...
+   |     pub fn start_double_buffer_read<C: DcaCache>(
    |         self,
    |         ^^^^

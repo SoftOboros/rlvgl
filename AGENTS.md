@@ -288,6 +288,17 @@ hosted31+3/custody/freshness/protected-route sequence. Preserve all profiles,
 failed results, 5d/623/13df, A2, Ratatui, fonts, allocations and parent pins.
 No tag/publication/parent/hardware/live/phase claim follows. Stop for any new PCDN.
 
+Owner-accepted PCDN-34 admits only [CRATES-CI §15 amendment 0.1.21](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Adopt reviewed impl/method context in the three named DCA stderr snapshots;
+preserve E0382, existing diagnostic lines, positions, fixtures and harness.
+Record owning amendment/mirror and canonical two indexes: exactly seven paths.
+Preserve frozen67b; use a genuine successor and fresh source/profile admission.
+Run all fourteen negatives, then one full precommit from phase0 with the
+accepted process-local empty RUSTC_WRAPPER. Retain all guards, failed results,
+latest-nightly policy and open sccache repair. Preserve A2, Ratatui, versions,
+locks and parent pins. Stop for any new PCDN; no standing retry or release
+permission follows. Keep attempt-specific details in release evidence.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 44,
+    "amendment": 45,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
     "rationale": 19
   },
-  "object_count": 85,
+  "object_count": 86,
   "objects": [
     {
       "attrs": {
@@ -1640,6 +1640,34 @@
       "line": 1687,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.20",
       "text": "Admit one identical unfiltered retry after four HTTP503 responses;"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's accepted PCDN-34",
+        "change_kind": "semantic",
+        "chronological_rank": 38,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-15",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.21",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Admit three reviewed diagnostic-context updates in a successor",
+        "touches": [
+          "§5 strict diagnostic snapshot maintenance admission"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1760,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.21",
+      "text": "Admit three reviewed diagnostic-context updates in a successor"
     },
     {
       "attrs": {

@@ -12,5 +12,8 @@ error[E0382]: borrow of moved value: `cpu`
 note: `rlvgl_platform::hwcore::dca::Cpu::<'a, T, N>::lend_for_read` takes ownership of the receiver `self`, which moves `cpu`
   --> src/hwcore/dca.rs
    |
+   | impl<'a, T: Copy, const N: usize> Cpu<'a, T, N> {
+...
+   |     pub fn lend_for_read<C: DcaCache>(
    |         self,
    |         ^^^^

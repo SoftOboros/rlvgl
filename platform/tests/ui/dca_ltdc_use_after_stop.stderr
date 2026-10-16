@@ -12,5 +12,7 @@ error[E0382]: borrow of moved value: `scan`
 note: `rlvgl_platform::hwcore::dca::LtdcScan::<'a, T, N>::stop_scan` takes ownership of the receiver `self`, which moves `scan`
   --> src/hwcore/dca.rs
    |
+   | impl<'a, T: Copy, const N: usize> LtdcScan<'a, T, N> {
+...
    |     pub fn stop_scan<C: DcaCache>(self, ctx: &mut DcaCacheCtx<'_, C>) -> Cpu<'a, T, N> {
    |                                   ^^^^

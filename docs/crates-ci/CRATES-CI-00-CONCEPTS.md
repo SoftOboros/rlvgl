@@ -1756,3 +1756,42 @@ publication, parent adoption, hardware/live qualification or phase closure
 follows. Any additional source, URL, status-policy, profile, input or normative
 requirement stops for owner disposition; any subsequent guard failure stops
 for another owning PCDN.
+
+### 0.1.21 — 2026-10-15 — amended
+
+**Author:** Codex, recording I. Abbott's accepted PCDN-34
+**Change kind:** semantic
+**Touches:** §5 strict diagnostic snapshot maintenance admission
+**Summary:** Admit three reviewed diagnostic-context updates in a successor
+candidate; retain strict negative tests and every release prerequisite.
+
+Permit only the added enclosing impl/method context captured by the PCDN-33
+latest-nightly failure in platform/tests/ui/dca_dbuf_use_after_lend.stderr,
+platform/tests/ui/dca_ltdc_use_after_stop.stderr and
+platform/tests/ui/dca_use_after_lend.stderr. Preserve every existing diagnostic
+line in order, E0382, moved-value/consuming-self rejection and fixture positions.
+Do not change fixtures, harness, API, production code, versions or locks, and
+do not use broad snapshot overwrite or diagnostic normalization.
+
+Record this amendment and its AGENTS mirror before the correction; regenerate
+only docs/spec-index/index/crates-ci.json and docs/spec-index/index/_manifest.json
+with the unchanged canonical generator. These four governing paths plus the
+three snapshots are the complete seven-path source boundary. Preserve frozen
+67b4a3565dfa977e7057908ea46c70474d4398c5 and form a genuine successor through
+the existing protected route. Bind its exact ref/tree/bodies and actual fresh
+source/profile/helper receipts; do not transfer prior qualification to it.
+
+After fresh admission on the most-recent nightly, run all fourteen unchanged
+negative cases once. On success, run one complete scripts/pre-commit.sh from
+phase zero with process-local RUSTC_WRAPPER empty under the accepted PCDN-33
+mode. Preserve all environment, warning, timeout, capacity, native metadata,
+source/profile/default and old-state guards. The focused suite replaces no full
+gate. Retain failed results and keep sccache repair open; stop for any new PCDN.
+All existing pre-publish, clean Linux/hosted Gate P and protected adoption
+prerequisites remain mandatory. Preserve released A2, unmodified Ratatui
+0.30.2, parent pins and all other guards. No release, publication or pin
+adoption follows from this admission.
+
+Attempt-specific commands, timings, compiler identities and raw failures remain
+in retained release evidence. This amendment records only the accepted scope
+and prerequisites; it grants no standing maintenance or retry authority.
