@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 47,
+    "amendment": 48,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
-    "rationale": 19
+    "rationale": 20
   },
-  "object_count": 88,
+  "object_count": 90,
   "objects": [
     {
       "attrs": {
@@ -1724,6 +1724,47 @@
       "line": 1853,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.23",
       "text": "Admit only the existing root README checksum for the reviewed"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's accepted PCDN-43",
+        "change_kind": "semantic",
+        "chronological_rank": 41,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-17",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.24",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Preserve declared family features and exact manifest bytes when",
+        "touches": [
+          "§5 bounded STM32 BSP feature synchronization"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1884,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.24",
+      "text": "Preserve declared family features and exact manifest bytes when"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5 bounded STM32 BSP feature synchronization"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 1884,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.24-rationale",
+      "text": "The failed Stage31 run removed seven declared compatibility family features\nthat were absent from the generated board set, then serialized an otherwise\ncovered manifest. Retaining those declarations and returning before writing\nwhen discovery adds nothing preserves the admitted manifest bytes without\nweakening the member guard. Real additions remain subject to that guard and\ntheir existing owning admission."
     },
     {
       "attrs": {

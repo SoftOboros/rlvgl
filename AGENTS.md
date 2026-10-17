@@ -329,6 +329,26 @@ Resume PCDN-40 under all existing qualification and preservation requirements.
 No automatic refresh, new member/target, checker, lock, version or pin change
 is admitted. Preserve all prior evidence and stop for any new PCDN.
 
+Owner-accepted PCDN-43 admits only [CRATES-CI §15 amendment 0.1.24](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve every declared stm32-* feature and exact dependency vector; add only
+missing discovered keys with empty vectors. If no addition is needed, leave
+Cargo.toml bytes untouched, including formatting/comments. Keep all other
+manifest data and c_hal/c_hal_cm4/stm32-h7 vectors exact; retained compatibility
+keys do not establish new board or C-HAL support. Bound helper/docs to
+tools/update_stm_bsp_features.py and focused temporary-fixture regressions to
+tools/test_update_stm_bsp_features.py. Record amendment/mirror before code and
+regenerate only the unchanged-generator two canonical indexes: exactly six
+paths. Keep the BSP manifest and member12 fingerprint named in the amendment,
+every other receipt, root48/native42 and strict raw P-MEMBER guard unchanged.
+No checksum refresh, generated manifest adoption, new feature admission or
+baseline ratchet follows. Preserve normal asset generation/full formatter,
+board-failure handling and open MCU/H7 refusals without skips or clock guesses.
+Preserve failed c593 and its evidence; use a genuine successor with every
+existing fresh same-ref latest-nightly, focused, full precommit/prepublish,
+Linux/hosted31+3, custody and protected adoption requirement. Preserve versions,
+locks, profiles, A2, official Ratatui and vendor/parent pins. Stop for new PCDN;
+no standing retry, release/tag/publication, parent/hardware or phase claim.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

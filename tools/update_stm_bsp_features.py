@@ -2,9 +2,9 @@
 """Synchronize ``stm32-*`` feature options for the STM BSP crate.
 
 Scans the generated BSP sources for ``#[cfg(feature = "stm32-*")]``
-entries and rewrites ``Cargo.toml`` with matching feature keys. This
-keeps the manifest in sync with the options referenced by the source
-to avoid warnings about unknown features.
+entries and adds missing feature keys to ``Cargo.toml``. Existing declarations
+and dependency vectors are retained for compatibility. If all discovered
+features are already declared, the manifest bytes are left untouched.
 """
 from __future__ import annotations
 
@@ -30,19 +30,16 @@ def collect_features() -> list[str]:
     return sorted(features)
 
 def update_cargo_toml(features: list[str]) -> None:
-    """Rewrite the `[features]` table with the supplied STM32 entries."""
+    """Add missing STM32 feature keys without removing existing declarations."""
     data = tomllib.loads(TOML_PATH.read_text(encoding="utf-8"))
     feats = data.setdefault("features", {})
-    existing_stm = {
-        key: value for key, value in feats.items() if key.startswith("stm32-")
-    }
-    # Remove existing stm32-* keys
-    for key in list(feats.keys()):
-        if key.startswith("stm32-"):
-            feats.pop(key)
-    for feat in features:
-        if feat.startswith("stm32-"):
-            feats[feat] = existing_stm.get(feat, [])
+    missing = sorted(
+        {feat for feat in features if feat.startswith("stm32-") and feat not in feats}
+    )
+    if not missing:
+        return
+    for feat in missing:
+        feats[feat] = []
     TOML_PATH.write_text(tomli_w.dumps(data), encoding="utf-8")
 
 def main() -> None:

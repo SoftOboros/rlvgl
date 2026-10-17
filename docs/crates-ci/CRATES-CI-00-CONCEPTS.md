@@ -1880,3 +1880,67 @@ Preserve all locks, versions, allocations, frozen and failed candidates,
 profiles, evidence, A2, official Ratatui0.30.2 and parent/vendor pins. Keep
 existing MCU and H7 refusals open and retain every other guard. Stop for any
 new PCDN; no publication, tag, parent adoption or phase closure follows.
+
+### 0.1.24 — 2026-10-17 — amended
+
+**Author:** Codex, recording I. Abbott's accepted PCDN-43
+**Change kind:** semantic
+**Touches:** §5 bounded STM32 BSP feature synchronization
+**Summary:** Preserve declared family features and exact manifest bytes when
+normal asset discovery requires no additions; retain strict member admission.
+
+Permit the owned STM32 BSP feature-sync helper to retain every existing
+`stm32-*` Cargo feature and its exact dependency vector while ensuring that
+keys discovered in generated BSP cfg references are represented. Absence from
+the current generated board set must not remove an existing declared feature.
+Add only missing discovered keys, using empty vectors; preserve all existing
+features, package/dependency/build-dependency data and the exact `c_hal`,
+`c_hal_cm4` and `stm32-h7` vectors. When no addition is needed, leave the
+manifest bytes untouched, including formatting and comments. This retains
+compatibility feature names; it does not add board or C-HAL implementation.
+
+Bound implementation and local helper documentation to
+`tools/update_stm_bsp_features.py`, with meaningful focused regressions in
+`tools/test_update_stm_bsp_features.py`. Require a discovered subset to preserve
+all seven existing empty family keys and existing dependency vectors, an
+already-covered set to leave original bytes unchanged without serialization,
+and a missing-key addition to preserve every existing semantic field and
+vector. A subsequent synchronization must be byte-idempotent. Exercise these
+cases only in isolated temporary fixtures; focused checks replace no full gate.
+
+Record this owning amendment and its AGENTS mirror before implementation;
+regenerate only `docs/spec-index/index/crates-ci.json` and
+`docs/spec-index/index/_manifest.json` with the unchanged canonical generator.
+These four governing paths and the helper/test are the complete six-path
+source boundary. Keep unrelated READMEs and shared-file fingerprints exact.
+
+Keep `chips/stm/bsps/Cargo.toml` and its member fingerprint at
+`/workspaces/0/members/12/manifest_sha256` in
+`scripts/crates_ci_workspace_contexts.json` unchanged at
+`0c81e45e101d1880a875153cab83a042d66cd7f645ca7c49d8144dc3cb8bf0ce`.
+Keep the raw `P-MEMBER-CHANGED` guard, staging/package checkers, every other
+receipt value and finite root48/native42 contexts unchanged. A genuinely new
+effective manifest change still requires its existing owning admission; no
+automatic feature admission, checksum refresh, generated manifest postimage or
+baseline ratchet is authorized. Preserve normal asset generation and full
+formatting, board-failure handling and the open MCU/H7 refusals; no board skip,
+clock inference, placeholder binding or guard waiver is admitted.
+
+Preserve failed candidate `c593e8d8930634ed04e3d8c2d9b2e4171809ce92`, its
+failed Stage31 result and partial evidence. Form a genuine successor and
+qualify its exact source through the existing same-ref most-recent-nightly
+source/profile/default/native/old-state, focused, full pre-commit/pre-publish,
+clean Linux and hosted Stage31/all-three-consumer checks and normal protected
+route. Previous candidate results do not qualify the successor. Preserve
+versions, selective allocations, locks, profiles, released A2, unmodified
+Ratatui0.30.2 and vendor/parent pins. Stop for any new PCDN. No standing retry,
+release/tag/publication, parent adoption, hardware or phase closure follows.
+
+#### Rationale
+
+The failed Stage31 run removed seven declared compatibility family features
+that were absent from the generated board set, then serialized an otherwise
+covered manifest. Retaining those declarations and returning before writing
+when discovery adds nothing preserves the admitted manifest bytes without
+weakening the member guard. Real additions remain subject to that guard and
+their existing owning admission.
