@@ -3,12 +3,14 @@ owned-bridge-maintenance.md — Current Unreleased candidate, native API and rel
 -->
 # Unreleased owned-bridge maintenance
 
-Status as of **2026-10-13**. This is the current source/API guide for the accepted
+Status as of **2026-10-17**. This is the current source/API guide for the accepted
 maintenance candidate. Released v0.2.7 / A2 remains unchanged. Package allocations
 below do not assert registry availability or select a future release tag.
-The [dated family state](v0.2.7-successor-family-state-20261013.md) records the
-remaining initiative decisions and evidence. Historical plans and failed results
-retain their original scope; this guide does not ratify a phase or close a gate.
+The [October 13 family snapshot](v0.2.7-successor-family-state-20261013.md)
+retains the allocations, decisions and evidence recorded on that date. This
+guide reflects the later accepted API/core allocations; owning amendments
+govern subsequent changes. Historical plans and failed results retain their
+original scope; this guide does not ratify a phase or close a gate.
 
 ## Source and package identity
 
@@ -17,13 +19,15 @@ retain their original scope; this guide does not ratify a phase or close a gate.
 | `rlvgl` | 0.2.8 | Selective umbrella-package allocation |
 | `rlvgl-platform` | 0.2.7 | Selective allocation including the accepted one-line compile-diagnostic correction; typed front-buffer write prohibition remains |
 | `ratatui-rlvgl` | 0.1.2 | Owned carrier at `crates/ratatui-rlvgl` |
-| `rlvgl-core` | 0.2.7 | Existing allocation and published payload remain unchanged |
+| `rlvgl-api` | 0.2.2 | Accepted PCDN-18 iterator compatibility allocation |
+| `rlvgl-core` | 0.2.8 | Accepted PCDN-19 const-safe slice correction; published core 0.2.7/A2 remains unchanged |
 | Official Ratatui | Release 0.30.2; commit `e665c36cb14752a61cd777fbd06dbef8474f2add` | Unmodified upstream source authority |
 | `ratatui-core` | Exactly 0.1.2 | Native primitive crate from that upstream release; its package version differs from the Ratatui release version |
 
-The other published package allocations and existing dependency minima are
-retained. Publication selects the changed bridge → platform → umbrella cohort;
-it does not bump every workspace package or dependency requirement.
+The other accepted package allocations and existing dependency minima are
+retained. The API/core allocations join the bridge, platform and umbrella
+maintenance changes; they do not bump every workspace package or dependency
+requirement. These are candidate allocations, not a claimed final publish list.
 
 Current source consumers use `ratatui_core` for `Terminal`, `Buffer`, `Rect`,
 styles, text and native widget traits, and `ratatui_rlvgl` for the backend, view
@@ -137,9 +141,13 @@ native-workspace members; these are not additional publish-list entries or
 permission to admit future descriptors automatically. The current authority is
 [CRATES-CI](../crates-ci/CRATES-CI-00-CONCEPTS.md).
 
-The publisher selects **three changed packages** in the existing full order:
-`ratatui-rlvgl` 0.1.2 → `rlvgl-platform` 0.2.7 → `rlvgl` 0.2.8. Full packaging
-still verifies unchanged versions with P-DIFF. Progressive package verification
+The accepted maintenance allocations include `rlvgl-api` 0.2.2 →
+`rlvgl-core` 0.2.8 → `ratatui-rlvgl` 0.1.2 → `rlvgl-platform` 0.2.7 →
+`rlvgl` 0.2.8 in the existing full order. Determine the actual publish cohort
+from the intended release baseline and complete candidate diff, then verify
+registry and package state through the existing gates. Comparing only the
+latest helper/docs commit with its parent does not establish that cohort.
+Full packaging still verifies unchanged versions with P-DIFF. Progressive package verification
 uses extracted predecessors; final consumers use extracted archives, with no
 workspace/source fallback. Include, metadata, resolution, order, finite-context,
 withdrawal and source/lock-drift guards remain required.

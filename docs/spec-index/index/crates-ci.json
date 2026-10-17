@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 48,
+    "amendment": 49,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
-    "rationale": 20
+    "rationale": 21
   },
-  "object_count": 90,
+  "object_count": 92,
   "objects": [
     {
       "attrs": {
@@ -1765,6 +1765,47 @@
       "line": 1884,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.24-rationale",
       "text": "The failed Stage31 run removed seven declared compatibility family features\nthat were absent from the generated board set, then serialized an otherwise\ncovered manifest. Retaining those declarations and returning before writing\nwhen discovery adds nothing preserves the admitted manifest bytes without\nweakening the member guard. Real additions remain subject to that guard and\ntheir existing owning admission."
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's accepted PCDN-44",
+        "change_kind": "semantic",
+        "chronological_rank": 42,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-17",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": true,
+        "rationale_required": true,
+        "rev": "0.1.25",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Reconcile current documentation with accepted API/core allocations",
+        "touches": [
+          "§5 current release guidance and root README shared-file admission"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1948,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.25",
+      "text": "Reconcile current documentation with accepted API/core allocations"
+    },
+    {
+      "attrs": {
+        "motivates": [
+          "§5 current release guidance and root README shared-file admission"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "rationale",
+      "line": 1948,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.25-rationale",
+      "text": "Current-facing guidance still described the earlier core 0.2.7 allocation and\nthree-package cohort after PCDN-18/19 accepted API 0.2.2 and core 0.2.8. Aligning\nthose statements prevents maintainers from treating historical allocations as\nthe current release plan. The root README is an admitted shared package input,\nso its factual correction requires the exact checksum amendment while leaving\nall other receipt values and package identity guards unchanged."
     },
     {
       "attrs": {

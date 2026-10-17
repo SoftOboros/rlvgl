@@ -349,6 +349,23 @@ Linux/hosted31+3, custody and protected adoption requirement. Preserve versions,
 locks, profiles, A2, official Ratatui and vendor/parent pins. Stop for new PCDN;
 no standing retry, release/tag/publication, parent/hardware or phase claim.
 
+Owner-accepted PCDN-44 admits only [CRATES-CI §15 amendment 0.1.25](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Align current README and owned-bridge maintenance guidance with accepted API
+0.2.2/core0.2.8 and retained root0.2.8/platform0.2.7/bridge0.1.2 allocations.
+Preserve core0.2.7/A2 as released history; distinguish the unchanged October13
+snapshot from current guidance. Derive actual publishing scope from the release
+baseline and full candidate diff; no three-package-only or registry claim.
+Admit only the root README shared-file checksum at policy member0, from8fa6
+to48d1 as fully specified by the owning amendment; every other byte/value and
+guard remains exact. Record amendment/mirror first and regenerate only the
+unchanged-generator canonical two indexes: exactly seven files including
+the two current docs and receipt. Verify versions, exact receipt delta,
+history, indexes and fresh unfiltered four-document links; retain inherited
+failures and existing dispositions. Preserve d946, all source/manifests/locks,
+allocations, profiles, A2, Ratatui and parent/vendor pins. The changed README
+still needs fresh exact-source full qualification and package/consumer proof
+through existing protected gates. Stop for new PCDN; no release or gate waiver.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

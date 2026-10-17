@@ -1944,3 +1944,66 @@ covered manifest. Retaining those declarations and returning before writing
 when discovery adds nothing preserves the admitted manifest bytes without
 weakening the member guard. Real additions remain subject to that guard and
 their existing owning admission.
+
+### 0.1.25 — 2026-10-17 — amended
+
+**Author:** Codex, recording I. Abbott's accepted PCDN-44
+**Change kind:** semantic
+**Touches:** §5 current release guidance and root README shared-file admission
+**Summary:** Reconcile current documentation with accepted API/core allocations
+and admit only the resulting root README checksum.
+
+Update only the current candidate statements in `README.md` and
+`docs/releases/owned-bridge-maintenance.md` to reflect the already accepted
+`rlvgl-api` 0.2.2 and `rlvgl-core` 0.2.8 allocations alongside `rlvgl` 0.2.8,
+`rlvgl-platform` 0.2.7 and `ratatui-rlvgl` 0.1.2. Preserve published core
+0.2.7 and released A2 as historical release identities. Remove the obsolete
+claim that only bridge, platform and umbrella packages form the publish cohort;
+the actual cohort must be established from the intended release baseline,
+complete candidate diff and existing package/registry gates. The listed
+allocations do not themselves assert publication or a final changed-crate list.
+
+Label links to `docs/releases/v0.2.7-successor-family-state-20261013.md` as a
+dated historical snapshot in the current guidance. Preserve that snapshot,
+all earlier amendment entries and historical receipts byte-for-byte. Do not
+rewrite their old allocations as if they had described this later candidate.
+
+At `/workspaces/0/members/0/shared_files/0/sha256` in
+`scripts/crates_ci_workspace_contexts.json`, replace only
+`8fa6ca9b1cd6b4077c255ecba1339effeea85e2eac2171bf333d23be6842e836` with
+`48d1ccf7e63162a23ccd73c29d54aff5cb6c28592cd178846637122ce7763974`,
+the bounded README postimage. Every other policy byte and structural value
+must remain exact. Preserve the finite root48/native42 contexts, all
+descriptor/member/target/shared-file identities and strict raw drift guards.
+This is one exact shared-file admission, not automatic checksum maintenance.
+
+Record this owning amendment and the AGENTS mirror before adopting the
+documentation and receipt postimages. Regenerate only
+`docs/spec-index/index/crates-ci.json` and
+`docs/spec-index/index/_manifest.json` with the unchanged canonical generator.
+Those four governing paths, the two current documents and the receipt are
+the complete seven-file boundary. Verify the current version statements
+against unchanged manifests, the sole receipt-field replacement, historical
+preservation and deterministic indexes; freshly check all four changed
+Markdown documents without filters or ignored errors. Retain inherited
+whole-tree link failures under their existing dispositions; change no checker
+or waiver. Review this bounded result before full release qualification.
+
+No implementation, test, manifest, version, dependency, lock, source snapshot,
+compiler profile, workflow or pin changes follow. Preserve committed PCDN-43
+`d946fa4e15980f0349dc7275f900a28bd669ac0e`, failed candidates and all evidence.
+The README is a package input: its new bytes still require fresh exact-source
+package/consumer verification. Preserve most-recent-nightly qualification,
+full pre-commit/pre-publish, clean Linux and hosted Stage31/all-three-consumer,
+protected integration and release guards. Preserve official Ratatui 0.30.2,
+A2 and parent/vendor pins; stop for any new PCDN. No passing qualification,
+release/tag/publication, parent adoption, hardware or phase closure is claimed.
+
+#### Rationale
+
+Current-facing guidance still described the earlier core 0.2.7 allocation and
+three-package cohort after PCDN-18/19 accepted API 0.2.2 and core 0.2.8. Aligning
+those statements prevents maintainers from treating historical allocations as
+the current release plan. The root README is an admitted shared package input,
+so its factual correction requires the exact checksum amendment while leaving
+all other receipt values and package identity guards unchanged.
