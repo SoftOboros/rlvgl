@@ -46,7 +46,7 @@
     "chips-ti": 31,
     "concepts": 7,
     "cpy": 334,
-    "crates-ci": 86,
+    "crates-ci": 88,
     "creator": 10,
     "dcb": 56,
     "disco-platform-guide": 1,
@@ -65,5 +65,5 @@
   },
   "schema_version": 2,
   "total_edges": 1649,
-  "total_objects": 2318
+  "total_objects": 2320
 }

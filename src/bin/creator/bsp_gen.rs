@@ -254,6 +254,9 @@ pub(crate) fn render_from_ir(
         }
     };
 
+    // Per-peripheral calls resolve at the board module containing this output.
+    // A parent board's FFI does not satisfy that path for split-core output.
+    let has_c_ffi = out_dir.join("c_ffi.rs").is_file();
     match layout {
         Layout::OneFile => {
             let filtered = maybe_filter_ir(ir);
@@ -298,6 +301,7 @@ pub(crate) fn render_from_ir(
                     grouped_writes,
                     with_deinit,
                     mod_name => name,
+                    has_c_ffi,
                     use_label_names,
                     emit_label_consts,
                     idents,
@@ -483,7 +487,8 @@ pub(crate) fn emit_board_mod(
         hal => has_hal,
         pac => has_pac,
         summary => has_summary,
-        pinreport => has_pinreport
+        pinreport => has_pinreport,
+        has_c_ffi => out_dir.join("c_ffi.rs").is_file()
     })?;
     fs::write(out_dir.join("mod.rs"), rendered)?;
     // Also emit a user-editable board.rs with defaults if missing.
@@ -525,6 +530,135 @@ fn sanitize_ident(label: &str, prefix: Option<&str>) -> String {
 mod tests {
     use super::*;
     use minijinja::{Environment, context};
+
+    #[test]
+    fn board_module_declares_only_existing_c_ffi_and_preserves_it() {
+        let ffi = include_bytes!("../../../chips/stm/bsps/src/stm32h747i_disco/c_ffi.rs");
+        for present in [false, true] {
+            let out = tempfile::tempdir().unwrap();
+            let path = out.path().join("c_ffi.rs");
+            if present {
+                fs::write(&path, ffi).unwrap();
+            }
+            emit_board_mod(out.path(), true, true, false, false).unwrap();
+            let module = fs::read_to_string(out.path().join("mod.rs")).unwrap();
+            assert!(module.contains("pub mod hal;"));
+            assert!(module.contains("pub mod pac;"));
+            assert!(module.contains("pub mod board;"));
+            assert!(out.path().join("board.rs").is_file());
+            assert_eq!(module.contains("pub mod c_ffi;"), present);
+            assert_eq!(module.contains("#[cfg(feature = \"c_hal\")]"), present);
+            if present {
+                assert_eq!(fs::read(&path).unwrap().as_slice(), &ffi[..]);
+            } else {
+                assert!(!path.exists(), "generation must not create a C FFI stub");
+            }
+        }
+    }
+
+    fn peripheral_pac_spec() -> ir::Ir {
+        ir::Ir {
+            mcu: "STM32H747XIHx".to_owned(),
+            package: "TFBGA240".to_owned(),
+            clocks: ir::Clocks::default(),
+            pinctrl: vec![ir::Pin {
+                pin: "PA9".to_owned(),
+                func: "USART1_TX".to_owned(),
+                label: None,
+                af: 7,
+            }],
+            peripherals: IndexMap::from([(
+                "usart1".to_owned(),
+                ir::Peripheral {
+                    class: "serial".to_owned(),
+                    signals: IndexMap::from([("tx".to_owned(), "PA9".to_owned())]),
+                    core: None,
+                },
+            )]),
+            pwr: ir::Power::default(),
+        }
+    }
+
+    fn render_peripheral_pac(out: &Path, layout: Layout) -> String {
+        let per_peripheral = matches!(layout, Layout::PerPeripheral);
+        render_from_ir(
+            &peripheral_pac_spec(),
+            TemplateKind::Pac,
+            out,
+            true,
+            true,
+            layout,
+            false,
+            None,
+            false,
+            false,
+            None,
+        )
+        .unwrap();
+        let relative = if per_peripheral {
+            "pac/usart1.rs"
+        } else {
+            "pac.rs"
+        };
+        fs::read_to_string(out.join(relative)).unwrap()
+    }
+
+    #[test]
+    fn peripheral_pac_delegates_only_with_local_c_ffi() {
+        let ffi = include_bytes!("../../../chips/stm/bsps/src/stm32h747i_disco/c_ffi.rs");
+        for present in [false, true] {
+            let out = tempfile::tempdir().unwrap();
+            if present {
+                fs::write(out.path().join("c_ffi.rs"), ffi).unwrap();
+            }
+            let rendered = render_peripheral_pac(out.path(), Layout::PerPeripheral);
+            for operation in [
+                "enable_gpio_clocks",
+                "configure_pins",
+                "enable_peripherals",
+                "deinit",
+            ] {
+                assert_eq!(
+                    rendered.contains(&format!("super::super::c_ffi::c_usart1_{operation}();")),
+                    present,
+                    "C delegation for {operation} must match the board module"
+                );
+            }
+            assert_eq!(rendered.contains("#[cfg(feature = \"c_hal\")]"), present);
+            assert_eq!(
+                rendered.contains("#[cfg(not(feature = \"c_hal\"))]"),
+                present
+            );
+            // Preserve the existing native register paths, including when c_hal
+            // is enabled for another board in the same BSP crate.
+            assert!(rendered.contains("const MASK:"));
+            assert!(rendered.contains("dp.GPIOA.pupdr.modify"));
+            assert!(rendered.contains("// Return pins to analog"));
+            assert!(rendered.contains("pub fn enable_peripherals("));
+            let one_file = render_peripheral_pac(out.path(), Layout::OneFile);
+            assert!(!one_file.contains("super::super::c_ffi::"));
+        }
+    }
+
+    #[test]
+    fn split_output_does_not_inherit_parent_c_ffi() {
+        let out = tempfile::tempdir().unwrap();
+        let ffi = include_bytes!("../../../chips/stm/bsps/src/stm32h747i_disco/c_ffi.rs");
+        fs::write(out.path().join("c_ffi.rs"), ffi).unwrap();
+        let split = out.path().join("cm7");
+        let rendered = render_peripheral_pac(&split, Layout::PerPeripheral);
+        emit_board_mod(&split, false, true, false, false).unwrap();
+        assert!(!rendered.contains("super::super::c_ffi::"));
+        assert!(
+            !fs::read_to_string(split.join("mod.rs"))
+                .unwrap()
+                .contains("pub mod c_ffi;")
+        );
+        assert_eq!(
+            fs::read(out.path().join("c_ffi.rs")).unwrap().as_slice(),
+            &ffi[..]
+        );
+    }
 
     #[test]
     fn pac_template_includes_label_in_comment() {

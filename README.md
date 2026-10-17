@@ -264,6 +264,14 @@ MiniJinja templates can use the following filters:
 - `af_alt` – render an alternate-function number for
   `into_alternate::<AF>()` (`7` → `<7>`).
 
+Per-peripheral BSP rendering supplies `has_c_ffi` when the output board directory
+already contains a concrete `c_ffi.rs`. The board module and PAC template use the
+same capability: supported boards retain feature-gated C delegation, while boards
+without that module keep the existing Rust register paths even when `c_hal` is
+enabled elsewhere in the crate. The generator preserves the existing FFI file and
+creates no replacement or stub. Split-core output checks its own directory;
+one-file PAC output does not delegate through a board module.
+
 Users may supply custom templates by pointing `--templates` at any
 directory; the filters above are always available.
 

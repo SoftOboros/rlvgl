@@ -299,6 +299,36 @@ latest-nightly policy and open sccache repair. Preserve A2, Ratatui, versions,
 locks and parent pins. Stop for any new PCDN; no standing retry or release
 permission follows. Keep attempt-specific details in release evidence.
 
+Owner-accepted PCDN-40 admits only [CRATES-CI §15 amendment 0.1.22](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Make generated board-local optional C-FFI declarations and PAC calls agree with
+concrete supported bindings. Preserve H747 C-HAL behavior and native Rust
+initialization without bindings, including with crate-wide c_hal enabled.
+No ancestor inference, fake bindings, expanded C-HAL or formatting waiver.
+Bound code/tests to bsp_gen.rs and its existing inline tests, board_mod.rs.jinja
+and pac.rs.jinja; document the helper boundary in the existing README section.
+Record amendment/mirror before implementation and regenerate the unchanged
+canonical two indexes: exactly eight source paths. Admit only the already
+pinned tomli-w1.2.0 prerequisite in a bounded private Python context, preserving
+old interpreter/compiler profiles and defaults without whole-setup replay.
+Preserve frozen98bf and failed packaging evidence; use a genuine successor
+with fresh source/profile admission and all existing focused, full precommit,
+prepublish, clean Linux/hosted31+3 and protected adoption guards. Keep the MCU
+lookup and five H7 clock-source refusals reported/open; no defaults, skips,
+vendor-input or loop-failure changes. Preserve versions, locks, A2, Ratatui,
+parent/vendor pins, empty process-local wrapper and all remaining guards.
+Stop for any new PCDN; no standing retry, publication, tag, pin or phase claim.
+
+Owner-accepted PCDN-41 admits only [CRATES-CI §15 amendment 0.1.23](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Replace only the existing root README shared-file SHA at
+/workspaces/0/members/0/shared_files/0/sha256 in
+scripts/crates_ci_workspace_contexts.json with the exact reviewed PCDN-40
+postimage named in that amendment. Every other receipt byte/value and guard
+stays unchanged. Record amendment/mirror before adoption and regenerate the
+same unchanged-generator two indexes; the source boundary is nine paths.
+Resume PCDN-40 under all existing qualification and preservation requirements.
+No automatic refresh, new member/target, checker, lock, version or pin change
+is admitted. Preserve all prior evidence and stop for any new PCDN.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

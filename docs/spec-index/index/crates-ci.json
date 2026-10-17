@@ -326,13 +326,13 @@
   ],
   "family": "crates-ci",
   "kind_counts": {
-    "amendment": 45,
+    "amendment": 47,
     "errata": 2,
     "gate": 13,
     "invariant": 7,
     "rationale": 19
   },
-  "object_count": 86,
+  "object_count": 88,
   "objects": [
     {
       "attrs": {
@@ -1668,6 +1668,62 @@
       "line": 1760,
       "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.21",
       "text": "Admit three reviewed diagnostic-context updates in a successor"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's accepted PCDN-40",
+        "change_kind": "semantic",
+        "chronological_rank": 39,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.22",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Align generated optional C-FFI declarations and calls with concrete",
+        "touches": [
+          "§5 bounded normal BSP asset preparation correction"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1799,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.22",
+      "text": "Align generated optional C-FFI declarations and calls with concrete"
+    },
+    {
+      "attrs": {
+        "author": "Codex, recording I. Abbott's accepted PCDN-41",
+        "change_kind": "semantic",
+        "chronological_rank": 40,
+        "commits": null,
+        "conformant_change_kind": true,
+        "conformant_status": true,
+        "date": "2026-10-16",
+        "doc_entries_out_of_order": false,
+        "field_provenance": "declared",
+        "has_rationale": false,
+        "rationale_required": true,
+        "rev": "0.1.23",
+        "shape": "block",
+        "status": "amended",
+        "summary": "Admit only the existing root README checksum for the reviewed",
+        "touches": [
+          "§5 existing shared README receipt admission"
+        ]
+      },
+      "doc": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md",
+      "family": "crates-ci",
+      "kind": "amendment",
+      "line": 1853,
+      "obj_id": "docs/crates-ci/CRATES-CI-00-CONCEPTS.md#0.1.23",
+      "text": "Admit only the existing root README checksum for the reviewed"
     },
     {
       "attrs": {

@@ -1795,3 +1795,88 @@ adoption follows from this admission.
 Attempt-specific commands, timings, compiler identities and raw failures remain
 in retained release evidence. This amendment records only the accepted scope
 and prerequisites; it grants no standing maintenance or retry authority.
+
+### 0.1.22 — 2026-10-16 — amended
+
+**Author:** Codex, recording I. Abbott's accepted PCDN-40
+**Change kind:** semantic
+**Touches:** §5 bounded normal BSP asset preparation correction
+**Summary:** Align generated optional C-FFI declarations and calls with concrete
+board-local bindings; retain normal asset preparation and release guards.
+
+Permit the owned BSP generator to declare and reference an optional C-FFI module
+only when that board's output has the concrete supported module. Preserve the
+existing STM32H747I-DISCO bindings and C-HAL calls. Boards without those bindings
+retain native Rust initialization, including when the crate-wide c_hal feature
+is selected. Keep module declaration and all generated C-call branches
+consistent; do not infer bindings from an ancestor directory, synthesize empty
+bindings, or broaden C-HAL support. Preserve one-file output behavior.
+
+Bound implementation to src/bin/creator/bsp_gen.rs and its existing inline
+tests, src/bin/creator/bsp/templates/board_mod.rs.jinja and
+src/bin/creator/bsp/templates/pac.rs.jinja. Document the template capability
+boundary in the existing README.md helper section. Require focused checks for
+present and absent bindings, retained native and C branches, unchanged concrete
+H747 bindings, and generated formatter closure. Do not waive or narrow formatting.
+
+Record this owning amendment and its AGENTS mirror before adopting the
+implementation, then regenerate docs/spec-index/index/crates-ci.json and
+docs/spec-index/index/_manifest.json with the unchanged canonical generator.
+These four governing paths plus the four implementation/documentation paths
+are the bounded source change. Preserve frozen candidate98bf768b and its failed
+packaging checkout; form a genuine successor and qualify its exact source anew.
+
+Admit the existing requirements.txt prerequisite tomli-w==1.2.0 into a bounded
+private packaging Python context. Preserve original interpreter/compiler
+profiles, defaults and all earlier setup results; no complete requirements or
+setup replay is authorized. Capture actual selected interpreter and dependency
+identities. Keep attempt-specific environment and evidence details outside
+the normative source amendment.
+
+Retain the failed Stage31 result and all partial evidence. The separate MCU
+lookup failure and five explicit H7 PLL-source refusals remain reported/open;
+do not invent clock sources or frequencies, change board-failure handling,
+edit vendor inputs, or add board skips. Preserve all versions, dependencies,
+locks, finite48/42 policy, assets policy, released A2, official Ratatui0.30.2,
+vendor and parent pins. No generated asset postimage is adopted by this source
+correction.
+
+Require fresh same-ref most-recent-nightly source/profile admission, focused
+regressions, all existing full pre-commit and pre-publish checks, clean Linux
+and hosted Stage31 with all three consumers, and normal protected adoption.
+Preserve process-local empty RUSTC_WRAPPER, the open sccache repair, strict
+warnings and diagnostics, timeouts, capacity floor, native/source/profile/
+default/old-state custody and every other guard. Previous candidate results
+do not qualify this successor. Stop for any new PCDN. No standing retry,
+publication, tag, parent adoption, hardware or phase-closure authority follows.
+
+### 0.1.23 — 2026-10-16 — amended
+
+**Author:** Codex, recording I. Abbott's accepted PCDN-41
+**Change kind:** semantic
+**Touches:** §5 existing shared README receipt admission
+**Summary:** Admit only the existing root README checksum for the reviewed
+PCDN-40 helper documentation; preserve every other receipt value and guard.
+
+At /workspaces/0/members/0/shared_files/0/sha256 in
+scripts/crates_ci_workspace_contexts.json, replace only
+c6028e99000b07f20bce08269a27bc539b840dbb51947dc657c2321e707d3960 with
+8fa6ca9b1cd6b4077c255ecba1339effeea85e2eac2171bf333d23be6842e836.
+This is the reviewed README.md postimage accompanying PCDN-40. Verify that
+every other receipt byte and structural value is unchanged. Keep the checker,
+workspace identities, descriptor/member/manifest/target definitions, other
+shared hashes and finite48/42 contexts exact. No automatic receipt refresh or
+standing checksum-maintenance exception is authorized.
+
+Record this amendment and AGENTS mirror before adopting the receipt change;
+regenerate the same two canonical outputs with the unchanged generator. The
+existing receipt file is the sole additional source path beyond 0.1.22, making
+nine paths. Resume the accepted correction and bounded Python prerequisite
+only with all existing fresh source/profile, focused, full pre-commit,
+pre-publish, clean Linux/hosted Stage31, three-consumer and protected adoption
+requirements intact. The checksum admission does not itself qualify packaging.
+
+Preserve all locks, versions, allocations, frozen and failed candidates,
+profiles, evidence, A2, official Ratatui0.30.2 and parent/vendor pins. Keep
+existing MCU and H7 refusals open and retain every other guard. Stop for any
+new PCDN; no publication, tag, parent adoption or phase closure follows.
