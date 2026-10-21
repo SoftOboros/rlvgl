@@ -932,11 +932,10 @@ impl ResolvedObjectDispatch {
 
     /// Return the pre-dispatch target view.
     pub const fn target_view(&self) -> NativeNodeView {
-        self.route
-            .as_slice()
-            .last()
-            .expect("resolved routes contain a target")
-            .view
+        match self.route.as_slice() {
+            [.., target] => target.view,
+            [] => panic!("resolved routes contain a target"),
+        }
     }
 
     /// Return whether target-phase widget semantics will be invoked.
@@ -3972,5 +3971,93 @@ mod tests {
 
     fn child_tags(root: &ObjectNode) -> Vec<&'static str> {
         root.children().iter().filter_map(ObjectNode::tag).collect()
+    }
+
+    // This body is checked in a const context. The runtime cases below do not
+    // claim const evaluation of a nonempty heap-allocated route.
+    const fn target_view_const_caller(resolved: &ResolvedObjectDispatch) -> NativeNodeView {
+        resolved.target_view()
+    }
+
+    #[test]
+    fn target_view_const_caller_keeps_root_snapshot() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let expected = NativeNodeView::capture(&root);
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: Vec::new(),
+                event: ObjectEvent::Clicked { x: 1, y: 1 },
+            },
+        )
+        .expect("selected root route resolves");
+        assert!(resolved.target_path().is_empty());
+        assert!(matches!(
+            resolved.event(),
+            ObjectEvent::Clicked { x: 1, y: 1 }
+        ));
+        assert_eq!(expected.tag, Some("root"));
+        assert_eq!(target_view_const_caller(&resolved), expected);
+
+        root.set_state(ObjectStates::FOCUSED, true);
+        assert_ne!(NativeNodeView::capture(&root), expected);
+        assert_eq!(target_view_const_caller(&resolved), expected);
+    }
+
+    #[test]
+    fn target_view_const_caller_keeps_deep_final_snapshot() {
+        let mut root = TestWidget::node("root", rect(0, 0, 100, 100));
+        let mut branch = TestWidget::node("branch", rect(5, 5, 40, 40));
+        branch.append_child(TestWidget::node("target", rect(9, 10, 15, 16)));
+        root.append_child(branch);
+        let expected = NativeNodeView::capture(&root.children()[0].children()[0]);
+        let resolved = resolve_object_dispatch(
+            &root,
+            DispatchInput::Container {
+                path: vec![0, 0],
+                event: ObjectEvent::Clicked { x: 10, y: 11 },
+            },
+        )
+        .expect("deep target route resolves");
+        assert_eq!(resolved.target_path(), &[0, 0]);
+        assert!(matches!(
+            resolved.event(),
+            ObjectEvent::Clicked { x: 10, y: 11 }
+        ));
+        assert_eq!(expected.tag, Some("target"));
+        assert_eq!(target_view_const_caller(&resolved), expected);
+        assert_ne!(target_view_const_caller(&resolved).tag, root.tag());
+        assert_ne!(
+            target_view_const_caller(&resolved).tag,
+            root.children()[0].tag()
+        );
+
+        root.children_mut()[0].children_mut()[0].set_state(ObjectStates::FOCUSED, true);
+        assert_ne!(
+            NativeNodeView::capture(&root.children()[0].children()[0]),
+            expected
+        );
+        assert_eq!(target_view_const_caller(&resolved), expected);
+    }
+
+    #[test]
+    fn target_view_empty_route_preserves_exact_panic() {
+        let invalid = ResolvedObjectDispatch {
+            target_path: Vec::new(),
+            event: ObjectEvent::Clicked { x: 0, y: 0 },
+            raw_stream_event: None,
+            route: Vec::new(),
+        };
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            target_view_const_caller(&invalid)
+        }))
+        .expect_err("private empty route must retain the invariant panic");
+        if let Some(message) = panic.downcast_ref::<&str>() {
+            assert_eq!(*message, "resolved routes contain a target");
+        } else if let Some(message) = panic.downcast_ref::<alloc::string::String>() {
+            assert_eq!(message.as_str(), "resolved routes contain a target");
+        } else {
+            panic!("empty route panic did not contain the invariant text");
+        }
     }
 }

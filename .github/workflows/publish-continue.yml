@@ -12,6 +12,13 @@ jobs:
     outputs:
       tag_sha: ${{ steps.tags.outputs.tag_sha }}
       base_sha: ${{ steps.tags.outputs.base_sha }}
+      date: ${{ steps.nightly.outputs.date }}
+      manifest_sha256: ${{ steps.nightly.outputs.manifest_sha256 }}
+      helper_sha256: ${{ steps.nightly.outputs.helper_sha256 }}
+      source_sha: ${{ steps.nightly.outputs.source_sha }}
+      workflow_sha: ${{ steps.tags.outputs.workflow_sha }}
+      artifact_id: ${{ steps.nightly_artifact.outputs.artifact-id }}
+      artifact_digest: ${{ steps.nightly_artifact.outputs.artifact-digest }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -42,32 +49,44 @@ jobs:
         echo "  workflow head: $workflow_sha"
         echo "  latest tag:    $head_tag ($tag_sha)"
         echo "  previous tag:  $base_tag ($base_sha)"
+    - name: Preserve qualification helper from workflow revision
+      shell: bash
+      run: |
+        test "$(git rev-parse HEAD)" = "${{ steps.tags.outputs.workflow_sha }}"
+        mkdir -p "$RUNNER_TEMP/rlvgl-nightly-tools"
+        cp scripts/setup-ci-env.sh "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh"
+        chmod +x "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh"
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.tags.outputs.tag_sha }}
+        fetch-depth: 0
+    - name: Resolve immutable newest nightly cohort
+      id: nightly
+      shell: bash
+      run: |
+        bash "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh" resolve \
+          --output-dir "$RUNNER_TEMP/rlvgl-nightly-cohort" \
+          --source-sha "${{ steps.tags.outputs.tag_sha }}" \
+          --workflow-sha "${{ steps.tags.outputs.workflow_sha }}"
+    - name: Retain immutable nightly cohort
+      id: nightly_artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nightly-cohort-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          ${{ runner.temp }}/rlvgl-nightly-cohort/channel-rust-nightly.toml
+          ${{ runner.temp }}/rlvgl-nightly-cohort/cohort.json
+        if-no-files-found: error
     permissions:
       contents: read
   gate-p:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    container:
-      image: docker.io/iraa/rlvgl:latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ needs.resolve-release.outputs.tag_sha }}
-        fetch-depth: 0
-        submodules: recursive
-    - name: Prepare build environment
-      run: bash scripts/setup-ci-env.sh
-    - name: Stage publishable crates
-      run: bash scripts/crates_ci_stage.sh
-    - name: Lib consumer smoke (Gate P)
-      run: bash consumers/lib-smoke/gate_p.sh
-    - name: Creator CLI smoke (Gate P)
-      run: bash consumers/creator-cli/smoke.sh
-    - name: User sim consumer (Gate P)
-      run: bash consumers/user-sim/gate_p.sh
     needs: resolve-release
-    permissions:
-      contents: read
+    uses: ./.github/workflows/gate-p-shards.yml
+    with:
+      source_sha: ${{ needs.resolve-release.outputs.tag_sha }}
+      workflow_sha: ${{ needs.resolve-release.outputs.workflow_sha }}
+      nightly_artifact_id: ${{ needs.resolve-release.outputs.artifact_id }}
+      manifest_sha256: ${{ needs.resolve-release.outputs.manifest_sha256 }}
   publish:
     runs-on: ubuntu-latest
     environment: release
@@ -79,6 +98,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        ref: ${{ needs.resolve-release.outputs.workflow_sha }}
         submodules: recursive
     - name: Preserve publish helper from workflow revision
       id: helper
@@ -90,6 +110,13 @@ jobs:
 
         echo "helper_sha=$helper_sha" >> "$GITHUB_OUTPUT"
         echo "Preserved publish helper from workflow revision: $helper_sha"
+    - name: Preserve qualification helper from workflow revision
+      shell: bash
+      run: |
+        test "$(git rev-parse HEAD)" = "${{ needs.resolve-release.outputs.workflow_sha }}"
+        mkdir -p "$RUNNER_TEMP/rlvgl-nightly-tools"
+        cp scripts/setup-ci-env.sh "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh"
+        chmod +x "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh"
     - name: Checkout frozen release source
       uses: actions/checkout@v4
       with:
@@ -103,15 +130,31 @@ jobs:
       run: |
         test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
         test -z "$(git status --porcelain)"
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.x
+    - name: Download immutable producer cohort
+      uses: actions/download-artifact@v4
+      with:
+        artifact-ids: ${{ needs.resolve-release.outputs.artifact_id }}
+        merge-multiple: true
+        path: ${{ runner.temp }}/rlvgl-nightly-cohort
+    - name: Verify newest-nightly release freshness before authentication
+      shell: bash
+      run: |
+        bash "$RUNNER_TEMP/rlvgl-nightly-tools/setup-ci-env.sh" freshness \
+          --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+          --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+          --expected-manifest-sha "${{ needs.resolve-release.outputs.manifest_sha256 }}" \
+          --source-sha "${{ needs.resolve-release.outputs.tag_sha }}" \
+          --workflow-sha "${{ needs.resolve-release.outputs.workflow_sha }}" \
+          --output-dir "$RUNNER_TEMP/rlvgl-nightly-freshness"
     - name: Install stable toolchain
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.x
     - name: Authenticate with crates.io
       id: crates_io_auth
       uses: rust-lang/crates-io-auth-action@v1

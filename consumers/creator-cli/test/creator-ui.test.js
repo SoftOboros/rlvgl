@@ -70,6 +70,7 @@ async function launch() {
     binaryPath: binaryPath(),
     automationHeadless: true,
     screen: SCREEN,
+    commandTimeoutMs: 15_000,
     cwd
   });
   return { session, cwd };

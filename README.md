@@ -11,11 +11,13 @@ rlvgl preserves the widget-based UI paradigm of LVGL while eliminating unsafe C-
 
 The C version of LVGL is included as a git submodule for reference and test vector extraction, but not linked or compiled into this library.
 
-## Current release status — 2026-10-13
+## Current release status — 2026-10-17
 
 Released **v0.2.7 / A2** remains the immutable source release. The next owned-bridge
 maintenance candidate is **Unreleased**: package allocations are `rlvgl` 0.2.8,
-`rlvgl-platform` 0.2.7 and `ratatui-rlvgl` 0.1.2; `rlvgl-core` remains 0.2.7.
+`rlvgl-api` 0.2.2, `rlvgl-core` 0.2.8, `rlvgl-platform` 0.2.7 and
+`ratatui-rlvgl` 0.1.2. These retain the accepted selective allocations; published
+core 0.2.7 remains part of the unchanged A2 release.
 These are candidate allocations, not a registry installation promise or a new
 release tag. Source release, package publication and family/hardware qualification
 have separate gates.
@@ -24,8 +26,9 @@ The candidate uses unmodified official Ratatui 0.30.2, its `ratatui-core` 0.1.2
 primitives and the RLVGL-owned bridge at `crates/ratatui-rlvgl`. Start with the
 [Unreleased maintenance guide](docs/releases/owned-bridge-maintenance.md) for the
 package matrix, bounded compatibility APIs, native snapshot flow and release
-checks, and the [dated family state](docs/releases/v0.2.7-successor-family-state-20261013.md)
-for remaining proof and decisions. Existing versioned examples and the
+checks. The [October 13 family snapshot](docs/releases/v0.2.7-successor-family-state-20261013.md)
+retains its historical allocations and evidence; use the current guide and
+owning amendments for subsequent changes and remaining gates. Existing versioned examples and the
 “What's New in 0.2.5” section below retain their historical context.
 
 ## Goals
@@ -263,6 +266,14 @@ MiniJinja templates can use the following filters:
   (`usart12` → `12`).
 - `af_alt` – render an alternate-function number for
   `into_alternate::<AF>()` (`7` → `<7>`).
+
+Per-peripheral BSP rendering supplies `has_c_ffi` when the output board directory
+already contains a concrete `c_ffi.rs`. The board module and PAC template use the
+same capability: supported boards retain feature-gated C delegation, while boards
+without that module keep the existing Rust register paths even when `c_hal` is
+enabled elsewhere in the crate. The generator preserves the existing FFI file and
+creates no replacement or stub. Split-core output checks its own directory;
+one-file PAC output does not delegate through a board module.
 
 Users may supply custom templates by pointing `--templates` at any
 directory; the filters above are always available.

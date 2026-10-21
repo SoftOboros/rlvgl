@@ -34,6 +34,24 @@ This initiative adds two gates and two harness layers:
 - Consumer Projects MUST use registry sources only — no `path`/`[patch]`
   into the workspace (INV-C2).
 
+## Gate P execution
+
+The three entry workflows (`crates-ci.yml`, `publish.yml`, and
+`publish-continue.yml`) call one reusable Gate P workflow. It resolves one
+official nightly cohort for the run, then runs full pre-commit and the 38
+release supplements before ordered staging. Staging still packages all 31
+crates in publish order. A run-scoped Actions artifact carries the original
+`.crate` archives and their source, workflow, nightly, order, size, and hash
+bindings to separate consumer jobs. Each consumer verifies the binding and
+extracts the complete packaged set locally; the final Gate P check requires
+every source, staging, and consumer job green and rechecks nightly freshness.
+Publication remains behind that aggregate check and its own pre-authentication
+freshness check.
+
+This job split is a CI capacity candidate. It does not establish that any
+individual shard fits a standard hosted runner: each requires a cold hosted
+disk check, and the builder image must be pinned and qualified separately.
+
 ## Documents
 
 | Doc | Status |

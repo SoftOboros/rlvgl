@@ -1,0 +1,52 @@
+# Candidate x86_64 Gate P image. Build and qualify before changing any workflow.
+# The seed is pinned only to retain the known rustup manager and cargo-binutils
+# executables; its preinstalled floating nightly and other layers are not copied.
+FROM docker.io/iraa/rlvgl@sha256:b1ccd0d452d3a471ef2940c147a789fbd293ece9d487708708c90ca95884a3bf AS rust-tools
+
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Preserve the current builder's native dependency set for the first comparison.
+# Package-level trimming is a separate, measured step.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates cargo clang cmake curl git openssh-client \
+    libclang-dev libfreetype6-dev libgtk-3-dev librlottie-dev libsdl2-dev \
+    libssl-dev libx11-dev libxext-dev libxrender1 llvm-dev \
+    gcc-arm-none-eabi binutils-arm-none-eabi zstd mold nano ninja-build \
+    pkg-config python3 python3-pip python3-venv sccache vim wget xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /requirements.txt
+RUN python3 -m venv /opt/venv \
+    && useradd -m -s /bin/bash rlvgl \
+    && install -d -o rlvgl -g rlvgl /opt/rust /opt/rust/cargo \
+       /opt/rust/rustup /opt/rlvgl /home/rlvgl/.ssh \
+    && install -d /home/ubuntu/.ssh \
+    && chown -R rlvgl:rlvgl /opt/venv
+
+# COPY --chown avoids the separate 1.04 GB recursive ownership copy-up in the
+# current image. This copies rustup proxies and cargo-binutils, but no toolchain.
+COPY --from=rust-tools --chown=rlvgl:rlvgl \
+    /opt/rust/cargo/bin/ /opt/rust/cargo/bin/
+
+# Keep Node and yarn for the existing playit/Creator/user-sim tests.
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+RUN npm install -g yarn
+
+ENV RUSTUP_HOME=/opt/rust/rustup \
+    CARGO_HOME=/opt/rust/cargo \
+    PATH=/opt/rust/cargo/bin:/opt/venv/bin:$PATH \
+    APP_HOME=/opt/rlvgl \
+    CARGO_INCREMENTAL=0 \
+    SCCACHE_S3_KEY_PREFIX=/rlvgl \
+    RUSTC_WRAPPER=/usr/bin/sccache
+
+# scripts/setup-ci-env.sh installs and verifies the selected official nightly
+# in a separate, job-scoped profile; the image must not select its own nightly.
+USER rlvgl
+WORKDIR /opt/rlvgl
+CMD ["bash"]

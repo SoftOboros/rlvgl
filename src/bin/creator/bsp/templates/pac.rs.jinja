@@ -168,7 +168,7 @@ use board::{Supply, Vos, DEFAULT_PWR_SUPPLY, DEFAULT_VOS};
 /// Enables GPIO clocks required by the generated board.
 {% endif %}
 pub fn enable_gpio_clocks(dp: &pac::Peripherals) {
-    {% if mod_name %}
+    {% if mod_name and has_c_ffi %}
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;
@@ -388,7 +388,7 @@ pub fn init_clocks(dp: &pac::Peripherals) {
 /// Configures pins using PAC registers.
 {% endif %}
 pub fn configure_pins_pac(dp: &pac::Peripherals) {
-    {% if mod_name %}
+    {% if mod_name and has_c_ffi %}
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;
@@ -564,12 +564,12 @@ pub fn configure_pins_pac(dp: &pac::Peripherals) {
     {%- if reg and field %}{% set pairs = pairs + [{"reg": reg, "field": field}] %}{% endif %}
 {%- endfor %}
 pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Peripherals) {
-    {% if mod_name %}
+    {% if mod_name and has_c_ffi %}
     #[cfg(feature = "c_hal")]
     unsafe { super::super::c_ffi::c_{{ mod_name }}_enable_peripherals(); }
     {% endif %}
 {% if pairs|length %}
-    {% if mod_name %}#[cfg(not(feature = "c_hal"))]{% endif %}
+    {% if mod_name and has_c_ffi %}#[cfg(not(feature = "c_hal"))]{% endif %}
     {
 {% if grouped_writes %}
 {%- for group in pairs | groupby("reg") %}
@@ -596,7 +596,7 @@ pub fn enable_peripherals({{ 'dp' if pairs|length else '_dp' }}: &pac::Periphera
 /// De-initializes board peripherals and clocks using PAC registers.
 {% endif %}
 pub fn deinit_board_pac(dp: &pac::Peripherals) {
-    {% if mod_name %}
+    {% if mod_name and has_c_ffi %}
     #[cfg(feature = "c_hal")]
     {
         let _ = dp;

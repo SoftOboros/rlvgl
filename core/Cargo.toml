@@ -1,6 +1,6 @@
 [package]
 name = "rlvgl-core"
-version = "0.2.7"
+version = "0.2.8"
 authors = ["Ira Abbott <ira@softobotos.com>"]
 edition = "2024"
 license = "MIT"

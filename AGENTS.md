@@ -191,6 +191,181 @@ hosted31+3, exact custody and protected adoption. Keep stable publisher/OIDC,
 manual continuation/no scheduled publishing, A2, parent pins, official Ratatui and all other guards.
 Stop for any new PCDN; this does not authorize release/tag/publication or pins.
 
+Owner-accepted PCDN-17 adds only the `FrontBuffer` to `FrontBuffer<'a>`
+headline spelling in platform/tests/ui/scanout_front_write.stderr under
+[CRATES-CI §15 amendment 0.1.16](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve E0599, the missing cpu_slice_mut prohibition, location 33:35 and the
+final inferred FrontBuffer<'_>; keep the fixture Rust, API and fourteen-case
+harness unchanged. The three PCDN-15 receiver-path notes remain the only other
+admitted snapshots. Retain the actual latest 10/14 failure OPEN, then freshly
+prove all fourteen and every existing source/prepublish/Linux/hosted31+3 guard
+on the immutable most-recent-nightly cohort. Record this owning amendment and
+mirror with only their unchanged-generator canonical projections in the normal
+protected source integration; no dated-result substitution or second authority
+waiver is admitted. Preserve A2, Ratatui, parent pins and all other guards.
+Stop for any new PCDN; no tag, publication, pin or phase closure is authorized.
+
+Owner-accepted PCDN-18 admits only [CRATES-CI §15 amendment 0.1.17](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve public OpcodeIter::Wire(ChunksExact) with one named, documented
+chunks_exact_to_as_chunks expectation at OpcodeList::iter; keep its production
+body, global -D warnings and unfulfilled-expectation detection unchanged.
+Allocate only rlvgl-api 0.2.2 and API_VERSION.patch 2. Preserve the three existing
+compatible dependency requirements and published core payload. Admit only the
+API manifest fingerprint leaf and local API version nodes in Cargo.lock,
+micropython/staticlib/Cargo.lock and the beetle-esp32p4-idf Rust component lock.
+Keep every other lock value/checksum and the other five governed locks exact.
+Add compatibility controls only to the existing api/tests/mpy_v1_golden.rs.
+Record owning amendment and mirror before implementation, then mechanically
+regenerate the same two canonical outputs. This is the twelve-path protected
+integration scope, without another authority waiver or dated-result substitute.
+Retain actual Clippy failure OPEN; require most-recent same-ref full source,
+prepublish, fourteen strict cases, publisher/cohort controls and clean Linux and
+hosted31+3 before protected adoption. Preserve 48/42 memberships, descriptors,
+targets, fonts, A2, unmodified official Ratatui, all other allocations and parent
+pins. No generic lint allowance, API redesign, additional nightly cleanup,
+release/tag/publication, hardware or phase claim follows. Stop for a new PCDN.
+
+Owner-accepted PCDN-19 admits only [CRATES-CI §15 amendment 0.1.18](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Use the const-safe slice pattern only in ResolvedObjectDispatch::target_view;
+preserve its public const signature, last cached view and exact empty panic.
+Introduce no lint allowance, expectation, language feature or compiler floor.
+Add controls only in the existing inline object test module and preserve all
+original tests; const-callability is not allocated Vec CTFE qualification.
+Allocate only the corrected future core payload as 0.2.8; retain published
+core 0.2.7/A2, API 0.2.2 and every other allocation and dependent minimum.
+Admit only the core manifest fingerprint at policy member13 and local core
+version nodes in root and IDF component locks; keep other values/checksums
+and the other six locks exact. Record this governing amendment/mirror before
+implementation, then regenerate only the unchanged-generator two canonical
+outputs. This is the exact nine-path protected integration boundary, without
+an authority waiver or dated-result substitution. Retain the actual Clippy
+failure OPEN; require fresh most-recent same-ref full source/prepublish,
+const/core/API controls, strict fourteen cases, publisher/cohort controls,
+clean Linux and hosted31+3, exact provenance and normal protected adoption.
+Preserve 48/42 policy, targets, shared receipts, Ratatui, fonts, A2, frozen
+623/13df sources/results, parent pins and all other guards. No tag, publication,
+parent adoption, hardware or phase claim follows. Stop for any new PCDN.
+
+Owner-accepted PCDN-20 admits only [CRATES-CI §15 amendment 0.1.19](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Replace exactly two fetch_update names with try_update in runtime-std/src/service.rs;
+preserve Relaxed/Relaxed, checked_add, prior-value/nonzero conversion, ownership,
+counter consumption, exhaustion, epochs, tickets, lifecycle and backpressure.
+Introduce no allowance, expectation, feature, fallback, API or test change.
+Accept the private-source API lower bound of Rust 1.95, not a verified whole-crate
+MSRV or public compiler floor; claim no older 1.90 compatibility. Preserve
+effective 0.1.15 daily newest-main and most-recent release qualification.
+Runtime stays 0.0.0/publish=false; no manifest, allocation, dependency, policy,
+target, shared fingerprint or lock change. Preserve all eight locks and 48/42.
+Record governing amendment/mirror before implementation and regenerate only the
+unchanged-generator two canonical projections: these plus service.rs are the
+exact five paths. Derive fresh owned source from frozen 5d755062 and use genuine
+normal protected integration without a second authority waiver or direct main.
+Run unchanged complete runtime tests, all thirteen native controls and headless
+owner coverage; direct MAX exhaustion tests remain unqualified, with equivalence
+supported by unchanged checked_add and genuine standard-library alias source.
+Require fresh most-recent same-ref full source/prepublish, core/API controls,
+all fourteen strict cases, Clippy, full precommit before PR, publisher/cohort,
+all-features docs and clean Linux/hosted31+3 with actual provenance and protected
+adoption. Preserve failed receipts, profiles, 5d/623/13df, A2, Ratatui, fonts,
+allocations, parent pins and every other guard. No tag, publication, parent,
+hardware or phase claim follows. Stop for any new PCDN.
+
+Owner-authorized PCDN-21 admits only [CRATES-CI §15 amendment 0.1.20](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+After recording this amendment/mirror and unchanged-generator canonical2 in a
+fresh derived checkout, admit one identical unfiltered lychee two-document retry
+with unchanged network/default status policy. Preserve all four failed A2 hrefs
+and old five-path WIP/seal; new governing text is the expressly admitted delta.
+Retain the four503 failure OPEN and require actual complete PASS. Accept no503,
+filter, ignore, cache substitution, href rewrite or narrowed diagnostic. Stop
+if the retry fails; no further automatic retry or recursive remediation. This
+disposition expires after its outcome and waives no source or release guard.
+Runtime postimage stays byte-exact; no code/test/manifest/version/dependency/
+policy/lock/workflow/target/pin or publisher-tool change is admitted. A possible
+publisher cause is read-only investigation, not new implementation authority.
+Only PASS permits genuine history and fresh most-recent same-ref full runtime,
+core/API/fourteen/Clippy/precommit/CLAUDE/allfeatures/publisher/cohort/Linux/
+hosted31+3/custody/freshness/protected-route sequence. Preserve all profiles,
+failed results, 5d/623/13df, A2, Ratatui, fonts, allocations and parent pins.
+No tag/publication/parent/hardware/live/phase claim follows. Stop for any new PCDN.
+
+Owner-accepted PCDN-34 admits only [CRATES-CI §15 amendment 0.1.21](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Adopt reviewed impl/method context in the three named DCA stderr snapshots;
+preserve E0382, existing diagnostic lines, positions, fixtures and harness.
+Record owning amendment/mirror and canonical two indexes: exactly seven paths.
+Preserve frozen67b; use a genuine successor and fresh source/profile admission.
+Run all fourteen negatives, then one full precommit from phase0 with the
+accepted process-local empty RUSTC_WRAPPER. Retain all guards, failed results,
+latest-nightly policy and open sccache repair. Preserve A2, Ratatui, versions,
+locks and parent pins. Stop for any new PCDN; no standing retry or release
+permission follows. Keep attempt-specific details in release evidence.
+
+Owner-accepted PCDN-40 admits only [CRATES-CI §15 amendment 0.1.22](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Make generated board-local optional C-FFI declarations and PAC calls agree with
+concrete supported bindings. Preserve H747 C-HAL behavior and native Rust
+initialization without bindings, including with crate-wide c_hal enabled.
+No ancestor inference, fake bindings, expanded C-HAL or formatting waiver.
+Bound code/tests to bsp_gen.rs and its existing inline tests, board_mod.rs.jinja
+and pac.rs.jinja; document the helper boundary in the existing README section.
+Record amendment/mirror before implementation and regenerate the unchanged
+canonical two indexes: exactly eight source paths. Admit only the already
+pinned tomli-w1.2.0 prerequisite in a bounded private Python context, preserving
+old interpreter/compiler profiles and defaults without whole-setup replay.
+Preserve frozen98bf and failed packaging evidence; use a genuine successor
+with fresh source/profile admission and all existing focused, full precommit,
+prepublish, clean Linux/hosted31+3 and protected adoption guards. Keep the MCU
+lookup and five H7 clock-source refusals reported/open; no defaults, skips,
+vendor-input or loop-failure changes. Preserve versions, locks, A2, Ratatui,
+parent/vendor pins, empty process-local wrapper and all remaining guards.
+Stop for any new PCDN; no standing retry, publication, tag, pin or phase claim.
+
+Owner-accepted PCDN-41 admits only [CRATES-CI §15 amendment 0.1.23](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Replace only the existing root README shared-file SHA at
+/workspaces/0/members/0/shared_files/0/sha256 in
+scripts/crates_ci_workspace_contexts.json with the exact reviewed PCDN-40
+postimage named in that amendment. Every other receipt byte/value and guard
+stays unchanged. Record amendment/mirror before adoption and regenerate the
+same unchanged-generator two indexes; the source boundary is nine paths.
+Resume PCDN-40 under all existing qualification and preservation requirements.
+No automatic refresh, new member/target, checker, lock, version or pin change
+is admitted. Preserve all prior evidence and stop for any new PCDN.
+
+Owner-accepted PCDN-43 admits only [CRATES-CI §15 amendment 0.1.24](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Preserve every declared stm32-* feature and exact dependency vector; add only
+missing discovered keys with empty vectors. If no addition is needed, leave
+Cargo.toml bytes untouched, including formatting/comments. Keep all other
+manifest data and c_hal/c_hal_cm4/stm32-h7 vectors exact; retained compatibility
+keys do not establish new board or C-HAL support. Bound helper/docs to
+tools/update_stm_bsp_features.py and focused temporary-fixture regressions to
+tools/test_update_stm_bsp_features.py. Record amendment/mirror before code and
+regenerate only the unchanged-generator two canonical indexes: exactly six
+paths. Keep the BSP manifest and member12 fingerprint named in the amendment,
+every other receipt, root48/native42 and strict raw P-MEMBER guard unchanged.
+No checksum refresh, generated manifest adoption, new feature admission or
+baseline ratchet follows. Preserve normal asset generation/full formatter,
+board-failure handling and open MCU/H7 refusals without skips or clock guesses.
+Preserve failed c593 and its evidence; use a genuine successor with every
+existing fresh same-ref latest-nightly, focused, full precommit/prepublish,
+Linux/hosted31+3, custody and protected adoption requirement. Preserve versions,
+locks, profiles, A2, official Ratatui and vendor/parent pins. Stop for new PCDN;
+no standing retry, release/tag/publication, parent/hardware or phase claim.
+
+Owner-accepted PCDN-44 admits only [CRATES-CI §15 amendment 0.1.25](docs/crates-ci/CRATES-CI-00-CONCEPTS.md).
+Align current README and owned-bridge maintenance guidance with accepted API
+0.2.2/core0.2.8 and retained root0.2.8/platform0.2.7/bridge0.1.2 allocations.
+Preserve core0.2.7/A2 as released history; distinguish the unchanged October13
+snapshot from current guidance. Derive actual publishing scope from the release
+baseline and full candidate diff; no three-package-only or registry claim.
+Admit only the root README shared-file checksum at policy member0, from8fa6
+to48d1 as fully specified by the owning amendment; every other byte/value and
+guard remains exact. Record amendment/mirror first and regenerate only the
+unchanged-generator canonical two indexes: exactly seven files including
+the two current docs and receipt. Verify versions, exact receipt delta,
+history, indexes and fresh unfiltered four-document links; retain inherited
+failures and existing dispositions. Preserve d946, all source/manifests/locks,
+allocations, profiles, A2, Ratatui and parent/vendor pins. The changed README
+still needs fresh exact-source full qualification and package/consumer proof
+through existing protected gates. Stop for new PCDN; no release or gate waiver.
+
 For changes touching publishable crates, also run the `/pre-publish` skill (or
 the phases listed in `CLAUDE.md` under "Pre-Publish Validation") to verify
 clippy, doc tests, `no_std` cross-compilation, and `cargo package` dry runs all

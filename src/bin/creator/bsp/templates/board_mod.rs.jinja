@@ -8,8 +8,10 @@ pub mod hal;
 #[cfg(feature = "pac")]
 pub mod pac;
 {%- endif %}
+{%- if has_c_ffi %}
 #[cfg(feature = "c_hal")]
 pub mod c_ffi;
+{%- endif %}
 /// Board-level user defaults (power, etc.).
 pub mod board;
 {%- if summary %}

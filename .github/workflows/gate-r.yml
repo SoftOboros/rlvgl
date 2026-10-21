@@ -50,8 +50,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Resolve immutable newest nightly cohort
+        id: nightly
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh resolve \
+            --output-dir "$RUNNER_TEMP/rlvgl-nightly-cohort" \
+            --source-sha "$(git rev-parse HEAD)" \
+            --workflow-sha "$(git rev-parse HEAD)"
+      - name: Retain immutable nightly cohort
+        id: nightly_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-cohort-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/rlvgl-nightly-cohort/channel-rust-nightly.toml
+            ${{ runner.temp }}/rlvgl-nightly-cohort/cohort.json
+          if-no-files-found: error
       - name: Prepare build environment
-        run: bash scripts/setup-ci-env.sh
+        shell: bash
+        run: |
+          bash scripts/setup-ci-env.sh prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ steps.nightly.outputs.manifest_sha256 }}" \
+            --source-sha "${{ steps.nightly.outputs.source_sha }}" \
+            --workflow-sha "${{ steps.nightly.outputs.workflow_sha }}"
       # No staging step: Gate R consumes real crates.io. GATE=r removes
       # any [patch] config so nothing shadows the registry.
       - name: Lib consumer (Gate R, real crates.io)

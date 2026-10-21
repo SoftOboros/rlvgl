@@ -889,7 +889,7 @@ impl<Request, Output, Fault> NativeService<Request, Output, Fault> {
         let Some(request_id) = self
             .shared
             .next_request_id
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                 current.checked_add(1)
             })
             .ok()
@@ -1726,7 +1726,7 @@ fn publish_with_permit<Output, Fault>(
 
 fn next_epoch() -> Option<ServiceEpoch> {
     NEXT_SERVICE_EPOCH
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
             current.checked_add(1)
         })
         .ok()

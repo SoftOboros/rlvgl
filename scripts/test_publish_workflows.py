@@ -37,18 +37,17 @@ def init_git(path):
 class PublishWorkflows(unittest.TestCase):
     def test_frozen_graph_and_authentication_boundary(self):
         recovery = workflow('publish-continue.yml')
+        shards = workflow('gate-p-shards.yml')
         self.assertEqual(set(triggers(recovery)), {'workflow_dispatch'})
         jobs = recovery['jobs']
         self.assertEqual(set(jobs['publish']['needs']), {'resolve-release', 'gate-p'})
         self.assertNotIn('if', jobs['publish'])  # Default successful-needs guard.
         self.assertNotIn('continue-on-error', jobs['gate-p'])
         ref = '${{ needs.resolve-release.outputs.tag_sha }}'
-        for job in ['gate-p', 'publish']:
-            checkouts = [s for s in jobs[job]['steps'] if s.get('uses', '').startswith('actions/checkout@')]
-            self.assertEqual(checkouts[-1]['with']['ref'], ref)
-            self.assertEqual(checkouts[-1]['with']['submodules'], 'recursive')
-        for job in ['resolve-release', 'gate-p']:
-            self.assertEqual(jobs[job]['permissions'], {'contents': 'read'})
+        self.assertEqual(jobs['gate-p']['with']['source_sha'], ref)
+        self.assertEqual(jobs['gate-p']['with']['workflow_sha'], '${{ needs.resolve-release.outputs.workflow_sha }}')
+        self.assertEqual(jobs['gate-p']['uses'], './.github/workflows/gate-p-shards.yml')
+        self.assertEqual(jobs['resolve-release']['permissions'], {'contents': 'read'})
         publish = jobs['publish']
         self.assertEqual(publish['environment'], 'release')
         self.assertEqual(publish['permissions'], {'contents': 'read', 'id-token': 'write'})
@@ -56,18 +55,41 @@ class PublishWorkflows(unittest.TestCase):
         names = [s.get('name') for s in steps]
         self.assertLess(names.index('Verify frozen release source'), names.index('Authenticate with crates.io'))
         self.assertLess(names.index('Preserve publish helper from workflow revision'), names.index('Checkout frozen release source'))
-        required = {
-            'bash consumers/lib-smoke/gate_p.sh',
-            'bash consumers/creator-cli/smoke.sh',
-            'bash consumers/user-sim/gate_p.sh',
-        }
-        self.assertTrue(required.issubset({s.get('run') for s in jobs['gate-p']['steps']}))
+        shard_jobs = shards['jobs']
+        self.assertEqual(set(shard_jobs['gate-p']['needs']),
+                         {'precommit', 'supplements', 'stage', 'lib', 'creator', 'user-sim'})
+        self.assertNotIn('continue-on-error', shard_jobs['gate-p'])
+        self.assertNotIn('if', shard_jobs['gate-p'])  # Failed/skipped shard skips aggregate.
+        self.assertEqual(set(shard_jobs['stage']['needs']), {'precommit', 'supplements'})
+        self.assertTrue(any('setup-ci-env.sh freshness' in s.get('run', '')
+                            for s in shard_jobs['gate-p']['steps']))
+        for job, command in [('lib', 'bash consumers/lib-smoke/gate_p.sh'),
+                             ('creator', 'bash consumers/creator-cli/smoke.sh'),
+                             ('user-sim', 'bash consumers/user-sim/gate_p.sh')]:
+            self.assertEqual(shard_jobs[job]['needs'], 'stage')
+            self.assertIn(command, [s.get('run') for s in shard_jobs[job]['steps']])
+        for name in ['precommit', 'supplements', 'stage', 'lib', 'creator', 'user-sim']:
+            steps = shard_jobs[name]['steps']
+            checkouts = [s for s in steps if s.get('uses', '').startswith('actions/checkout@')]
+            self.assertEqual(checkouts[-1]['with']['ref'], '${{ inputs.source_sha }}')
+            self.assertEqual(checkouts[-1]['with']['submodules'], 'recursive')
+            self.assertTrue(any('setup-ci-env.sh" prepare' in s.get('run', '') for s in steps))
+        precommit = '\n'.join(s.get('run', '') for s in shard_jobs['precommit']['steps'])
+        self.assertIn('cargo fmt --all -- --check', precommit)
+        self.assertIn('bash scripts/pre-commit.sh', precommit)
+        supplements = (ROOT / 'scripts/gate_p_supplements.sh').read_text()
+        self.assertEqual(supplements.count('cargo '), 38)
+        self.assertIn('RUSTDOCFLAGS="--cfg docsrs --cfg nightly" cargo doc --all-features --no-deps', supplements)
         primary = workflow('publish.yml')
         self.assertNotIn('schedule', triggers(primary))
-        self.assertEqual(primary['jobs']['publish']['needs'], 'gate-p')
-        for job in ['gate-p', 'publish']:
-            checkout = next(s for s in primary['jobs'][job]['steps'] if s.get('uses', '').startswith('actions/checkout@'))
-            self.assertEqual(checkout['with']['ref'], '${{ github.sha }}')
+        self.assertEqual(set(primary['jobs']['publish']['needs']), {'resolve-release', 'gate-p'})
+        self.assertNotIn('always()', primary['jobs']['publish'].get('if', ''))
+        self.assertEqual(primary['jobs']['gate-p']['with']['source_sha'],
+                         '${{ needs.resolve-release.outputs.source_sha }}')
+        checkout = next(s for s in primary['jobs']['publish']['steps'] if s.get('uses', '').startswith('actions/checkout@'))
+        self.assertEqual(checkout['with']['ref'], '${{ github.sha }}')
+        crates_ci = workflow('crates-ci.yml')
+        self.assertEqual(crates_ci['jobs']['gate-p']['uses'], './.github/workflows/gate-p-shards.yml')
         registry = triggers(workflow('gate-r.yml'))
         self.assertEqual(registry['schedule'], [{'cron': '30 16 * * *'}])
         self.assertEqual(set(registry['workflow_run']['workflows']), {'Publish', 'Publish Continue'})
