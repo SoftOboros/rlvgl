@@ -1,0 +1,404 @@
+# Reusable run-scoped Gate P. Every job binds the same source and newest-nightly
+# cohort; the final job is the only successful Gate P result.
+name: Gate P shards
+'on':
+  workflow_call:
+    inputs:
+      source_sha: {required: true, type: string}
+      workflow_sha: {required: true, type: string}
+      nightly_artifact_id: {required: true, type: string}
+      manifest_sha256: {required: true, type: string}
+
+permissions:
+  contents: read
+
+jobs:
+  precommit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Run full pre-commit
+        shell: bash
+        run: |
+          cargo fmt --all -- --check
+          bash scripts/pre-commit.sh
+
+  supplements:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Run exact release supplements
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/gate_p_supplements.sh"
+
+  stage:
+    needs: [precommit, supplements]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    outputs:
+      artifact_id: ${{ steps.stage_artifact.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Stage all 31 crates in publish order
+        shell: bash
+        run: |
+          bash scripts/crates_ci_stage.sh
+      - name: Bind and retain original package archives
+        shell: bash
+        run: |
+          python3 "$RUNNER_TEMP/rlvgl-gate-tools/gate_p_stage_artifact.py" pack \
+            --stage target/crates-ci --packages target/package \
+            --output "$RUNNER_TEMP/rlvgl-stage-artifact" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}" \
+            --manifest-sha "${{ inputs.manifest_sha256 }}"
+      - name: Upload immutable package set
+        id: stage_artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-p-crates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/rlvgl-stage-artifact/
+          if-no-files-found: error
+
+  lib:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Download immutable package set
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.stage.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-stage-artifact
+      - name: Verify binding and restore extracted staged packages
+        shell: bash
+        run: |
+          python3 "$RUNNER_TEMP/rlvgl-gate-tools/gate_p_stage_artifact.py" restore \
+            --stage target/crates-ci \
+            --artifact "$RUNNER_TEMP/rlvgl-stage-artifact" \
+            --publisher scripts/publish_changed.sh \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}" \
+            --manifest-sha "${{ inputs.manifest_sha256 }}"
+      - name: Lib consumer smoke (Gate P)
+        shell: bash
+        run: bash consumers/lib-smoke/gate_p.sh
+
+  creator:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Download immutable package set
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.stage.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-stage-artifact
+      - name: Verify binding and restore extracted staged packages
+        shell: bash
+        run: |
+          python3 "$RUNNER_TEMP/rlvgl-gate-tools/gate_p_stage_artifact.py" restore \
+            --stage target/crates-ci \
+            --artifact "$RUNNER_TEMP/rlvgl-stage-artifact" \
+            --publisher scripts/publish_changed.sh \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}" \
+            --manifest-sha "${{ inputs.manifest_sha256 }}"
+      - name: Creator CLI smoke (Gate P)
+        shell: bash
+        run: bash consumers/creator-cli/smoke.sh
+
+  user-sim:
+    needs: stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: docker.io/iraa/rlvgl:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - name: Preserve qualification helpers from workflow revision
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          mkdir -p "$RUNNER_TEMP/rlvgl-gate-tools"
+          cp scripts/setup-ci-env.sh scripts/gate_p_stage_artifact.py scripts/gate_p_supplements.sh "$RUNNER_TEMP/rlvgl-gate-tools/"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+      - name: Verify frozen source and download cohort
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_sha }}"
+          test -z "$(git status --porcelain)"
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Prepare the one immutable nightly cohort
+        shell: bash
+        run: |
+          bash "$RUNNER_TEMP/rlvgl-gate-tools/setup-ci-env.sh" prepare \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}"
+      - name: Record per-job disk baseline
+        shell: bash
+        run: df -h . "$RUNNER_TEMP"
+      - name: Download immutable package set
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.stage.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-stage-artifact
+      - name: Verify binding and restore extracted staged packages
+        shell: bash
+        run: |
+          python3 "$RUNNER_TEMP/rlvgl-gate-tools/gate_p_stage_artifact.py" restore \
+            --stage target/crates-ci \
+            --artifact "$RUNNER_TEMP/rlvgl-stage-artifact" \
+            --publisher scripts/publish_changed.sh \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}" \
+            --manifest-sha "${{ inputs.manifest_sha256 }}"
+      - name: User sim consumer (Gate P)
+        shell: bash
+        run: bash consumers/user-sim/gate_p.sh
+
+  gate-p:
+    needs: [precommit, supplements, stage, lib, creator, user-sim]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Gate P shard green
+        shell: bash
+        run: |
+          test '${{ needs.precommit.result }}' = success
+          test '${{ needs.supplements.result }}' = success
+          test '${{ needs.stage.result }}' = success
+          test '${{ needs.lib.result }}' = success
+          test '${{ needs.creator.result }}' = success
+          test '${{ needs.user-sim.result }}' = success
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.workflow_sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.nightly_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/rlvgl-nightly-cohort
+      - name: Require newest nightly at Gate P completion
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.workflow_sha }}"
+          bash scripts/setup-ci-env.sh freshness \
+            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
+            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}" \
+            --source-sha "${{ inputs.source_sha }}" \
+            --workflow-sha "${{ inputs.workflow_sha }}" \
+            --output-dir "$RUNNER_TEMP/rlvgl-gate-freshness"

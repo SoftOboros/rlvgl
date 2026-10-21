@@ -1,14 +1,10 @@
-# CRATES-CI-01: Gate P — package all publishable crates in publish order from a
-# clean tree, then smoke-test consumers against the staged packages.
+# CRATES-CI-01: Gate P — full source checks, ordered package staging, and
+# consumer checks share one immutable nightly cohort through the reusable gate.
 # Governed by docs/crates-ci/CRATES-CI-00-CONCEPTS.md §5 (gate topology) and
 # §12 (CRATES-CI-01 acceptance).
 #
-# Conventions mirrored from ci.yml: ubuntu-latest runner, the
-# docker.io/iraa/rlvgl:latest container (which bakes in the Rust toolchain and
-# the system deps used by the workspace, creator-e2e, chipdb, and boards jobs),
-# and scripts/setup-ci-env.sh for environment prep. ci.yml defines no
-# actions/cache steps — the container image is the cache — so none is added
-# here either.
+# The reusable workflow owns the runner image and per-job setup. Each shard
+# remains subject to a cold hosted disk-fit check before release qualification.
 name: crates-ci (Gate P)
 
 on:
@@ -21,11 +17,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  gate-p:
+  resolve-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    container:
-      image: docker.io/iraa/rlvgl:latest
+    outputs:
+      source_sha: ${{ steps.nightly.outputs.source_sha }}
+      workflow_sha: ${{ steps.nightly.outputs.workflow_sha }}
+      manifest_sha256: ${{ steps.nightly.outputs.manifest_sha256 }}
+      artifact_id: ${{ steps.nightly_artifact.outputs.artifact-id }}
 
     steps:
       - uses: actions/checkout@v4
@@ -50,32 +48,11 @@ jobs:
             ${{ runner.temp }}/rlvgl-nightly-cohort/channel-rust-nightly.toml
             ${{ runner.temp }}/rlvgl-nightly-cohort/cohort.json
           if-no-files-found: error
-      - name: Prepare build environment
-        shell: bash
-        run: |
-          bash scripts/setup-ci-env.sh prepare \
-            --cohort "$RUNNER_TEMP/rlvgl-nightly-cohort/cohort.json" \
-            --manifest "$RUNNER_TEMP/rlvgl-nightly-cohort/channel-rust-nightly.toml" \
-            --expected-manifest-sha "${{ steps.nightly.outputs.manifest_sha256 }}" \
-            --source-sha "${{ steps.nightly.outputs.source_sha }}" \
-            --workflow-sha "${{ steps.nightly.outputs.workflow_sha }}"
-      # Stages every publishable crate (ordered_crates in
-      # scripts/publish_changed.sh) in publish order from a clean tree;
-      # runs scripts/stm32_afdb_pipeline.sh and scripts/gen_ioc_bsps.sh itself
-      # for the two asset-bearing crates (mirroring publish), extracts packages
-      # to target/crates-ci/staged/, and emits target/crates-ci/patch-config.toml.
-      - name: Stage publishable crates
-        run: bash scripts/crates_ci_stage.sh
-      # Builds + runs a library consumer against the staged packages.
-      - name: Lib consumer smoke (Gate P)
-        run: bash consumers/lib-smoke/gate_p.sh
-      # Builds the rlvgl-creator bin (--features creator) inside the staged
-      # rlvgl package and runs a CLI round-trip.
-      - name: Creator CLI smoke (Gate P)
-        run: bash consumers/creator-cli/smoke.sh
-      # CRATES-CI-02: builds the user-sim consumer (custom simulator per
-      # docs/CUSTOM-SIMULATOR.md from packaged crates), runs the in-binary
-      # golden-PNG check (INV-C4) and the playit/node automation test
-      # (INV-C7). Requires node; the script fails loudly if it is absent.
-      - name: User sim consumer (Gate P)
-        run: bash consumers/user-sim/gate_p.sh
+  gate-p:
+    needs: resolve-release
+    uses: ./.github/workflows/gate-p-shards.yml
+    with:
+      source_sha: ${{ needs.resolve-release.outputs.source_sha }}
+      workflow_sha: ${{ needs.resolve-release.outputs.workflow_sha }}
+      nightly_artifact_id: ${{ needs.resolve-release.outputs.artifact_id }}
+      manifest_sha256: ${{ needs.resolve-release.outputs.manifest_sha256 }}

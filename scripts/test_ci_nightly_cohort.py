@@ -369,6 +369,9 @@ class NightlyWorkflowTests(unittest.TestCase):
         for name in ("ci", "crates-ci", "creator-e2e", "publish", "publish-continue", "gate-r"):
             with self.subTest(workflow=name):
                 document = load_workflow((ROOT / ".github/workflows" / (name + ".yml")).read_text())
+                reusable = name in ("crates-ci", "publish", "publish-continue")
+                qualification = (load_workflow((ROOT / ".github/workflows/gate-p-shards.yml").read_text())
+                                 if reusable else document)
                 calls = []
                 for job_id, job in document["jobs"].items():
                     for index, step in enumerate(job.get("steps", [])):
@@ -378,6 +381,19 @@ class NightlyWorkflowTests(unittest.TestCase):
                 resolvers = [c for c in calls if c[0] == "resolve"]
                 prepares = [c for c in calls if c[0] == "prepare"]
                 self.assertEqual(len(resolvers), 1, "Resolve latest once per workflow")
+                if reusable:
+                    gate = document["jobs"]["gate-p"]
+                    self.assertEqual(gate["uses"], "./.github/workflows/gate-p-shards.yml")
+                    self.assertEqual(gate["needs"], resolvers[0][1])
+                    self.assertIn("manifest_sha256", gate["with"])
+                    self.assertIn("nightly_artifact_id", gate["with"])
+                    for job in qualification["jobs"].values():
+                        for index, step in enumerate(job.get("steps", [])):
+                            text = step.get("run", "")
+                            for match in invoke.finditer(text):
+                                self.assertNotEqual(match[1], "resolve")
+                                calls.append((match[1], "shard", index, text))
+                    prepares = [c for c in calls if c[0] == "prepare"]
                 self.assertTrue(prepares, "Actual qualification consumers must prepare explicit cohort")
                 producer = resolvers[0]
                 for mode, job_id, index, text in calls:
@@ -387,6 +403,8 @@ class NightlyWorkflowTests(unittest.TestCase):
                         for option in ("--cohort", "--manifest", "--expected-manifest-sha"):
                             self.assertIn(option, text)
                     if mode == "prepare":
+                        if reusable and job_id == "shard":
+                            continue  # Checkout/prepare order is checked per shard below.
                         preceding_checkouts = [step for step in document["jobs"][job_id]["steps"][:index]
                                                if step.get("uses", "").startswith("actions/checkout@")]
                         self.assertTrue(preceding_checkouts,
@@ -399,6 +417,14 @@ class NightlyWorkflowTests(unittest.TestCase):
                             needs = document["jobs"][job_id].get("needs", [])
                             needs = [needs] if isinstance(needs, str) else needs
                             self.assertIn(producer[1], needs)
+                if reusable:
+                    for job_id in ("precommit", "supplements", "stage", "lib", "creator", "user-sim"):
+                        steps = qualification["jobs"][job_id]["steps"]
+                        prepare = next(i for i, step in enumerate(steps)
+                                       if re.search(r"setup-ci-env\.sh[\"']?\s+prepare\b", step.get("run", "")))
+                        checkouts = [step for step in steps[:prepare]
+                                     if step.get("uses", "").startswith("actions/checkout@")]
+                        self.assertEqual(checkouts[-1]["with"].get("submodules"), "recursive")
                 self.assertNotIn("RUSTUP_TOOLCHAIN", document.get("env", {}))
                 if name in ("publish", "publish-continue"):
                     triggers = document.get("on", document.get(True))
@@ -427,7 +453,7 @@ class NightlyWorkflowTests(unittest.TestCase):
         # is explicit, even for one ID. Prepare consumes the two flat files.
         for name in ("ci", "publish", "publish-continue"):
             document = load_workflow((ROOT / ".github/workflows" / (name + ".yml")).read_text())
-            producer = {"ci": "nightly-cohort", "publish": "gate-p",
+            producer = {"ci": "nightly-cohort", "publish": "resolve-release",
                         "publish-continue": "resolve-release"}[name]
             downloads = [step for job in document["jobs"].values()
                          for step in job.get("steps", [])
@@ -455,20 +481,18 @@ class NightlyWorkflowTests(unittest.TestCase):
                 if line.startswith(("RUSTFLAGS=", "RLVGL_LINT_STRICT=")):
                     missing.append(line)
         self.assertGreater(len(missing), 30)
+        shards = load_workflow((ROOT / ".github/workflows/gate-p-shards.yml").read_text())["jobs"]
         for name in ("publish", "publish-continue"):
             document = load_workflow((ROOT / ".github/workflows" / (name + ".yml")).read_text())
-            steps = document["jobs"]["gate-p"]["steps"]
-            prepares = [i for i, step in enumerate(steps)
-                        if re.search(r"setup-ci-env\.sh[\"']?\s+prepare\b", step.get("run", ""))]
-            stage = next(i for i, step in enumerate(steps)
-                         if step.get("run") == "bash scripts/crates_ci_stage.sh")
-            guards = [(i, step["run"]) for i, step in enumerate(steps)
-                      if "bash scripts/pre-commit.sh" in step.get("run", "")]
-            self.assertEqual(len(prepares), 1)
-            self.assertEqual(len(guards), 1)
-            index, body = guards[0]
-            self.assertLess(prepares[0], index)
-            self.assertLess(index, stage)
+            self.assertEqual(document["jobs"]["gate-p"]["uses"],
+                             "./.github/workflows/gate-p-shards.yml")
+            self.assertEqual(set(shards["stage"]["needs"]), {"precommit", "supplements"})
+            self.assertEqual(set(shards["gate-p"]["needs"]),
+                             {"precommit", "supplements", "stage", "lib", "creator", "user-sim"})
+            self.assertTrue(any(step.get("run", "").strip() == "bash scripts/crates_ci_stage.sh"
+                                for step in shards["stage"]["steps"]))
+            body = "\n".join(step.get("run", "") for step in shards["precommit"]["steps"])
+            body += "\n" + (ROOT / "scripts/gate_p_supplements.sh").read_text()
             commands = {line.strip() for line in body.splitlines()
                         if line.strip() and not line.lstrip().startswith("#")}
             self.assertTrue(set(missing) <= commands)
