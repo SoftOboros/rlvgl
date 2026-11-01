@@ -205,8 +205,7 @@ impl ButtonMatrix {
         let mut current_row: Vec<ButtonMatrixButton> = Vec::new();
         for &entry in map {
             if entry == "\n" {
-                self.rows.push(current_row);
-                current_row = Vec::new();
+                self.rows.push(core::mem::take(&mut current_row));
             } else {
                 current_row.push(ButtonMatrixButton::new(entry));
             }
